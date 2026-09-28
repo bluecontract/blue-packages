@@ -21,6 +21,8 @@ Blue Python reader to validate those identities, definition closure and source l
 That command needs Python 3.13+ and the Blue Python library.
 
 For a source change, also run the affected package's source/rebuild and acceptance
+checks. Native protocol types must declare their own rules reference; see
+[specification links](specification-links.md) for the metadata model and regression
 checks. For example, using that same interpreter:
 
 ```sh

@@ -26,7 +26,7 @@ def setup_publisher():
 
 def compile_package(refresh_lock=False):
     setup_publisher()
-    from package_core import build,wire,Language,Repository,sha,source,read_package,require
+    from package_core import build,wire,Language,Repository,sha,source,read_package,require,current_ledger
     from blue_language.physical import PhysicalCache
     config=source((ROOT/'blue-package.yaml').read_bytes())
     packages={}
@@ -41,7 +41,7 @@ def compile_package(refresh_lock=False):
         require(pins==json.loads((ROOT/'blue-package.lock.json').read_text()),
                 'Dependency lock mismatch; refresh is an explicit authoring action')
     with tempfile.TemporaryDirectory(prefix='blue-time-build-') as tmp,PhysicalCache(65536).scope():
-        stage=Path(tmp)
+        stage=Path(tmp).resolve()
         names={config['readme'],config['protocol']['rules'],'spec/frozen.json',*config.get('files',[])}
         names.update(row['path'] for row in config['exports'])
         for name in names:
@@ -51,6 +51,7 @@ def compile_package(refresh_lock=False):
         for prefix,entry in config['imports'].items():
             name='inputs/'+prefix+'.bluepkg';(stage/name).write_bytes(packages[prefix].archive)
             entry['path']=name;stage_pins['imports'][prefix]['path']=name
+        current_ledger(stage)
         language=Language(core_contracts=False)
         for prefix,p in packages.items():
             language.enable_repository(Repository.from_payload('import:'+prefix,
@@ -59,7 +60,8 @@ def compile_package(refresh_lock=False):
         language.publish_document(rules);aliases={}
         for row in config['exports']:
             alias=config['namespace']+'/'+row['name'];raw=source((stage/row['path']).read_bytes())
-            raw['specification']={'blueId':rules.blue_id}
+            require(raw.get('specification') == {'blueId':rules.blue_id},
+                    row['path']+': specification must explicitly reference the protocol rules Text BlueId')
             doc=language.admit_definition(wire(raw).decode(),format='json');language.publish_document(doc)
             language.aliases[alias]=doc.blue_id;aliases[alias]=doc.blue_id
         repository=Repository.from_payload(config['name'],aliases,language.provider.snapshot())

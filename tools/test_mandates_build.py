@@ -86,4 +86,20 @@ class LockedBuild(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'already exists'):
             self.run_command('candidate','--output',str(destination),'--revision','another','--version','0.1.0-preview.4')
 
+    def test_08_missing_specification_is_rejected_without_publishing(self):
+        p=self.project/'types/operation-grant.blue'
+        raw=builder.source(p.read_bytes());del raw['specification'];p.write_bytes(builder.wire(raw))
+        before=self.state()
+        with self.assertRaisesRegex(ValueError,'operation-grant.blue: specification must explicitly reference'):
+            self.run_command('build')
+        self.assertEqual(self.state(),before)
+    def test_09_protocol_descriptor_cannot_replace_rules_reference(self):
+        p=self.project/'types/operation-grant.blue';raw=builder.source(p.read_bytes())
+        manifest=json.loads((self.project/'dist/package.json').read_text())
+        raw['specification']={'blueId':manifest['protocol']};p.write_bytes(builder.wire(raw))
+        before=self.state()
+        with self.assertRaisesRegex(ValueError,'operation-grant.blue: specification must explicitly reference'):
+            self.run_command('check')
+        self.assertEqual(self.state(),before)
+
 if __name__=='__main__':unittest.main(verbosity=2)

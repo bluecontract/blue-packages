@@ -26,7 +26,7 @@ bootstrap.WORKSPACE = Path(_standard.name)
 bootstrap.ROOT = ROOT / 'blue-contracts'
 bootstrap.LOCK = {'blue': {'archiveSha256': json.loads((ROOT / 'blue-mandates/provenance/import.json').read_text())['sha256']}}
 sys.modules['bootstrap'] = bootstrap
-from package_core import build, wire, Language, Repository, sha, source, verify_bytes, read_package, require
+from package_core import build, wire, Language, Repository, sha, source, verify_bytes, read_package, require, current_ledger
 from blue_language.physical import PhysicalCache
 
 
@@ -64,6 +64,10 @@ def compile_locked(project, *, revision='shared-mandates-20260927-2', version=No
             (stage/path).write_bytes(dependencies[prefix].archive)
             entry['path']=path
             stage_pins['imports'][prefix]['path']=path
+        if version:
+            config['version']=version
+            (stage/'spec/frozen.json').write_bytes(wire({config['protocol']['rules']:sha((stage/config['protocol']['rules']).read_bytes())}))
+        current_ledger(stage)
         language=Language(core_contracts=False)
         for prefix, dependency in dependencies.items():
             language.enable_repository(Repository.from_payload('import:'+prefix,
@@ -73,16 +77,15 @@ def compile_locked(project, *, revision='shared-mandates-20260927-2', version=No
         aliases={}
         for entry in config['exports']:
             alias=config['namespace']+'/'+entry['name']
-            raw=source((stage/entry['path']).read_bytes());raw['specification']={'blueId':rules.blue_id}
+            raw=source((stage/entry['path']).read_bytes())
+            require(raw.get('specification') == {'blueId':rules.blue_id},
+                    entry['path']+': specification must explicitly reference the protocol rules Text BlueId')
             doc=language.admit_definition(wire(raw).decode(),format='json')
             language.publish_document(doc);language.aliases[alias]=doc.blue_id;aliases[alias]=doc.blue_id
         repository=Repository.from_payload(config['name'],aliases,language.provider.snapshot())
         data=(repository._json+'\n').encode();rel='inputs/authored.repository.json';(stage/rel).write_bytes(data)
         config['inputs']=[{'path':rel,'sha256':sha(data),'identity':repository.identity}]
         config['exports']=[{'name':e['name'],'fromInput':rel,'inputAlias':config['namespace']+'/'+e['name']} for e in config['exports']]
-        if version:
-            config['version']=version
-            (stage/'spec/frozen.json').write_bytes(wire({config['protocol']['rules']:sha((stage/config['protocol']['rules']).read_bytes())}))
         (stage/'blue-package.yaml').write_bytes(wire(config))
         (stage/'blue-package.lock.json').write_bytes(wire(stage_pins))
         package=build(stage,revision=revision,source_url='')
