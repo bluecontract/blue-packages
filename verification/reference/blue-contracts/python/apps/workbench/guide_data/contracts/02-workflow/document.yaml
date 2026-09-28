@@ -1,0 +1,41 @@
+total: 0
+contracts:
+  input:
+    type: Contracts/External Channel
+  calculate:
+    type: Contracts/Sequential Workflow Operation
+    channel: input
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $let:
+          name: amount
+          expr:
+            $binding: call/request/amount
+      - $return:
+          $add:
+          - $var: amount
+          - $const: fee
+      name: calculate
+      constants:
+        fee: 2
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /total
+        val:
+          $steps: calculate
+    - type: Contracts/Trigger Event
+      event:
+        kind: calculated
+        total:
+          $document: /total
+        at:
+          $binding: timestamp
+        reference:
+          $event: /reference
+    request:
+      amount:
+        type: Integer
+        schema:
+          required: true

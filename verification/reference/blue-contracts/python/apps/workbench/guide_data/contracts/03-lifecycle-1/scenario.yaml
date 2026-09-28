@@ -1,0 +1,73 @@
+id: 03-lifecycle-1
+document:
+  type: Tutorial/StartCheck
+  x: 1
+  terminated: false
+inputs: []
+expectInitialization:
+  /x: 1
+  /terminated: true
+expectInitializationEvents:
+- kind: check
+- kind: stop
+expectTerminated: true
+definitions:
+  Tutorial/StartCheck:
+    name: StartCheck
+    x:
+      type: Integer
+      schema:
+        required: true
+    terminated:
+      type: Boolean
+      schema:
+        required: true
+    contracts:
+      lifecycle:
+        type: Contracts/Lifecycle Event Channel
+      localEvents:
+        type: Contracts/Triggered Event Channel
+      onInitialize:
+        type: Contracts/Sequential Workflow
+        channel: lifecycle
+        steps:
+        - type: Contracts/Trigger Event
+          event:
+            kind: check
+        event:
+          type: Contracts/Document Processing Initiated
+      checkValue:
+        type: Contracts/Sequential Workflow
+        channel: localEvents
+        steps:
+        - type: Contracts/Compute
+          do:
+          - $if:
+              cond:
+                $eq:
+                - $document: /x
+                - 1
+              then:
+              - $appendEvent:
+                  kind: stop
+        event:
+          kind: check
+      stop:
+        type: Contracts/Sequential Workflow
+        channel: localEvents
+        steps:
+        - type: Contracts/Terminate Processing
+          cause: x-is-one
+        event:
+          kind: stop
+      onTerminate:
+        type: Contracts/Sequential Workflow
+        channel: lifecycle
+        steps:
+        - type: Contracts/Update Document
+          changeset:
+          - op: replace
+            path: /terminated
+            val: true
+        event:
+          type: Contracts/Document Processing Terminated

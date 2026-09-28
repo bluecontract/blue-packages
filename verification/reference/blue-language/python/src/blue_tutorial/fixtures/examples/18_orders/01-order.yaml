@@ -1,0 +1,88 @@
+name: Tutorial Order
+documentId: tutorial-order
+customerReference: customer-42
+quantity: 3
+status: draft
+initializedState: pending
+
+contracts:
+  lifecycle:
+    type: Lifecycle Event Channel
+    order: 0
+
+  initialize:
+    type: Coordination/Sequential Workflow
+    channel: lifecycle
+    order: 0
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /initializedState
+              val: initialized
+
+          - $appendEvent:
+              type: Coordination/Event
+              kind: Tutorial/Order Initialized
+              orderDocumentId:
+                $document: /documentId
+
+          - $return: true
+
+  ownerChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/orders/alice
+    actor:
+      type: MyOS/Principal Actor
+      accountId: alice
+
+  markReady:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /status
+              val: ready
+
+          - $appendEvent:
+              type: Coordination/Event
+              kind: Tutorial/Order Ready
+
+          - $return: true
+
+  merchantChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/order-factory/merchant
+    actor:
+      type: MyOS/Principal Actor
+      accountId: merchant
+
+  approve:
+    name: Approve Order
+    type: Coordination/Sequential Workflow Operation
+    channel: merchantChannel
+    request: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /status
+              val: approved
+
+          - $appendEvent:
+              type: Coordination/Event
+              kind: Tutorial/Order Approved
+              orderDocumentId:
+                $document: /documentId
+
+          - $return: true

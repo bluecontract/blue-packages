@@ -1,0 +1,74 @@
+id: 09-cycle
+document:
+- name: A
+  done: false
+  peer:
+    blueId: this#1
+  contracts:
+    embedded:
+      type: Contracts/Process Embedded
+      paths:
+      - /peer
+    input:
+      type: Contracts/External Channel
+    start:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Trigger Event
+        event:
+          kind: ping
+    fromPeer:
+      type: Contracts/Embedded Node Channel
+      sourcePath: /peer
+      event:
+        kind: pong
+    finish:
+      type: Contracts/Sequential Workflow
+      channel: fromPeer
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /done
+          val: true
+- name: B
+  replied: false
+  peer:
+    blueId: this#0
+  contracts:
+    embedded:
+      type: Contracts/Process Embedded
+      paths:
+      - /peer
+    fromPeer:
+      type: Contracts/Embedded Node Channel
+      sourcePath: /peer
+      event:
+        kind: ping
+    reply:
+      type: Contracts/Sequential Workflow
+      channel: fromPeer
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /replied
+          val: true
+      - type: Contracts/Trigger Event
+        event:
+          kind: pong
+inputs:
+- eventTimestamp: 1000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: start
+  expect:
+    /done: true
+    /peer/replied: true
+    /peer/peer/done: true
+  expectEvents:
+  - kind: ping
+  expectCycle: true
+cyclicSet: true

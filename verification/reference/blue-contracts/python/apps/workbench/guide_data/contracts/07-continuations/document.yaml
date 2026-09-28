@@ -1,0 +1,53 @@
+count: 0
+doubled: 0
+observed: 0
+contracts:
+  input:
+    type: Contracts/External Channel
+  go:
+    type: Contracts/Sequential Workflow Operation
+    channel: input
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /count
+        val: 1
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /observed
+        val:
+          $document: /doubled
+    - type: Contracts/Trigger Event
+      event:
+        kind: first
+    - type: Contracts/Trigger Event
+      event:
+        kind: second
+  updates:
+    type: Contracts/Document Update Channel
+    path: /count
+  double:
+    type: Contracts/Sequential Workflow
+    channel: updates
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /doubled
+        val:
+          $multiply:
+          - $document: /count
+          - 2
+  localEvents:
+    type: Contracts/Triggered Event Channel
+  first:
+    type: Contracts/Sequential Workflow
+    channel: localEvents
+    steps:
+    - type: Contracts/Trigger Event
+      event:
+        kind: third
+    event:
+      kind: first

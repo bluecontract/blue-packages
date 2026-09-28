@@ -1,0 +1,88 @@
+name: Operation Mandate
+type: Mandates/Mandate
+description: One holder and one delegate, any number of complete operation grants
+  and targets.
+scope:
+  type: Mandates/Scope
+grantTemplates:
+  type: Mandates/Scope
+contracts:
+  initializeOperationScope:
+    type: contracts/Sequential Workflow
+    channel: lifecycle
+    event:
+      type: contracts/Document Processing Initiated
+    steps:
+    - type: contracts/Compute
+      do:
+      - $appendChange:
+          op: add
+          path: /scope
+          val:
+            $coalesce:
+            - $document: /scope
+            - $emptyObject: true
+    order: 10
+  clearOperationScope:
+    type: contracts/Sequential Workflow
+    channel: terminationRequests
+    event:
+      type: Mandates/Mandate Termination Requested
+    steps:
+    - type: contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /scope
+          val:
+            $emptyObject: true
+      - $appendEvent:
+          $objectSet:
+            object:
+              $objectSet:
+                object:
+                  $literal:
+                    type: Mandates/Scope Changed
+                    timestampUs: 0
+                    scopeId: uninitialized
+                key: timestampUs
+                val:
+                  $binding: timestamp
+            key: scopeId
+            val:
+              $nodeBlueId:
+                $resultValue: /scope
+    order: -10
+  scopeUpdates:
+    type: contracts/Document Update Channel
+    path: /scope
+  notifyScopeChanged:
+    type: contracts/Sequential Workflow
+    channel: scopeUpdates
+    event:
+      type: contracts/Document Update
+    steps:
+    - type: contracts/Compute
+      do:
+      - $if:
+          cond:
+            $eq:
+            - $document: /status
+            - Active
+          then:
+          - $appendEvent:
+              $objectSet:
+                object:
+                  $objectSet:
+                    object:
+                      $literal:
+                        type: Mandates/Scope Changed
+                        timestampUs: 0
+                        scopeId: uninitialized
+                    key: timestampUs
+                    val:
+                      $binding: timestamp
+                key: scopeId
+                val:
+                  $nodeBlueId:
+                    $resultValue: /scope

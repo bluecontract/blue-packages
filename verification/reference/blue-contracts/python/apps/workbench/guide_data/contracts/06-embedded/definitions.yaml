@@ -1,0 +1,75 @@
+Tutorial/Counter:
+  name: Counter
+  count:
+    type: Integer
+    schema:
+      required: true
+  requestsSeen:
+    type: Integer
+    schema:
+      required: true
+  contracts:
+    input:
+      type: Contracts/External Channel
+    increase:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /count
+            val:
+              $add:
+              - $document: /count
+              - $binding: call/request/amount
+      - type: Contracts/Trigger Event
+        event:
+          kind: countChanged
+          count:
+            $document: /count
+      order: 10
+      request:
+        amount:
+          type: Integer
+          schema:
+            required: true
+    decrease:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /count
+            val:
+              $subtract:
+              - $document: /count
+              - $binding: call/request/amount
+      - type: Contracts/Trigger Event
+        event:
+          kind: countChanged
+          count:
+            $document: /count
+      order: 10
+      request:
+        amount:
+          type: Integer
+          schema:
+            required: true
+    observeCalls:
+      type: Contracts/Sequential Workflow
+      channel: input
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /requestsSeen
+            val:
+              $add:
+              - $document: /requestsSeen
+              - 1
+      order: 20

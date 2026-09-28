@@ -1,0 +1,67 @@
+paid: 0
+large: 0
+cancelled: 0
+contracts:
+  input:
+    type: Contracts/External Channel
+  publish:
+    type: Contracts/Sequential Workflow Operation
+    channel: input
+    steps:
+    - type: Contracts/Trigger Event
+      event:
+        $binding: call/request
+  localEvents:
+    type: Contracts/Triggered Event Channel
+  countPaid:
+    type: Contracts/Sequential Workflow
+    channel: localEvents
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /paid
+          val:
+            $add:
+            - $document: /paid
+            - 1
+    order: 10
+    event:
+      kind: paid
+  countLarge:
+    type: Contracts/Sequential Workflow
+    channel: localEvents
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /large
+          val:
+            $add:
+            - $document: /large
+            - 1
+    order: 20
+    event:
+      kind: paid
+      amount:
+        type: Integer
+        schema:
+          minimum: 100
+  countCancelled:
+    type: Contracts/Sequential Workflow
+    channel: localEvents
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /cancelled
+          val:
+            $add:
+            - $document: /cancelled
+            - 1
+    order: 30
+    event:
+      kind: cancelled

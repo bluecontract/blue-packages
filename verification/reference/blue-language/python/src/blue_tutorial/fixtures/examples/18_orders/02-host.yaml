@@ -1,0 +1,117 @@
+name: Managed Order Host
+documentId: tutorial-order-host
+initializedOrderCount: 0
+lastInitializedOrder: none
+orders: {}
+
+contracts:
+  embedded:
+    type: Process Embedded
+    collectionPaths:
+      - /orders
+
+  ownerChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/orders/alice
+    actor:
+      type: MyOS/Principal Actor
+      accountId: alice
+
+  addOrder:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      orderKey:
+        type: Text
+      order: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: add
+              path:
+                $pointerJoin:
+                  - orders
+                  - $binding: event/message/request/orderKey
+              val:
+                $binding: event/message/request/order
+
+          - $return: true
+
+  fromOrder01Initialized:
+    type: Embedded Node Channel
+    sourcePath: /orders/order-01
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Order Initialized
+
+  recordOrder01Initialization:
+    type: Coordination/Sequential Workflow
+    channel: fromOrder01Initialized
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Order Initialized
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /initializedOrderCount
+              val:
+                $add:
+                  - $document: /initializedOrderCount
+                  - 1
+
+          - $appendChange:
+              op: replace
+              path: /lastInitializedOrder
+              val:
+                $document: /orders/order-01/documentId
+
+          - $appendEvent:
+              type: Coordination/Event
+              kind: Tutorial/Host Observed Order Initialization
+              orderDocumentId:
+                $document: /orders/order-01/documentId
+
+          - $return: true
+
+  fromOrder02Initialized:
+    type: Embedded Node Channel
+    sourcePath: /orders/order-02
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Order Initialized
+
+  recordOrder02Initialization:
+    type: Coordination/Sequential Workflow
+    channel: fromOrder02Initialized
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Order Initialized
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /initializedOrderCount
+              val:
+                $add:
+                  - $document: /initializedOrderCount
+                  - 1
+
+          - $appendChange:
+              op: replace
+              path: /lastInitializedOrder
+              val:
+                $document: /orders/order-02/documentId
+
+          - $appendEvent:
+              type: Coordination/Event
+              kind: Tutorial/Host Observed Order Initialization
+              orderDocumentId:
+                $document: /orders/order-02/documentId
+
+          - $return: true

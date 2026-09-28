@@ -1,0 +1,29 @@
+name: Second Parent
+documentId: tutorial-second-parent
+contracts:
+  embedded:
+    type: Process Embedded
+    paths:
+      - /child
+  ownerChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/embedding/alice
+    actor:
+      type: MyOS/Principal Actor
+      accountId: alice
+  attach:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      child: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: add
+              path: /child
+              val:
+                $binding: event/message/request/child
+          - $return: true

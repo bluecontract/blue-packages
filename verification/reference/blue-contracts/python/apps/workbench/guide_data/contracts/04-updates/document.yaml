@@ -1,0 +1,58 @@
+label: draft
+obsolete: remove me
+lines:
+- A
+removed: false
+appended: 0
+contracts:
+  input:
+    type: Contracts/External Channel
+  edit:
+    type: Contracts/Sequential Workflow Operation
+    channel: input
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: add
+        path: /note
+        val: ready
+      - op: replace
+        path: /label
+        val: updated
+      - op: remove
+        path: /obsolete
+      - op: add
+        path: /lines/-
+        val: B
+  removal:
+    type: Contracts/Document Update Channel
+    path: /obsolete
+    event:
+      op: remove
+  recordRemoval:
+    type: Contracts/Sequential Workflow
+    channel: removal
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /removed
+        val: true
+  additions:
+    type: Contracts/Document Update Channel
+    path: /lines
+    event:
+      op: add
+  recordAddition:
+    type: Contracts/Sequential Workflow
+    channel: additions
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /appended
+          val:
+            $add:
+            - $document: /appended
+            - 1

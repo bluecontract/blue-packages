@@ -1,0 +1,105 @@
+id: 13-deep-boundaries
+document:
+  b:
+    c:
+      count: 0
+      contracts:
+        input:
+          type: Contracts/External Channel
+        go:
+          type: Contracts/Sequential Workflow Operation
+          channel: input
+          steps:
+          - type: Contracts/Update Document
+            changeset:
+            - op: replace
+              path: /count
+              val: 1
+          - type: Contracts/Trigger Event
+            event:
+              kind: cSignal
+    contracts:
+      embedded:
+        type: Contracts/Process Embedded
+        paths:
+        - /c
+      child:
+        type: Contracts/Embedded Node Channel
+        sourcePath: /c
+        event:
+          kind: cSignal
+      relay:
+        type: Contracts/Sequential Workflow
+        channel: child
+        steps:
+        - type: Contracts/Trigger Event
+          event:
+            kind: bSignal
+  deepSeen: 0
+  directSeen: 0
+  leaked: 0
+  contracts:
+    embedded:
+      type: Contracts/Process Embedded
+      paths:
+      - /b
+    deep:
+      type: Contracts/Document Update Channel
+      path: /b/c/count
+    observeDeep:
+      type: Contracts/Sequential Workflow
+      channel: deep
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /deepSeen
+          val:
+            $document: /b/c/count
+    children:
+      type: Contracts/Embedded Node Channel
+    direct:
+      type: Contracts/Sequential Workflow
+      channel: children
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /directSeen
+            val:
+              $add:
+              - $document: /directSeen
+              - 1
+      event:
+        event:
+          kind: bSignal
+    noGrandchild:
+      type: Contracts/Sequential Workflow
+      channel: children
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /leaked
+            val:
+              $add:
+              - $document: /leaked
+              - 1
+      event:
+        event:
+          kind: cSignal
+inputs:
+- eventTimestamp: 1000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: go
+  expect:
+    /b/c/count: 1
+    /deepSeen: 0
+    /directSeen: 1
+    /leaked: 0
+  expectEvents: []
+  expectRootCheckpoint: false

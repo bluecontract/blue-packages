@@ -1,0 +1,137 @@
+id: 05-filters
+document:
+  paid: 0
+  large: 0
+  cancelled: 0
+  contracts:
+    input:
+      type: Contracts/External Channel
+    publish:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Trigger Event
+        event:
+          $binding: call/request
+    localEvents:
+      type: Contracts/Triggered Event Channel
+    countPaid:
+      type: Contracts/Sequential Workflow
+      channel: localEvents
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /paid
+            val:
+              $add:
+              - $document: /paid
+              - 1
+      order: 10
+      event:
+        kind: paid
+    countLarge:
+      type: Contracts/Sequential Workflow
+      channel: localEvents
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /large
+            val:
+              $add:
+              - $document: /large
+              - 1
+      order: 20
+      event:
+        kind: paid
+        amount:
+          type: Integer
+          schema:
+            minimum: 100
+    countCancelled:
+      type: Contracts/Sequential Workflow
+      channel: localEvents
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /cancelled
+            val:
+              $add:
+              - $document: /cancelled
+              - 1
+      order: 30
+      event:
+        kind: cancelled
+inputs:
+- eventTimestamp: 1000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: publish
+    request: &id001
+      kind: paid
+      amount: 120
+  expect:
+    /paid: 1
+    /large: 1
+    /cancelled: 0
+  expectEvents:
+  - *id001
+- eventTimestamp: 2000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: publish
+    request: &id002
+      kind: paid
+      amount: 20
+  expect:
+    /paid: 2
+    /large: 1
+    /cancelled: 0
+  expectEvents:
+  - *id002
+- eventTimestamp: 3000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: publish
+    request: &id003
+      kind: cancelled
+  expect:
+    /paid: 2
+    /large: 1
+    /cancelled: 1
+  expectEvents:
+  - *id003
+- eventTimestamp: 4000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: publish
+    request: &id004
+      kind: paid
+  expect:
+    /paid: 3
+    /large: 1
+    /cancelled: 1
+  expectEvents:
+  - *id004
+- eventTimestamp: 5000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: publish
+    request: &id005
+      amount: 120
+  expect:
+    /paid: 3
+    /large: 1
+    /cancelled: 1
+  expectEvents:
+  - *id005

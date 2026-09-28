@@ -1,0 +1,183 @@
+name: Mandate
+description: Two-role owner-approved authority program. No mandatory guarantor. The
+  base alone grants no target operation.
+status:
+  type: Mandates/Status
+approvedAt:
+  type: Integer
+terminatedAt:
+  type: Integer
+contracts:
+  authorityHolderChannel:
+    type: coordination/Timeline Channel
+    schema:
+      required: true
+  authorizedActorChannel:
+    type: coordination/Timeline Channel
+    schema:
+      required: true
+  mandateProtocol:
+    type: Mandates/Authority Protocol
+  lifecycle:
+    type: contracts/Lifecycle Event Channel
+  terminationRequests:
+    type: contracts/Triggered Event Channel
+  initializeMandate:
+    type: contracts/Sequential Workflow
+    channel: lifecycle
+    event:
+      type: contracts/Document Processing Initiated
+    steps:
+    - type: contracts/Compute
+      do:
+      - $appendChange:
+          op: add
+          path: /status
+          val: Pending
+      - $if:
+          cond:
+            $exists:
+              $document: /approvedAt
+          then:
+          - $appendChange:
+              op: remove
+              path: /approvedAt
+      - $if:
+          cond:
+            $exists:
+              $document: /terminatedAt
+          then:
+          - $appendChange:
+              op: remove
+              path: /terminatedAt
+      - $appendEvent:
+          $literal:
+            type: Mandates/Mandate Initialized
+  approveMandate:
+    type: contracts/Sequential Workflow Operation
+    channel: authorityHolderChannel
+    request: {}
+    steps:
+    - type: contracts/Compute
+      do:
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $document: /status
+              - Pending
+          message: MANDATE_NOT_PENDING
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $keys:
+                  $binding: call/request
+              - []
+          message: EMPTY_REQUEST_REQUIRED
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $binding: call/requireExactDocumentVersion
+              - true
+          message: EXACT_REVIEW_REQUIRED
+      - $appendChange:
+          op: replace
+          path: /status
+          val: Active
+      - $appendChange:
+          op: add
+          path: /approvedAt
+          val:
+            $binding: timestamp
+      - $appendEvent:
+          $objectSet:
+            object:
+              $objectSet:
+                object:
+                  $literal:
+                    type: Mandates/Mandate Approved
+                    timestampUs: 0
+                    reviewedDocumentId: uninitialized
+                key: timestampUs
+                val:
+                  $binding: timestamp
+            key: reviewedDocumentId
+            val:
+              $nodeBlueId:
+                $binding: call/document
+  terminateMandate:
+    type: contracts/Sequential Workflow Operation
+    channel: authorityHolderChannel
+    request:
+      reason:
+        type: Text
+        schema:
+          required: true
+          minLength: 1
+    steps:
+    - type: contracts/Compute
+      do:
+      - $failIf:
+          cond:
+            $not:
+              $or:
+              - $eq:
+                - $document: /status
+                - Pending
+              - $eq:
+                - $document: /status
+                - Active
+          message: MANDATE_ENDED
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $keys:
+                  $binding: call/request
+              - - reason
+          message: ONLY_REASON_REQUIRED
+      - $appendEvent:
+          $objectSet:
+            object:
+              $literal:
+                type: Mandates/Mandate Termination Requested
+                reason: uninitialized
+            key: reason
+            val:
+              $binding: call/request/reason
+  applyMandateTermination:
+    type: contracts/Sequential Workflow
+    channel: terminationRequests
+    event:
+      type: Mandates/Mandate Termination Requested
+    steps:
+    - type: contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /status
+          val: Terminated
+      - $appendChange:
+          op: add
+          path: /terminatedAt
+          val:
+            $binding: timestamp
+      - $appendEvent:
+          $objectSet:
+            object:
+              $objectSet:
+                object:
+                  $literal:
+                    type: Mandates/Mandate Terminated
+                    timestampUs: 0
+                    reason: uninitialized
+                key: timestampUs
+                val:
+                  $binding: timestamp
+            key: reason
+            val:
+              $event: /reason
+    - type: contracts/Terminate Processing
+      cause: mandate-terminated

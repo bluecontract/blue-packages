@@ -1,0 +1,72 @@
+# Verification report
+
+This report records checks executed for the local Blue Language publication dated 26 September 2026. It is implementation evidence, not additional normative Language rules.
+
+## Selected publication
+
+- Package BlueId: `8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4`
+- Data archive SHA-256: `sha256:a030dd4c88e41a414918ef4895017862e154b438848bd5c0e4f5bc880e7b8a90`
+- Specification Text BlueId: `H7WiYQ6GiWypRdFyWRcv99dsvTv6WnJYnu9eLYPQmWnc`
+- Specification file SHA-256: `sha256:6ceb8f87b9b10dbdcbbf629aacc8ac73b9ed46ce440308a6d49be3c85297a94e`
+- Implemented Language edition: `blue-language/2026-09-26-specification-metadata-1`
+
+`release.json` pins these results outside the package's own identity input. `SHA256SUMS` inventories the source workspace. Package verification remains distinct from the source inventory check.
+
+## Reference preservation
+
+The source baseline is `blue-java-bex-project-2026-09-26.zip`, SHA-256 `8bd27a5df372bfb82f09f07a536abe8b402c36fefd9155d322b93453d3b60689`, selected from `blue-java/reference/blue-next-local/python-reference`. `reference/SOURCE-LOCK.json` records hashes of **244 original files**. All are checked before build, inspection, verification, or tests.
+
+The executable Language algorithm modules and all eight supplied core/standard definitions are unchanged. Appendix D embeds the exact algorithm sources; dedicated tests compare them byte-for-byte (apart from terminal newline handling). The ordinary Package and Protocol Specification export identities are also checked against the original definitions.
+
+The publication consolidates the normative description and package contents; it does not implement a new resolver, a new BlueId algorithm, or a second Language interpreter. Historical package IDs remain historical. Dependent BEX, Contracts, and Coordination packages were not rebuilt or silently retargeted.
+
+## Completed checks
+
+| Check | Result | Evidence |
+|---|---:|---|
+| Original portable Language corpus | 1,408 passed | `verification/core-fixtures.json` |
+| Original portable edge corpus | 52 passed | `verification/edge-fixtures.json` |
+| Native metadata regressions | 26 passed | `verification/metadata-tests.log` |
+| Public API and field-name tests | 42 passed; 132 subtests | `verification/public-api-focused.log` |
+| Admission and diagnostics | 86 passed; 14 subtests | `verification/admission-diagnostics.log` |
+| Independent release tests | 23 passed | `verification/release-tests-final.log` |
+| Complete data-package audit | Both exported definitions passed | `verification/direct-verify.json` |
+| Generic local consumer | Definition creation, value admission, query and explicit mounts passed | `verification/example-output.json` |
+| Standalone-document checks | No external normative Markdown links, unresolved generators, or broken TOC targets | `verification/editorial-checks.json` |
+
+The release tests cover unchanged standard identities, exact normative algorithm inclusion, standalone-document structure, identical packaged specification, a byte-identical rebuild, corrupted archive rejection, three local-prefix forms, unavailable specification evidence, cyclic-set canonicalization and owning proofs, transitive content without transitive names, an unsupported Language selection, and imports that do not automatically become execution requirements.
+
+Counts are heterogeneous and overlap in coverage. Subtests are not additional independent end-to-end scenarios.
+
+## Execution limits and initial setup
+
+The aggregate `./blue-package test` invocation completed the 1,460 portable cases, metadata tests and 128 selected public tests, then reached the review environment's wall-time bound during the release tests. All 23 release tests were subsequently executed successfully as a separate invocation. The incomplete aggregate log is retained under `verification/investigation/`; no unfinished stage is counted as a success from that invocation.
+
+An initial source extract omitted an example file required by an existing test. The original file was added unchanged. Final focused public-test runs passed. A broader generated-revision test selection was not completed and is not claimed here. Original expected answers and semantic algorithm files were not rewritten to suppress a failure.
+
+No native Java test, complete Contracts/Coordination execution suite, remote registry transfer, GitHub Actions run, or MyOS integration was performed for this publication. Mixed-edition execution is explicitly not defined or implemented by this edition; the mismatch test verifies rejection, not an imaginary second Language implementation.
+
+## Reproduction
+
+From the source workspace with Python 3.13 and pytest available:
+
+```sh
+./blue-package verify
+./blue-package test
+python3.13 examples/use_package.py
+```
+
+For a deliberate rebuild:
+
+```sh
+./blue-package build
+./blue-package verify
+```
+
+The source fixture files and frozen inputs are not regenerated by these commands. Test logs are finite evidence, not a proof of exhaustive conformance. Clean-extraction results are recorded separately when the delivery archive is verified.
+
+## Clean extraction
+
+The delivery ZIP was extracted into a new directory without the original workspace on its paths. All 322 inventoried files matched their hashes. The extracted local verifier accepted the pinned package, the generic consumer created and queried a document, and all 23 release checks passed again (21.71 seconds in that test run). These are repeated cases, not 23 additional unique scenarios.
+
+A first combined archive/extraction/test invocation reached the environment wall limit near the end of the tests; the isolated clean-directory test invocation completed. Only the completed invocation is reported as passing. Files subsequently added to the delivery are this verification evidence and its inventory; the package, algorithms, specification, and executed application source are unchanged. The final ZIP inventory and package verification are checked once more after those evidence files are included.

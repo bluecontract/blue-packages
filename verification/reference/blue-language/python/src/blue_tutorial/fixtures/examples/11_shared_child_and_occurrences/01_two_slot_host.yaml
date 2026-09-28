@@ -1,0 +1,46 @@
+name: Two-slot Host
+documentId: tutorial-two-slot-host
+firstCount: -1
+secondCount: -1
+contracts:
+  embedded:
+    type: Process Embedded
+    paths:
+      - /first
+      - /second
+  ownerChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/embedding/alice
+    actor:
+      type: MyOS/Principal Actor
+      accountId: alice
+  attachFirst:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      child: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: add
+              path: /first
+              val:
+                $binding: event/message/request/child
+          - $return: true
+  attachSecond:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      child: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: add
+              path: /second
+              val:
+                $binding: event/message/request/child
+          - $return: true

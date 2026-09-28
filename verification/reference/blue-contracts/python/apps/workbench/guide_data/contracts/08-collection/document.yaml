@@ -1,0 +1,64 @@
+children: {}
+readyChildren: 0
+contracts:
+  input:
+    type: Contracts/External Channel
+  embedded:
+    type: Contracts/Process Embedded
+    collectionPaths:
+    - /children
+  addChild:
+    type: Contracts/Sequential Workflow Operation
+    channel: input
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $failIf:
+          cond:
+            $hasKey:
+              object:
+                $document: /children
+              key:
+                $binding: call/request/key
+          message: Child key already exists
+      - $appendChange:
+          op: add
+          path:
+            $pointerJoin:
+            - children
+            - $binding: call/request/key
+          val:
+            $objectSet:
+              object:
+                type: Tutorial/Item
+                title: ''
+                ready: false
+              key: title
+              val:
+                $binding: call/request/title
+    request:
+      key:
+        type: Text
+        schema:
+          required: true
+      title:
+        type: Text
+        schema:
+          required: true
+  readyEvents:
+    type: Contracts/Embedded Node Channel
+    event:
+      kind: ready
+  countReady:
+    type: Contracts/Sequential Workflow
+    channel: readyEvents
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /readyChildren
+          val:
+            $add:
+            - $document: /readyChildren
+            - 1

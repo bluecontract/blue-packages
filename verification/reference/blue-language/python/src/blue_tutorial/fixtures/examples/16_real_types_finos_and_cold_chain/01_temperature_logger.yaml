@@ -1,0 +1,35 @@
+name: Temperature Logger
+documentId: tutorial-temperature-logger
+temperatureC: 4.0
+state: normal
+contracts:
+  ownerChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/cold-chain/operator
+    actor:
+      type: MyOS/Principal Actor
+      accountId: operator
+  reportTemperature:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      temperatureC:
+        type: Double
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /temperatureC
+              val:
+                $binding: event/message/request/temperatureC
+          - $appendChange:
+              op: replace
+              path: /state
+              val: excursion
+          - $appendEvent:
+              type: Coordination/Event
+              kind: Tutorial/Temperature Excursion
+          - $return: true

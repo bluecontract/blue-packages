@@ -1,0 +1,63 @@
+name: Vaccine Shipment
+documentId: tutorial-vaccine-shipment
+status: releasable
+releaseBlocked: false
+excursionCount: 0
+contracts:
+  embedded:
+    type: Process Embedded
+    paths:
+      - /logger
+  ownerChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/cold-chain/operator
+    actor:
+      type: MyOS/Principal Actor
+      accountId: operator
+  attachLogger:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      logger: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: add
+              path: /logger
+              val:
+                $binding: event/message/request/logger
+          - $return: true
+  fromExcursion:
+    type: Embedded Node Channel
+    sourcePath: /logger
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Temperature Excursion
+  quarantine:
+    type: Coordination/Sequential Workflow
+    channel: fromExcursion
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Temperature Excursion
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /status
+              val: quarantined
+          - $appendChange:
+              op: replace
+              path: /releaseBlocked
+              val: true
+          - $appendChange:
+              op: replace
+              path: /excursionCount
+              val:
+                $add:
+                  - $document: /excursionCount
+                  - 1
+          - $return: true

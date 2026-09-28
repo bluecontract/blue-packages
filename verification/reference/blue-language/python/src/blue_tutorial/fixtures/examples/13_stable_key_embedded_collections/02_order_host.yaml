@@ -1,0 +1,58 @@
+name: Managed Order Host
+documentId: tutorial-order-host
+orders: {}
+contracts:
+  embedded:
+    type: Process Embedded
+    collectionPaths:
+      - /orders
+
+  ownerChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/orders/alice
+    actor:
+      type: MyOS/Principal Actor
+      accountId: alice
+
+  addOrder:
+    name: Add Order
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      orderKey:
+        type: Text
+        schema:
+          required: true
+      order: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: add
+              path:
+                $pointerJoin:
+                  - orders
+                  - {$binding: event/message/request/orderKey}
+              val:
+                $binding: event/message/request/order
+          - $return: true
+  removeOrder:
+    type: Coordination/Sequential Workflow Operation
+    channel: ownerChannel
+    request:
+      orderKey:
+        type: Text
+        schema:
+          required: true
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: remove
+              path:
+                $pointerJoin:
+                  - orders
+                  - $binding: event/message/request/orderKey
+          - $return: true

@@ -1,0 +1,124 @@
+id: 08-collection
+document:
+  children: {}
+  readyChildren: 0
+  contracts:
+    input:
+      type: Contracts/External Channel
+    embedded:
+      type: Contracts/Process Embedded
+      collectionPaths:
+      - /children
+    addChild:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $failIf:
+            cond:
+              $hasKey:
+                object:
+                  $document: /children
+                key:
+                  $binding: call/request/key
+            message: Child key already exists
+        - $appendChange:
+            op: add
+            path:
+              $pointerJoin:
+              - children
+              - $binding: call/request/key
+            val:
+              $objectSet:
+                object:
+                  type: Tutorial/Item
+                  title: ''
+                  ready: false
+                key: title
+                val:
+                  $binding: call/request/title
+      request:
+        key:
+          type: Text
+          schema:
+            required: true
+        title:
+          type: Text
+          schema:
+            required: true
+    readyEvents:
+      type: Contracts/Embedded Node Channel
+      event:
+        kind: ready
+    countReady:
+      type: Contracts/Sequential Workflow
+      channel: readyEvents
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /readyChildren
+            val:
+              $add:
+              - $document: /readyChildren
+              - 1
+inputs:
+- eventTimestamp: 1000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: addChild
+    request:
+      key: first
+      title: First item
+  expect:
+    /children/first/ready: true
+    /children/first/title: First item
+    /readyChildren: 1
+  expectEvents: []
+  expectCheckpointCount: 1
+- eventTimestamp: 2000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: addChild
+    request:
+      key: second
+      title: Second item
+  expect:
+    /children/second/ready: true
+    /readyChildren: 2
+  expectEvents: []
+  expectCheckpointCount: 1
+definitions:
+  Tutorial/Item:
+    name: Item
+    title:
+      type: Text
+      schema:
+        required: true
+    ready:
+      type: Boolean
+      schema:
+        required: true
+    contracts:
+      lifecycle:
+        type: Contracts/Lifecycle Event Channel
+      prepare:
+        type: Contracts/Sequential Workflow
+        channel: lifecycle
+        steps:
+        - type: Contracts/Update Document
+          changeset:
+          - op: replace
+            path: /ready
+            val: true
+        - type: Contracts/Trigger Event
+          event:
+            kind: ready
+            title:
+              $document: /title
+        event:
+          type: Contracts/Document Processing Initiated

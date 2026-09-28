@@ -1,0 +1,264 @@
+{
+  "name": "Portfolio Agreement",
+  "type": "Agreements/Agreement",
+  "declaredContracts": [
+    "embedded",
+    "clauseProgress",
+    "applyClause",
+    "lifecycle",
+    "initialize",
+    "subagreementEvents",
+    "observeSubagreements",
+    "initializePortfolio"
+  ],
+  "description": "An Agreement with its own activation clause and a collection of independently managed Agreements.",
+  "agreements": {},
+  "priorityAgreementIds": [],
+  "observedEvents": {
+    "type": "Integer"
+  },
+  "activatedCount": {
+    "type": "Integer"
+  },
+  "declinedCount": {
+    "type": "Integer"
+  },
+  "followUpCount": {
+    "type": "Integer"
+  },
+  "followUps": {},
+  "lastObserved": {},
+  "contracts": {
+    "embedded": {
+      "type": "Contracts/Process Embedded",
+      "paths": [
+        "/activation"
+      ],
+      "collectionPaths": [
+        "/agreements"
+      ]
+    },
+    "subagreementEvents": {
+      "type": "Contracts/Embedded Node Channel",
+      "event": {
+        "type": "Agreements/Agreement Event"
+      }
+    },
+    "initializePortfolio": {
+      "type": "Contracts/Sequential Workflow",
+      "channel": "lifecycle",
+      "steps": [
+        {
+          "type": "Contracts/Compute",
+          "do": [
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/observedEvents",
+                "val": 0
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/activatedCount",
+                "val": 0
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/declinedCount",
+                "val": 0
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/followUpCount",
+                "val": 0
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "observeSubagreements": {
+      "type": "Contracts/Sequential Workflow",
+      "channel": "subagreementEvents",
+      "steps": [
+        {
+          "type": "Contracts/Compute",
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$startsWith": [
+                      {
+                        "$event": "/sourcePath"
+                      },
+                      "/agreements/"
+                    ]
+                  }
+                },
+                "message": "NOT_A_SUBAGREEMENT"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/observedEvents",
+                "val": {
+                  "$add": [
+                    {
+                      "$document": "/observedEvents"
+                    },
+                    1
+                  ]
+                }
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/lastObserved",
+                "val": {
+                  "sourcePath": {
+                    "$event": "/sourcePath"
+                  },
+                  "agreementId": {
+                    "$event": "/event/agreementId"
+                  },
+                  "kind": {
+                    "$event": "/event/kind"
+                  }
+                }
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$eq": [
+                    {
+                      "$event": "/event/kind"
+                    },
+                    "Agreement Activated"
+                  ]
+                },
+                "then": [
+                  {
+                    "$appendChange": {
+                      "op": "replace",
+                      "path": "/activatedCount",
+                      "val": {
+                        "$add": [
+                          {
+                            "$document": "/activatedCount"
+                          },
+                          1
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "$if": {
+                      "cond": {
+                        "$includes": {
+                          "list": {
+                            "$document": "/priorityAgreementIds"
+                          },
+                          "val": {
+                            "$event": "/event/agreementId"
+                          }
+                        }
+                      },
+                      "then": [
+                        {
+                          "$appendChange": {
+                            "op": "replace",
+                            "path": "/followUpCount",
+                            "val": {
+                              "$add": [
+                                {
+                                  "$document": "/followUpCount"
+                                },
+                                1
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "$appendChange": {
+                            "op": "replace",
+                            "path": "/followUps",
+                            "val": {
+                              "$objectSet": {
+                                "object": {
+                                  "$document": "/followUps"
+                                },
+                                "key": {
+                                  "$event": "/event/agreementId"
+                                },
+                                "val": {
+                                  "status": "READY_FOR_ONBOARDING",
+                                  "termsId": {
+                                    "$event": "/event/termsId"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "$appendEvent": {
+                            "type": "AgreementExamples/Onboarding Requested",
+                            "kind": "Onboarding Requested",
+                            "agreementId": {
+                              "$event": "/event/agreementId"
+                            },
+                            "termsId": {
+                              "$event": "/event/termsId"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$eq": [
+                    {
+                      "$event": "/event/kind"
+                    },
+                    "Agreement Declined"
+                  ]
+                },
+                "then": [
+                  {
+                    "$appendChange": {
+                      "op": "replace",
+                      "path": "/declinedCount",
+                      "val": {
+                        "$add": [
+                          {
+                            "$document": "/declinedCount"
+                          },
+                          1
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

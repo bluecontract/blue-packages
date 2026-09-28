@@ -1,0 +1,132 @@
+b:
+  count: 0
+  handledE2: false
+  contracts:
+    input:
+      type: Contracts/External Channel
+    start:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /count
+          val: 1
+        - op: replace
+          path: /count
+          val: 2
+    localEvents:
+      type: Contracts/Triggered Event Channel
+    reactToE1:
+      type: Contracts/Sequential Workflow
+      channel: localEvents
+      event:
+        kind: E1
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /count
+          val: 2
+      - type: Contracts/Trigger Event
+        event:
+          kind: E2
+          count: 2
+    reactToE2:
+      type: Contracts/Sequential Workflow
+      channel: localEvents
+      event:
+        kind: E2
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /handledE2
+          val: true
+    updates:
+      type: Contracts/Document Update Channel
+      path: /count
+    observe:
+      type: Contracts/Sequential Workflow
+      channel: updates
+      order: 0
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: add
+          path: /seen/-
+          val:
+            $document: /count
+  seen: []
+payloadAtE1: 0
+childAtE1: 0
+stage: 0
+stageAtP1: 0
+deepUpdateSeen: false
+contracts:
+  embedded:
+    type: Contracts/Process Embedded
+    paths:
+    - /b
+  fromB:
+    type: Contracts/Embedded Node Channel
+    sourcePath: /b
+  observeE1:
+    type: Contracts/Sequential Workflow
+    channel: fromB
+    event:
+      event:
+        kind: E1
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /payloadAtE1
+        val:
+          $event: /event/count
+      - op: replace
+        path: /childAtE1
+        val:
+          $document: /b/count
+    - type: Contracts/Trigger Event
+      event:
+        kind: P1
+  observeE2:
+    type: Contracts/Sequential Workflow
+    channel: fromB
+    event:
+      event:
+        kind: E2
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /stage
+        val: 2
+  localEvents:
+    type: Contracts/Triggered Event Channel
+  observeP1:
+    type: Contracts/Sequential Workflow
+    channel: localEvents
+    event:
+      kind: P1
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /stageAtP1
+        val:
+          $document: /stage
+  oldDeepObserver:
+    type: Contracts/Document Update Channel
+    path: /b/count
+  mustNotRun:
+    type: Contracts/Sequential Workflow
+    channel: oldDeepObserver
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /deepUpdateSeen
+        val: true

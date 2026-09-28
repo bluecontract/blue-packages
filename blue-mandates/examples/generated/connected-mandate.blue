@@ -1,0 +1,350 @@
+{
+  "contracts": {
+    "afterApproved": {
+      "channel": "approvedEvents",
+      "event": {},
+      "steps": [
+        {
+          "do": [
+            {
+              "$if": {
+                "cond": {
+                  "$and": [
+                    {
+                      "$eq": [
+                        {
+                          "$document": "/status"
+                        },
+                        "Active"
+                      ]
+                    },
+                    {
+                      "$eq": [
+                        {
+                          "$document": "/stage"
+                        },
+                        "EvidencePassed"
+                      ]
+                    },
+                    {
+                      "$eq": [
+                        {
+                          "$document": "/target/phase"
+                        },
+                        "Approved"
+                      ]
+                    }
+                  ]
+                },
+                "else": [
+                  {
+                    "$appendEvent": {
+                      "$literal": {
+                        "reason": "Order advanced outside this delegation stage.",
+                        "type": {
+                          "blueId": "C3xPiFWLeDGAK3uaBYT312rBK5UjSwqsdfveSNuFUsas"
+                        }
+                      }
+                    }
+                  }
+                ],
+                "then": [
+                  {
+                    "$appendChange": {
+                      "op": "replace",
+                      "path": "/scope",
+                      "val": {
+                        "release": {
+                          "$document": "/grantTemplates/release"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "$appendChange": {
+                      "op": "replace",
+                      "path": "/stage",
+                      "val": "ReleaseEnabled"
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "type": {
+            "blueId": "92eWpSLhfvP2TDsSzZiVVh5ue4hdZTZHDm1Foft3SeLp"
+          }
+        }
+      ],
+      "type": {
+        "blueId": "9GoyPopJiVkEygcM7Qm3GR92mrq3cvXvxsxcWYRJYkhY"
+      }
+    },
+    "afterReleased": {
+      "channel": "releasedEvents",
+      "event": {},
+      "steps": [
+        {
+          "do": [
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/stage",
+                "val": "Finished"
+              }
+            },
+            {
+              "$appendEvent": {
+                "$literal": {
+                  "reason": "Order released; delegation complete.",
+                  "type": {
+                    "blueId": "C3xPiFWLeDGAK3uaBYT312rBK5UjSwqsdfveSNuFUsas"
+                  }
+                }
+              }
+            }
+          ],
+          "type": {
+            "blueId": "92eWpSLhfvP2TDsSzZiVVh5ue4hdZTZHDm1Foft3SeLp"
+          }
+        }
+      ],
+      "type": {
+        "blueId": "9GoyPopJiVkEygcM7Qm3GR92mrq3cvXvxsxcWYRJYkhY"
+      }
+    },
+    "approvedEvents": {
+      "event": {
+        "type": {
+          "blueId": "57rY9LUnFtC6hUAL3GsRDiVdQCiF1yTm5DUsRj1zaH4b"
+        }
+      },
+      "sourcePath": "/target",
+      "type": {
+        "blueId": "Cjvq1tcU52uxmQd7tJM9u92FXHTmCK3scBVA6BzXqCth"
+      }
+    },
+    "authorityHolderChannel": {
+      "actor": {
+        "blueId": "BMaeMLH8sHyAS5Bk1vt69vohbZFkZ7JC4Eqfr9K1c1kd"
+      },
+      "timeline": {
+        "blueId": "AVqAw8tu4p2mrXKDxcn78wL8KKigcQp9ojQiaL1NRyby"
+      },
+      "type": {
+        "blueId": "59beUBLVth3dgvHUecAuADPSLcNc7cGi3sS7EAKQt5mx"
+      }
+    },
+    "authorizedActorChannel": {
+      "actor": {
+        "blueId": "C5BFA79JybBfBd5TjWyJu1fB5BQ38vtbjVBmuqW63yUT"
+      },
+      "timeline": {
+        "blueId": "J7RdYJ3KwQ5DeAezxABZ3WkD1RnH3scBtGwo7sukmp7R"
+      },
+      "type": {
+        "blueId": "59beUBLVth3dgvHUecAuADPSLcNc7cGi3sS7EAKQt5mx"
+      }
+    },
+    "embedded": {
+      "paths": [
+        "/target"
+      ],
+      "type": {
+        "blueId": "GH77fFd9mUnB2mAMBoG544BYUUruSSMixgsrYdzJkLZ1"
+      }
+    },
+    "evidenceProviderChannel": {
+      "actor": {
+        "blueId": "BKs2ftPNemxSAmfQsukHrpuHUXWvbHv6BqaLPeNJ88Tn"
+      },
+      "timeline": {
+        "blueId": "Dx9cU2RFRSQjH2qzsw3Cd1MZQvwLFaEzj5FwUAM1zW89"
+      },
+      "type": {
+        "blueId": "59beUBLVth3dgvHUecAuADPSLcNc7cGi3sS7EAKQt5mx"
+      }
+    },
+    "releasedEvents": {
+      "event": {
+        "type": {
+          "blueId": "7ZeA7k8BkLeYW9AZ8utRCH93QVwk9C3HSinJ7C14pmjZ"
+        }
+      },
+      "sourcePath": "/target",
+      "type": {
+        "blueId": "Cjvq1tcU52uxmQd7tJM9u92FXHTmCK3scBVA6BzXqCth"
+      }
+    }
+  },
+  "evidenceRequirement": {
+    "document": {
+      "blueId": "EFe3xQqmYhU7aTfET5Mw5bhiHWn7h57HUQV8PLpezV5w"
+    },
+    "operationId": "customer-qualification",
+    "operationRevision": 1
+  },
+  "grantTemplates": {
+    "approve": {
+      "target": {
+        "channel": "sellerChannel",
+        "documentValidation": {
+          "document": {
+            "type": {
+              "blueId": "GLDLgkBENMn3SGGwiBG6aeeZxemEiLkGjAffKHQ7xpuB"
+            },
+            "valueType": {
+              "blueId": "Ee2Kve8kvuQK6HwYW8Za9hocREULco1iRDNkdSTefASe"
+            }
+          },
+          "function": {
+            "expr": {
+              "$and": [
+                {
+                  "$gt": [
+                    {
+                      "$binding": "targetDocument/total"
+                    },
+                    0
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$binding": "targetDocument/total"
+                    },
+                    1000
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "initialDocument": {
+          "blueId": "EFe3xQqmYhU7aTfET5Mw5bhiHWn7h57HUQV8PLpezV5w"
+        },
+        "operation": "approveOrder"
+      },
+      "type": {
+        "blueId": "DWqQ7Hoc2tx3XpNbY9shHmzUZNv4X3rm8BqdUmh8J3Xo"
+      },
+      "validation": {
+        "function": {
+          "expr": {
+            "$eq": [
+              {
+                "$keys": {
+                  "$binding": "request"
+                }
+              },
+              []
+            ]
+          }
+        }
+      }
+    },
+    "release": {
+      "target": {
+        "channel": "sellerChannel",
+        "documentValidation": {
+          "document": {
+            "phase": "Approved"
+          }
+        },
+        "initialDocument": {
+          "blueId": "EFe3xQqmYhU7aTfET5Mw5bhiHWn7h57HUQV8PLpezV5w"
+        },
+        "operation": "releaseForFulfilment"
+      },
+      "type": {
+        "blueId": "DWqQ7Hoc2tx3XpNbY9shHmzUZNv4X3rm8BqdUmh8J3Xo"
+      },
+      "validation": {
+        "function": {
+          "expr": {
+            "$eq": [
+              {
+                "$keys": {
+                  "$binding": "request"
+                }
+              },
+              [
+                "method"
+              ]
+            ]
+          }
+        },
+        "request": {
+          "method": "standard"
+        }
+      }
+    }
+  },
+  "scope": {},
+  "scopeOnSuccess": {
+    "approve": {
+      "target": {
+        "channel": "sellerChannel",
+        "documentValidation": {
+          "document": {
+            "type": {
+              "blueId": "GLDLgkBENMn3SGGwiBG6aeeZxemEiLkGjAffKHQ7xpuB"
+            },
+            "valueType": {
+              "blueId": "Ee2Kve8kvuQK6HwYW8Za9hocREULco1iRDNkdSTefASe"
+            }
+          },
+          "function": {
+            "expr": {
+              "$and": [
+                {
+                  "$gt": [
+                    {
+                      "$binding": "targetDocument/total"
+                    },
+                    0
+                  ]
+                },
+                {
+                  "$lte": [
+                    {
+                      "$binding": "targetDocument/total"
+                    },
+                    1000
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        "initialDocument": {
+          "blueId": "EFe3xQqmYhU7aTfET5Mw5bhiHWn7h57HUQV8PLpezV5w"
+        },
+        "operation": "approveOrder"
+      },
+      "type": {
+        "blueId": "DWqQ7Hoc2tx3XpNbY9shHmzUZNv4X3rm8BqdUmh8J3Xo"
+      },
+      "validation": {
+        "function": {
+          "expr": {
+            "$eq": [
+              {
+                "$keys": {
+                  "$binding": "request"
+                }
+              },
+              []
+            ]
+          }
+        }
+      }
+    }
+  },
+  "target": {
+    "blueId": "5WtiEMi3J29Rr6WB253VxSbe1KJzMHS6xWJ873tVz1BP"
+  },
+  "type": {
+    "blueId": "DS6J36EQm2d1TyTkeZP2n2BCMWb2ZK9ES1JGub1sAVWX"
+  }
+}

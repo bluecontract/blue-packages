@@ -1,0 +1,128 @@
+id: 06-embedded
+document:
+  child:
+    type: Tutorial/Counter
+    count: 0
+    requestsSeen: 0
+  lastChildCount: 0
+  contracts:
+    embedded:
+      type: Contracts/Process Embedded
+      paths:
+      - /child
+    refresh:
+      type: Contracts/Sequential Workflow
+      channel: childEvents
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /lastChildCount
+          val:
+            $document: /child/count
+    childEvents:
+      type: Contracts/Embedded Node Channel
+      sourcePath: /child
+      event:
+        kind: countChanged
+    report:
+      type: Contracts/Sequential Workflow
+      channel: childEvents
+      steps:
+      - type: Contracts/Trigger Event
+        event:
+          kind: childChanged
+          count:
+            $event: /event/count
+inputs:
+- eventTimestamp: 1000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: increase
+    request:
+      amount: 3
+  expect:
+    /child/count: 3
+    /child/requestsSeen: 1
+    /lastChildCount: 3
+  expectEvents:
+  - kind: childChanged
+    count: 3
+  expectRootCheckpoint: false
+definitions:
+  Tutorial/Counter:
+    name: Counter
+    count:
+      type: Integer
+      schema:
+        required: true
+    requestsSeen:
+      type: Integer
+      schema:
+        required: true
+    contracts:
+      input:
+        type: Contracts/External Channel
+      increase:
+        type: Contracts/Sequential Workflow Operation
+        channel: input
+        steps:
+        - type: Contracts/Compute
+          do:
+          - $appendChange:
+              op: replace
+              path: /count
+              val:
+                $add:
+                - $document: /count
+                - $binding: call/request/amount
+        - type: Contracts/Trigger Event
+          event:
+            kind: countChanged
+            count:
+              $document: /count
+        order: 10
+        request:
+          amount:
+            type: Integer
+            schema:
+              required: true
+      decrease:
+        type: Contracts/Sequential Workflow Operation
+        channel: input
+        steps:
+        - type: Contracts/Compute
+          do:
+          - $appendChange:
+              op: replace
+              path: /count
+              val:
+                $subtract:
+                - $document: /count
+                - $binding: call/request/amount
+        - type: Contracts/Trigger Event
+          event:
+            kind: countChanged
+            count:
+              $document: /count
+        order: 10
+        request:
+          amount:
+            type: Integer
+            schema:
+              required: true
+      observeCalls:
+        type: Contracts/Sequential Workflow
+        channel: input
+        steps:
+        - type: Contracts/Compute
+          do:
+          - $appendChange:
+              op: replace
+              path: /requestsSeen
+              val:
+                $add:
+                - $document: /requestsSeen
+                - 1
+        order: 20

@@ -1,0 +1,34 @@
+child:
+  type: Tutorial/Counter
+  count: 0
+  requestsSeen: 0
+lastChildCount: 0
+contracts:
+  embedded:
+    type: Contracts/Process Embedded
+    paths:
+    - /child
+  refresh:
+    type: Contracts/Sequential Workflow
+    channel: childEvents
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - op: replace
+        path: /lastChildCount
+        val:
+          $document: /child/count
+  childEvents:
+    type: Contracts/Embedded Node Channel
+    sourcePath: /child
+    event:
+      kind: countChanged
+  report:
+    type: Contracts/Sequential Workflow
+    channel: childEvents
+    steps:
+    - type: Contracts/Trigger Event
+      event:
+        kind: childChanged
+        count:
+          $event: /event/count

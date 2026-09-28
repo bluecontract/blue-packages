@@ -1,0 +1,76 @@
+name: Tutorial Order Factory Host
+documentId: tutorial-order-factory-host
+initializedOrderCount: 0
+lastInitializedOrder: none
+orders: {}
+
+contracts:
+  embedded:
+    type: Process Embedded
+    collectionPaths:
+      - /orders
+
+  merchantChannel:
+    type: Coordination/Timeline Channel
+    timeline:
+      type: MyOS/MyOS Timeline
+      timelineId: tutorial/order-factory/merchant
+    actor:
+      type: MyOS/Principal Actor
+      accountId: merchant
+
+  createOrder01:
+    name: Create Order 01
+    description: Add one complete managed Order supplied by the caller.
+    type: Coordination/Sequential Workflow Operation
+    channel: merchantChannel
+    request:
+      order: {}
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: add
+              path: /orders/order-01
+              val:
+                $binding: event/message/request/order
+
+          - $return: true
+
+  fromOrderInitialized:
+    type: Embedded Node Channel
+    sourcePath: /orders/order-01
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Order Initialized
+
+  recordOrderInitialization:
+    type: Coordination/Sequential Workflow
+    channel: fromOrderInitialized
+    event:
+      type: Coordination/Event
+      kind: Tutorial/Order Initialized
+    steps:
+      - type: Coordination/Compute
+        do:
+          - $appendChange:
+              op: replace
+              path: /initializedOrderCount
+              val:
+                $add:
+                  - $document: /initializedOrderCount
+                  - 1
+
+          - $appendChange:
+              op: replace
+              path: /lastInitializedOrder
+              val:
+                $document: /orders/order-01/documentId
+
+          - $appendEvent:
+              type: Coordination/Event
+              kind: Tutorial/Host Observed Order Initialization
+              orderDocumentId:
+                $document: /orders/order-01/documentId
+
+          - $return: true

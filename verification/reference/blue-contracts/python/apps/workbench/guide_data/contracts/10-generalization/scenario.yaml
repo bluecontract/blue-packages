@@ -1,0 +1,46 @@
+id: 10-generalization
+document:
+  amount:
+    type: Tutorial/SmallAmount
+    value: 80
+  contracts:
+    input:
+      type: Contracts/External Channel
+    generalization:
+      type: Contracts/Type Generalization Policy
+      rules:
+      - path: /amount
+        mode: nearest-valid-ancestor
+        mustRemainSubtypeOf:
+          blueId: DxNUAFAnosXU9Z7E9QJfs4sHNZkoF9GiuNCqq4q842qQ
+    raiseAmount:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Update Document
+        changeset:
+        - op: replace
+          path: /amount/value
+          val: 120
+inputs:
+- eventTimestamp: 1000000
+  event:
+    type: Contracts/Operation Request
+    channel: input
+    operation: raiseAmount
+  expect:
+    /amount: 120
+  expectEvents: []
+  expectTypes:
+    /amount: Tutorial/Amount
+definitions:
+  Tutorial/Amount:
+    name: Amount
+    type: Integer
+    schema:
+      minimum: 0
+  Tutorial/SmallAmount:
+    name: SmallAmount
+    type: Tutorial/Amount
+    schema:
+      maximum: 100

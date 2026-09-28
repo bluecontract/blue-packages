@@ -1,0 +1,80 @@
+id: 11-unions
+document:
+  count: 0
+  contracts:
+    desk:
+      type: Contracts/External Channel
+      event:
+        location: desk
+    web:
+      type: Contracts/External Channel
+      event:
+        location: web
+    selectedInputs:
+      type: Contracts/Composite External Channels
+      order: 10
+      channels:
+      - desk
+      - web
+    overlap:
+      type: Contracts/Composite External Channels
+      order: 15
+      channels:
+      - desk
+      - selectedInputs
+    allInputs:
+      type: Contracts/All External Channels
+      order: 20
+    go:
+      type: Contracts/Sequential Workflow Operation
+      channel: desk
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /count
+            val:
+              $add:
+              - $document: /count
+              - 1
+    observeSelected:
+      type: Contracts/Sequential Workflow
+      channel: selectedInputs
+      steps:
+      - type: Contracts/Trigger Event
+        event:
+          kind: selectedInputSeen
+    observeOverlap:
+      type: Contracts/Sequential Workflow
+      channel: overlap
+      steps:
+      - type: Contracts/Trigger Event
+        event:
+          kind: overlapSeen
+    observeAll:
+      type: Contracts/Sequential Workflow
+      channel: allInputs
+      steps:
+      - type: Contracts/Trigger Event
+        event:
+          kind: anyInputSeen
+inputs:
+- eventTimestamp: 1000000
+  event:
+    location: desk
+    operation:
+      type: Contracts/Operation Request
+      channel: desk
+      operation: go
+  expect:
+    /count: 1
+  expectEvents:
+  - kind: selectedInputSeen
+  - kind: overlapSeen
+  - kind: anyInputSeen
+  expectCheckpointChannels:
+  - desk
+  - selectedInputs
+  - overlap
+  - allInputs

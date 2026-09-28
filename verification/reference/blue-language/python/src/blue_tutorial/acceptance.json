@@ -1,0 +1,35 @@
+{
+  "format": "blue-tutorial-command-observation/1",
+  "inputMyOSCommit": "164e90f4efe59bc6e57f44ab6055a5614367e18a",
+  "identityComparison": "Compare exact IDs only under equal repository, Language, and runtime profiles. Business observations are shared across profiles; gas is reported, not asserted Java-equivalent.",
+  "scenarios": [
+    {
+      "id": "counter-two-inputs",
+      "commands": [
+        {"action":"start","document":"counter","fixture":["06","counter.yaml"]},
+        {"action":"call","document":"counter","operation":"increment","channel":"aliceChannel","request":{"amount":3},"timestamp":10},
+        {"action":"call","document":"counter","operation":"decrement","channel":"bobChannel","request":{"amount":1},"timestamp":20}
+      ],
+      "assertions":[{"root":"counter","pointer":"/counter","equals":2}]
+    },
+    {
+      "id": "factory-independent-child",
+      "commands": [
+        {"action":"start","document":"factory","fixture":["18","factory-host.yaml"]},
+        {"action":"call","document":"factory","operation":"createOrder01","channel":"merchantChannel","request":{"$fixture":["18","factory-input.yaml"]},"timestamp":10},
+        {"action":"call","document":"tutorial-order","operation":"markReady","channel":"ownerChannel","request":{},"timestamp":30}
+      ],
+      "assertions":[{"root":"factory","pointer":"/initializedOrderCount","equals":1},{"root":"tutorial-order","pointer":"/status","equals":"ready"},{"root":"factory","document":"tutorial-order","pointer":"/status","equals":"draft"}]
+    },
+    {
+      "id": "historical-counter-attachment",
+      "commands":[
+        {"action":"start","document":"child","fixture":["10","01_child_counter.yaml"]},
+        {"action":"start","document":"parent","fixture":["10","02_host.yaml"]},
+        {"action":"call","document":"child","operation":"increment","channel":"ownerChannel","request":{"amount":3},"timestamp":10},
+        {"action":"call","document":"parent","operation":"attachChild","channel":"ownerChannel","request":{"child":{"$managedHead":"child"}},"timestamp":20}
+      ],
+      "assertions":[{"root":"parent","pointer":"/observedCounter","equals":3},{"root":"child","pointer":"/counter","equals":3}]
+    }
+  ]
+}
