@@ -22,12 +22,17 @@ python ../blue-packages/blue-mandates/examples/run_examples.py
 ```
 
 The Workbench Coordination tutorial includes “A delegates to B · a flag controls decrement”.
-The Runtime uses the exact shared Coordination publication. The supplied predecessor
-Mandates package is preserved by its provenance digest; this package revision rebinds
-that dependency while retaining the 19 type identities and normative protocol.
+The Runtime uses the exact shared Coordination publication. The current preview.3
+specifies the predicate host capabilities required by `$is`
+and `$nodeBlueId`, including function argument patterns and shared Language/BEX
+metering. It selects new rules, protocol, package and type identities. The exact
+preview.2 archive and authored inputs remain under
+`verification/publications/mandates-before-predicate-context-20260929/`.
 
-Original verification notes describe the incoming preview. Current integration evidence
-is in blue-python/docs/mandates-integration-20260927.md. No old workspace is rebound.
+Original verification notes describe the incoming preview. Initial integration evidence
+is in blue-python/docs/mandates-integration-20260927.md; the current correction is
+documented in blue-python/docs/mandate-predicates-20260929.md. No old workspace is
+rebound: the corrected runtime selects `blue-runtime/2026-09-29-mandate-predicates-1`.
 
 ### Locked reconstruction and deliberate revisions
 
@@ -37,7 +42,7 @@ Use the installed Blue Python library (`BLUE_PYTHON` selects its interpreter):
 ./blue-package verify        # retained archive only
 ./blue-package check-source  # current authored source + committed lock + native approval
 ./blue-package build         # staged locked reconstruction; identical dist is a no-op
-./blue-package candidate --output ../releases/mandates-preview-3 --version 0.1.0-preview.3 --revision reviewed-change
+./blue-package candidate --output ../releases/mandates-preview-4 --version 0.1.0-preview.4 --revision reviewed-change
 ```
 
 A candidate is a complete new directory, published by one rename. It does not

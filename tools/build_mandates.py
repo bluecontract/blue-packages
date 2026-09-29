@@ -44,7 +44,7 @@ def locked_dependencies(project, config, *, refresh=False):
     return packages, pins
 
 
-def compile_locked(project, *, revision='shared-mandates-20260927-2', version=None, refresh=False):
+def compile_locked(project, *, revision='shared-mandates-20260929-predicate-context-1', version=None, refresh=False):
     config = json.loads((project / 'blue-package.yaml').read_text())
     dependencies, pins = locked_dependencies(project, config, refresh=refresh)
     with tempfile.TemporaryDirectory(prefix='blue-mandates-build-') as tmp, PhysicalCache(65536).scope():
@@ -142,7 +142,7 @@ def main(argv=None):
         require(not args.output.exists(), 'Candidate destination already exists; immutable releases are not overwritten')
     elif args.output or args.revision or args.version or args.refresh_lock:
         parser.error('revision/lock changes require the explicit candidate command')
-    package,pins,rules=compile_locked(project,revision=args.revision or 'shared-mandates-20260927-2',version=args.version,refresh=args.refresh_lock)
+    package,pins,rules=compile_locked(project,revision=args.revision or 'shared-mandates-20260929-predicate-context-1',version=args.version,refresh=args.refresh_lock)
     if candidate:
         args.output.parent.mkdir(parents=True,exist_ok=True)
         with tempfile.TemporaryDirectory(dir=args.output.parent,prefix='.candidate-') as tmp:
