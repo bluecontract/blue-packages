@@ -97,12 +97,21 @@ PYTHONDONTWRITEBYTECODE=1 python tools/verify_packages.py
 
 # A deterministic data-only bundle of the 18 selected package archives.
 python3 tools/release.py bundle --output build/blue-packages.zip
+
+# Flat GitHub Release attachments: individual archives, ZIP, catalogue and checksums.
+python3 tools/release.py assets --output build/release
 ```
 
 The bundle includes a catalogue, checksums and distribution notes. It excludes
 runtime snapshots, tests, logs, unpacked duplicates and historical publications.
 Individual `dist/package.bluepkg` files remain the units to distribute and pin.
 The bundle is an artifact collection, not a replacement source checkout.
+
+The [GitHub Releases workflow](.github/workflows/packages-release.yml) checks and
+prepares these shared data artifacts on pull requests, `main` pushes and manual runs.
+Pushing a `blue-packages-*` tag publishes them as one collection for compatible
+Java, Python and other implementations. See [publishing](docs/publishing.md) for
+tagging, downloading and verification instructions.
 
 See [publishing](docs/publishing.md) for release checks and licensing status,
 [layout](docs/layout.md) for source ownership, and

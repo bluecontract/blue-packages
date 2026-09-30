@@ -4,7 +4,14 @@ This collection contains 18 current Blue data-package archives: Language, BEX,
 Contracts, Coordination, Agreements, Mutual Activation, Immediate Termination,
 Reseller Agreement, Agreement Examples, Mandates, Time and three commerce-function
 releases. `CATALOG.json` records each package's exact identity, version, exports,
-imports and archive SHA-256. `SHA256SUMS` checks every other bundled file.
+imports and archive SHA-256. When prepared as GitHub Release attachments, it also
+maps each package to its `<name>-<version>.bluepkg` filename via `releaseAsset`.
+All compatible language implementations use the same published documents.
+
+Inside the ZIP, `SHA256SUMS` checks every other bundled file. Alongside the Release
+attachments, the standalone `SHA256SUMS` checks the individual archives, ZIP,
+catalogue and distribution notices. Verify with `sha256sum --check SHA256SUMS`
+(on macOS, `shasum -a 256 --check SHA256SUMS`).
 
 Load individual `.bluepkg` files with a compatible Blue package reader. Native
 execution support must be selected separately in the Java or Python runtime.
