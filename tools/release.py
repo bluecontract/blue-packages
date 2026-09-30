@@ -41,7 +41,10 @@ def selections(root):
     time = next(row for row in preview['requiredPackages'] if row['name'] == 'blue-time')
     require(not any(row['name'] == 'blue-time' for row in rows), 'Time selection needs explicit review')
     rows.append(dict(time, path='blue-time/dist/package.bluepkg', selection='preview'))
-    require(len({r['name'] for r in rows}) == len(rows), 'Duplicate package name')
+    edition = json.loads((root / 'ROOT-CLAUSE-PACKAGES.json').read_text())
+    require(edition['nativeRuntimeModified'] is False, 'Business edition cannot register native support')
+    rows.extend(dict(row, selection=edition['edition']) for row in edition['packages'])
+    require(len({(r['selection'], r['name']) for r in rows}) == len(rows), 'Duplicate selected package name')
     require(len({r['path'] for r in rows}) == len(rows), 'Duplicate archive path')
     return sorted(rows, key=lambda row: row['name'])
 

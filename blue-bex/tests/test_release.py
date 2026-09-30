@@ -85,3 +85,12 @@ def test_corruption_rejected_before_use(package):
 def test_rebuild_is_byte_identical(package):
     p=build(ROOT,revision=REVISION,source_url='')
     assert p.archive==package.archive
+
+
+def test_explicit_empty_source_url_does_not_inherit_git_remote(monkeypatch):
+    import package_v2
+    monkeypatch.setattr(package_v2, 'git', lambda *args: 'git@github.com:example/local-checkout.git')
+    explicit = package_v2._source_info(ROOT, 'fixed-revision', '')
+    inferred = package_v2._source_info(ROOT, 'fixed-revision', None)
+    assert explicit == {'revision': 'fixed-revision', 'repository': ''}
+    assert inferred == {'revision': 'fixed-revision', 'repository': 'https://github.com/example/local-checkout'}

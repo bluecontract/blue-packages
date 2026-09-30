@@ -11,8 +11,8 @@ explicitly supports its exact protocol dependencies.
 
 ## Available packages
 
-There are **14 current package projects**, including three versions of the commerce
-function example. Follow the package links for sources, specifications and examples.
+There are **14 baseline package projects**, including three versions of the commerce
+function example, plus four explicitly selected root-clause editions. Follow the package links for sources, specifications and examples.
 
 | Package | Suggested import prefix | What it provides |
 | --- | --- | --- |
@@ -35,6 +35,16 @@ The foundation is Language → BEX → Contracts → Coordination. Agreements an
 business clauses compose on top of it. Mandates and Time specify additional protocol
 requirements. Exact imports are recorded in each `blue-package.lock.json`; the table
 is an overview, not a substitute for those pins.
+
+## Root-clause Agreement edition
+
+[Clauses generate the Agreement](editions/root-clauses/) adds four immutable
+business packages pinned in [ROOT-CLAUSE-PACKAGES.json](ROOT-CLAUSE-PACKAGES.json).
+The base Agreement initializes and reconciles Blue clause blueprints inside one
+managed root document. Reseller supplies Mutual Activation and Immediate
+Termination with bindings to its parameters. The existing shared selection and
+embedded-clause publications remain unchanged. Workbench selects this edition
+explicitly; this does not register any new native runtime behavior.
 
 ## Identities, names and content
 
@@ -85,7 +95,7 @@ python3 tools/release.py check
 # Semantic package/definition checks; Python 3.13+ with Blue Python installed.
 PYTHONDONTWRITEBYTECODE=1 python tools/verify_packages.py
 
-# A deterministic data-only bundle of the 14 current package archives.
+# A deterministic data-only bundle of the 18 selected package archives.
 python3 tools/release.py bundle --output build/blue-packages.zip
 ```
 

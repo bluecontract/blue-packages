@@ -1,6 +1,6 @@
 # Blue package archives
 
-This collection contains 14 current Blue data-package archives: Language, BEX,
+This collection contains 18 current Blue data-package archives: Language, BEX,
 Contracts, Coordination, Agreements, Mutual Activation, Immediate Termination,
 Reseller Agreement, Agreement Examples, Mandates, Time and three commerce-function
 releases. `CATALOG.json` records each package's exact identity, version, exports,
@@ -24,3 +24,7 @@ The project has no declared repository-wide license. Existing provenance and not
 are retained in `THIRD-PARTY-NOTICES.md`; its referenced implementation snapshot is
 source-repository material and is not part of this data bundle. Confirm publication
 rights and licensing before public redistribution.
+
+The four `root-clause-bindings-20260929-1` business archives are an explicit
+selection in `editions/root-clauses/`; they do not replace the shared aliases
+or expand approved native protocol support.

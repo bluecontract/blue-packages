@@ -1,0 +1,126 @@
+{
+  "name": "Immediate Termination Clause",
+  "type": "Agreements/Clause",
+  "description": "Root-local termination right. Only a configured principal may exercise the exact accepted policy; business termination does not stop the processor.",
+  "parameters": {},
+  "bindings": {},
+  "parameterDefinitions": {
+    "allowedParty": {
+      "kind": "text",
+      "enum": [
+        "A",
+        "B",
+        "EITHER"
+      ]
+    },
+    "acceptedPolicyPointer": {
+      "kind": "text"
+    }
+  },
+  "bindingDefinitions": {
+    "activated": "state",
+    "terminated": "state",
+    "acceptedTerms": "state",
+    "acceptedRevision": "state",
+    "record": "state",
+    "policy": "state",
+    "channelA": "channel",
+    "channelB": "channel",
+    "initialize": "contract",
+    "terminateA": "contract",
+    "terminateB": "contract"
+  },
+  "stateDefinitions": {
+    "terminated": {
+      "kind": "boolean",
+      "initial": false
+    },
+    "record": {
+      "kind": "object",
+      "initial": {}
+    },
+    "policy": {
+      "kind": "object",
+      "initial": {}
+    }
+  },
+  "freezeBindings": [
+    "activated",
+    "terminated"
+  ],
+  "features": {
+    "initialize": {
+      "template": {
+        "type": "Contracts/Sequential Workflow",
+        "channel": "_installation",
+        "steps": [
+          {
+            "type": "Contracts/Compute",
+            "definition": {
+              "type": "ImmediateTermination/Root Termination Logic"
+            },
+            "entry": "initialize",
+            "constants": {}
+          }
+        ]
+      },
+      "category": "handler",
+      "fills": [],
+      "constantsAt": [
+        "/steps/0/constants"
+      ]
+    },
+    "terminateA": {
+      "template": {
+        "type": "Contracts/Sequential Workflow Operation",
+        "channel": "partyA",
+        "steps": [
+          {
+            "type": "Contracts/Compute",
+            "definition": {
+              "type": "ImmediateTermination/Root Termination Logic"
+            },
+            "entry": "terminateA",
+            "constants": {}
+          }
+        ]
+      },
+      "category": "handler",
+      "fills": [
+        {
+          "path": "/channel",
+          "binding": "channelA"
+        }
+      ],
+      "constantsAt": [
+        "/steps/0/constants"
+      ]
+    },
+    "terminateB": {
+      "template": {
+        "type": "Contracts/Sequential Workflow Operation",
+        "channel": "partyB",
+        "steps": [
+          {
+            "type": "Contracts/Compute",
+            "definition": {
+              "type": "ImmediateTermination/Root Termination Logic"
+            },
+            "entry": "terminateB",
+            "constants": {}
+          }
+        ]
+      },
+      "category": "handler",
+      "fills": [
+        {
+          "path": "/channel",
+          "binding": "channelB"
+        }
+      ],
+      "constantsAt": [
+        "/steps/0/constants"
+      ]
+    }
+  }
+}
