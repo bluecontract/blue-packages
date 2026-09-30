@@ -1,0 +1,73 @@
+name: Blue Packages release
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['blue-packages-*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: blue-packages-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Verify and prepare shared data artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out exact revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python for the standard-library release tools
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - name: Test integrity and export behavior
+        run: python -m unittest discover -s tools -p 'test_release.py' -v
+      - name: Verify selected bytes and prepare release assets
+        run: python tools/release.py assets --output build/release
+      - name: Verify upload checksums
+        working-directory: build/release
+        run: sha256sum --check SHA256SUMS
+      - name: Keep prepared assets for review and publication
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: blue-packages-release
+          path: build/release/
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish the tagged collection to GitHub Releases
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/blue-packages-')
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified assets from this run
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: blue-packages-release
+          path: build/release
+      - name: Recheck upload checksums
+        working-directory: build/release
+        run: sha256sum --check SHA256SUMS
+      - name: Upload all assets, then publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          gh release create "$RELEASE_TAG" build/release/* \
+            --repo "$GH_REPO" --verify-tag --draft \
+            --title "Blue Packages ${RELEASE_TAG#blue-packages-}" \
+            --notes-file build/release/README.md
+          gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --draft=false
