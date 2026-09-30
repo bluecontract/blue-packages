@@ -2,7 +2,7 @@
 
 Protocol name: `owner-approved-operation-authority/1`  
 Package namespace: `Mandates`  
-Release status: Python integration preview, 27 September 2026
+Release status: Python integration preview, 29 September 2026
 
 ## 1. Scope and layer boundary
 
@@ -136,6 +136,29 @@ non-Boolean result or exhausted budget never authorizes. Predicate BEX uses the
 same pinned evaluator as the selected Contracts implementation. Each evaluation
 retains the unchanged 100,000 gas ceiling; this does not implement a cumulative
 user-level spending or resource budget.
+
+The authority-predicate host MUST provide Language-backed matching for `$is`
+and pure function argument patterns, and Language exact identity for `$nodeBlueId`.
+These are required read-only capabilities of both document and request predicates.
+They MUST use the same pinned Language implementation and resolution context as
+Contracts; a missing host callback is an invalid predicate host, not permission
+to skip a condition. This requirement does not enable effects or native intrinsics.
+
+The host MUST preserve exact operands, including nested references and their
+captured resolution context. `$nodeBlueId` MUST use Language identity, not a hash
+of a materialized JSON value; Integer and Number identities remain distinct.
+The document and candidate bindings MUST be the actual values defined in §6.
+
+Each evaluation MUST use one fresh ledger with the 100,000-gas limit above.
+Context view construction, demanded reads, Language matching (including function
+argument matching), identity construction and BEX evaluation MUST all debit that
+ledger using the selected Contracts logical-work tariffs and pinned BEX costs.
+The predicate ledger is separate from the target Contracts invocation and from
+other predicate evaluations. Physical caching MUST NOT change these logical charges.
+Invalid operands, unavailable required content, host interruption or exhausted gas
+MUST NOT confer authority. Required-content and host-incomplete failures MUST keep
+their existing waiting/incomplete classification rather than becoming permission
+or a semantic rejection.
 
 The standard lifecycle and Operation Mandate housekeeping declarations are protected.
 Concrete Mandates may add owner-reviewed workflows and state, but cannot replace

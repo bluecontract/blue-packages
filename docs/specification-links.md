@@ -15,6 +15,10 @@ The legacy `specification: null` transport-manifest field does not mean that the
 current metadata is missing. Do not replace a rules reference with the descriptor
 ID: that changes the type's meaning and identity.
 
+The Mandates predicate-host revision on 29 September 2026 intentionally selects
+new rules and rebinds all 19 types. See [the current release note](../blue-mandates/docs/predicate-context-20260929.md).
+The identities and unchanged-publication results below describe the prior release.
+
 ## Source correction on 28 September 2026
 
 The supplied `Blue_specification_audyt_i_typy_20260928.zip` audit identified 25
