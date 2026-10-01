@@ -66,3 +66,21 @@ Repeated equal flag assignments in the Workbench lesson emit no business flag
 or Scope Changed event. Checkpoints can still advance for processed inputs.
 The lesson synchronizes its embedded flag during initialization, after the base
 Operation Mandate initialization, and then on real embedded flag events.
+
+## Current authored predicate/scalar candidate
+
+The authored source now prepares `0.1.0-preview.4`, protocol
+`Mandates / owner-approved-operation-authority/3`, revision
+`shared-mandates-20261001-predicate-scalar-1`. Section4 retains the existing
+Language callback/shared-ledger requirements byte-for-byte; section6 adds the
+reviewed scalar lexical grant order, first complete match and reached error/WAIT
+rule, plus a cross-reference to section4. The four locked dependencies are unchanged.
+The exported types explicitly reference the new rules Text identity.
+
+The retained `dist`, inventory and native-support approval still describe the
+previous published edition. Use the explicit candidate command above to create
+new artifacts; ordinary check-source intentionally cannot certify this authored
+revision against an older native approval. Candidate generation does not adopt a
+runtime. Java implements and qualifies this edition first, followed by actual
+MyOS opt-in qualification and the matching Python/existing-spec port. Keep prior
+published IDs and archives immutable throughout that sequence.

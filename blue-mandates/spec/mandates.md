@@ -274,6 +274,28 @@ For candidate full key K = (timestamp, source Timeline tie-break, entry tie-brea
    Supply the original eligible entry to the target operation, without replacing
    the real actor with the holder.
 
+This edition orders scope grant keys by ascending lexicographic decoded Unicode
+scalar value. Compare the first unequal scalar numerically; a proper prefix sorts
+before its extension. Do not use UTF-16 code-unit order, locale collation,
+normalization, or case folding. For example, U+E000 sorts before U+10000.
+
+After the mandatory authority, participant, scope and predicate-validity
+prerequisites, evaluate complete grants in that order. Within a grant, evaluate
+target restrictions first, then document conditions, then request conditions.
+An ordinary nonmatch, including a completed false or non-Boolean predicate result,
+continues with the next grant. The first complete match is the selected grant and
+stops traversal. A reached interpreter/authority error or missing required
+evidence before that match stops with its existing invalid or waiting outcome;
+it must not be skipped in search of a later match. Predicates after a selected
+complete match are not evaluated. Mandatory whole-scope validity checks remain
+mandatory even when an earlier grant would match. Record the actual selected key
+and historical authority position under Coordination Q12; target-policy denial
+after selection does not replace that evidence with another grant.
+
+This ordering belongs to the explicitly selected owner-approved-operation-authority/3
+protocol. It does not reinterpret saved /1 or /2 assessments, the older Mandate namespace,
+Language identity hashing, BlueId order, or independent BEX/storage ordering.
+
 All restrictions within a grant are conjunctive. Different grants and different
 Mandates are alternative authority paths; checks cannot be mixed across them.
 A valid broad independent Mandate is not narrowed by the existence of another one.
@@ -283,6 +305,7 @@ The document predicate receives `$document` = historical processed Mandate and
 `$binding: targetDocument` = actual target before the candidate action. The request
 predicate receives `$document` = that Mandate and `$binding: request` = the actual
 operation payload. There is no caller-selected substitute target/request to validate.
+Both use the read-only Language host and single predicate ledger required by §4.
 
 A missing prefix or required history is WAITING, not permission and not proof of
 ineligibility. Once evidence is sufficient, a mismatching complete grant denies the
