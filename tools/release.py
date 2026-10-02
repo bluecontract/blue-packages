@@ -45,8 +45,12 @@ def selections(root):
     edition = json.loads((root / 'ROOT-CLAUSE-PACKAGES.json').read_text())
     require(edition['nativeRuntimeModified'] is False, 'Business edition cannot register native support')
     rows.extend(dict(row, selection=edition['edition']) for row in edition['packages'])
+    retained = root / 'RETAINED-PACKAGES.json'
+    if retained.exists():
+        rows.extend(json.loads(retained.read_text())['packages'])
     require(len({(r['selection'], r['name']) for r in rows}) == len(rows), 'Duplicate selected package name')
     require(len({r['path'] for r in rows}) == len(rows), 'Duplicate archive path')
+    require(len({(r['name'], r['packageBlueId']) for r in rows}) == len(rows), 'Ambiguous package identity')
     return sorted(rows, key=lambda row: row['name'])
 
 
@@ -158,6 +162,15 @@ def assets(output, catalogue, payloads, root=ROOT):
             require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', row[key]) is not None,
                     'Unsafe release asset ' + key + ': ' + row[key])
         name = row['name'] + '-' + row['version'] + '.bluepkg'
+        if 'releaseAsset' in row:
+            # Historical editions can share a display version. An explicit
+            # selection may disambiguate only with that exact immutable ID.
+            identity = row['packageBlueId']
+            require(re.fullmatch(r'[A-Za-z0-9]+', identity) is not None,
+                    'Unsafe release asset identity')
+            expected = row['name'] + '-' + row['version'] + '-' + identity + '.bluepkg'
+            require(row['releaseAsset'] == expected, 'Unsafe release asset override')
+            name = expected
         require(name not in files, 'Duplicate release asset: ' + name)
         data = payloads[row['path']]
         require(digest(data) == row['archiveSha256'], 'Release payload checksum differs: ' + name)
