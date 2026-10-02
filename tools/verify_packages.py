@@ -16,7 +16,8 @@ def main():
     selected=PackageStore(ROOT)
     assert {r['name']:r for r in inventory['packages']} == selected._entries, 'Consumer/shared selection differs'
     from blue_coordination.engine.mandate_package import supported_definition
-    assert json.loads((ROOT/'blue-mandates/docs/native-support.json').read_text()) == supported_definition(), 'Native approval differs'
+    mandate_root=(ROOT/selected._entries['blue-mandates']['path']).parent.parent
+    assert json.loads((mandate_root/'docs/native-support.json').read_text()) == supported_definition(), 'Native approval differs'
     checked=[]
     for row in selections(ROOT):
         package=read_package(ROOT/row['path'])

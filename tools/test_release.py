@@ -14,6 +14,24 @@ SPEC.loader.exec_module(release)
 
 
 class ReleaseTests(unittest.TestCase):
+    def test_retained_editions_cannot_alias_a_catalogue_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            current = dict(name='contracts', packageBlueId='current', path='current/dist/package.bluepkg')
+            (root / 'SHARED-PACKAGES.json').write_text(json.dumps({'packages': [current]}))
+            (root / 'ROOT-CLAUSE-PACKAGES.json').write_text(json.dumps(dict(
+                edition='roots', nativeRuntimeModified=False, packages=[])))
+            (root / 'blue-time/docs').mkdir(parents=True)
+            (root / 'blue-time/docs/integration-selection.json').write_text(json.dumps(dict(
+                approvedNativeSupport=False, requiredPackages=[dict(name='blue-time', packageBlueId='preview')])) )
+            previous = dict(current, path='previous/dist/package.bluepkg', selection='retained', packageBlueId='previous')
+            retained = root / 'RETAINED-PACKAGES.json'
+            retained.write_text(json.dumps({'packages': [previous]}))
+            self.assertEqual(3, len(release.selections(root)))
+            retained.write_text(json.dumps({'packages': [dict(previous, packageBlueId='current')]}))
+            with self.assertRaisesRegex(ValueError, 'Ambiguous package identity'):
+                release.selections(root)
+
     def fixture(self, root, *, extra=None):
         folder = root / 'example'
         dist = folder / 'dist'
@@ -149,6 +167,22 @@ class ReleaseTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'Release payload checksum differs'):
                 release.assets(output, catalogue, changed, root)
             self.assertFalse(output.exists())
+
+    def test_explicit_identity_suffix_preserves_same_version_historical_bytes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalogue, payloads = self.distribution_fixture(root)
+            row = catalogue['packages'][1]
+            row['version'] = catalogue['packages'][0]['version']
+            row['packageBlueId'] = 'HistoricalIdentity'
+            row['releaseAsset'] = row['name'] + '-' + row['version'] + '-HistoricalIdentity.bluepkg'
+            output = root / 'release'
+            release.assets(output, catalogue, payloads, root)
+            self.assertEqual(payloads[row['path']], (output / row['releaseAsset']).read_bytes())
+            row['releaseAsset'] = '../escape.bluepkg'
+            with self.assertRaisesRegex(ValueError, 'Unsafe release asset override'):
+                release.assets(root / 'invalid', catalogue, payloads, root)
+            self.assertFalse((root / 'invalid').exists())
 
     def test_assets_do_not_overwrite_existing_output(self):
         with tempfile.TemporaryDirectory() as tmp:
