@@ -12,7 +12,7 @@ explicitly supports its exact protocol dependencies.
 ## Available packages
 
 There are **14 baseline package projects**, including three versions of the commerce
-function example, plus four explicitly selected root-clause editions. Follow the package links for sources, specifications and examples.
+function example. Historical immutable editions are retained separately. Follow the package links for sources, specifications and examples.
 
 | Package | Suggested import prefix | What it provides |
 | --- | --- | --- |
@@ -36,15 +36,22 @@ business clauses compose on top of it. Mandates and Time specify additional prot
 requirements. Exact imports are recorded in each `blue-package.lock.json`; the table
 is an overview, not a substitute for those pins.
 
-## Root-clause Agreement edition
+## Current Agreement model
 
-[Clauses generate the Agreement](editions/root-clauses/) adds four immutable
-business packages pinned in [ROOT-CLAUSE-PACKAGES.json](ROOT-CLAUSE-PACKAGES.json).
-The base Agreement initializes and reconciles Blue clause blueprints inside one
-managed root document. Reseller supplies Mutual Activation and Immediate
-Termination with bindings to its parameters. The existing shared selection and
-embedded-clause publications remain unchanged. Workbench selects this edition
-explicitly; this does not register any new native runtime behavior.
+The four top-level Agreement projects now use **root clauses, version 0.3.0-rc.1**.
+[ROOT-CLAUSE-PACKAGES.json](ROOT-CLAUSE-PACKAGES.json) pins their exact publications.
+Clauses install state and workflows into one managed root document. The installer
+supports atomic add/edit/remove amendments, revision checks, typed change events,
+whole workflow parameters and references to existing fields.
+
+Start with [the authoring guide](blue-agreements/docs/root-clauses.md) and
+[Java qualification results](docs/root-clause-amendments.md).
+
+The previous top-level embedded-clause projects are preserved in
+[editions/embedded-clauses](editions/embedded-clauses/). SHARED-PACKAGES.json keeps
+those legacy identities, so existing consumers can continue using that selection.
+The original root-clause preview remains in editions/root-clauses with its own
+SELECTION.json. Selecting the new release does not migrate an existing instance.
 
 ## Identities, names and content
 

@@ -1,0 +1,501 @@
+{
+  "name": "Root Termination Logic",
+  "type": "Contracts/Compute Definition",
+  "functions": {
+    "initialize": {
+      "do": [
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": {
+              "$const": {
+                "name": "bindings",
+                "path": "/policy"
+              }
+            },
+            "val": {
+              "initialAllowedParty": {
+                "$const": {
+                  "name": "parameters",
+                  "path": "/allowedParty"
+                }
+              },
+              "acceptedTermsPath": {
+                "$const": {
+                  "name": "bindings",
+                  "path": "/acceptedTerms"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "terminate": {
+      "args": {
+        "side": {
+          "type": "Text"
+        }
+      },
+      "do": [
+        {
+          "$let": {
+            "name": "r",
+            "expr": {
+              "$binding": "call/request"
+            }
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$isKind": {
+                  "val": {
+                    "$var": "r"
+                  },
+                  "kind": "object"
+                }
+              }
+            },
+            "message": "REQUEST_REQUIRED"
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$and": [
+                  {
+                    "$isKind": {
+                      "val": {
+                        "$pointerGet": {
+                          "object": {
+                            "$var": "r"
+                          },
+                          "path": "/requestId"
+                        }
+                      },
+                      "kind": "text"
+                    }
+                  },
+                  {
+                    "$ne": [
+                      {
+                        "$pointerGet": {
+                          "object": {
+                            "$var": "r"
+                          },
+                          "path": "/requestId"
+                        }
+                      },
+                      ""
+                    ]
+                  }
+                ]
+              }
+            },
+            "message": "REQUEST_ID_REQUIRED"
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$var": "r"
+              }
+            },
+            "item": "requestField",
+            "do": [
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$includes": {
+                        "list": {
+                          "$literal": [
+                            "requestId",
+                            "termsId",
+                            "reason"
+                          ]
+                        },
+                        "val": {
+                          "$var": "requestField"
+                        }
+                      }
+                    }
+                  },
+                  "message": "UNKNOWN_TERMINATION_FIELD"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$isKind": {
+                  "val": {
+                    "$pointerGet": {
+                      "object": {
+                        "$var": "r"
+                      },
+                      "path": "/reason",
+                      "default": ""
+                    }
+                  },
+                  "kind": "text"
+                }
+              }
+            },
+            "message": "REASON_MUST_BE_TEXT"
+          }
+        },
+        {
+          "$let": {
+            "name": "rh",
+            "expr": {
+              "$nodeBlueId": {
+                "$var": "r"
+              }
+            }
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$eq": [
+                {
+                  "$document": {
+                    "$const": {
+                      "name": "bindings",
+                      "path": "/terminated"
+                    }
+                  }
+                },
+                true
+              ]
+            },
+            "then": [
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$and": [
+                        {
+                          "$eq": [
+                            {
+                              "$pointerGet": {
+                                "object": {
+                                  "$document": {
+                                    "$const": {
+                                      "name": "bindings",
+                                      "path": "/record"
+                                    }
+                                  }
+                                },
+                                "path": "/side"
+                              }
+                            },
+                            {
+                              "$var": "side"
+                            }
+                          ]
+                        },
+                        {
+                          "$eq": [
+                            {
+                              "$pointerGet": {
+                                "object": {
+                                  "$document": {
+                                    "$const": {
+                                      "name": "bindings",
+                                      "path": "/record"
+                                    }
+                                  }
+                                },
+                                "path": "/requestId"
+                              }
+                            },
+                            {
+                              "$var": {
+                                "name": "r",
+                                "path": "/requestId"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "$eq": [
+                            {
+                              "$pointerGet": {
+                                "object": {
+                                  "$document": {
+                                    "$const": {
+                                      "name": "bindings",
+                                      "path": "/record"
+                                    }
+                                  }
+                                },
+                                "path": "/requestHash"
+                              }
+                            },
+                            {
+                              "$var": "rh"
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "message": "ALREADY_TERMINATED"
+                }
+              },
+              {
+                "$return": {}
+              }
+            ]
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$eq": [
+                  {
+                    "$document": {
+                      "$const": {
+                        "name": "bindings",
+                        "path": "/activated"
+                      }
+                    }
+                  },
+                  true
+                ]
+              }
+            },
+            "message": "AGREEMENT_NOT_ACTIVE"
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$eq": [
+                  {
+                    "$pointerGet": {
+                      "object": {
+                        "$var": "r"
+                      },
+                      "path": "/termsId"
+                    }
+                  },
+                  {
+                    "$pointerGet": {
+                      "object": {
+                        "$document": {
+                          "$const": {
+                            "name": "bindings",
+                            "path": "/acceptedRevision"
+                          }
+                        }
+                      },
+                      "path": "/termsId"
+                    }
+                  }
+                ]
+              }
+            },
+            "message": "STALE_TERMS"
+          }
+        },
+        {
+          "$let": {
+            "name": "policy",
+            "expr": {
+              "$pointerGet": {
+                "object": {
+                  "$document": {
+                    "$const": {
+                      "name": "bindings",
+                      "path": "/acceptedTerms"
+                    }
+                  }
+                },
+                "path": {
+                  "$const": {
+                    "name": "parameters",
+                    "path": "/acceptedPolicyPointer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$includes": {
+                  "list": {
+                    "$literal": [
+                      "A",
+                      "B",
+                      "EITHER"
+                    ]
+                  },
+                  "val": {
+                    "$var": "policy"
+                  }
+                }
+              }
+            },
+            "message": "ACCEPTED_POLICY_REQUIRED"
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$or": [
+                  {
+                    "$eq": [
+                      {
+                        "$var": "policy"
+                      },
+                      "EITHER"
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      {
+                        "$var": "policy"
+                      },
+                      {
+                        "$var": "side"
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "message": "PARTY_NOT_ALLOWED_TO_TERMINATE"
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": {
+              "$const": {
+                "name": "bindings",
+                "path": "/record"
+              }
+            },
+            "val": {
+              "side": {
+                "$var": "side"
+              },
+              "requestId": {
+                "$var": {
+                  "name": "r",
+                  "path": "/requestId"
+                }
+              },
+              "requestHash": {
+                "$var": "rh"
+              },
+              "termsId": {
+                "$pointerGet": {
+                  "object": {
+                    "$document": {
+                      "$const": {
+                        "name": "bindings",
+                        "path": "/acceptedRevision"
+                      }
+                    }
+                  },
+                  "path": "/termsId"
+                }
+              },
+              "reason": {
+                "$pointerGet": {
+                  "object": {
+                    "$var": "r"
+                  },
+                  "path": "/reason",
+                  "default": ""
+                }
+              },
+              "timestampUs": {
+                "$binding": "timestamp"
+              },
+              "eventId": {
+                "$nodeBlueId": {
+                  "$binding": "processingEvent"
+                }
+              }
+            }
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": {
+              "$const": {
+                "name": "bindings",
+                "path": "/terminated"
+              }
+            },
+            "val": true
+          }
+        },
+        {
+          "$appendEvent": {
+            "kind": "Agreement Terminated",
+            "party": {
+              "$var": "side"
+            },
+            "termsId": {
+              "$pointerGet": {
+                "object": {
+                  "$document": {
+                    "$const": {
+                      "name": "bindings",
+                      "path": "/acceptedRevision"
+                    }
+                  }
+                },
+                "path": "/termsId"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "terminateA": {
+      "do": [
+        {
+          "$call": {
+            "function": "terminate",
+            "args": {
+              "side": "A"
+            }
+          }
+        }
+      ]
+    },
+    "terminateB": {
+      "do": [
+        {
+          "$call": {
+            "function": "terminate",
+            "args": {
+              "side": "B"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
