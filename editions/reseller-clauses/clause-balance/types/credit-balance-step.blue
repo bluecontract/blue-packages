@@ -1,0 +1,217 @@
+name: Credit Balance Step
+type: Contracts/Compute
+constants: {}
+do:
+- $let:
+    name: source
+    expr:
+      $pointerGet:
+        object:
+          $event: ''
+        path:
+          $const: sourcePath
+- $let:
+    name: amount
+    expr:
+      $pointerGet:
+        object:
+          $event: ''
+        path:
+          $const: amountPath
+- $let:
+    name: currency
+    expr:
+      $pointerGet:
+        object:
+          $event: ''
+        path:
+          $const: currencyPath
+- $let:
+    name: balance
+    expr:
+      $document:
+        $const: statePath
+- $if:
+    cond:
+      $not:
+        $and:
+        - $and:
+          - $isKind:
+              val:
+                $var: source
+              kind: text
+          - $ne:
+            - $var: source
+            - ''
+          - $eq:
+            - $size:
+                $split:
+                  text:
+                    $var: source
+                  separator: /
+            - 1
+          - $eq:
+            - $size:
+                $split:
+                  text:
+                    $var: source
+                  separator: '~'
+            - 1
+        - $and:
+          - $isKind:
+              val:
+                $var: amount
+              kind: integer
+          - $gte:
+            - $var: amount
+            - 0
+          - $lte:
+            - $var: amount
+            - 1000000000000
+        - $and:
+          - $isKind:
+              val:
+                $const: rateBps
+              kind: integer
+          - $gte:
+            - $const: rateBps
+            - 0
+          - $lte:
+            - $const: rateBps
+            - 10000
+        - $eq:
+          - $var: currency
+          - $var:
+              name: balance
+              path: /currency
+    then:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Business Operation Rejected
+        - code: INVALID_BALANCE_CREDIT
+    - $return: {}
+- $if:
+    cond:
+      $hasKey:
+        object:
+          $var:
+            name: balance
+            path: /credits
+        key:
+          $var: source
+    then:
+    - $return: {}
+- $let:
+    name: remainder
+    expr:
+      $multiply:
+      - $var: amount
+      - $const: rateBps
+- $let:
+    name: credit
+    expr: 0
+- $forEach:
+    item: power
+    in:
+      $literal:
+      - 1099511627776
+      - 549755813888
+      - 274877906944
+      - 137438953472
+      - 68719476736
+      - 34359738368
+      - 17179869184
+      - 8589934592
+      - 4294967296
+      - 2147483648
+      - 1073741824
+      - 536870912
+      - 268435456
+      - 134217728
+      - 67108864
+      - 33554432
+      - 16777216
+      - 8388608
+      - 4194304
+      - 2097152
+      - 1048576
+      - 524288
+      - 262144
+      - 131072
+      - 65536
+      - 32768
+      - 16384
+      - 8192
+      - 4096
+      - 2048
+      - 1024
+      - 512
+      - 256
+      - 128
+      - 64
+      - 32
+      - 16
+      - 8
+      - 4
+      - 2
+      - 1
+    do:
+    - $let:
+        name: piece
+        expr:
+          $multiply:
+          - $var: power
+          - 10000
+    - $if:
+        cond:
+          $gte:
+          - $var: remainder
+          - $var: piece
+        then:
+        - $set:
+            name: remainder
+            expr:
+              $subtract:
+              - $var: remainder
+              - $var: piece
+        - $set:
+            name: credit
+            expr:
+              $add:
+              - $var: credit
+              - $var: power
+- $appendChange:
+    op: add
+    path:
+      $concat:
+      - $const: statePath
+      - /credits/
+      - $var: source
+    val:
+      amountMinor:
+        $var: credit
+      basisMinor:
+        $var: amount
+      rateBps:
+        $const: rateBps
+- $appendChange:
+    op: add
+    path:
+      $concat:
+      - $const: statePath
+      - /amountMinor
+    val:
+      $add:
+      - $var:
+          name: balance
+          path: /amountMinor
+      - $var: credit
+- $appendEvent:
+    $merge:
+    - type: Balance/Balance Credited
+    - sourceId:
+        $var: source
+      amountMinor:
+        $var: credit
+      currency:
+        $var: currency

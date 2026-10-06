@@ -1,0 +1,19 @@
+name: Counter
+count: 0
+contracts:
+  input:
+    type: contracts/External Channel
+  increment:
+    type: contracts/Sequential Workflow Operation
+    channel: input
+    steps:
+      - type: contracts/Update Document
+        changeset:
+          - op: replace
+            path: /count
+            val:
+              $add: [{$document: /count}, 1]
+      - type: contracts/Trigger Event
+        event:
+          count:
+            $document: /count

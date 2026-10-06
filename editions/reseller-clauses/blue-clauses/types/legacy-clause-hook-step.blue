@@ -1,0 +1,204 @@
+constants: {}
+description: Reusable Clause Hook Step definition for the Clauses host profile.
+do:
+- $let:
+    name: context
+    expr:
+      actorChannel:
+        $document: /clauseRuntime/work/actorChannel
+      blueprint:
+        $document:
+          $concat:
+          - $choose:
+              cond:
+                $eq:
+                - $const: mode
+                - configuration
+              then: /clauseRuntime/work/candidate/
+              else: /clauses/
+          - $const: clauseKey
+          - /type
+      configurationId:
+        $document: /clauseRuntime/configurationId
+      initializing:
+        $document: /clauseRuntime/work/initializing
+      key:
+        $const: clauseKey
+      mode:
+        $const: mode
+      old:
+        $choose:
+          cond:
+            $document: /clauseRuntime/work/initializing
+          then: {}
+          else:
+            $pointerGet:
+              object:
+                $document: /clauses
+              path:
+                $concat:
+                - /
+                - $const: clauseKey
+              default: {}
+      oldConfiguration:
+        $choose:
+          cond:
+            $document: /clauseRuntime/work/initializing
+          then: {}
+          else:
+            $document: /clauses
+      proposed:
+        $pointerGet:
+          default: {}
+          object:
+            $document: /clauseRuntime/work/candidate
+          path:
+            $concat:
+            - /
+            - $const: clauseKey
+      proposedConfiguration:
+        $document: /clauseRuntime/work/candidate
+      request:
+        $document: /clauseRuntime/work/request
+- $let:
+    name: decision
+    expr:
+      $choose:
+        cond:
+          $eq:
+          - $const: mode
+          - configuration
+        then:
+          $call:
+            function: validateConfiguration
+            args:
+              context:
+                $var: context
+        else:
+          $call:
+            function: validateTransition
+            args:
+              context:
+                $var: context
+- $if:
+    cond:
+      $gt:
+      - $add:
+        - $size:
+            $changeset: true
+        - $size:
+            $events: true
+      - 0
+    then:
+    - $return:
+        allowed: false
+        code: CLAUSE_HOOK_EFFECTS_NOT_ALLOWED
+        changeset: []
+        events: []
+- $if:
+    cond:
+      $not:
+        $and:
+        - $isKind:
+            val:
+              $var: decision
+            kind: object
+        - $isKind:
+            val:
+              $var:
+                name: decision
+                path: /allowed
+            kind: boolean
+        - $isKind:
+            val:
+              $var:
+                name: decision
+                path: /code
+            kind: text
+    then:
+    - $return:
+        allowed: false
+        code: INVALID_CLAUSE_DECISION
+- $if:
+    cond:
+      $not:
+        $var:
+          name: decision
+          path: /allowed
+    then:
+    - $return:
+        $var: decision
+- $if:
+    cond:
+      $eq:
+      - $const: mode
+      - configuration
+    then:
+    - $let:
+        name: plan
+        expr:
+          $call:
+            function: plan
+            args:
+              context:
+                $var: context
+    - $if:
+        cond:
+          $gt:
+          - $add:
+            - $size:
+                $changeset: true
+            - $size:
+                $events: true
+          - 0
+        then:
+        - $return:
+            allowed: false
+            code: CLAUSE_HOOK_EFFECTS_NOT_ALLOWED
+            changeset: []
+            events: []
+    - $if:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: plan
+                    path: /states
+                kind: object
+            - $isKind:
+                val:
+                  $var:
+                    name: plan
+                    path: /contracts
+                kind: object
+            - $isKind:
+                val:
+                  $var:
+                    name: plan
+                    path: /reads
+                kind: list
+        then:
+        - $return:
+            allowed: false
+            code: INVALID_CLAUSE_PLAN
+    - $return:
+        allowed: true
+        code: ''
+        plan:
+          $var: plan
+- $return:
+    allowed: true
+    code: ''
+    governor:
+      $pointerGet:
+        object:
+          $var:
+            name: context
+            path: /blueprint
+        path: /governsAmendments
+        default: false
+functions: {}
+name: Legacy Clause Hook Step
+type: Contracts/Compute

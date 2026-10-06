@@ -1,0 +1,274 @@
+name: Timer Clause
+type: Clauses/Clause
+description: Registers one keyed timer after clause initialization using an explicit
+  scheduleAt expression. Runs steps on firing. Native Time owns registration, replacement,
+  cancellation and recovery; no duplicate timer state is kept in the document.
+hookAbi: document-context-1
+transitionUnconditional: true
+hookDefinition:
+  type: Contracts/Compute Definition
+  functions:
+    validateConfiguration:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $return:
+          $choose:
+            cond:
+              $and:
+              - $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: p
+                        path: /key
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: p
+                      path: /key
+                  - ''
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: p
+                            path: /key
+                        separator: /
+                  - 1
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: p
+                            path: /key
+                        separator: '~'
+                  - 1
+              - $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: b
+                        path: /channel
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: b
+                      path: /channel
+                  - ''
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: b
+                            path: /channel
+                        separator: /
+                  - 1
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: b
+                            path: /channel
+                        separator: '~'
+                  - 1
+              - $hasKey:
+                  object:
+                    $var: p
+                  key: scheduleAt
+              - $isKind:
+                  val:
+                    $var:
+                      name: p
+                      path: /steps
+                  kind: list
+            then:
+              allowed: true
+              code: ''
+            else:
+              allowed: false
+              code: INVALID_TIMER
+    validateTransition:
+      args: {}
+      do:
+      - $return:
+          allowed: true
+          code: ''
+    plan:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $let:
+          name: contributions
+          expr:
+            $objectFromEntries:
+            - key:
+                $var:
+                  name: b
+                  path: /channel
+              val:
+                kind: channel
+                contract:
+                  type: Time/Timer Channel
+            - key:
+                $concat:
+                - timer_
+                - $const: clauseKey
+                - _schedule
+              val:
+                kind: handler
+                contract:
+                  $merge:
+                  - type: Contracts/Sequential Workflow
+                  - channel: __clausesInitialized
+                    steps:
+                    - $merge:
+                      - type: Time/Schedule Timer
+                      - request:
+                          channel:
+                            $var:
+                              name: b
+                              path: /channel
+                          key:
+                            $var:
+                              name: p
+                              path: /key
+                          timestamp:
+                            $var:
+                              name: p
+                              path: /scheduleAt
+            - key:
+                $concat:
+                - timer_
+                - $const: clauseKey
+                - _fired
+              val:
+                kind: handler
+                contract:
+                  $merge:
+                  - type: Contracts/Sequential Workflow
+                  - channel:
+                      $var:
+                        name: b
+                        path: /channel
+                    event:
+                      request:
+                        key:
+                          $var:
+                            name: p
+                            path: /key
+                    steps:
+                      $var:
+                        name: p
+                        path: /steps
+      - $if:
+          cond:
+            $hasKey:
+              object:
+                $var: p
+              key: cancelOn
+          then:
+          - $set:
+              name: contributions
+              expr:
+                $objectSet:
+                  object:
+                    $var: contributions
+                  key:
+                    $concat:
+                    - timer_
+                    - $const: clauseKey
+                    - _cancelChannel
+                  val:
+                    kind: channel
+                    contract:
+                      $merge:
+                      - type: Contracts/Triggered Event Channel
+                      - event:
+                          $var:
+                            name: p
+                            path: /cancelOn
+          - $set:
+              name: contributions
+              expr:
+                $objectSet:
+                  object:
+                    $var: contributions
+                  key:
+                    $concat:
+                    - timer_
+                    - $const: clauseKey
+                    - _cancel
+                  val:
+                    kind: handler
+                    contract:
+                      $merge:
+                      - type: Contracts/Sequential Workflow
+                      - channel:
+                          $concat:
+                          - timer_
+                          - $const: clauseKey
+                          - _cancelChannel
+                        steps:
+                        - $merge:
+                          - type: Time/Cancel Timer
+                          - request:
+                              channel:
+                                $var:
+                                  name: b
+                                  path: /channel
+                              key:
+                                $var:
+                                  name: p
+                                  path: /key
+      - $return:
+          contracts:
+            $var: contributions
+          states: {}
+          reads: []

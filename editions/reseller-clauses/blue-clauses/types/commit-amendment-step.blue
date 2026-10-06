@@ -1,0 +1,1519 @@
+description: Atomically validate and reconcile composable clause plans. Only active
+  artifact ownership is retained.
+do:
+- $let:
+    name: plans
+    expr: {}
+- $let:
+    name: governors
+    expr: 0
+- $forEach:
+    item: ck
+    in:
+      $keys:
+        $choose:
+          cond:
+            $document: /clauseRuntime/work/initializing
+          then: {}
+          else:
+            $document: /clauses
+    do:
+    - $if:
+        cond:
+          $not:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauses/
+                  - $var: ck
+                  - /type
+              path: /transitionUnconditional
+              default: false
+        then:
+        - $let:
+            name: result
+            expr:
+              $steps:
+                step:
+                  $concat:
+                  - transition-
+                  - $var: ck
+        - $if:
+            cond:
+              $not:
+                $var:
+                  name: result
+                  path: /allowed
+            then:
+            - $call:
+                function: reject
+                args:
+                  code:
+                    $var:
+                      name: result
+                      path: /code
+            - $return: {}
+        - $if:
+            cond:
+              $pointerGet:
+                object:
+                  $var: result
+                path: /governor
+                default: false
+            then:
+            - $set:
+                name: governors
+                expr:
+                  $add:
+                  - $var: governors
+                  - 1
+- $if:
+    cond:
+      $and:
+      - $not:
+          $document: /clauseRuntime/work/initializing
+      - $eq:
+        - $var: governors
+        - 0
+    then:
+    - $call:
+        function: reject
+        args:
+          code: NO_AMENDMENT_AUTHORITY
+    - $return: {}
+- $forEach:
+    item: ck
+    in:
+      $keys:
+        $document: /clauseRuntime/work/candidate
+    do:
+    - $let:
+        name: result
+        expr:
+          $steps:
+            step:
+              $concat:
+              - configuration-
+              - $var: ck
+    - $if:
+        cond:
+          $not:
+            $var:
+              name: result
+              path: /allowed
+        then:
+        - $call:
+            function: reject
+            args:
+              code:
+                $var:
+                  name: result
+                  path: /code
+        - $return: {}
+    - $set:
+        name: plans
+        expr:
+          $objectSet:
+            object:
+              $var: plans
+            key:
+              $var: ck
+            val:
+              $var:
+                name: result
+                path: /plan
+- $let:
+    name: candidate
+    expr:
+      $document: /clauseRuntime/work/candidate
+- $let:
+    name: configId
+    expr:
+      $nodeBlueId:
+        clauses:
+          $var: candidate
+- $if:
+    cond:
+      $and:
+      - $not:
+          $document: /clauseRuntime/work/initializing
+      - $eq:
+        - $var: configId
+        - $document: /clauseRuntime/configurationId
+    then:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Amendment Unchanged
+        - configurationId:
+            $var: configId
+          requestId:
+            $document: /clauseRuntime/work/request/requestId
+          revision:
+            $document: /clauseRuntime/revision
+    - $appendChange:
+        op: add
+        path: /clauseRuntime/work
+        val: {}
+    - $appendChange:
+        op: remove
+        path: /contracts/__clausesApply
+    - $return: {}
+- $let:
+    name: wanted
+    expr: {}
+- $let:
+    name: managed
+    expr: {}
+- $let:
+    name: stateClaims
+    expr: {}
+- $let:
+    name: stateWrites
+    expr: {}
+- $let:
+    name: oldOwners
+    expr:
+      $document: /clauseRuntime/contracts
+- $let:
+    name: oldEmbedding
+    expr:
+      $document: /clauseRuntime/embedding
+- $let:
+    name: embedding
+    expr:
+      paths: []
+      collectionPaths: []
+- $let:
+    name: baselineEmbedding
+    expr:
+      paths: []
+      collectionPaths: []
+- $forEach:
+    item: field
+    in:
+      $literal:
+      - paths
+      - collectionPaths
+    do:
+    - $forEach:
+        item: p
+        in:
+          $pointerGet:
+            object:
+              $document: /contracts
+            path:
+              $concat:
+              - /embedded/
+              - $var: field
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $get:
+                      object:
+                        $var: oldEmbedding
+                      key:
+                        $var: field
+                  val:
+                    $var: p
+            then:
+            - $set:
+                name: baselineEmbedding
+                expr:
+                  $objectSet:
+                    object:
+                      $var: baselineEmbedding
+                    key:
+                      $var: field
+                    val:
+                      $listConcat:
+                      - $get:
+                          object:
+                            $var: baselineEmbedding
+                          key:
+                            $var: field
+                      - - $var: p
+- $forEach:
+    item: ck
+    in:
+      $keys:
+        $var: plans
+    do:
+    - $let:
+        name: plan
+        expr:
+          $get:
+            object:
+              $var: plans
+            key:
+              $var: ck
+    - $forEach:
+        item: binding
+        in:
+          $keys:
+            $var:
+              name: plan
+              path: /states
+        do:
+        - $let:
+            name: claim
+            expr:
+              $get:
+                object:
+                  $var:
+                    name: plan
+                    path: /states
+                key:
+                  $var: binding
+        - $let:
+            name: path
+            expr:
+              $var:
+                name: claim
+                path: /path
+        - $if:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: path
+                    kind: text
+                - $startsWith:
+                  - $var: path
+                  - /
+                - $and:
+                  - $isKind:
+                      val:
+                        $sliceAfter:
+                        - $var: path
+                        - /
+                      kind: text
+                  - $ne:
+                    - $sliceAfter:
+                      - $var: path
+                      - /
+                    - ''
+                  - $eq:
+                    - $size:
+                        $split:
+                          text:
+                            $sliceAfter:
+                            - $var: path
+                            - /
+                          separator: /
+                    - 1
+                  - $eq:
+                    - $size:
+                        $split:
+                          text:
+                            $sliceAfter:
+                            - $var: path
+                            - /
+                          separator: '~'
+                    - 1
+                - $not:
+                    $includes:
+                      list:
+                        $literal:
+                        - type
+                        - name
+                        - description
+                        - specification
+                        - contracts
+                        - clauses
+                        - clauseRuntime
+                        - value
+                        - items
+                        - itemType
+                        - keyType
+                        - valueType
+                        - schema
+                        - mergePolicy
+                      val:
+                        $sliceAfter:
+                        - $var: path
+                        - /
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: INVALID_STATE_PATH
+            - $return: {}
+        - $if:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $literal:
+                    - object
+                    - list
+                    - text
+                    - integer
+                    - boolean
+                    - double
+                  val:
+                    $var:
+                      name: claim
+                      path: /kind
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: INVALID_STATE_KIND
+            - $return: {}
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: stateClaims
+                key:
+                  $var: path
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: STATE_OWNER_COLLISION
+            - $return: {}
+        - $set:
+            name: stateClaims
+            expr:
+              $objectSet:
+                object:
+                  $var: stateClaims
+                key:
+                  $var: path
+                val:
+                  $var: claim
+        - $if:
+            cond:
+              $or:
+              - $not:
+                  $exists:
+                    $document:
+                      $var: path
+              - $and:
+                - $pointerGet:
+                    object:
+                      $var: claim
+                    path: /replace
+                    default: false
+                - $or:
+                  - $document: /clauseRuntime/work/initializing
+                  - $ne:
+                    - $get:
+                        object:
+                          $var: candidate
+                        key:
+                          $var: ck
+                    - $pointerGet:
+                        object:
+                          $document: /clauses
+                        path:
+                          $concat:
+                          - /
+                          - $var: ck
+                        default: {}
+            then:
+            - $let:
+                name: initial
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: claim
+                    path: /initial
+                    default: {}
+            - $if:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: claim
+                    key: from
+                then:
+                - $if:
+                    cond:
+                      $not:
+                        $and:
+                        - $isKind:
+                            val:
+                              $var:
+                                name: claim
+                                path: /from
+                            kind: text
+                        - $startsWith:
+                          - $var:
+                              name: claim
+                              path: /from
+                          - /
+                        - $and:
+                          - $isKind:
+                              val:
+                                $sliceAfter:
+                                - $var:
+                                    name: claim
+                                    path: /from
+                                - /
+                              kind: text
+                          - $ne:
+                            - $sliceAfter:
+                              - $var:
+                                  name: claim
+                                  path: /from
+                              - /
+                            - ''
+                          - $eq:
+                            - $size:
+                                $split:
+                                  text:
+                                    $sliceAfter:
+                                    - $var:
+                                        name: claim
+                                        path: /from
+                                    - /
+                                  separator: /
+                            - 1
+                          - $eq:
+                            - $size:
+                                $split:
+                                  text:
+                                    $sliceAfter:
+                                    - $var:
+                                        name: claim
+                                        path: /from
+                                    - /
+                                  separator: '~'
+                            - 1
+                        - $not:
+                            $includes:
+                              list:
+                                $literal:
+                                - type
+                                - name
+                                - description
+                                - specification
+                                - contracts
+                                - clauses
+                                - clauseRuntime
+                                - value
+                                - items
+                                - itemType
+                                - keyType
+                                - valueType
+                                - schema
+                                - mergePolicy
+                              val:
+                                $sliceAfter:
+                                - $var:
+                                    name: claim
+                                    path: /from
+                                - /
+                    then:
+                    - $call:
+                        function: reject
+                        args:
+                          code: INVALID_STATE_SOURCE
+                    - $return: {}
+                - $if:
+                    cond:
+                      $not:
+                        $exists:
+                          $document:
+                            $var:
+                              name: claim
+                              path: /from
+                    then:
+                    - $call:
+                        function: reject
+                        args:
+                          code: STATE_SOURCE_MISSING
+                    - $return: {}
+                - $set:
+                    name: initial
+                    expr:
+                      $document:
+                        $var:
+                          name: claim
+                          path: /from
+            - $if:
+                cond:
+                  $ne:
+                  - $kind:
+                      $var: initial
+                  - $var:
+                      name: claim
+                      path: /kind
+                then:
+                - $call:
+                    function: reject
+                    args:
+                      code: INVALID_INITIAL_STATE
+                - $return: {}
+            - $set:
+                name: stateWrites
+                expr:
+                  $objectSet:
+                    object:
+                      $var: stateWrites
+                    key:
+                      $var: path
+                    val:
+                      $var: initial
+            else:
+            - $if:
+                cond:
+                  $ne:
+                  - $kind:
+                      $document:
+                        $var: path
+                  - $var:
+                      name: claim
+                      path: /kind
+                then:
+                - $call:
+                    function: reject
+                    args:
+                      code: LIVE_STATE_KIND_MISMATCH
+                - $return: {}
+    - $forEach:
+        item: key
+        in:
+          $keys:
+            $var:
+              name: plan
+              path: /contracts
+        do:
+        - $let:
+            name: c
+            expr:
+              $get:
+                object:
+                  $var:
+                    name: plan
+                    path: /contracts
+                key:
+                  $var: key
+        - $let:
+            name: contract
+            expr:
+              $var:
+                name: c
+                path: /contract
+        - $let:
+            name: path
+            expr:
+              $concat:
+              - /contracts/
+              - $var: key
+        - $if:
+            cond:
+              $or:
+              - $not:
+                  $and:
+                  - $isKind:
+                      val:
+                        $var: key
+                      kind: text
+                  - $ne:
+                    - $var: key
+                    - ''
+                  - $eq:
+                    - $size:
+                        $split:
+                          text:
+                            $var: key
+                          separator: /
+                    - 1
+                  - $eq:
+                    - $size:
+                        $split:
+                          text:
+                            $var: key
+                          separator: '~'
+                    - 1
+              - $startsWith:
+                - $var: key
+                - __clauses
+              - $includes:
+                  list:
+                    $literal:
+                    - checkpoint
+                    - initialized
+                    - terminated
+                    - generalization
+                  val:
+                    $var: key
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: RESERVED_CONTRACT_KEY
+            - $return: {}
+        - $if:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $literal:
+                    - channel
+                    - handler
+                    - embedding
+                    - definition
+                  val:
+                    $var:
+                      name: c
+                      path: /kind
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: INVALID_CONTRACT_CATEGORY
+            - $return: {}
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $var:
+                    name: c
+                    path: /kind
+                - definition
+              - $not:
+                  $is:
+                    node:
+                      $var: contract
+                    pattern:
+                      type: Contracts/Compute Definition
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: CONTRIBUTION_ROLE_MISMATCH
+            - $return: {}
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $var:
+                    name: c
+                    path: /kind
+                - channel
+              - $not:
+                  $is:
+                    node:
+                      $var: contract
+                    pattern:
+                      type: Contracts/Channel
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: CONTRIBUTION_ROLE_MISMATCH
+            - $return: {}
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $var:
+                    name: c
+                    path: /kind
+                - handler
+              - $not:
+                  $is:
+                    node:
+                      $var: contract
+                    pattern:
+                      type: Contracts/Handler
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: CONTRIBUTION_ROLE_MISMATCH
+            - $return: {}
+        - $if:
+            cond:
+              $or:
+              - $and:
+                - $eq:
+                  - $var: key
+                  - embedded
+                - $ne:
+                  - $var:
+                      name: c
+                      path: /kind
+                  - embedding
+              - $and:
+                - $eq:
+                  - $var:
+                      name: c
+                      path: /kind
+                  - embedding
+                - $or:
+                  - $ne:
+                    - $var: key
+                    - embedded
+                  - $not:
+                      $is:
+                        node:
+                          $var: contract
+                        pattern:
+                          type: Contracts/Process Embedded
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: INVALID_EMBEDDING_CONTRIBUTION
+            - $return: {}
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: c
+                  path: /kind
+              - embedding
+            then:
+            - $forEach:
+                item: field
+                in:
+                  $literal:
+                  - paths
+                  - collectionPaths
+                do:
+                - $forEach:
+                    item: p
+                    in:
+                      $pointerGet:
+                        object:
+                          $var: contract
+                        path:
+                          $concat:
+                          - /
+                          - $var: field
+                        default: []
+                    do:
+                    - $if:
+                        cond:
+                          $not:
+                            $includes:
+                              list:
+                                $get:
+                                  object:
+                                    $var: embedding
+                                  key:
+                                    $var: field
+                              val:
+                                $var: p
+                        then:
+                        - $set:
+                            name: embedding
+                            expr:
+                              $objectSet:
+                                object:
+                                  $var: embedding
+                                key:
+                                  $var: field
+                                val:
+                                  $listConcat:
+                                  - $get:
+                                      object:
+                                        $var: embedding
+                                      key:
+                                        $var: field
+                                  - - $var: p
+            else:
+            - $if:
+                cond:
+                  $and:
+                  - $hasKey:
+                      object:
+                        $var: wanted
+                      key:
+                        $var: key
+                  - $ne:
+                    - $get:
+                        object:
+                          $var: wanted
+                        key:
+                          $var: key
+                    - $var: c
+                then:
+                - $call:
+                    function: reject
+                    args:
+                      code: CONTRACT_CONTRIBUTION_CONFLICT
+                - $return: {}
+            - $if:
+                cond:
+                  $and:
+                  - $exists:
+                      $document:
+                        $var: path
+                  - $not:
+                      $hasKey:
+                        object:
+                          $var: oldOwners
+                        key:
+                          $var: key
+                  - $ne:
+                    - $document:
+                        $var: path
+                    - $var: contract
+                then:
+                - $call:
+                    function: reject
+                    args:
+                      code: HOST_CONTRACT_CONFLICT
+                - $return: {}
+            - $set:
+                name: wanted
+                expr:
+                  $objectSet:
+                    object:
+                      $var: wanted
+                    key:
+                      $var: key
+                    val:
+                      $var: c
+            - $if:
+                cond:
+                  $or:
+                  - $hasKey:
+                      object:
+                        $var: oldOwners
+                      key:
+                        $var: key
+                  - $not:
+                      $exists:
+                        $document:
+                          $var: path
+                then:
+                - $set:
+                    name: managed
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: managed
+                        key:
+                          $var: key
+                        val: true
+- $let:
+    name: ownedEmbedding
+    expr:
+      paths: []
+      collectionPaths: []
+- $forEach:
+    item: field
+    in:
+      $literal:
+      - paths
+      - collectionPaths
+    do:
+    - $forEach:
+        item: p
+        in:
+          $get:
+            object:
+              $var: embedding
+            key:
+              $var: field
+        do:
+        - $if:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $get:
+                      object:
+                        $var: baselineEmbedding
+                      key:
+                        $var: field
+                  val:
+                    $var: p
+            then:
+            - $set:
+                name: ownedEmbedding
+                expr:
+                  $objectSet:
+                    object:
+                      $var: ownedEmbedding
+                    key:
+                      $var: field
+                    val:
+                      $listConcat:
+                      - $get:
+                          object:
+                            $var: ownedEmbedding
+                          key:
+                            $var: field
+                      - - $var: p
+    - $set:
+        name: embedding
+        expr:
+          $objectSet:
+            object:
+              $var: embedding
+            key:
+              $var: field
+            val:
+              $listConcat:
+              - $get:
+                  object:
+                    $var: baselineEmbedding
+                  key:
+                    $var: field
+              - $get:
+                  object:
+                    $var: ownedEmbedding
+                  key:
+                    $var: field
+- $if:
+    cond:
+      $gt:
+      - $add:
+        - $size:
+            $var:
+              name: embedding
+              path: /paths
+        - $size:
+            $var:
+              name: embedding
+              path: /collectionPaths
+      - 0
+    then:
+    - $set:
+        name: wanted
+        expr:
+          $objectSet:
+            object:
+              $var: wanted
+            key: embedded
+            val:
+              kind: embedding
+              contract:
+                $merge:
+                - type: Contracts/Process Embedded
+                - $var: embedding
+    - $set:
+        name: managed
+        expr:
+          $objectSet:
+            object:
+              $var: managed
+            key: embedded
+            val: true
+- $forEach:
+    item: ck
+    in:
+      $keys:
+        $var: plans
+    do:
+    - $forEach:
+        item: read
+        in:
+          $pointerGet:
+            object:
+              $get:
+                object:
+                  $var: plans
+                key:
+                  $var: ck
+            path: /reads
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $or:
+                - $hasKey:
+                    object:
+                      $var: stateClaims
+                    key:
+                      $var:
+                        name: read
+                        path: /path
+                - $exists:
+                    $document:
+                      $var:
+                        name: read
+                        path: /path
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: STATE_DEPENDENCY_MISSING
+            - $return: {}
+        - $if:
+            cond:
+              $ne:
+              - $choose:
+                  cond:
+                    $hasKey:
+                      object:
+                        $var: stateClaims
+                      key:
+                        $var:
+                          name: read
+                          path: /path
+                  then:
+                    $pointerGet:
+                      object:
+                        $get:
+                          object:
+                            $var: stateClaims
+                          key:
+                            $var:
+                              name: read
+                              path: /path
+                      path: /kind
+                  else:
+                    $kind:
+                      $document:
+                        $var:
+                          name: read
+                          path: /path
+              - $var:
+                  name: read
+                  path: /kind
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: STATE_DEPENDENCY_KIND_MISMATCH
+            - $return: {}
+- $forEach:
+    item: key
+    in:
+      $keys:
+        $var: wanted
+    do:
+    - $let:
+        name: c
+        expr:
+          $get:
+            object:
+              $var: wanted
+            key:
+              $var: key
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: c
+              path: /kind
+          - handler
+        then:
+        - $let:
+            name: channel
+            expr:
+              $pointerGet:
+                object:
+                  $var:
+                    name: c
+                    path: /contract
+                path: /channel
+        - $if:
+            cond:
+              $not:
+                $choose:
+                  cond:
+                    $hasKey:
+                      object:
+                        $var: wanted
+                      key:
+                        $var: channel
+                  then:
+                    $eq:
+                    - $pointerGet:
+                        object:
+                          $get:
+                            object:
+                              $var: wanted
+                            key:
+                              $var: channel
+                        path: /kind
+                    - channel
+                  else:
+                    $and:
+                    - $not:
+                        $hasKey:
+                          object:
+                            $var: oldOwners
+                          key:
+                            $var: channel
+                    - $is:
+                        node:
+                          $document:
+                            $concat:
+                            - /contracts/
+                            - $var: channel
+                        pattern:
+                          type: Contracts/Channel
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: HANDLER_CHANNEL_MISSING
+            - $return: {}
+- $let:
+    name: revision
+    expr:
+      $add:
+      - $document: /clauseRuntime/revision
+      - 1
+- $let:
+    name: beforeId
+    expr:
+      $document: /clauseRuntime/configurationId
+- $let:
+    name: requestId
+    expr:
+      $document: /clauseRuntime/work/request/requestId
+- $let:
+    name: initializing
+    expr:
+      $document: /clauseRuntime/work/initializing
+- $let:
+    name: changed
+    expr: []
+- $forEach:
+    item: ck
+    in:
+      $keys:
+        $merge:
+        - $document: /clauses
+        - $var: candidate
+    do:
+    - $if:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $document: /clauses
+              path:
+                $concat:
+                - /
+                - $var: ck
+              default: {}
+          - $pointerGet:
+              object:
+                $var: candidate
+              path:
+                $concat:
+                - /
+                - $var: ck
+              default: {}
+        then:
+        - $set:
+            name: changed
+            expr:
+              $listConcat:
+              - $var: changed
+              - - $var: ck
+- $forEach:
+    item: path
+    in:
+      $keys:
+        $var: stateWrites
+    do:
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $get:
+            object:
+              $var: stateWrites
+            key:
+              $var: path
+- $appendChange:
+    op: add
+    path: /clauses
+    val:
+      $var: candidate
+- $appendChange:
+    op: add
+    path: /clauseRuntime
+    val:
+      revision:
+        $var: revision
+      configurationId:
+        $var: configId
+      contracts:
+        $var: managed
+      embedding:
+        $var: ownedEmbedding
+      work: {}
+- $if:
+    cond:
+      $var: initializing
+    then:
+    - $let:
+        name: finalContracts
+        expr:
+          $document: /contracts
+    - $forEach:
+        item: key
+        in:
+          $keys:
+            $var: oldOwners
+        do:
+        - $if:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: wanted
+                  key:
+                    $var: key
+            then:
+            - $set:
+                name: finalContracts
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: finalContracts
+                    path:
+                      $concat:
+                      - /
+                      - $var: key
+                    op: remove
+    - $forEach:
+        item: key
+        in:
+          $keys:
+            $var: wanted
+        do:
+        - $set:
+            name: finalContracts
+            expr:
+              $objectSet:
+                object:
+                  $var: finalContracts
+                key:
+                  $var: key
+                val:
+                  $pointerGet:
+                    object:
+                      $get:
+                        object:
+                          $var: wanted
+                        key:
+                          $var: key
+                    path: /contract
+    - $set:
+        name: finalContracts
+        expr:
+          $pointerSet:
+            object:
+              $var: finalContracts
+            path: /__clausesApply
+            op: remove
+    - $appendChange:
+        op: add
+        path: /contracts
+        val:
+          $var: finalContracts
+    else:
+    - $let:
+        name: removed
+        expr: []
+    - $forEach:
+        item: key
+        in:
+          $keys:
+            $var: oldOwners
+        do:
+        - $if:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: wanted
+                  key:
+                    $var: key
+            then:
+            - $set:
+                name: removed
+                expr:
+                  $listConcat:
+                  - $var: removed
+                  - - $var: key
+    - $forEach:
+        item: key
+        in:
+          $var: removed
+        do:
+        - $if:
+            cond:
+              $is:
+                node:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: key
+                pattern:
+                  type: Contracts/Handler
+            then:
+            - $appendChange:
+                op: remove
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: key
+    - $forEach:
+        item: key
+        in:
+          $var: removed
+        do:
+        - $if:
+            cond:
+              $not:
+                $is:
+                  node:
+                    $document:
+                      $concat:
+                      - /contracts/
+                      - $var: key
+                  pattern:
+                    type: Contracts/Handler
+            then:
+            - $appendChange:
+                op: remove
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: key
+    - $forEach:
+        item: category
+        in:
+          $literal:
+          - channel
+          - definition
+          - embedding
+          - handler
+        do:
+        - $forEach:
+            item: key
+            in:
+              $keys:
+                $var: wanted
+            do:
+            - $let:
+                name: c
+                expr:
+                  $get:
+                    object:
+                      $var: wanted
+                    key:
+                      $var: key
+            - $if:
+                cond:
+                  $and:
+                  - $eq:
+                    - $var:
+                        name: c
+                        path: /kind
+                    - $var: category
+                  - $ne:
+                    - $document:
+                        $concat:
+                        - /contracts/
+                        - $var: key
+                    - $var:
+                        name: c
+                        path: /contract
+                then:
+                - $appendChange:
+                    op: add
+                    path:
+                      $concat:
+                      - /contracts/
+                      - $var: key
+                    val:
+                      $var:
+                        name: c
+                        path: /contract
+    - $appendChange:
+        op: remove
+        path: /contracts/__clausesApply
+- $if:
+    cond:
+      $var: initializing
+    else:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Amendment Accepted
+        - changedKeys:
+            $var: changed
+          configurationId:
+            $var: configId
+          previousConfigurationId:
+            $var: beforeId
+          requestId:
+            $var: requestId
+          revision:
+            $var: revision
+    then:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Clauses Initialized
+        - configurationId:
+            $var: configId
+          revision:
+            $var: revision
+functions:
+  reject:
+    args:
+      code:
+        type: Text
+    do:
+    - $if:
+        cond:
+          $document: /clauseRuntime/work/initializing
+        then:
+        - $fail:
+            $var: code
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Amendment Rejected
+        - code:
+            $var: code
+          configurationId:
+            $document: /clauseRuntime/configurationId
+          requestId:
+            $choose:
+              cond:
+                $isKind:
+                  kind: text
+                  val:
+                    $pointerGet:
+                      default: ''
+                      object:
+                        $document: /clauseRuntime/work/request
+                      path: /requestId
+              else: ''
+              then:
+                $pointerGet:
+                  default: ''
+                  object:
+                    $document: /clauseRuntime/work/request
+                  path: /requestId
+          revision:
+            $document: /clauseRuntime/revision
+    - $appendChange:
+        op: add
+        path: /clauseRuntime/work
+        val: {}
+    - $if:
+        cond:
+          $exists:
+            $document: /contracts/__clausesApply
+        then:
+        - $appendChange:
+            op: remove
+            path: /contracts/__clausesApply
+    - $return: {}
+name: Commit Amendment Step
+type: Contracts/Compute

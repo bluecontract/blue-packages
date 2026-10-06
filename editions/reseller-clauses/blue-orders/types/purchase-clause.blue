@@ -1,0 +1,241 @@
+name: Purchase Clause
+type: Clauses/Clause
+description: A customer may confirm before the configured deadline. Confirmation and
+  expiry are mutually exclusive. Successful confirmation cancels the native expiry
+  timer and emits the configured product amount. This demo confirmation does not execute
+  or prove a real payment.
+hookAbi: document-context-1
+transitionUnconditional: true
+hookDefinition:
+  type: Contracts/Compute Definition
+  functions:
+    validateConfiguration:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $return:
+          $choose:
+            cond:
+              $and:
+              - $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: b
+                        path: /customer
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: b
+                      path: /customer
+                  - ''
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: b
+                            path: /customer
+                        separator: /
+                  - 1
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: b
+                            path: /customer
+                        separator: '~'
+                  - 1
+              - $isKind:
+                  val:
+                    $var:
+                      name: b
+                      path: /product
+                  kind: text
+              - $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: p
+                        path: /timerChannel
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: p
+                      path: /timerChannel
+                  - ''
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: p
+                            path: /timerChannel
+                        separator: /
+                  - 1
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: p
+                            path: /timerChannel
+                        separator: '~'
+                  - 1
+              - $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: p
+                        path: /timerKey
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: p
+                      path: /timerKey
+                  - ''
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: p
+                            path: /timerKey
+                        separator: /
+                  - 1
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var:
+                            name: p
+                            path: /timerKey
+                        separator: '~'
+                  - 1
+              - $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: p
+                        path: /durationMicros
+                    kind: integer
+                - $gte:
+                  - $var:
+                      name: p
+                      path: /durationMicros
+                  - 1
+                - $lte:
+                  - $var:
+                      name: p
+                      path: /durationMicros
+                  - 86400000000
+            then:
+              allowed: true
+              code: ''
+            else:
+              allowed: false
+              code: INVALID_PURCHASE
+    validateTransition:
+      args: {}
+      do:
+      - $return:
+          allowed: true
+          code: ''
+    plan:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $return:
+          contracts:
+            purchase:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow Operation
+                - channel:
+                    $var:
+                      name: b
+                      path: /customer
+                  steps:
+                  - $merge:
+                    - type: Orders/Purchase Step
+                    - constants:
+                        product:
+                          $var:
+                            name: b
+                            path: /product
+                        durationMicros:
+                          $var:
+                            name: p
+                            path: /durationMicros
+                        timerChannel:
+                          $var:
+                            name: p
+                            path: /timerChannel
+                        timerKey:
+                          $var:
+                            name: p
+                            path: /timerKey
+            purchaseReady:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow
+                - channel: __clausesInitialized
+                  steps:
+                  - type: Orders/Order Ready Step
+          states:
+            purchase:
+              path: /purchase
+              kind: object
+              initial:
+                status: pending
+                confirmations: 0
+          reads:
+          - path: /orderId
+            kind: text
+          - path: /startedAt
+            kind: integer

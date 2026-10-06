@@ -1,0 +1,400 @@
+description: Independent example clause with live configuration and a state-aware
+  transition guard.
+name: Hello Clause
+templates:
+  lock:
+    constants:
+      clauseKey: ''
+      statePath: ''
+    do:
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $const: statePath
+          - /locked
+        val: true
+    - $appendEvent:
+        $merge:
+        - type: Hello/Hello Locked
+        - clauseKey:
+            $const: clauseKey
+    type: Contracts/Compute
+  say:
+    constants:
+      clauseKey: ''
+      statePath: ''
+    do:
+    - $let:
+        expr:
+          $const: statePath
+        name: path
+    - $let:
+        expr:
+          $document:
+            $var: path
+        name: s
+    - $let:
+        expr:
+          $document:
+            $concat:
+            - /clauses/
+            - $const: clauseKey
+            - /parameters/text
+        name: text
+    - $let:
+        expr:
+          locked:
+            $var:
+              name: s
+              path: /locked
+          message:
+            $var: text
+          says:
+            $add:
+            - $var:
+                name: s
+                path: /says
+            - 1
+        name: next
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $var: next
+    - $appendEvent:
+        $merge:
+        - type: Hello/Hello Said
+        - clauseKey:
+            $const: clauseKey
+          message:
+            $var: text
+          says:
+            $var:
+              name: next
+              path: /says
+    type: Contracts/Compute
+type: Clauses/Clause
+hookDefinition:
+  type: Contracts/Compute Definition
+  functions:
+    plan:
+      args: {}
+      do:
+      - $let:
+          expr:
+            clauseKey:
+              $const: clauseKey
+            statePath:
+              $pointerGet:
+                object:
+                  $pointerGet:
+                    default: {}
+                    object:
+                      $document: /clauseRuntime/work/candidate
+                    path:
+                      $concat:
+                      - /
+                      - $const: clauseKey
+                path: /bindings/state
+          name: constants
+      - $let:
+          expr: {}
+          name: contributions
+      - $set:
+          expr:
+            $objectSet:
+              object:
+                $var: contributions
+              key:
+                $pointerGet:
+                  object:
+                    $pointerGet:
+                      default: {}
+                      object:
+                        $document: /clauseRuntime/work/candidate
+                      path:
+                        $concat:
+                        - /
+                        - $const: clauseKey
+                  path: /bindings/say
+              val:
+                contract:
+                  $merge:
+                  - type: Contracts/Sequential Workflow Operation
+                  - channel:
+                      $pointerGet:
+                        object:
+                          $pointerGet:
+                            default: {}
+                            object:
+                              $document: /clauseRuntime/work/candidate
+                            path:
+                              $concat:
+                              - /
+                              - $const: clauseKey
+                        path: /bindings/actor
+                    steps:
+                    - $objectSet:
+                        object:
+                          $pointerGet:
+                            object:
+                              $document:
+                                $concat:
+                                - $choose:
+                                    cond:
+                                      $eq:
+                                      - $const: mode
+                                      - configuration
+                                    then: /clauseRuntime/work/candidate/
+                                    else: /clauses/
+                                - $const: clauseKey
+                                - /type
+                            path: /templates/say
+                        key: constants
+                        val:
+                          $var: constants
+                kind: handler
+          name: contributions
+      - $set:
+          expr:
+            $objectSet:
+              object:
+                $var: contributions
+              key:
+                $pointerGet:
+                  object:
+                    $pointerGet:
+                      default: {}
+                      object:
+                        $document: /clauseRuntime/work/candidate
+                      path:
+                        $concat:
+                        - /
+                        - $const: clauseKey
+                  path: /bindings/lock
+              val:
+                contract:
+                  $merge:
+                  - type: Contracts/Sequential Workflow Operation
+                  - channel:
+                      $pointerGet:
+                        object:
+                          $pointerGet:
+                            default: {}
+                            object:
+                              $document: /clauseRuntime/work/candidate
+                            path:
+                              $concat:
+                              - /
+                              - $const: clauseKey
+                        path: /bindings/actor
+                    steps:
+                    - $objectSet:
+                        object:
+                          $pointerGet:
+                            object:
+                              $document:
+                                $concat:
+                                - $choose:
+                                    cond:
+                                      $eq:
+                                      - $const: mode
+                                      - configuration
+                                    then: /clauseRuntime/work/candidate/
+                                    else: /clauses/
+                                - $const: clauseKey
+                                - /type
+                            path: /templates/lock
+                        key: constants
+                        val:
+                          $var: constants
+                kind: handler
+          name: contributions
+      - $return:
+          contracts:
+            $var: contributions
+          reads: []
+          states:
+            state:
+              initial:
+                locked: false
+                message: ''
+                says: 0
+              kind: object
+              path:
+                $pointerGet:
+                  object:
+                    $pointerGet:
+                      default: {}
+                      object:
+                        $document: /clauseRuntime/work/candidate
+                      path:
+                        $concat:
+                        - /
+                        - $const: clauseKey
+                  path: /bindings/state
+    validateConfiguration:
+      args: {}
+      do:
+      - $if:
+          cond:
+            $or:
+            - $not:
+                $isKind:
+                  kind: text
+                  val:
+                    $pointerGet:
+                      object:
+                        $pointerGet:
+                          default: {}
+                          object:
+                            $document: /clauseRuntime/work/candidate
+                          path:
+                            $concat:
+                            - /
+                            - $const: clauseKey
+                      path: /parameters/text
+            - $eq:
+              - $pointerGet:
+                  object:
+                    $pointerGet:
+                      default: {}
+                      object:
+                        $document: /clauseRuntime/work/candidate
+                      path:
+                        $concat:
+                        - /
+                        - $const: clauseKey
+                  path: /parameters/text
+              - ''
+          then:
+          - $return:
+              allowed: false
+              code: TEXT_REQUIRED
+      - $if:
+          cond:
+            $ne:
+            - $keys:
+                $pointerGet:
+                  object:
+                    $pointerGet:
+                      default: {}
+                      object:
+                        $document: /clauseRuntime/work/candidate
+                      path:
+                        $concat:
+                        - /
+                        - $const: clauseKey
+                  path: /parameters
+            - $literal:
+              - text
+          then:
+          - $return:
+              allowed: false
+              code: HELLO_PARAMETER_FIELDS
+      - $if:
+          cond:
+            $ne:
+            - $keys:
+                $pointerGet:
+                  object:
+                    $pointerGet:
+                      default: {}
+                      object:
+                        $document: /clauseRuntime/work/candidate
+                      path:
+                        $concat:
+                        - /
+                        - $const: clauseKey
+                  path: /bindings
+            - $literal:
+              - actor
+              - lock
+              - say
+              - state
+          then:
+          - $return:
+              allowed: false
+              code: HELLO_BINDING_FIELDS
+      - $return:
+          allowed: true
+          code: ''
+    validateTransition:
+      args: {}
+      do:
+      - $let:
+          expr:
+            $choose:
+              cond:
+                $document: /clauseRuntime/work/initializing
+              then: {}
+              else:
+                $pointerGet:
+                  object:
+                    $document: /clauses
+                  path:
+                    $concat:
+                    - /
+                    - $const: clauseKey
+                  default: {}
+          name: old
+      - $if:
+          cond:
+            $and:
+            - $eq:
+              - $pointerGet:
+                  default: false
+                  object:
+                    $document:
+                      $pointerGet:
+                        object:
+                          $choose:
+                            cond:
+                              $document: /clauseRuntime/work/initializing
+                            then: {}
+                            else:
+                              $pointerGet:
+                                object:
+                                  $document: /clauses
+                                path:
+                                  $concat:
+                                  - /
+                                  - $const: clauseKey
+                                default: {}
+                        path: /bindings/state
+                  path: /locked
+              - true
+            - $ne:
+              - $nodeBlueId:
+                  $choose:
+                    cond:
+                      $document: /clauseRuntime/work/initializing
+                    then: {}
+                    else:
+                      $pointerGet:
+                        object:
+                          $document: /clauses
+                        path:
+                          $concat:
+                          - /
+                          - $const: clauseKey
+                        default: {}
+              - $nodeBlueId:
+                  $pointerGet:
+                    default: {}
+                    object:
+                      $document: /clauseRuntime/work/candidate
+                    path:
+                      $concat:
+                      - /
+                      - $const: clauseKey
+          then:
+          - $return:
+              allowed: false
+              code: HELLO_LOCKED
+      - $return:
+          allowed: true
+          code: ''
+hookAbi: document-context-1

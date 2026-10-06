@@ -1,0 +1,38 @@
+name: Dispatch Listener Step
+type: Contracts/Compute
+constants: {}
+do:
+- $if:
+    cond:
+      $is:
+        node:
+          $event: ''
+        pattern:
+          type: Clauses/Listener Delivery
+    then:
+    - $return: {}
+- $if:
+    cond:
+      $ne:
+      - $const: context
+      - ''
+    then:
+    - $if:
+        cond:
+          $not:
+            $startsWith:
+            - $event: /sourcePath
+            - $concat:
+              - $const: context
+              - /
+        then:
+        - $return: {}
+- $appendEvent:
+    $merge:
+    - type: Clauses/Listener Delivery
+    - listenerKey:
+        $const: listenerKey
+      source:
+        $const: source
+      input:
+        $event: ''
