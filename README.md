@@ -9,6 +9,15 @@ Packages are data: native protocol implementations live in the consuming runtime
 Loading a package makes its definitions available; execution requires a runtime that
 explicitly supports its exact protocol dependencies.
 
+## Timeline provider selection
+
+`blue-coordination` **0.2.0-rc.2** replaces the temporary package. Its provider has
+one required `endpoint` for public and private reads. See
+[the migration notes](docs/timeline-provider-migration.md) and
+[TIMELINE-PACKAGES.json](TIMELINE-PACKAGES.json) for the rebuilt consumer identities.
+Existing native runtime approvals remain attached to their original publications;
+this data-package migration does not silently migrate live MyOS documents.
+
 ## Available packages
 
 There are **14 baseline package projects**, including three versions of the commerce
@@ -19,14 +28,14 @@ function example. Historical immutable editions are retained separately. Follow 
 | [Language](blue-language/) | `Language` | Immutable typed content graphs, BlueId calculation, references, specialization and schemas. Exports `Package` and `Protocol Specification`; primitive types belong to the Language registry. |
 | [BEX](blue-bex/) | `BEX` | The deterministic expression and program language used by workflows: values, functions, changesets, events and metered execution. This package defines a protocol and has no named type exports. |
 | [Contracts](blue-contracts/) | `Contracts` | Document processing: channels, operations, workflows, compute steps, document updates, event delivery and embedded documents. Contains 32 type exports and the processing specification. |
-| [Coordination](blue-coordination/) | `Coordination` | 41 definitions for authenticated timelines, independently managed documents and coordinated processing. Its scheduler and storage are implemented by the host runtime. |
+| [Coordination](blue-coordination/) | `Coordination` | 53 definitions for timelines, signed reads, completeness, Timeline Access and timestamped document input. Provider storage and feeder scheduling belong to the host. |
 | [Agreements](blue-agreements/) | `Agreements` | The reusable `Agreement` and `Clause` model, progress notifications and typed agreement lifecycle events. Independent of any particular activation clause. |
 | [Mutual Activation](clause-mutual-activation/) | `MutualActivation` | Two-party negotiation, proposed edits, review rounds, approvals and decline. Emits typed events including `Activation Succeeded` and `Activation Declined`. |
 | [Immediate Termination](clause-immediate-termination/) | `ImmediateTermination` | Separates negotiable termination terms from the executable clause. Allows party A, party B or either party to terminate, with authenticated actions and typed evidence. |
 | [Reseller Agreement](agreement-reseller/) | `Reseller` | A concrete agreement combining commercial terms, mutual activation and optional immediate termination. Demonstrates the NEGOTIATING → ACTIVE → TERMINATED lifecycle. |
 | [Agreement Examples](blue-agreement-examples/) | `AgreementExamples` | A portfolio containing subagreements. Observes their lifecycle events and requests onboarding for selected activated agreements. |
 | [Mandates](blue-mandates/) | `Mandates` | Owner-approved conditional delegation of operations, including correlated evidence requests and responses. Requires explicitly supported native Coordination/Mandates behavior. |
-| [Time](blue-time/) | `Time` | Six timer definitions for scheduling, firing, cancelling and replacing one-shot timers using explicit Unix timestamps in microseconds. **Conformance preview:** a data package and test fixture; native scheduling is not approved by this package. |
+| [Time](blue-time/) | `Time` | Eight timer definitions for scheduling, firing, cancelling and replacing one-shot timers using explicit Unix timestamps in microseconds. **Conformance preview:** a data package and test fixture; native scheduling is not approved by this package. |
 | [Commerce Functions v1](functions/commerce-functions-v1/) | `CommerceFunctions` | `Totals`: an exact integer line-total calculation implemented as ordinary Contracts/BEX data. |
 | [Commerce Functions v1.1](functions/commerce-functions-v1_1/) | `CommerceFunctions` | Adds `Double` while preserving the original `Totals` export; demonstrates an additive package release. |
 | [Commerce Functions v2](functions/commerce-functions-v2/) | `CommerceFunctions` | Changes the total function's arguments to include a fee; demonstrates explicitly selecting a different release. |
@@ -38,7 +47,7 @@ is an overview, not a substitute for those pins.
 
 ## Current Agreement model
 
-The four top-level Agreement projects now use **root clauses, version 0.3.0-rc.1**.
+The four top-level Agreement projects now use **root clauses, version 0.3.0-rc.2**.
 [ROOT-CLAUSE-PACKAGES.json](ROOT-CLAUSE-PACKAGES.json) pins their exact publications.
 Clauses install state and workflows into one managed root document. The installer
 supports atomic add/edit/remove amendments, revision checks, typed change events,

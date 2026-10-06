@@ -1,255 +1,960 @@
-# Blue Coordination 1.0 — timelines, established history and delegated operations
+# Coordination: timelines and timestamped inputs to Contracts
 
-> **Core authoring and Compute revision:** `2026-09-24-core-compute-1`. Bare mandatory core names, Language-backed node identity and shared Compute definitions. The Contracts maximum remains 100,000. See `docs/core-compute-20260924.md` for qualification.
+Version 0.2.0-rc.2. Exact Blue types select the protocol semantics.
+Status: selected Coordination specification for the standalone timeline provider.
 
-**Edition 2026-09-24-core-compute-1 · revised runtime and generated type bindings.**
+## 1. Purpose: supplying timestamped inputs to Contracts
 
-This specification defines portable meaning. `ENGINE-DESIGN.md` defines our automatic engine and storage implementation. `GUIDE.md` explains examples. `TYPES.md` maps the actual YAML definitions. Contracts remains the sole document-processing algorithm. The lower baseline is the supplied document-local-completion revision, not the older deep-update/global-FIFO revision.
+Contracts calculates a document's state by processing original events with supplied
+timestamps: `process(document, originalEvent, eventTimestamp)`. It defines what
+execution does with those inputs. It does not discover external events, query a
+provider, establish publication order, or certify that an earlier input is missing.
+Contracts itself does not impose chronological ordering on distinct events.
 
-## 1. Scope and authority
+Coordination supplies that missing agreement about input acquisition and ordering.
+For documents adopting this protocol, state at a time is calculated from the
+applicable, authenticated inputs in an established order. Before processing an
+entry at timestamp T, the feeder must know that all required sources are complete
+through T and that it has every needed earlier entry. Seeing a new entry, or seeing
+no new entries in a network response, is not enough to establish either fact.
 
-**Q01.** Coordination establishes which original inputs may be processed, in what order, against which exact history, with what participant authority, and what evidence establishes the outcome. It MUST NOT reimplement Contracts handlers, operation dispatch, child incorporation, initialization, cycles, gas or rollback.
+For example, Alice's source contains an entry at 120. If Bob's source is known only
+through 110, Bob might still have an entry at 115 which must be considered first.
+The feeder waits for Bob's authenticated completeness beyond 120 and acquires the
+missing history before choosing the next input. It also checks the public sources
+that establish whether the document's required parties still have read access.
 
-`process(document, originalEvent, eventTimestamp)` retains its three inputs. The original event is never replaced by an inner request. The selected complete request is Contracts' `call`; operation arguments use `call/request/...`. Internal notifications remain internal. There is no separate channel argument or delivery/payload selector.
+This specification defines structures called **timelines** that can provide these
+facts, and the rules for using them. A **timeline entry** is an immutable occurrence
+on a timeline. A **timeline provider** accepts and preserves occurrences and attests
+to their history. A **feeder** acquires and verifies that history, then supplies the
+appropriate original entries and timestamps to Contracts. Provider and feeder may
+be separate services; a provider does not have to execute documents.
 
-The exact type definitions determine Timeline, actor, channel and authority semantics. The host must implement every required contract it accepts. Unknown required behavior fails closed; having a definition's bytes does not install behavior. No public Execution Profile, repository manifest, duplicate limits catalogue or worker capability negotiation is required. Lower-runtime semantics and policy bindings still have to be fixed and retained for reproducible execution. Repositories are content/alias services, not semantic authorities.
+The same interface can serve a personal timeline, a company system, or a government
+publication register. How those systems create their entries is their own concern.
+Their interoperable obligation is to expose verifiable history, completeness and
+Timeline Access through the common public interface defined here. A public endpoint
+means publicly reachable HTTPS; a private timeline still requires an authorized
+reader's Ed25519 signature. The publication of an endpoint does not publish its data.
 
-The YAML folder is an isolated unpublished overlay. Its descriptions bind the exact BlueId of this text; the installed Timeline runtime also binds that exact semantics document. This does not override inherited Contracts specification fields or add record properties to scalar types. Reusing an authoring alias never authorizes changing content beneath an old published BlueId. Normative cross-field rules below supplement Language schemas; schema admission alone is not protocol verification. Optional complex fields are intentionally untyped declaration holes when inherited concrete defaults would materialize absent content; their descriptions name the required ancestry, which the protocol validator checks only when the field is supplied. This avoids inventing absent Operation Requests or Timeline Entries.
+### 1.1 Authority and conformance
 
-## 2. Identities and exact values
+MUST, MUST NOT, SHOULD and MAY express requirements. Cross-field rules below are
+normative even where a Blue schema cannot express them. A conforming consumer
+validates both the schema and these rules.
 
-**Q02.** Distinguish:
+Language defines BlueIds, exact values, ancestry and referenced content. Contracts
+is the sole authority for initialization, handlers, operations, embedded-document
+execution, cycles, gas, rollback and completed execution records. Coordination
+neither duplicates those algorithms nor changes its three-input processing API.
+It establishes which original entry and historical context may be offered next.
 
-| Identity | Meaning |
-|---|---|
-| DocumentId | Exact pre-initialization document identity establishing this logical lineage. |
-| Document BlueId | Exact content, including legitimate processing markers. |
-| History Position | One exact predecessor-linked position in established processing/receiving history. |
-| Epoch | Number of the latest established stable revision in that history. |
-| Processing instance | Host-local execution/control identity, never inserted into Blue content. |
-| Occurrence | Parent, path, source lineage, activation generation and selected source position. |
+Provider, evidence-verifier and feeder conformance are separate claims. Loading
+these types does not install a runtime. AWS services, polling intervals, databases,
+publication workflows and owner login mechanisms are deployment choices. Business
+participant clauses, delegated operations and timers need their own adopted rules.
 
-Same exact initial content denotes the same lineage in this model; independent business instances must have legitimately distinct authored content. Two host accounts can establish independent processing instances without altering semantic identity. Repeated embeddings need not create duplicate authoritative histories. Different historical views are not silently merged.
+Every conforming provider implements the baseline in sections 2–9 and 11, including
+Timeline Access and the combined signed read operation. Section 4.2's
+owner-ingest creation/append interface and section 10's
+committed update-stream interface are optional extensions. Section 12 defines
+feeder obligations; section 13 defines package use and validation. See the
+[worked examples](../docs/examples.md) for a timeline, entries, and a complete
+signed HTTP exchange using these types.
 
-BlueId comparison uses canonical ASCII identity text bytewise, not locale or database collation. Timestamp/ordinal comparison is numeric. All semantic identities use unchanged Language, including cyclic owning-set/member proofs. A hash of arbitrary JSON is not a BlueId. Physical record hashes and runtime capability commitments remain separately named.
+## 2. Timelines, entries, providers and time
 
-## 3. Actors, submission provenance and Timelines
+### 2.1 A timeline and its entries
 
-**Q03.** Actor is an extensible typed attribution value. Principal Actor identifies an account/principal; Agent Actor explicitly identifies automation. Provider-specific subtypes define their own accepted fields and authentication meaning. Exact actor identity, not a matching display name, determines equality. Principal attribution does not prove human presence.
+A timeline identifies one immutable, append-only publication history. Its identity
+is stable as entries arrive; the timeline object is not a mutable array of entries.
+An entry names its timeline, timestamp, publishing actor, exact original message,
+and (except at genesis) immediate predecessor. The predecessor links form its
+history. Different timelines can carry occurrences with the same timestamp.
 
-`Timeline Entry.actor` is the actual submitter. `onBehalfOf.actor`, when used, is the represented holder; it never overwrites the submitter. `Source` describes authenticated submission provenance (for example interactive/API context), not a provider endpoint. Optional provenance is usable only when authenticated by the Timeline protocol.
+This profile uses `Signed Timeline`, a timeline whose provider promises a single
+strictly increasing chain and authenticates its accepted history. The name does
+not mean the timeline descriptor contains a signature or each returned entry needs
+a separate signature: a signed checkpoint plus its verified chain can authenticate
+many entries at once. Provider attestations can also authenticate individual entries.
 
-**Q04.** Timeline identifies an ordered source and a supported verification protocol. Concrete provider implementations acquire its entries. Reading a Timeline or knowing its BlueId does not confer append/read permission. Providers authenticate submitters and retain exact accepted content. Their protocols determine evidence needed for those assertions.
+The entry, including its occurrence identity and provenance, is the original event
+passed to Contracts; the feeder must not replace it with just `entry.message`.
+An event may concern a document, but a timeline can contain entries for many
+documents. Fetching and verifying its chain must not silently omit the others.
 
-The reference Signed Timeline is a strict chain: each new timestamp is greater than its predecessor's timestamp and at least the provider's already promised complete-before bound. The first entry has no `prevEntry`. Its public key authenticates source assertions; the verifier must separately adopt that exact Timeline/provider as authoritative for its claims.
+### 2.2 Exact content and provider identity
 
-## 4. Original entries and operation addressing
+A BlueId is calculated by the selected Language implementation, never by hashing
+arbitrary JSON. A reference is resolved and verified against its BlueId. JSON and
+YAML are representations of Blue content; labels, aliases and URLs are not identity.
+Aliases in examples use `Coordination/`. Consumers bind them to exact exports.
 
-**Q05.** A Timeline Entry has required Timeline, integer timestamp, Actor and original message; optional predecessor, Source, Authority and operation. Time is an integer microsecond within the Contracts accepted range. Required references must resolve and validate; unavailable content is not an untyped general message.
+`Timeline Provider` contains its public verification key and required `endpoint`:
+the base HTTPS URL of the common REST API for all its public and private timelines.
+Its exact BlueId is its identity. A domain subtype may supply the endpoint as an
+inherited value, along with company name, address or website. Clients resolve
+inherited Blue values rather than reading only fields physically present in JSON.
+Exact Blue types define semantics and versions; no separate protocol version or
+provider identifier is required.
 
-If the message is a recognized Operation Request, `operation` MUST identify that same complete request. Otherwise `operation` MUST be absent. Inline and referenced forms are equivalent only when their exact identified values agree. Author the recognition field before provider authentication. Disagreement, malformed recognized requests, unknown required types and fabricated attribution are not ordinary filter misses.
+A `Timeline` contains that provider, a canonical HTTPS `url`, and `publicRead`.
+The URL is a real resource address for that history, not a second arbitrary ID.
+Its exact BlueId identifies the complete timeline. `Signed Timeline` selects the
+strict-chain rules. Different histories need different canonical URLs; URLs and
+identities MUST NOT be recycled. Access documents refer to timelines using ordinary
+Blue references. There are no accessId, timelineId, grantId or streamId fields.
+The remaining `blueId` keys are Language content references, not extra identifiers.
 
-The provider chain records acceptance, not application success. An entry can be accepted yet inapplicable or denied for a particular receiver. Idempotent append with one request key returns the original accepted entry; different content under that key is a conflict. This is transport bookkeeping outside the entry's business request.
+An `Ed25519 Public Key` is Text containing exactly 64 lowercase hexadecimal
+characters (32 bytes); an `Ed25519 Signature` is exactly 128 (64 bytes). These are
+scalar refinements, not records with an invented `value` property in their schema.
+`Actor` describes the identified entity responsible for an occurrence. Its two
+standard categories are `Principal Actor` (human) and `Agent Actor` (non-human:
+application, automated service or institution). Neither category requires provider,
+principalId, a key or a fixed identity-field layout. Providers attest the attribution
+in their accepted entries; the provider is already identified by the timeline.
 
-**Q06. Target selection above Contracts.** An Operation Request's optional `document` is used by this Timeline protocol to identify the addressed logical document through its *established* exact history. This does not change Contracts: Contracts still treats its flag as an exact input-state precondition, not an instruction to retarget execution. The feeder narrows receiving contexts before calling it.
+Domain types extend these categories through normal Blue type ancestry. A government
+service might define `Polish Citizen` extending Principal Actor with given names,
+family name and a domain-specific citizen identifier. A bank might define `Bank
+Access Service` extending Agent Actor with service and deployment details. These
+are domain choices, not extra universal Coordination actor categories. Consumers
+accept valid descendants, not just values with exactly the base type's BlueId.
+Entity details alone do not prove authority or authentication. In particular,
+labelling an actor Agent Actor does not let it publish provider control facts;
+that authority comes from the provider-owned control timeline and verified
+provider evidence. Reader keys remain separate from actor descriptions.
 
-When `document` is present, resolve its actual lineage using established initialization/history. Offer the operation only to that lineage's applicable receiving view. If `requireExactDocumentVersion` is true, the original requested ID must equal that target's input-state ID. A stale addressed request is a refusal/failure for its real target, not a broadcast or a match for another document with a similar operation. Missing target lineage is a wait; proven inconsistent history is an error.
+### 2.3 One provider API for public and private timelines
 
-When `document` is absent, the request is channel-addressed: each active member with the named Timeline Channel and eligible participant/source is an intended receiver. Contracts validates the named operation on those receivers. Do not silently exclude a real receiver just because it lacks the named operation. Authoring helpers SHOULD include an exact known target reference to avoid accidental multi-target calls.
+`Timeline Provider.endpoint` is the one REST API base. For an endpoint of
+`https://timeline.acme.example`, the standard addresses are:
 
-General messages follow Timeline/actor matching and actual filters, without operation targeting. Operation entries and general messages share one source order.
+| Operation | Address |
+| --- | --- |
+| Provider discovery | GET https://timeline.acme.example/provider |
+| Entries and completeness | POST https://timeline.acme.example/timelines/read |
+| Exact entry | POST https://timeline.acme.example/timelines/entry |
+| Referenced content | POST https://timeline.acme.example/timelines/content |
+| Create Timeline Access | POST https://timeline.acme.example/access/create |
+| Update Timeline Access | POST https://timeline.acme.example/access/update |
+| Retrieve Timeline Access | POST https://timeline.acme.example/access/get |
 
-## 5. Completeness and range evidence
+The read address serves **both public and private timelines**. The request names
+the exact target timeline. A public timeline accepts a bare Read Timeline Request;
+a private timeline requires an authorized Ed25519 Signed Reader Request. Both
+return the same provider-signed response, page and completeness checkpoint.
+There is no separate public API, custom read URL or per-timeline endpoint override.
 
-**Q07.** `Timeline Completeness Guarantee(timeline, completeBefore, lastEntry?)` asserts that all accepted entries below the exclusive bound are already fixed and no future acceptance can add one there. `lastEntry` identifies the last entry **inside that closed prefix**, not necessarily today's entire head. Its absence asserts an empty closed prefix. An unverified absence does not count.
+A `Public Timeline Channel` is a Contracts external channel with `provider` and
+`url`. It denotes exactly `Signed Timeline(provider, url, publicRead=true)`.
+The canonical `url` identifies that specific history; clients fetch it through
+its provider's `/timelines/read` API. It is not another REST base. Reconstruct
+document state by executing the applicable verified entries; a mutable JSON
+snapshot is not a substitute for public history.
 
-`Timeline Range Evidence` contains a guarantee, an ordered entries list, optional `after` anchor and the exact provider attestation. With no anchor, enumerate from genesis. With an anchor, the verifier must already have established its contiguous prefix; enumerate all successors through the guarantee's head. When there are no successors, the anchor must be that head. An empty genesis range requires a headless guarantee. The anchor itself must be below the bound. A truncated physical page is not complete evidence.
+Both the endpoint and canonical timeline URL are absolute HTTPS, without userinfo,
+query, fragment, whitespace, dot segments or a trailing slash. An endpoint may
+contain a path prefix: `https://acme.example/api` + `/timelines/read` becomes
+`https://acme.example/api/timelines/read`. The provider type may supply the endpoint,
+but it must resolve to a concrete value on every provider instance. Changing an
+adopted provider or timeline creates a different Blue identity; clients do not
+silently substitute it. HTTPS redirects must retain the exact requested timeline
+and independently pinned provider identity in the verified response.
 
-Verification checks exact type/content identities, the adopted source authority, signature, same Timeline for every entry, strict source timestamps, each predecessor, final head equality, the bound, and agreement with any overlapping established prefix. An earlier weaker true guarantee can still be used; later assertions cannot rewrite earlier closed history. Contradictions are integrity failures, not an instruction to rewind consumers.
+GET `<provider.endpoint>/provider` returns an attested Provider Descriptor whose
+provider and endpoint match the adopted provider. It declares the public control
+timeline reserved for provider access operations. A Timeline Access channel must
+match that reserved timeline; a customer-owned public timeline cannot issue
+provider grants. Discovery cannot silently replace a provider.
 
-**Q08. Reference authentication.** Signed Timeline's public key and Timeline Attestation signature are lowercase hexadecimal of exactly 32 and 64 bytes respectively. Sign and verify this exact byte string:
+### 2.4 Time and order
 
-```text
-UTF8("blue.coordination.guarantee/1\n" + canonicalGuaranteeBlueId)
+Timestamps are integer Unix microseconds in [0, 9007199254740990]. Exclusive bounds
+may also be 9007199254740991. The top safe Language integer is reserved for the exclusive final bound, so even
+the last permitted entry can be closed without an unsafe numeric literal. A -1 timestamp is allowed only as the genesis lower
+bound of a read request. Comparisons are integer comparisons. BlueId ordering is
+bytewise ordering of canonical ASCII BlueId text. Displayed wall-clock time is not
+an independently certified time source; the provider is trusted for its clock.
+
+For entries from different timelines the total order key is:
+`(timestamp, timelineBlueId, entryBlueId)`. Within one timeline timestamps MUST be
+strictly increasing: at most ONE accepted entry is allowed in a given microsecond
+on a given timeline. If two publications arrive during the same clock microsecond,
+the provider assigns distinct later microseconds or rejects/delays acceptance; it
+cannot assign both the same timestamp. Different timelines may share timestamps.
+The Order Key type carries the timeline and entry as Blue references; compare
+their derived BlueIds as above. The full key, not just its timestamp, identifies
+processing progress. The same entry can have multiple legitimate document recipients.
+
+## 3. Authentication and signed objects
+
+There are three separate authorities:
+
+* the provider's authenticated publishing authority controls acceptance, and the
+  timeline owner controls sharing; these may be the same account;
+* a reader proves possession of a public key that currently has read access;
+* the provider signs accepted facts with its pinned provider signing key.
+
+A read grant never permits append, resharing or changing provider metadata. Owner
+sessions/API tokens are deployment authentication mapped to the account allowed
+to manage that timeline. This mapping must be enforced on every owner operation.
+The optional owner-ingest extension also authorizes that principal to append; other
+providers may publish through an internal pipeline with no external append API. Signing with a reader key
+does not turn a reader into an owner. Public-read endpoints need no reader proof.
+Transport confidentiality is required for private data and credentials.
+
+A read request contains its operation type, target timeline (or the operation's
+binding/access target), and query parameters. It does NOT carry requestId, provider,
+createdAt, expiresAt or nonce. The target already determines the provider, and the
+receiving endpoint MUST reject targets belonging to another provider. Read-only
+operations need no caller-generated idempotency label. Responses correlate through
+an exact Blue reference in `response.request`; identical requests have the same identity.
+
+`Signed Reader Request` contains the exact typed request, publicKey and signature.
+The Ed25519 signature signs exactly:
+
+```
+UTF8("blue.coordination.reader-request\n" + requestBlueId)
 ```
 
-Use Ed25519. The guarantee's own exact content binds its Timeline, bound and closed-prefix head. Chained entry hashes bind all predecessor entries. That signature authenticates the provider's assertion about attribution/completeness; it is not independent proof the provider behaved honestly. Provider adoption/trust and access are explicit configuration. No caller field can install another trusted provider.
+The signed request binds the exact operation, parameters and target; the target
+binds the provider. Only read operations may use this envelope. For private reads,
+the provider verifies the signature and the signing key's CURRENT Timeline Access
+on EVERY use, including cursor continuation. Read permission never authorizes a
+mutation. Public reads need no reader envelope or key.
+
+This deliberately simple read signature is reusable for the same query. It is not
+a proof that the signer is present now: someone obtaining the signed request can
+repeat that exact read while the key remains authorized. HTTPS protects it in
+transit; clients treat private signed requests as credentials. Revocation blocks
+subsequent uses, and replay cannot change the signed query or authorize a write.
+No nonce store or client clock synchronization is part of this baseline.
+
+Request freshness and history completeness are separate. When a consumer needs a
+prefix closed through T, it asks for minimumCompleteBefore > T and verifies the
+returned bound. Replaying an old signed response below that minimum fails. Without
+a minimum, an authentic older checkpoint remains evidence only of its stated
+historical bound, not proof of wall-clock freshness. A provider may add stronger
+session authentication as an extension, but must support this baseline.
+
+`Provider Attestation` contains provider, object and signature. The signature is:
 
-The included pure reference verifier implements this wire scheme. Memory providers can sign with a configured key; a production key must not be the deterministic demonstration key. Notifications are unauthenticated hints until their corresponding source facts are verified.
-
-For efficiency, providers may return pages and anchored suffixes, provided the verifier assembles/establishes the identical complete chain. Resource limits produce a requirement/backpressure outcome, not a false empty prefix. No protocol-wide fixed 10,000-entry ceiling is introduced.
-
-## 6. Canonical next-input selection
-
-**Q09.** Order external entries by `K = (timestamp, timelineBlueId, entryBlueId)` with Q02 comparators. Equal-time entries on different Timelines remain distinct. A source-native page cursor is not the merged order key.
-
-For the current exact receiving graph, enumerate every Timeline needed by the supported channel runtimes, occurrence-history obligations and pre-action authority. Use complete ranges sufficient to exclude earlier unresolved input. The aggregate safe interval for a fixed source set is below the minimum established exclusive bound. Settle the candidate's timestamp group before choosing its key; a bound equal to its timestamp is insufficient.
-
-Keep source enumeration progress separate from channel checkpoints. A provider can contain irrelevant entries, denied entries and accepted entries with no business effect. Record their exact assessments in the receiving/lifetime context; never manufacture a Contracts checkpoint for an entry that Contracts did not consume. A full all-history lookup is not required each iteration once an exact prefix is established.
-
-**SELECT**:
-
-1. Verify the committed starting runtime state and the active occurrence lifetimes.
-2. Resolve unfinished historical attachment obligations and any earlier source/authority prerequisites.
-3. Determine the current relevant source set. Acquire and verify sufficient ranges; retain a precise wait when insufficient.
-4. Merge unexamined entries by K; deduplicate the same exact source entry within this selection, not across different legitimate occurrence contexts.
-5. Assess addressing and authority for each candidate against its real pre-entry context. Mark conclusively inapplicable/denied receivers examined without changing their business document. Do not execute a malformed or denied operation as a general event.
-6. Select the least eligible candidate after all earlier relevant work is accounted for. Freeze entry, exact views, source guarantees and admission decisions.
-7. After a complete result changing channels/embeddings, invalidate the unused old selection and repeat against the new topology.
-
-Do not infer no work from an empty current notification queue or from a page limit. A `READY` read means ready through a specified checked boundary, not that no future event can occur.
-
-## 7. Timeline Channel and immutable admission boundary
-
-**Q10.** The feeder establishes admissibility; Contracts performs deterministic processing. A Timeline Channel cannot authorize a claimed Mandate merely by reading `onBehalfOf`.
-
-Establish direct rights to the requested target channel first; a valid direct caller need not exercise a Mandate merely because delegation is supported. Delegated eligibility is not a fallback after failed operation validation. Direct authority requires the original Timeline and actor to match the intended channel under the supported source and target policies. Delegated authority requires Q12 and a legitimate originating channel/source for the actual actor in the target context. On an operation-bearing entry, its addressed member's declared source channels may observe the same original event as ordinary observers; the named operation executes only on its declared effective target channel. Unrelated members/channels cannot become recipients by sharing a type name.
-
-The runtime integration consumes a **frozen verified admission set**, keyed by exact input member/view, channel key and generation, original entry and timestamp. It is produced by the verifier, never accepted as a user-supplied Boolean. It covers every relevant channel; a missing demanded decision is an error/wait, not an implicit denial that could hide a workflow. Primitive decisions are fixed before Contracts derives Composite/All External Channels. A replay reconstructs or verifies the identical decisions and their evidence.
-
-Required narrow integration: the registered external-channel runtime needs the input member identity and channel key in its read-only context and access to this exact admission evidence. The supplied runtime's `ExternalChannelContext` has header/event/time/checkpoint/peer lookup but not those self identifiers. The implementation must add this **generic read-only context/evidence hook**, retaining the three-input public transition and all Contracts algorithms. It must record the evidence in the invocation dependency bundle. No Mandate evaluator, mutable global allowlist, database authorization lookup during BEX, replacement actor or extra `process` channel argument is permitted.
-
-An implementation using another existing supported hook is conforming only if it proves the same binding, complete decision coverage and replay behavior. The single-document guide harness is deliberately narrower and is not evidence that this graph-aware bridge already exists.
-
-Channel freshness uses the complete order key established from the original checkpoint entry and receiving generation. Comparing only checkpoint timestamp is wrong once delegated entries from several source Timelines may exercise the same target channel. All-history examined progress and occurrence application cursors remain Coordination records.
-
-## 8. Mandates and scope
-
-**Q11.** `Mandate` is a genuine processed owner-approved authority program. `Operation Mandate` adds a typed current `scope: Dictionary[Text, Operation Grant]`; it can permit multiple operations and targets. One initial Mandate reference is used as scope evolves. No mandatory guarantor or separate approval token is required for this base.
-
-The lifecycle is Pending → Active → Terminated; Pending may terminate. Owner approval is an authenticated direct `approveMandate({})` operation pinning the exact reviewed pending state. It approves the whole program, participants, stored future grants and allowed state evolution, not just today's scope. A child/factory-created Mandate is not automatically approved. A specialized independently reviewed co-approval protocol can be added under a new type.
-
-The YAML base supplies executable initialization, approval and termination. A supported authority implementation additionally enforces: genuine initialization/history, unchanged base lifecycle code/roles, protected lifecycle fields and participant channels, and owner-approved customization rules. An unrelated added handler cannot set Active or replace the holder. Every accepted authority-state transition must be checked against those rules using the actual Contracts result/handler evidence; superficial current-shape validation is insufficient.
-
-Reserved writes are `status`, `approvedAt`, `terminatedAt`, the holder/delegate channels and base lifecycle handler declarations. Status/time writes are allowed only from the exact base lifecycle handlers. Scope changes from owner-approved additional workflows are allowed after their complete result validates every grant. Base operation scope-clearing is part of termination. Ordinary contract amendments to this approved program are not supported in v1: create and explicitly approve a replacement Mandate. Runtime failures cannot create approval.
-
-**Q12. AUTHORIZE operation delegation**:
-
-1. Preserve actual entry actor. Resolve the initial Mandate lineage; require a supported Operation Mandate.
-2. Establish its exact state immediately before candidate K, including all relevant earlier own and embedded inputs, using complete provider ranges. Do not substitute latest or worker-time state.
-3. Require genuine owner approval, Active state, unchanged protected program, actual actor equal to authorized actor, and represented actor equal to holder.
-4. Establish that the holder actually controls the effective target channel and that its exact policies permit delegation. A Mandate cannot override a nondelegable target policy.
-5. Match one complete scope grant: initialDocument if specified; exact channel key; operation key; actual target pattern/function; actual request pattern/function.
-6. Each configured pattern must match actual values without filling omissions. Each predicate is read-only BEX and must return Boolean true. `$document` is the processed Mandate; document validation additionally binds `targetDocument`; request validation additionally binds `request`. These are authority-evaluation bindings, not extra target-workflow bindings. Missing evidence waits; false rejects; invalid code/result rejects as invalid authority rather than granting.
-7. Do not mix pieces of different grants. Empty scope grants nothing. A future grant outside scope is inert.
-8. Record the exact authority position and matching grant with the frozen entry assessment. Process the target only after eligibility is established.
-
-The action's own subsequent effect can remove the grant. Do not apply that change backward. A revocation before K denies the call; one after K does not undo it. Histories with identical timestamps still use full K. An authority dependency cycle requiring the candidate itself to produce its own approval is invalid; earlier independent prerequisites can be computed, but no assumption of success closes the cycle.
-
-The local Actor Policy is a Marker with an `operations` dictionary. `requiresActor` is principal, agent or any (exact supported Actor ancestry); `requiresSource`/`excludeSource` name the authenticated browserSession, apiCall or documentRequest Source specialization. Missing dimensions impose no extra policy restriction. `allowsDelegation:false` forbids use of a Mandate for that operation; absent/true allows checking one but never grants authority by itself. All applicable restrictions conjunct. Principal attribution alone does not imply a human: use the required authenticated Source policy where needed. The feeder inspects all such known policy markers; a validator/runtime registration recognizes the marker even though it emits no effects. Supported Actor/Source policies are ordinary exact contract types. This package does not reinterpret legacy policy or mandatory-guarantor IDs. Unknown required policy behavior stops admission. Target-side single-use, budget consumption and business guards remain the target's responsibilities; Mandates are not an implicit global consumable token.
-
-## 9. Full-history establishment and initialization
-
-**Q13.** Every managed document is established from its genuine pre-initialization content. Existing trusted local history can be reused; an uploaded initialized snapshot or alleged epoch is not authority to skip its prefix. No frontier-import admission mode or proof-trust shortcut is supplied in v1.
-
-Top-level initialization has no fabricated Timeline event or timestamp. Its actual admitted original content and creation context are retained. Genuinely new runtime-created members use their Contracts-captured pre-initialization reference and causal creation context. Entries before a genuine birth boundary are not retroactively delivered. An existing document has its old birth; discovering it now is not a new birth.
-
-Before using a supplied initialized version, prove its exact lineage, all required predecessors and exact position from reconstructed/local established history. A marked body without required evidence is `CONTENT_MISSING`/`DEPENDENCY_PENDING`, not a fresh document. Exact disagreement with an established immutable history is an error.
-
-**Q14. Automatic managed membership.** Every surviving reachable occurrence declared by Process Embedded, including collection members and descendants introduced during processing, is included in the engine's managed collection. This is an implementation obligation of the selected engine, with the semantic identity/lifecycle restrictions of this section. Ordinary references are not automatically active subscriptions.
-
-For a genuine new child, publication of the creating result atomically includes its legitimate initialized runtime, unique managed binding, source discovery and durable work. If the creating attempt fails, no successful child is exposed. For an existing child, reuse the unique binding and establish the required historical view; do not initialize it again. Missing content can create a provisional requirement/handle, never a fabricated stable document. If Contracts cannot finish the parent without it, the parent's prior stable state remains unchanged.
-
-Removing an occurrence does not delete the source's authoritative session or retained history. Reattaching at the same path has a new generation, even for identical source content. Old pending applications cannot migrate to it. A node created and removed within one attempt need not remain an active managed listing entry; retain its attempted/committed lifecycle evidence as required, not a falsely surviving attachment.
-
-## 10. Source history, receiving history and attachment cutoff
-
-**Q15.** The receiving history of a new occurrence is distinct from the source history being proven. Let A attach source position Bp during entry a with boundary K(a). Determine the last source position established from work strictly before K(a), including prerequisites of that source's own earlier attachments. This is the frozen join goal. If supplied Bp lies beyond this goal, reject `FUTURE_ATTACHMENT_POSITION`; never expose future state to the earlier parent.
-
-If Bp is older, apply the required contiguous successors after Bp through the goal in source-history order. Do not replay transitions already represented by Bp, initialization output already represented there, or previously retired occurrence work. A no-entry top-level attachment completes full-history establishment of the starting exact graph, then ordinary source selection begins; it does not invent a wall-clock attachment event. Its explicit initialized reference is the initial selected position. A runtime attachment caused by an internal reaction retains the actual external creation/activation entry (or no-event initialization origin) rather than the wall clock.
-
-**Q16. APPLY retained completed source work** uses the Contracts completion kernel, not arbitrary patches or one `process(parent,event)` call per emitted value. Prepare one exact receiving turn with the complete eligible source-state set and full batches for a single recorded causal step, no receiver external seed, and the original causal entry/time when present. Install all those source states before callbacks. Preserve local updates, FIFO, occurrence generation checks and the selected root's own output. Preserve the lower logical work/gas schedule for that application. The source operation and source epoch are not performed again.
-
-The current `begin/execute/accept/finish` API is scoped to an invocation and its exact tokens. Rebinding a committed source result to a new receiving invocation therefore requires a **supported completion-adoption / receiving-turn API** in the adapter. Its closed input includes receiver before-view, source predecessor/result evidence, source cause, occurrence tickets and source order. It verifies compatibility, seeds only permitted internal receiving work and returns a complete atomic result with captured member projections. This is a bounded runtime integration feature to implement/test; `snapshot = patch(parent, childAfter)` is not a substitute. Do not add an external wrapper or rewrite Contracts event recognition.
-
-A source result from a different before-view, channel generation, refinement or cyclic context is not reusable. Match lower semantic turn descriptors and normalize logical setup/application work through the supported driver. Portable data-only chunks in the current code re-execute for verification; trusted persisted results need an explicit controlled local provenance path before execution can actually be avoided.
-
-Merge historical prerequisites across changed sources by original cause K while respecting exact predecessor chains. Steps from the same original cause needed by one receiving turn are grouped so sibling state and whole-batch ordering match Contracts. No source can leap over another earlier required cause. A source's initialization position is a prerequisite, not an entry with invented K.
-
-A historical reaction after attachment is recorded at that attachment's effective logical boundary for `stateBefore` queries, while retaining the original source cause/time for Contracts. This prevents the engine from falsely asserting that A had observed B's old event before A attached it. Parent direct checkpoints are not rewound or advanced by internal application. A subsequent parent input runs only after the attachment plan is complete. Topology changes during application cause reevaluation of remaining obligations; retired obligations end without transfer.
-
-## 11. Completed processing, cyclic owners and failure
-
-**Q17.** For LIVE work use the Contracts completed-document algorithm: local-only Document Updates; sealed state and whole own-event batches; parent state-first/batch-before-handlers; direct-child observation; coherent cyclic rounds. Exact accepted input and checkpoint provenance are unchanged.
-
-A child completion is not a commit. One selected Contracts attempt keeps its complete rollback and shared gas boundary. Independently committed source and receiver attempts have distinct boundaries; a later parent failure does not undo an earlier separately committed source. An engine must not expose a tentative prefix of one attempt as a success.
-
-In a live cyclic group, select one complete compatible component view and one canonical orchestration representative (smallest canonical DocumentId among the actual owners). Member semantics remain their own. Publish every required owner and genuine newborn together. Derive live membership from exact current evidence, never the union of historical backreferences. Sticky joins/splits within the attempt follow Contracts; later selection uses the resulting graph. One-way observers are not automatically added to the semantic atomic owner set.
-
-Member runtime keys must be stable across rerooting of an established view. For first top-level uninitialized admission, use the canonical DocumentId as the initial root key. For runtime-created children retain the exact key produced by the Contracts vertex constructor (the baseline binds cause/input, creator key, path, allocation ordinal and initial value). Never reallocate this key on source promotion or cold reopening. Store this origin mapping as retained runtime evidence. A conflicting second birth origin for the same DocumentId is rejected as AMBIGUOUS_LINEAGE_ORIGIN rather than silently merged. Distinct business instances require distinct initial content. For archived duplicate views retain their already established separate exact runtime bindings; do not rename them during proof export. The adapter uses the captured Contracts keys/bindings; it cannot create B as a new root named `root` and claim source occurrence identity parity. New source/instance registration maps a canonical DocumentId to an existing verified slot; incompatible historical slots retain their exact declared bindings. Independent language implementations must use the origin-key rules in this paragraph and the pinned Contracts archived-view constructor and pass reroot/duplicate-view fixtures before claiming portable result identity. No random account/worker label may affect event order.
-
-**Q18. Failure/progress.** Provider verified-prefix progress, feeder terminal/examined progress and successful Contracts checkpoints are separate facts. Against complete verified context, a bad operation, bad arguments, wrong actual target channel, stale exact precondition or established authority denial is durably REJECTED for its receiving continuation. An explicit business guard or direct deterministic gas exhaustion is EXECUTION_REJECTED. Retain the actual diagnostic, admitted gas and first rejected charge; no automatic budget escalation occurs. Neither outcome changes business state, creates an epoch/checkpoint, emits a success outbox item nor fabricates a successful source completion. The continuation automatically considers later ordered input after atomic decision publication.
-
-The private InputDisposition binds original entry/full K, receiving instance and lineage, member/channel generations, exact evaluation prestate, verified authority/source evidence, structured reason and any real failed Contracts observations. Its stable lookup key is scoped to receiving history/lifetime and original entry, not the mutable current head. Later state cannot resurrect a terminal decision. New lifetimes and historical attachments retain their separately verified applicability. Admission consults the same retained decisions, preventing graph replay of rejected work in that continuation. Independent receivers are not globally blacklisted. Original evidence and terminal decisions participate in exact pre-time completeness without invented successful document history.
-
-Missing content, incomplete coverage/history, unavailable providers, invalid signatures or contradictory prefixes are never converted to a terminal user rejection. Integrity and internal/unsupported execution faults retain their precise failure. CAS conflicts, transient I/O and unknown publication use conditional retry/reconciliation. A host parser/work/fetch limit, memory/stack failure, cancellation or worker death below actual deterministic gas exhaustion is an operational interruption, not `REJECTED`, `EXECUTION_REJECTED`, `NO_MATCH`, a successful History Position, or a consumed checkpoint. Preserve the original unresolved obligation and last stable state. Only the meter's authentic failed debit can establish a gas-exhaustion result; do not convert `OperationLimitExceeded`, `ResourceError`, elapsed timeout or missing evidence into gas failure. Partial trace data is host diagnostics, not a completed processing receipt. Reconcile an uncertain publication before repeating execution. A rejected direct attempt containing no committed source obligation can release its wave reservation; failed required receiving application cannot.
-
-Missing content, source coverage or authority history waits. Last stable state remains readable. Completeness/provider facts are not rolled back by a document failure. Exported proofs must contain any denial assessments necessary to justify passage over accepted source entries; those assessments must be reproducible under the same earlier authority.
-
-## 12. Receipts, positions and epochs
-
-**Q19.** A Processing Receipt is a canonical computation claim. It is not proof of source order, issuer honesty or database publication. It contains the exact initial lineage, before/after documents, kind, ordered output occurrences and gas, with all actual owner/newborn projections in `members` sorted by DocumentId.
-
-Variants are closed by these rules:
-
-| Kind | Required additional fields | Forbidden |
-|---|---|---|
-| INITIALIZE | No event/time; before is captured original content. | sourceReceipts, attachment, fabricated event/time. |
-| PROCESS | Original event and identical eventTimestamp. | sourceReceipts, attachment. |
-| APPLY | Nonempty exact sourceReceipts, exact attachment; event/time iff its source causal step has them. | Receiver external checkpoint or fabricated source input. |
-
-The top-level emitted list contains only selected root-origin output. Member projections preserve each member's output with zero-based distinct occurrence ordinals; equal values are not deduplicated. Source processing and receiving application are different receipts. Source gas is not copied as receiver gas or multiplied by number of owners. Actual integers come from execution. Failed runnable attempts retain diagnostics separately, not a successful Processing Receipt.
-
-**Q20.** History Position forms an exact append-only predecessor chain. Position 0 records initialization. Every later retained complete transition increments `position` by one. `documentId` is constant; before must agree with the selected predecessor document/view under its declared transition. A stable revision advances `epoch`; a catch-up continuation can keep the previous stable epoch with `stable:false`. This extra coordinate prevents assigning new stable epochs to intermediate catch-up bookkeeping.
-
-A Document Epoch references one stable History Position with matching documentId, document and epoch. Epoch 0 is the completed stable initialized result. Each subsequent stable logical change increments by one. Checkpoint-only changes count; physical collapse/reencoding, waiting, polling and unchanged carry do not. Final completion of a catch-up interval creates at most the next stable epoch, even if it had several intermediate positions. No unchanged cyclic companion receives an invented epoch.
-
-`effectiveEntry` on a position is the receiving logical boundary: the external entry for PROCESS or attachment entry for its catch-up APPLY. Original source causes remain in their receipts. No-event initialization has none. `stateBefore(K)` replays/selects complete receiving transitions effective strictly before K, including their required catch-up, never simply the largest receipt timestamp less than K. Incomplete required history returns WAITING.
-
-**Q21.** Processing Proof is an index to available exact content, positions, ranges, reproducible assessments and authority positions, plus the lower-runtime evidence necessary to reproduce member keys and exact graph commitments. Stronger sufficient range proofs do not change the same semantic processing receipt. Runtime evidence is supporting exact content, not an opaque assertion accepted as execution. Its codec must be the supplied lower-runtime snapshot/completion format or a verified equivalent; arbitrary dictionaries are invalid.
-
-V1 verifies a foreign package by establishing initialization and replay, not by trusting its final snapshot. Provider authentication, source completeness, legal-next selection, authority, execution and host publication are different claims. Nothing here requires a zk-proof, trusted remote execution service, blanket signature of a result or extra Execution Profile type.
-
-## 13. Conformance boundary
-
-`CONFORMANCE.md` specifies source, authority, history, lifecycle, engine and performance cases separately. An implementation claiming Coordination support must pass protocol/source/authority/history cases. Our automatic-engine release additionally requires automatic progress, state/listing, wave scheduling, crash and bulk-loading cases.
-
-The guide's executed reference examples are evidence only for the exercised single-document path and predicate checks. They do not certify unimplemented automatic workers, the generic graph admission bridge, cross-attempt completion adoption, database publication, cycles in the new engine or production throughput.
-
-Authority order for this package is this specification for Coordination semantics; current Contracts for all document processing; YAML definition shapes plus the explicit cross-field rules here; then the engine design for the selected host policy. Disagreement is a defect to correct before publication, not a mode chosen by Codex.
-
-
-## 16. Lazy input access and failed receiving obligations
-
-The processor observes exact values through the Contracts immutable host-value interface. Timeline admission requires current entry facts and authenticated prefix evidence, not recursive expansion of prevEntry or inherited specification text. A demanded predecessor path follows that exact link. Authentication still verifies all newly supplied predecessor links/signatures; established prefixes can support anchored suffixes. There is no protocol maximum on a finite Timeline history, source count or logical prefix-verification task. Acquire and verify large histories incrementally using exact contiguous pages and retained verification state. Page sizes and per-worker acquisition effort are physical choices, not proof boundaries. An established prefix may anchor a later suffix. No intermediate page or partial candidate prefix becomes source completeness before all required links, bodies, authentication and the claimed end boundary are verified.
-
-Operation audience and ordinary observation authority are independent. An addressed request selects only its established lineage for invocation. Other members with ordinary workflows on authorized source channels can observe the complete original entry. An operation-only channel outside the invocation audience has no ordinary workflow observation to schedule. Missing target lineage waits. A malformed typed request is not an ordinary message.
-
-After a separately committed source result, receiving failure belongs to the actual receiver continuation. Retain its exact before-position, occurrence generations, source receipts, original cause, phase, gas and diagnostic, while keeping the source result successful. A deterministic receiver fault is ERROR; genuinely missing resources are WAITING and rechecked automatically. Ancestors and a source held by the strict wave barrier can be WAITING with DEPENDENCY_FAILED referencing that receiver. Do not mark the wave complete or drop its pending application. Leases are released while the durable reservation remains. Explicit retry revalidates the retained obligation without repeating the source operation. Unrelated work remains eligible. An entirely tentative rooted Contracts call still rolls back atomically.
-
-Historical authority is evaluated strictly before the candidate full order key. A later terminal rejection or a precisely bounded later operational fault does not invalidate an independently established earlier prefix. Missing/corrupt earlier authority, or a failure with unknown relevant boundary, blocks. The candidate cannot authorize itself through its resulting scope change.
-
-## 17. Fixed Contracts budget; host-independent progress
-
-The current Contracts invocation default and maximum remain **100,000 gas**, shared across its entire required calculation including children, cyclic rounds and equivalent chunks. Lower gas ceilings already supported by the selected invocation/policies are explicit semantic conditions; host capacity must not silently choose a smaller budget. Native/reused execution must reproduce the same logical charge prefix. This rule does not create a 100,000 limit on the total Timeline lifetime or on all catch-up invocations combined.
-
-Standalone content admission and provider history verification are prerequisites, not synthetic document operations. Their host controls may yield, stream or stop acquisition; incomplete acquisition cannot consume a candidate or become an authentication denial. Preserve source consistency, complete range verification and exact canonical ordering through page continuation and cold reopening.
-
-A deficient host may stop an instance with an operational reason without changing the semantic history. Use the existing four-state engine model and a structured issue reason; do not add public resource-profile types. Release active worker capacity, retain required propagation/reservation obligations, permit unrelated work, and retry the original pending cause after capacity/implementation correction or explicit resume. Do not automatically increase gas, hot-retry unchanged insufficiency, or skip the cause so that later conflicting work passes it.
-
-For an already committed child and an interrupted parent, retain the child's true success and the parent's outstanding receiving application. For one entirely tentative invocation, retain no partial state success. If execution finished but its database acknowledgement is unknown, original-publication reconciliation takes precedence over this retry path.
-
----
-
-# Exact imported specification bindings
-
-```json
-{
-  "edition": "2026-09-24-core-compute-1",
-  "files": {
-    "bex/COMPLETE_SPECIFICATION.md": "dc478556d2e18a3c0c12d010a9539bfd4ec87891da0dd9a25102a75b1638dfb1",
-    "contracts/COMPLETE_SPECIFICATION.md": "c7cf9c28ca437701e1be27c925e4152cadce0eb6a3b4dc59e3cebbba4a63746a",
-    "language/COMPLETE_SPECIFICATION.md": "445297a8da200d5644069cf009ab5374e46156b3d6d407fa663a048da6c7e30b"
-  }
-}
 ```
+UTF8("blue.coordination.object\n" + providerBlueId + "\n" + objectBlueId)
+```
+
+The object MUST be an allowed accepted entry, provider descriptor, protocol
+response, stream binding, or access-state assertion under these rules. A provider
+MUST NOT expose a generic signing oracle. Every timeline governed by the signed fact must belong to that provider. Actor
+details and domain message content are not redundant provider identity fields. Signatures are outside the
+signed content, so no signature/BlueId self-reference exists.
+
+`Timeline Attestation` preserves the dedicated guarantee-signing convention:
+
+```
+UTF8("blue.coordination.guarantee\n" + guaranteeBlueId)
+```
+
+Its timeline must equal guarantee.timeline; verify using that timeline's provider
+key. Ed25519 here means pure Ed25519 per RFC 8032, not Ed25519ph. A valid signature
+establishes a claim by the adopted provider, not honesty independent of it.
+
+Every successful protocol response is carried in a Provider Attestation. Its
+provider MUST match the adopted provider, and the response object's `request` reference
+MUST identify the exact outstanding request.
+Authentic cached results may be reused as historical evidence; freshness is only
+what the signed bound/request actually establishes. Old evidence proves no later
+state. HTTP status alone is never a completeness or access proof.
+
+Malformed unauthenticated requests may receive unsigned errors. A signed failure
+is still not evidence of an empty history. Signature checks reject wrong lengths,
+noncanonical key encodings, modified content, wrong domains and mismatched sources.
+Implementations MUST use a maintained Ed25519 implementation.
+
+For this preview the provider key is immutable for the lifetime of its timelines.
+Routine deployments preserve it. A lost or replaced key requires a new provider
+identity and explicit consumer adoption; no URL, descriptor refresh, cross-signing
+or new advertised key silently migrates old history. Reader-key rotation is an
+ordinary access-set change, with old/new keys simultaneously granted if needed.
+
+## 4. Accepted history and provider publication choices
+
+### 4.1 Required properties of every published history
+
+A provider decides how to establish a timeline and accept occurrences. A government
+provider may approve publications through a statutory workflow; a company may
+import committed records from its internal system; a personal provider may offer
+an owner-only append API. None of those ingestion mechanisms is mandated here.
+A reader's signature and a Timeline Access grant never confer publishing authority.
+
+Whatever the ingestion mechanism, every accepted `Timeline Entry` contains timeline,
+timestamp, actor and exact message. prevEntry is absent at genesis; otherwise it
+identifies the immediately preceding accepted entry. The provider authenticates the
+publishing actor; a caller-supplied actor label alone is not sufficient. `source`
+may carry authenticated submission provenance. If the message is a recognized
+Contracts Operation Request, entry.operation identifies that same exact complete
+request; otherwise it is absent. Acceptance does not assert business execution.
+
+The timestamp is greater than the predecessor's timestamp and at least the
+provider's durably sealed completeBefore boundary. It is the provider-assigned
+publication position. An occurrence's earlier real-world time belongs inside the
+message, not in a backdated insertion into a closed prefix. No in-flight or later
+acceptance may insert behind the accepted head or a sealed boundary.
+
+The provider durably commits the entry and head before attesting to acceptance.
+Concurrent acceptance, read/seal and access-change operations have a consistent
+linearization order, including after restart. Accepted entries cannot be edited,
+deleted, forked or reordered. A correction is a later entry. IDs cannot be recycled,
+and a public timeline cannot retrospectively become private. Archival must retain
+promised evidence or report unavailability, never invent an empty replacement.
+
+Every provider exposes the common read interface and the Timeline Access operations
+in sections 6, 7 and 11, regardless of how it accepts entries. A public history's
+publicRead flag grants everyone access. Private histories use confirmed executable
+Timeline Access documents. Reader grants never give publishing or owner authority.
+
+### 4.2 Optional owner-ingest interface
+
+A provider advertising the owner-ingest operation types additionally implements `Create Timeline
+Request` and `Append Entry Request` through the routes in section 11. These types
+are conveniences for providers such as the planned AWS service, not prerequisites
+for a government or existing enterprise source to participate in Coordination.
+
+Creation is owner-only, takes explicit publicRead, and returns the exact Signed
+Timeline in `Timeline Created Response`. Append is owner-only, takes timeline,
+message and optional expectedLastEntry, and derives the actor from authentication.
+`Append Entry Response` returns the accepted entry and its Provider Attestation.
+An expectedLastEntry mismatch is HEAD_CONFLICT with no acceptance. Entry content,
+head, result identity and request deduplication commit atomically.
+
+### 4.3 Idempotent mutations
+
+Standard owner-ingest and Timeline Access mutation requests carry a required
+idempotencyKey, scoped by authenticated owner and operation. The stored fingerprint
+covers their logical parameters. Reusing the key with the same parameters returns
+the original accepted result; different parameters yield IDEMPOTENCY_CONFLICT.
+Records live for the affected timeline or access document's lifetime. This key is
+not part of read requests, actor identity or public access-update operations.
+Rejected uncommitted operations do not reserve successful result identities.
+Provider-specific ingestion must still satisfy section 4.1.
+
+## 5. Completeness: two valid proof forms
+
+### 5.1 Explicit guarantee
+
+`Timeline Completeness Guarantee(timeline, completeBefore, lastEntry?)` means all
+accepted entries with timestamp < completeBefore are fixed and no future entry
+can appear there. lastEntry is the last entry INSIDE that prefix, not necessarily
+the current head. Its absence positively asserts an empty prefix.
+
+The combined `Read Timeline Request` MAY specify minimumCompleteBefore. Its
+`Timeline Read Response` always contains a Timeline Attestation meeting that bound
+or returns BOUND_UNAVAILABLE. Use limit=0 when only the checkpoint is needed;
+positive limits fetch entries under the same checkpoint (section 6). It MUST NOT invent a distant future clock value merely
+to satisfy a request. Without a minimum it seals a current logical frontier.
+Bound advancement and appends use the same durable serialization mechanism; a
+bound cannot overtake an uncommitted earlier append that may still succeed.
+Completeness bounds do not decrease. At the maximum bound, further append fails
+TIME_EXHAUSTED. Silent timelines MUST support explicit bound advancement.
+
+The verifier resolves the attested guarantee and every newly needed entry from an
+already established prefix (or genesis) to lastEntry. It checks identities, same
+timeline, predecessor adjacency, strict times, each entry below the bound and exact
+final head equality. A headless guarantee needs no entries and proves the empty
+prefix. A hash is not a substitute for missing content needed by a consumer.
+
+### 5.2 Authenticated successor evidence
+
+`Timeline Successor Evidence` contains a Provider Attestation of an accepted entry
+S and the ordered entries extending an optional already-established `after` anchor
+through S. Check the attestation, exact adjacency, source identity, strict time
+order and agreement with all retained history.
+
+The strict-chain promise then establishes completeness strictly BEFORE S.timestamp.
+The resulting prefix head is S.prevEntry, or absent when S is genesis. S itself is
+not within this derived prefix. Its content may be retained as authenticated, but
+a bound > S.timestamp is needed to settle S's complete cross-timeline time group.
+
+Example: A.timestamp = T-1, S.timestamp = T+1, S.prevEntry = A. Once A's prefix is
+established and S is authenticated as accepted, there is no entry at T; the derived
+completeBefore is T+1. Merely receiving two sorted records, a submitted append
+request, or an unauthenticated link proves nothing. A direct predecessor link
+proves the gap; it does not supply an unknown earlier prefix. An authenticated
+later checkpoint committing to S can also authenticate S without an entry-specific
+signature, provided the full required chain is verified.
+
+An entry exactly at T establishes only completeBefore=T by this rule, insufficient
+to finish processing timestamp T. A quiet source offers no future successor; use
+an explicit guarantee. These two proof forms feed the SAME retained-prefix model.
+A provider MUST implement explicit guarantees and accepted-entry attestations;
+consumers SHOULD accept both forms.
+
+## 6. One read operation: entries and completeness
+
+Every provider MUST support `Read Timeline Request` at `/timelines/read`.
+`Timeline Read Response` always contains a signed checkpoint for the requested
+timeline, correlated to the exact request. There is no separate mandatory
+completeness operation. A reader can both acquire entries and establish the closed
+frontier in one exchange, including when no new entries have appeared.
+
+limit is a required nonnegative integer. With limit=0, return only the checkpoint:
+page MUST be absent, and the request MUST NOT contain afterEntry, afterTimestamp or
+cursor. This is a completeness-only query, not an empty-history assertion. The
+checkpoint may name a lastEntry which the reader still needs to acquire. With
+limit>0, page MUST be present (even for an empty history), and its checkpoint MUST
+be exactly the response checkpoint. The provider's advertised maxPageSize is the
+maximum positive limit.
+
+minimumCompleteBefore is an optional integer exclusive bound in the permitted
+range. It applies to a fresh read, with or without entries. It MUST NOT accompany
+a cursor: continuation preserves its original checkpoint. The provider either
+seals a frontier at least as large as requested or returns BOUND_UNAVAILABLE; the
+client cannot force future timestamps. A checkpoint-only response does not prove
+that the feeder already possesses the closed prefix's contents.
+
+For limit>0, the request accepts at most one of:
+afterEntry, afterTimestamp, or cursor. With none, start at genesis. afterTimestamp
+is EXCLUSIVE and may be -1; return entries with timestamp > it. Within a strict
+timeline timestamps are unique, but exact-entry/cursor continuation is preferred.
+A read starting at a timestamp makes no claim about earlier unestablished history.
+An afterEntry anchor must belong to the requested timeline and selected checkpoint;
+unknown or later anchors fail rather than silently seek elsewhere.
+
+The first request seals/selects a complete prefix ending at an immutable checkpoint
+(a Timeline Attestation). A `Timeline Entries Page` contains that checkpoint,
+ordered entries, optional predecessor, hasMore and optional nextCursor. The
+predecessor is the immediate entry before the first returned entry, if any. For an
+empty result it is the last accepted entry in the selected prefix at or before the
+requested lower position, if any. The response attests this boundary selection.
+
+A `Timeline Read Cursor` binds the timeline, checkpoint, and exact next position
+by afterEntry or the initial afterTimestamp. It is an identified value, not an
+authority-bearing bearer token. The server verifies/recognizes the checkpoint,
+validates the anchor within it and rechecks the reader's CURRENT authorization on
+every page. Cursor signatures do not bypass revocation. A cursor cannot switch
+sources, bounds or anchors. A checkpoint-bound cursor remains valid as long as
+its promised history is available; this profile has no artificial cursor expiry.
+
+Pages enumerate EVERY successor after the selected lower position below the
+checkpoint bound. They MUST NOT filter by document ID, actor or message while
+claiming unfiltered completeness. The server may return fewer entries than limit
+for byte constraints, but a nonterminal page has at least one entry and advances
+the cursor. A single entry that cannot fit returns LIMIT_EXCEEDED, not an empty
+successful page. Maximum entries per page is advertised in Provider Descriptor; there
+is no protocol maximum total history length.
+
+hasMore is true exactly when another matching entry remains in THIS checkpoint.
+A successful hasMore=false is a permanent assertion: every accepted entry in the
+requested suffix strictly before the signed completeBefore bound has been returned
+across this read's pages,
+and no future acceptance can add another entry below that bound. This applies to
+empty results as well. "Until then" means this explicit bound, not an unstated
+HTTP arrival time. For a continuation page it is the original checkpoint's bound,
+not a newer clock time. Earlier entries before the requested lower position may
+exist; a timestamp seek does not claim to have returned them.
+When hasMore=true, nextCursor is required and anchored at the page's last entry. When false,
+nextCursor is absent and the final returned/predecessor position agrees with the
+checkpoint's head (subject to an empty interval when lower bound >= checkpoint).
+Concurrent appends beyond the checkpoint do not appear in continuation pages.
+Start a fresh request after that checkpoint head to acquire them.
+
+For timestamp seeking, predecessor.timestamp <= afterTimestamp and the first entry
+(if any) has a greater timestamp. The attested boundary identifies the selected
+suffix. To extend an existing contiguous prefix the consumer MUST reconcile that
+predecessor with its own exact anchor; an arbitrary timestamp seek cannot certify
+that skipped older history was processed. A lower bound beyond the checkpoint is
+an empty query interval, not completeness beyond the checkpoint.
+
+`Timeline Range Evidence` is an assembled proof: checkpoint plus every contiguous
+entry after a previously established anchor through the guarantee's lastEntry.
+Only after all pages/links and the ending head are verified may a consumer advance
+usable completeness. hasMore=false, a page count, a cursor or max(timestamp) alone
+is not evidence. Loss, duplication, reordering or mixing pages from different
+checkpoints cannot silently advance it.
+
+`Fetch Timeline Entry Request` and `Resolve Timeline Content Request` provide exact
+entry/content retrieval. Their `entry` and `content` fields are required exact
+Blue references. Private content resolution is scoped by an authorized
+timeline and reachability from its accepted entries or its access document. Knowing
+a BlueId or finding the same blob in storage grants no extra access. Public access
+histories publish their complete required content closure; private message bodies
+are not part of that closure merely because an access document names the timeline.
+
+## 7. Timeline Access is an executable Blue document
+
+### 7.1 Document structure and authority
+
+`Timeline Access` has two lists, `allowedTimelines` and `allowedKeys`, and a real
+`contracts` section. Each listed key is permitted to read every listed timeline,
+including entries, referenced content and completeness. Either list may be empty;
+values must be distinct. Every timeline's provider must equal the provider declared
+in `contracts.provider`. The lists contain exact timeline references and Ed25519
+public keys. There are no invented document or grant IDs.
+
+`contracts.provider` is a Public Timeline Channel: provider and URL of the provider's
+reserved public control timeline. The adopted, signed Provider Descriptor must
+confirm that source. A customer's public timeline and an arbitrary Agent Actor
+label cannot confer this authority. The provider is not repeated at the root of
+the access document or alongside each reference in its allowed list.
+
+`contracts.update` has type `Update Timeline Access`, a specialization of the
+standard Contracts Sequential Workflow Operation. It is bound to channel `provider`.
+Its typed Timeline Access Update arguments contain BOTH replacement lists. Its
+ordinary BEX checks reject foreign-provider timelines and duplicates; its standard
+Update Document step replaces both fields in one atomic Contracts transition.
+It does not mutate contracts, the provider channel, or unrelated document content.
+The type supplies this executable definition; the examples show the two contract
+members explicitly for readability. Instances must preserve this definition and
+channel binding. A document containing a different update program is not evidence
+under these rules, even if it claims the base type.
+
+### 7.2 Publication, updates and current state
+
+The initial exact document is published as the message of an accepted entry on
+that provider control timeline. This publication confirms the initial lists and
+establishes its initial Blue identity. The publisher is an Agent Actor or a domain
+subtype. A self-authored document with no confirmed publication grants nothing.
+The public control history needs no access document of its own: it is unconditionally
+public. Several access documents may share this history.
+
+An update is a standard Contracts Operation Request carried as the message of a
+later control entry, also copied exactly into the entry's `operation` field:
+
+- `document` references the original, published access document;
+- `channel` is `provider`, and `operation` is `update`;
+- `request` is a Timeline Access Update with both replacement lists.
+
+The original document is the stable target for every update. The feeder resolves
+it through established Contracts lineage to the current execution state. There is no version precondition,
+revision counter or previousChange chain. Each accepted operation replaces both
+lists completely, in immutable control-timeline order. If two valid replacements
+are accepted, the later one determines the lists; they are not merged. An owner
+that wants to preserve an earlier change includes it in its desired replacement.
+Contracts supplies execution, checkpoints, rollback and the resulting exact
+document. Feed the complete original Timeline Entry, never just its message.
+An invalid update fails atomically. The provider MUST validate the operation
+before committing an accepted permission update; it cannot publish success and
+then enforce different permission sets. Already accepted control history cannot be
+rewritten to repair a bad update. Treat a contradictory provider assertion as an
+integrity failure, not as permission to skip it.
+
+A verifier starts from the confirmed initial document, initializes it under
+Contracts with this exact channel implementation, and processes the complete
+applicable history in established order. Shared-history entries for other documents
+are retained for chain verification, then dispositioned by their exact target
+lineage. Processing yields an actual current Timeline Access document, not a
+separate custom access-state record. To establish state as of B, acquire complete
+control history strictly through B. A signed current snapshot alone establishes
+only the provider's claim; it does not replace publication and replay evidence.
+
+### 7.3 Owner requests and enforcement
+
+`Create Timeline Access Request` asks the provider to publish the initial lists.
+`Update Timeline Access Request` names the initial access document and both desired
+replacement lists. These are owner-authenticated requests, not reader-signed
+requests. A provider verifies that the owner may manage
+the access document and every affected timeline, including both removed and added
+ones. An empty initial timeline list must not allow claiming another owner's
+resource later. The provider constructs and publishes the standard operation.
+The same idempotency rules as other owner mutations apply. Repeating identical
+initial content may reuse its identical Blue document; never invent an arbitrary
+ID just to make identical permission documents distinct.
+
+A `Timeline Access Response` contains `access` (initial exact document), `current`
+(executed document), `publication` (attestation of its initial control entry), and
+`lastEntry` (attestation of the latest relevant publication/update). The public
+Get Timeline Access Request names `access` by exact reference. Multiple documents
+may grant the same key access to the same timeline: effective private read access
+is the union of current confirmed documents. Removing one grant cannot revoke a
+separate still-valid grant. Public timelines and owner reads retain their own
+independent authority.
+
+Publishing the accepted change, updating the enforced permissions, and recording
+the owner request's result MUST be one logical durable transition. Every private
+read, including cursor continuation, rechecks the resulting current grants.
+Removing a timeline or key revokes the corresponding pairs unless another grant
+still permits them. Re-adding them restores access to retained history. A read
+grant never confers append, update, reshare or owner capability.
+
+The provider publishes the initial documents, operation arguments, definitions,
+control entries and evidence through public read/content routes. Everything needed
+to locate and verify them is included in the shared document or its public content
+closure. This remains available after revocation. Keys, timeline references and
+changes on public control history are public metadata.
+
+## 8. Using access evidence as an input dependency
+
+Consumers can embed the executable access document and verify its public source
+alongside other timeline inputs. Keep acquisition of that public source independent
+of access to private data: revoking a private key must not prevent observing a
+later restoration. Establish current permissions from confirmed execution and
+complete public history, not a Boolean supplied by a caller.
+
+Participant definitions, required party keys, business admission/amendment rules
+and how an application represents a pending state belong to the consuming document.
+They are not defined here. Coordination provides permission facts and their input
+dependencies; it does not authorize changes to a business agreement.
+
+## 9. Portable evidence and response failures
+
+Mandatory failure codes are INVALID_REQUEST, UNAUTHENTICATED, ACCESS_DENIED,
+NOT_FOUND, HEAD_CONFLICT, IDEMPOTENCY_CONFLICT,
+BOUND_UNAVAILABLE, LIMIT_EXCEEDED, TIME_EXHAUSTED, UNAVAILABLE and INTEGRITY_ERROR.
+`Provider Failure` contains code, retryable and optional safe detail. INVALID_REQUEST
+includes malformed cursor, wrong identity and invalid field combinations. Unknown
+required types/profile behavior fails closed. A public error need not disclose
+whether an inaccessible private timeline exists; NOT_FOUND may mask ACCESS_DENIED.
+Neither can be interpreted as an authenticated headless guarantee.
+
+An adopted verifier detects mismatched content, gaps, equivocation against a
+retained prefix, and contradicting bounds or executed access states. It retains the
+conflicting evidence and stops that source; it does not choose a new history by
+arrival order. Nondecreasing bounds alone cannot detect every dishonest fork.
+Operators controlling keys and storage can sign competing histories to isolated
+readers. Signatures/commitments do not prevent that; witnesses, comparison or
+attested continuity may be added only as explicit stronger evidence profiles.
+No reader requiring such a profile may silently accept the baseline instead.
+
+## 10. Optional committed update stream
+
+### 10.1 Reuse ordinary timelines, add explicit coverage
+
+A push connection, SSE notification or WebSocket is just transport. It proves no
+absence. An ordinary strict timeline already supports successor/guarantee evidence
+for ITS OWN entries; it cannot prove completeness of other timelines without an
+explicit coverage promise. This optional profile defines that promise.
+
+`Timeline Update Stream` contains its provider, generation and a public,
+provider-owned Signed Timeline used as its feed. `Timeline Stream Batch` is an
+ordinary message on that feed, containing stream, sequence, fromInclusive,
+completeBefore and a list of announcements. Feed predecessor links and normal
+provider attestations authenticate the batches; there is no second block hashing
+algorithm. The feed is dedicated to batch messages for that stream generation and each entry
+is attributed to an Agent Actor or its subtype, published by the provider itself. A batch may not announce its own feed entries: only
+other bound data timelines are covered, avoiding self-referential commitments.
+
+The first batch has sequence=0. Each next batch has sequence+1 and fromInclusive
+exactly equal to the preceding completeBefore. Windows are nonempty [fromInclusive,
+completeBefore); empty announcements still advance coverage. Their boundary times
+are DATA timeline time, not the enclosing feed entry's timestamp. A quiet provider
+can publish empty batches. A later feed entry alone cannot advance data coverage
+beyond its explicit batch bound.
+
+### 10.2 Membership and commitments
+
+A provider-attested `Timeline Stream Binding` maps a timeline to stream,
+generation (via stream), opaque timelineTag and immutable [fromInclusive,
+untilExclusive) eligibility. Its span is nonempty. Bindings are available to that
+timeline's authorized readers; knowledge of a tag is not read permission. The tag
+is 32 random bytes encoded as 64 lowercase hex, unique per stream generation and
+binding; tags are not reused. A timeline has at most one selected binding for a
+given timestamp. The provider must fulfill that entire interval even if it stops
+advertising the binding. Switching feeds/tags uses adjacent nonoverlapping binding
+intervals and explicit consumer adoption. There is no silent shortening, generation
+reset or reassignment of an already attested binding. Outside known coverage use
+normal timeline acquisition. Bindings may be finite and renewed.
+
+Each accepted data entry within a binding's interval has exactly one announcement
+in the matching batch. All appends/in-flight acceptances covered by a batch must be
+settled before its window is sealed, and future acceptance behind that boundary is
+forbidden. The provider coordinates this fence across all bound timelines; there
+is no obligation to list all timeline identities publicly.
+
+`Timeline Announcement` contains timelineTag, timestamp and entryCommitment.
+Announcements sort by (timestamp, timelineTag, entryCommitment) using ASCII for
+text. This order only makes the batch deterministic. Document input order remains
+(timestamp, actual timelineBlueId, actual entryBlueId). In particular, a tag order
+cannot settle cross-timeline timestamp ties for a document.
+
+For each announcement choose an independent cryptographically random 32-byte salt.
+It is not in the public feed. Define LP(s) = 4-byte unsigned big-endian UTF-8 byte
+length followed by UTF-8(s). Define U64(n) as 8-byte unsigned big-endian. Then:
+
+```
+entryCommitment = lowercaseHex(SHA256(
+    ASCII("blue.coordination.stream-entry\n")
+    || LP(streamBlueId) || LP(timelineTag) || U64(timestamp)
+    || LP(entryBlueId) || saltBytes))
+```
+
+streamBlueId already commits to provider and generation. Lengths must fit U32;
+fixed numeric bounds remain those of section 2. SHA-256 here is a separately named
+commitment, never a BlueId. The provider retains the salt and exact entry.
+
+A `Fetch Stream Entry Request` identifies binding, exact batch feed entry and
+zero-based announcementIndex. It requires current target read access. The response
+contains exact data entry and salt. Verify the feed entry, index bounds, binding
+span, tag, timestamp, recomputed BlueId and commitment. Global BlueId/content
+lookup MUST NOT bypass access to this opening. Stable tags reveal activity patterns;
+this is pseudonymization, not traffic secrecy. Stronger privacy can use no stream.
+
+### 10.3 Proof, acquisition and restart
+
+`Timeline Stream Evidence` contains the binding and its provider attestation,
+afterBatch (optional previously established anchor), and every authenticated feed
+entry needed to cover the claimed window. Without afterBatch, start at batch 0.
+With it, first establish that exact prior batch and its complete chain; never trust
+an arbitrary latest block. Check sequences, feed links, adjacent windows, signatures
+and overlap consistency. Only the intersection of binding eligibility and verified
+batch coverage proves anything about the target timeline. All announcements in
+those windows must be examined for that tag. An inclusion proof for one row does
+not prove absence of omitted rows. Filtered-proof formats are not defined in v1;
+servers may offer hints, but complete batch verification remains required.
+
+Maintain distinct announcedThrough and usableCompleteBefore. Persist all matching
+announcements and outstanding fetch obligations before exposing announcedThrough.
+An announcement with unavailable content blocks processing wherever it could be the
+next required input; it is not an absent event. For a usable contiguous source
+prefix, resolve all needed openings, verify data-chain adjacency against the
+established anchor, and reconcile checkpoint heads and overlapping explicit
+proofs. Coverage may advance partially before a known later missing entry, but
+never through it. Announcements for other documents do not require re-verification
+per document, yet every document retains its own processing obligations.
+
+A new timeline subscription may need historical backfill even when the stream's
+global cursor is advanced: previously ignored announcements may be needed now.
+Replay retained batches or acquire normal ranges. Restart resumes durable exact
+feed/data anchors; duplicate import is idempotent. A stopped stream proves only its
+last covered interval. Feed gaps, unavailable openings and binding expiry use
+ordinary acquisition or WAITING, never an assumption of no entries. Streaming is
+optional acceleration; the minimal provider and all correctness tests work by
+polling. No stream is required to implement the accepted-successor proof.
+
+## 11. Required public interface and optional publication API
+
+Every provider MUST expose the publicly reachable HTTPS API declared by its
+endpoint, however it accepts entries internally. The endpoint may be supplied by
+the provider type or instance. `GET <provider.endpoint>/provider` returns an attested
+Provider Descriptor with that API base, its public control timeline, maxPageSize,
+and optional operation type BlueIds encoded as Text. The descriptor, provider identity/public key and control timeline
+are included inline for public bootstrap; this request needs no authentication. Initial provider adoption is an independent trust decision; a URL
+or discovery response cannot replace a pinned provider identity.
+
+All operations below use POST, `Content-Type: application/json`, and Blue JSON
+request bodies. Private reader operations MUST accept `Signed Reader Request`
+with Ed25519 proof under section 3. Owner login is not a prerequisite for a granted
+reader to use these operations. Public timelines and access discovery also accept
+unsigned requests. A supplied signature is still validated, even on a public
+source. POST keeps signatures and structured cursors out of URLs. Providers may
+rate limit but cannot require their proprietary login as a substitute for this
+portable authorized-reader path.
+
+### 11.1 Baseline operations (required)
+
+| Path | Request | Response | Authority |
+| --- | --- | --- | --- |
+| /timelines/read | Read Timeline Request | Timeline Read Response | reader/public |
+| /timelines/entry | Fetch Timeline Entry Request | Timeline Entry Response | reader/public |
+| /timelines/content | Resolve Timeline Content Request | Timeline Content Response | reader/public |
+| /access/create | Create Timeline Access Request | Timeline Access Response | owner of affected timelines |
+| /access/update | Update Timeline Access Request | Timeline Access Response | owner of affected timelines |
+| /access/get | Get Timeline Access Request | Timeline Access Response | public |
+
+All paths are appended to Timeline Provider.endpoint.
+For access requests, use the provider named by its reserved public channel;
+an existing access document contains this channel. Before creating the first access
+document, discover that reserved channel through a known timeline's API base.
+
+The read operation combines bulk entries and completeness; entry/content routes
+resolve individual evidence or referenced bodies without rereading a range.
+Access creation/change use the provider's owner authentication and policy; a
+reader signature alone never authorizes them. The provider may approve public
+register entries through its internal system while separately authorizing a
+principal to manage Timeline Access. A denied owner mutation is a typed failure,
+not a false confirmation of a grant.
+
+Access get returns the initial document, latest executed document and publication/update evidence.
+The caller reads the public control timeline to establish a complete history and
+freshness. It must not treat an unconfirmed arbitrary document as provider-issued evidence.
+
+### 11.2 Keyless public reads and pagination
+
+Every baseline provider MUST support the following path for every public timeline,
+including its Timeline Access control history:
+
+1. Read the Public Timeline Channel, derive its exact public Signed Timeline, and
+   resolve the provider endpoint using section 2.3. Verify the signed descriptor
+   from `GET <provider.endpoint>/provider` against the adopted provider and channel.
+2. POST a bare `Read Timeline Request` to `<provider.endpoint>/timelines/read`, selecting
+   that exact public timeline. Omit the Signed Reader Request wrapper entirely. No reader
+   publicKey, signature, requestId, timestamp, nonce, account, API token, cookie, client certificate, private
+   target-timeline permission or owner session may be required.
+3. Receive the same `Provider Attestation` of `Timeline Read Response` used for a
+   private read. Verify the response and checkpoint with the already public
+   provider key. Keyless access means the caller owns no key; it does not remove
+   the provider signatures which make the history portable evidence.
+4. If hasMore=true, submit page.nextCursor in another bare request to the SAME
+   endpoint. The request BlueId correlates the response; the cursor fixes the
+   checkpoint. No new client label, clock value, nonce or signature is required.
+5. If hasMore=false, the selected suffix at that checkpoint is exhausted. Poll
+   later using afterEntry equal to the known head, or no selector for a still-empty
+   timeline. Use limit=0 without a selector for a checkpoint-only refresh.
+
+The baseline deliberately uses POST for both public and private reads so requests,
+filters, cursors, responses and verification have one definition. Discovery uses
+GET. A provider MAY offer additional GET snapshots or feeds, but clients cannot assume they
+exist, and an arbitrary JSON list is not baseline completeness evidence. No
+nextPage URL is required: nextCursor names a position in this timeline, not another
+server or an authorization token. Providers MUST NOT substitute redirects to a
+login page for public data or condition public access on the target grant still
+being active. Ordinary public rate limits may return typed availability failures;
+those failures are never interpreted as an empty history.
+
+Public access discovery (`/access/get`), exact-entry retrieval and required
+public content resolution likewise accept bare requests. A supplied reader
+signature, if any, is validated; silently ignoring an invalid supplied signature
+is not an alternate path into the private API. Local clauses continue receiving
+public access changes while the private timeline is revoked or unavailable.
+
+For concrete actors, both Hello entries, a complete Timeline Access document and
+public requests/responses, see [the worked examples](../docs/examples.md).
+
+### 11.3 Optional extensions
+
+| Extension | Path | Request | Response | Authority |
+| --- | --- | --- | --- | --- |
+| owner ingest | /timelines/create | Create Timeline Request | Timeline Created Response | owner |
+| owner ingest | /timelines/append | Append Entry Request | Append Entry Response | owner of affected timelines |
+| committed update stream | /streams/binding | Get Stream Binding Request | Stream Binding Response | reader/public |
+| committed update stream | /streams/entry | Fetch Stream Entry Request | Stream Entry Response | reader/public |
+
+Only advertised operation types require their optional routes. The descriptor
+uses their exact BlueIds, not independently versioned capability labels. Read an optional stream's own
+history through the ordinary combined read endpoint. A provider can conform with
+no public append operation and no aggregate stream. Additional GET conveniences,
+owner list/UI APIs or ingestion workflows must preserve the baseline semantics.
+
+### 11.4 Content transport and results
+
+A wire request MUST include its typed request body inline in the reader envelope.
+Definitions are identified by exact exported BlueIds, not unbound type aliases.
+Providers and timelines may be referenced by their adopted BlueIds. Other client
+inputs (such as a cursor) must be inline or already known to the provider; servers
+do not fetch arbitrary client-supplied URLs to interpret a request.
+
+A successful wire response MUST include its typed response inline in the Provider
+Attestation. The read response includes its checkpoint and guarantee inline; for
+a page it also includes the page, returned entries, immediate predecessor (if any)
+and next cursor inline. The page may reference the identical top-level checkpoint.
+A lastEntry/prevEntry link remains a BlueId reference: transmitting it does not
+recursively transmit all older history. Original message bodies and actors may be
+inline or retrieved through authorized content resolution. Inline expansion must
+preserve the Language identity of the referenced value; it is never a license to
+rewrite signed content. A receiver verifies identities before using any content.
+
+Responses attest the stated response type or Provider Failure. Success is HTTP
+200; invalid request 400; missing authentication 401; denied access 403 (or
+nondisclosing 404); unknown resource 404; state/idempotency conflict 409; size limit
+413; rate limit 429 with Retry-After and UNAVAILABLE; temporary availability/bound
+failure 503; detected integrity failure 500. Typed failure codes, not status or
+localized text, determine failure handling. Failures never establish absence.
+
+Cache private responses only in authorized scopes. Each read page, single-entry
+fetch, salt opening and content fetch rechecks current access. A public copy of a
+grant is evidence, not a bearer credential. Complete HTTP examples and public test
+signatures are included in [docs/examples.md](../docs/examples.md).
+
+## 12. Feeders: calculating document state from established history
+
+A feeder is the host-side component that turns acquired history into valid inputs
+for a particular document. It combines acquisition, evidence verification and
+input selection; implementations may split those jobs into separate components.
+To calculate state through a requested timestamp T, it must establish all required
+history through T, process or explicitly dispose of every relevant entry in order,
+and retain the evidence and positions behind that result. It must not claim state
+through T while a required source, access history or earlier input is unresolved.
+
+The installed Public Timeline Channel implementation must authenticate the
+original entry against its exact declared provider and derived public timeline,
+verify the timestamp equals the original entry's timestamp, and establish its
+required prefix and completeness beyond that timestamp. Its invocation evidence
+is bound to the exact receiver state, channel declaration and original event.
+Only then may it accept the entry as external input. It does not unwrap or rewrite
+that entry. Contracts remains responsible for operation dispatch, lineage
+resolution and execution checkpoints. A mere URL match, claimed actor or caller-supplied
+acceptance Boolean is insufficient. For Timeline Access, additionally confirm the
+provider's reserved control timeline and provider publication as section 7 requires.
+
+An importer is keyed by adopted provider, exact timeline and evidence policy. It
+polls or streams independently of the number of documents consuming that history.
+It retains verified content, exact prefix head, completeBefore, evidence and
+outstanding obligations durably. It can share verification across 100 documents;
+it MUST preserve authorization boundaries when exposing private content to them.
+One reader's permission does not grant another document or tenant access.
+
+For each next step:
+
+1. Establish the required source set for the exact current/historical Contracts
+   view, including active channels, required embedded views and pending historical
+   attachment obligations. Include public access-control sources needed for its
+   adopted access requirements. Do not inspect only currently noisy sources.
+2. Acquire contiguous history and enough verified coverage to identify the least
+   unresolved candidate K. For every relevant ordinary source, require
+   completeBefore > K.timestamp; equality does not close a cross-source tie.
+3. Verify required access at the appropriate established control position. Account
+   for public revocation/restoration inputs without deadlocking their acquisition
+   on unavailable private sources. Business progress can remain pending while the
+   separately declared public control path advances.
+4. Reconcile actor, timeline, full order key and target-operation addressing with
+   the receiver's exact context. The original entry remains the original event;
+   recognized operation fields must agree with its message. Access to read a
+   timeline is not business authority to invoke an operation.
+5. Freeze the selected entry, exact dependency views, admission evidence and
+   source-set version. Invoke Contracts with its original three-input interface.
+   Use only completed results admitted under Contracts' own rules.
+6. Durably publish result/progress together, or preserve a retry obligation. Record
+   skipped/nonmatching entries as explicit receiver dispositions, not invented
+   Contracts execution. Recompute affected requirements after topology changes.
+
+An Operation Request's document target, when present, must resolve through
+established exact lineage. Missing lineage waits. Unaddressed operations use the
+declared channel and participant rules; malformed operations cannot be reclassified as harmless
+messages. This baseline covers direct authority. Any delegated authority needs its
+separately adopted semantics and evidence; unknown delegation fails closed.
+
+`Source Coverage` and `Input Selection` are portable descriptions of the facts used
+by a verifier (source, anchor/head/bound, evidence, selected original entry and order
+key). They are not new Contracts completion formats or self-authenticating execution
+certificates. A dishonest caller cannot set ready=true to install trusted progress.
+
+The required-source set is a set over the finite established graph, not a count of
+infinitely many paths through cycles. Multiple occurrences can share acquisition
+but retain distinct processing/history obligations. Adding a dependency requires
+its relevant history even if it predates the receiving document's latest step.
+Removing an edge never erases obligations of earlier captured occurrences. Select
+historical child results appropriate to the receiving position, not ambient latest
+state. Raw child inputs do not automatically become parent business inputs.
+
+Cycles, local rounds and embedded result incorporation execute exactly as specified
+by Contracts. Coordination adds no alternate SCC execution, global FIFO barrier or
+recursive document evaluator. Hosts may index dependency membership however they
+choose as long as these historical and coverage obligations hold.
+
+Notifications only wake acquisition/processing; they are not proof or durable work.
+A crash between acquisition and publication cannot lose an obligation or expose an
+unverified bound. Resumption never rewinds a committed document merely to fit a new
+provider claim. Contradictions are integrity failures; missing resources are WAITING;
+a confirmed access deficit is PENDING_ACCESS under the participating clause rules.
+
+## 13. Package use and validation
+
+This is an explicitly selected candidate with new package, rules and type BlueIds.
+Do not silently rebind old identities or load old and new Coordination aliases
+in the same context. A package import supplies definitions, not an implemented
+provider, feeder or Contracts runtime extension.
+
+The accompanying reference model and tests check identity, signatures, actor
+ancestry, immutable history, completeness, pagination, access and feeder ordering.
+The worked access document also executes through the pinned Contracts processor
+with this package's public-channel verifier; updates are not simulated by a custom
+list-assignment interpreter.
+The builder checks pinned dependencies, frozen rules and reproducible distribution.
+Live provider conformance additionally requires durable crash recovery, concurrent
+acceptance/seal/access serialization, availability and an interoperating client.
+
+Ed25519 signatures use the algorithm in RFC 8032. Language defines Blue content
+identity; Contracts defines execution. No alternative cycle or execution algorithm
+is introduced here.

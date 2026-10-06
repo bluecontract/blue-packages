@@ -1,9 +1,9 @@
-# Time: explicit timestamp triggers / 1
+# Time: ordered timer inputs / 2
 
 Status: integration preview. This publication defines data and the required runtime
 behavior. A package import does not install a scheduler or authorize an executable
-binding. The included Python harness is conformance evidence, not a production
-Coordination implementation.
+binding. Native support is an explicit host selection. The MyOS Java adapter implements
+this publication; other runtimes must qualify their own integration.
 
 ## 1. Layering and inputs
 
@@ -146,23 +146,39 @@ parent-completion barrier or deadlock a cycle by demanding impossible mutually
 final completeness.
 
 Pending timers occupy candidate positions as soon as their source commit is
-visible. A processor cannot commit a later external input and subsequently
-insert the overlooked earlier timer. External Timeline entries at timestamp T
-precede timer candidates at T, retaining Coordination's existing total order
-among external inputs. Within one receiver, timers at T are ordered by the
-UTF-8 bytes of (channel key, registrationId). Across dependencies the existing
-Coordination prerequisite order takes precedence; this is not a new global
-order across unrelated sessions. All required causal consequences of a preceding
-entry must be respected. Cancellation at exactly T therefore precedes its timer.
+visible. Every input uses Coordination's lexicographic order
+(timestamp, sourceBlueId, entryBlueId). An ordinary entry uses its Timeline ID;
+a timer uses its Timer Source ID and Timer Entry ID. There is no input-class
+priority. At equal timestamps a cancellation wins only when its entry precedes
+the timer. Dependency prerequisites still take precedence; this is not a new
+global order across unrelated documents.
 
-An operation may arm a timer at its own logical timestamp; the new timer comes
-after the operation and earlier same-timestamp external entries. A newly emitted
-request may not insert before the receiver's committed logical position. It
-must be strictly after that position in the combined ordering. In particular a
-timer handler cannot rearm at its just-processed timestamp; it must request a
-strictly later timestamp. A newly attached child initialized as a prerequisite
-of an existing history position cannot insert timers behind that position.
-Reject these attempts as TIME_DEADLINE_BEFORE_POSITION before commit.
+Each managed document has one immutable Timer Source with exactly type,
+contextId and documentId (the stable managed identity, not its current state ID).
+A Timer Entry has exactly type, source (an exact Timer Source reference),
+timestamp (the requested deadline), and message (an exact Timer Fired reference).
+Its message contains the registration identity and original request. Neither
+object contains arrival time, worker identity, mutable status or a predecessor.
+Multiple timers may have the same source and timestamp. Pending entries are
+candidates, not append operations on a strictly increasing Signed Timeline.
+
+The Time adapter admits this exact Timer Entry type wherever the selected
+Coordination receipt/history/attachment format records the effective input.
+It preserves the existing order tuple and receipt construction. This extension
+is enabled only for the exact approved Time publication; arbitrary entry types
+remain invalid. The outer Timer Entry is the durable input identity, whereas
+Contracts receives its Timer Fired message and deadline. Retained completion
+records preserve both identities so receivers verify the original invocation.
+Ordinary Signed Timeline validation and its strict timestamp rule are unchanged.
+
+A newly emitted request must have a timestamp strictly greater than the
+invocation's logical timestamp, regardless of whether its cause is an operation,
+a timer or a received child outcome. New child initialization inherits the
+causal floor of the attaching invocation. Requests at or before that floor are
+rejected as TIME_DEADLINE_BEFORE_POSITION before publication. No fixed minimum
+interval is imposed beyond strict increase. Hosts may fairly throttle processing
+without changing logical timestamps or skipping backlog positions. Pending
+registration quotas are host resource limits, not automatic recurrence rules.
 
 A genuinely new standalone document with no committed external position may
 initialize with an already elapsed absolute deadline. Process it as due once

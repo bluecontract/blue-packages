@@ -38,7 +38,12 @@ def selections(root):
     rows = [dict(row, selection='shared') for row in rows]
     preview = json.loads((root / 'blue-time/docs/integration-selection.json').read_text())
     require(preview['approvedNativeSupport'] is False, 'Review the Time preview selection explicitly')
-    time = next(row for row in preview['requiredPackages'] if row['name'] == 'blue-time')
+    requirements = preview['requiredPackages']
+    if isinstance(requirements, dict):
+        time = dict(name='blue-time', packageBlueId=preview['packageBlueId'],
+                    archiveSha256=preview['archiveSha256'])
+    else:
+        time = next(row for row in requirements if row['name'] == 'blue-time')
     require(not any(row['name'] == 'blue-time' for row in rows), 'Time selection needs explicit review')
     rows.append(dict(time, path='blue-time/dist/package.bluepkg', selection='preview'))
     edition = json.loads((root / 'ROOT-CLAUSE-PACKAGES.json').read_text())

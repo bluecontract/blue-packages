@@ -1,66 +1,60 @@
 # Blue Time
 
-Explicit-timestamp, one-shot triggers for Blue managed documents.
+This publication imports Coordination 0.2.0-rc.2. Native host integration for these
+new exact identities is pending. Earlier qualification reports and native-support
+records apply to their original publications, preserved under
+`../editions/pre-timeline-provider/`. Use `../tools/build_timeline_dependents.py`
+to reproduce this data package; this does not register native protocol support.
+
+One-shot, explicit-timestamp timers for managed Blue documents. Native MyOS support
+is available in the `agreements` and `mandates` profiles. Importing the package into
+another runtime does not install a scheduler.
+
+`Time / Schedule Timer` evaluates a read-only BEX request under the current
+invocation's gas budget. `Time / Cancel Timer` cancels a pending key. A firing
+arrives on `Time / Timer Channel` with its original request and registration ID.
+Timestamps are Unix **microseconds**. There is no cron or implicit recurrence.
 
 ```yaml
-type: Time/Timer Request
-channel: time
-key: activation
-timestamp: 1790931600000000
-context:
-  purpose: activateAgreement
+- type: Time / Schedule Timer
+  request:
+    channel: clock
+    key: reminder
+    timestamp: {$add: [{$binding: timestamp}, 15000000]}
 ```
 
-`timestamp` is an Integer Unix timestamp in **microseconds**, not an ISO date,
-duration, arrival timestamp or measured firing time. The processor determines
-when the request is eligible; it returns `Time/Timer Fired` containing the exact
-request and registrationId. An idle document needs no business Timeline entry.
+The complete [example](examples/two-timers.blue) starts with an operation, fires
+15 seconds later, then schedules a second firing 20 seconds after the first.
+A late worker retains those exact logical timestamps.
 
-## Two ways to schedule
+All inputs share Coordination's `(timestamp, sourceBlueId, entryBlueId)` order.
+At equal timestamps a cancellation wins only if it sorts before the timer.
+New requests must be strictly later than their invocation; there is no fixed
+15-second or one-minute minimum. Idle timelines must supply trusted completeness
+through the deadline before a timer can fire.
 
-The complete example is [`examples/two-timers.blue`](examples/two-timers.blue).
-Initialization uses ordinary `Contracts/Trigger Event`. The scheduleReminder
-operation uses the custom `Time/Schedule Timer` step with expression-valued request
-arguments. Both produce the same Timer Request protocol. Two workflows match
-`request.context.purpose` to perform different changes. `key` is only for replacing
-or cancelling pending timers; it is not a workflow name. Direct conditional BEX
-is in `examples/direct-bex.blue`.
+Eight exports: Timer Channel, Timer Request, Timer Fired, Cancel Timer Request,
+Schedule Timer, Cancel Timer, Timer Source and Timer Entry. The last two are
+immutable identities for the virtual source and its ordered inputs.
 
-## Contents
+## Build and verification
 
-Six exports: Timer Channel, Timer Request, Timer Fired, Cancel Timer Request,
-Schedule Timer and Cancel Timer. The package has its own normative spec, examples,
-conformance tests, exact dependency lock and data-only distribution. It contains
-no copied dependencies, vendor environment or production engine implementation.
-
-## Installation and verification
-
-Place this folder at `blue-packages/blue-time`, beside the four pinned foundations,
-with the supplied `blue-python` sibling installed (Python 3.13 or later).
-The wrapper also supports the sibling source checkout without an editable install.
+The supported native implementation and publisher are in the sibling MyOS checkout.
+Use JDK 21 and set `BLUE_MYOS` if that checkout is not `../../myos-aws-test`.
 
 ```sh
-cd blue-packages/blue-time
 ./blue-package verify
 ./blue-package check-source
 ./blue-package test
-./blue-package example
 ```
 
-`BLUE_PYTHON` selects the interpreter. `build` reconstructs the same locked release
-and refuses to overwrite different existing distribution bytes. `--refresh-lock`
-is an explicit initial authoring action, not a normal rebuild behavior.
+`verify` validates the archive and unchanged foundation locks. `check-source`
+rebuilds into a temporary directory and compares every publication byte. `build`
+refuses to replace different published bytes. `test` executes the native Java
+coordination and durable restart tests. `example` prints the source example.
 
-## Runtime status — important
-
-This is a **built data/protocol package with an executable conformance fixture**.
-The attached Python/Java/MyOS native runtimes do not already implement Time.
-Installing the archive alone therefore does not create background wake-ups.
-The example runner uses real attached Contracts and BEX with explicit, in-memory
-fixture bindings and simulated trusted progress. It does not claim real signed
-completeness, durable recovery, automatic native scheduling or graph qualification.
-
-`docs/runtime-contract.md` and `docs/IMPLEMENTATION-TASK.md` specify the integration
-work. `docs/acceptance.md` lists production gates not covered by the fixture.
-Existing packages and native support selections remain untouched. Approve exact
-Language + BEX + Contracts + Coordination + Time dependencies together.
+[Runtime contract](docs/runtime-contract.md), [qualification](docs/acceptance.md)
+and [normative rules](spec/time.md) describe the precise boundaries. The previous
+0.1 preview and its Python fixture are preserved in `releases/0.1.0-preview.1`.
+That fixture tests the old ordering rules; it is not current runtime evidence.
+The Language, BEX, Contracts and Coordination publications are unchanged.

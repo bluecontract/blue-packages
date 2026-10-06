@@ -1,135 +1,65 @@
-name: Agreement with activation and reminder
-
-status: pending
-reminderCount: 0
-lastReminder: ""
-
-# Timestamp = Unix microseconds. A complete request is data, not yet a timer.
-activationRequest:
-  type: Time/Timer Request
-  channel: time
-  key: activation
-  timestamp: 1790931600000000
-  context:
-    purpose: activateAgreement
-
+name: Two-stage timer demonstration
+status: idle
+startedAt: 0
+firstFiredAt: 0
+secondFiredAt: 0
+firstCount: 0
+secondCount: 0
 contracts:
-  lifecycle:
-    type: Contracts/Lifecycle Event Channel
-    event:
-      type: Contracts/Document Processing Initiated
-
   owner:
-    type: Coordination/Timeline Channel
-    timeline:
-      timelineId: owner-timeline
-    actor:
-      actorId: owner
-
-  time:
-    type: Time/Timer Channel
-
-  # Scheduling style 1: the existing Trigger Event step.
-  # Initialization has NO originating Timeline entry or timestamp.
-  initialize:
-    type: Contracts/Sequential Workflow
-    channel: lifecycle
-    steps:
-      - name: Register activation
-        type: Contracts/Trigger Event
-        event:
-          $document: /activationRequest
-
-  # Scheduling style 2: a custom step whose request is a BEX expression.
-  scheduleReminder:
-    type: Contracts/Sequential Workflow Operation
+    type: Coordination / Timeline Channel
+    timeline: {timelineId: time-demo}
+    actor: {accountId: owner}
+  clock:
+    type: Time / Timer Channel
+  start:
+    type: Contracts / Sequential Workflow Operation
     channel: owner
-    request:
-      timestamp:
-        type: Integer
-        schema:
-          required: true
-          minimum: 0
-          maximum: 9007199254740991
-      message:
-        type: Text
-        schema:
-          required: true
     steps:
-      - name: Require pending agreement
-        type: Contracts/Compute
+      - type: Contracts / Compute
         do:
           - $failIf:
-              cond:
-                $ne:
-                  - $document: /status
-                  - pending
-              message: Agreement is not pending.
-      - name: Register reminder
-        type: Time/Schedule Timer
+              cond: {$ne: [{$document: /status}, idle]}
+              message: This demonstration has already started.
+          - $appendChange: {op: replace, path: /status, val: started}
+          - $appendChange: {op: replace, path: /startedAt, val: {$binding: timestamp}}
+      - type: Time / Schedule Timer
         request:
-          channel: time
-          key: reminder
-          timestamp:
-            $binding: call/request/timestamp
-          context:
-            purpose: showReminder
-            message:
-              $binding: call/request/message
-
-  activateWhenDue:
-    type: Contracts/Sequential Workflow
-    channel: time
-    # The channel admits only Timer Fired; match the business data here.
-    event:
-      request:
-        context:
-          purpose: activateAgreement
+          channel: clock
+          key: first
+          timestamp: {$add: [{$binding: timestamp}, 15000000]}
+  first:
+    type: Contracts / Sequential Workflow
+    channel: clock
+    event: {request: {key: first}}
     steps:
-      - name: Activate if still pending
-        type: Contracts/Compute
+      - type: Contracts / Compute
         do:
-          - $if:
-              cond:
-                $eq:
-                  - $document: /status
-                  - pending
-              then:
-                - $appendChange:
-                    op: replace
-                    path: /status
-                    val: active
-
-  recordReminderWhenDue:
-    type: Contracts/Sequential Workflow
-    channel: time
-    event:
-      request:
-        context:
-          purpose: showReminder
+          - $appendChange: {op: replace, path: /status, val: first-completed}
+          - $appendChange: {op: replace, path: /firstFiredAt, val: {$binding: timestamp}}
+          - $appendChange: {op: replace, path: /firstCount, val: {$add: [{$document: /firstCount}, 1]}}
+          - $appendEvent: {kind: First timer completed}
+      - type: Time / Schedule Timer
+        request:
+          channel: clock
+          key: second
+          timestamp: {$add: [{$binding: timestamp}, 20000000]}
+  second:
+    type: Contracts / Sequential Workflow
+    channel: clock
+    event: {request: {key: second}}
     steps:
-      - name: Record the captured reminder
-        type: Contracts/Update Document
-        changeset:
-          - op: replace
-            path: /reminderCount
-            val:
-              $add:
-                - $document: /reminderCount
-                - 1
-          - op: replace
-            path: /lastReminder
-            val:
-              $event: /request/context/message
-
-  cancelReminder:
-    type: Contracts/Sequential Workflow Operation
+      - type: Contracts / Compute
+        do:
+          - $appendChange: {op: replace, path: /status, val: completed}
+          - $appendChange: {op: replace, path: /secondFiredAt, val: {$binding: timestamp}}
+          - $appendChange: {op: replace, path: /secondCount, val: {$add: [{$document: /secondCount}, 1]}}
+          - $appendEvent: {kind: Second timer completed}
+  cancel:
+    type: Contracts / Sequential Workflow Operation
     channel: owner
     steps:
-      - name: Emit reminder cancellation
-        type: Contracts/Compute
-        do:
-          - $appendEvent:
-              type: Time/Cancel Timer Request
-              channel: time
-              key: reminder
+      - type: Time / Cancel Timer
+        request: {channel: clock, key: first}
+      - type: Time / Cancel Timer
+        request: {channel: clock, key: second}

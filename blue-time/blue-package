@@ -1,6 +1,18 @@
 #!/bin/sh
 set -eu
 HERE=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-PY=${BLUE_PYTHON:-python3}
-if [ "$#" -eq 0 ]; then set -- verify; fi
-exec "$PY" "$HERE/tools/package.py" "$@"
+MYOS=${BLUE_MYOS:-"$HERE/../../myos-aws-test"}
+if [ ! -f "$MYOS/runtime/gradlew" ]; then
+  MYOS="$HERE/../../.."
+fi
+if [ ! -f "$MYOS/runtime/gradlew" ]; then
+  echo 'Set BLUE_MYOS to the MyOS source checkout (JDK 21 required).' >&2
+  exit 1
+fi
+COMMAND=${1:-verify}
+case "$COMMAND" in
+  example) cat "$HERE/examples/two-timers.blue";;
+  test) exec "$MYOS/runtime/gradlew" -p "$MYOS/runtime" :verification:test --tests blue.coordination.CoordinationTimeTest :blue-core-service:test --tests blue.core.TimeIntegrationTest;;
+  build|check-source|verify|inspect) exec "$MYOS/runtime/gradlew" -p "$MYOS/runtime" :blue-core-service:timePackageBuild "-PtimeSource=$HERE" "-PtimeCommand=$COMMAND";;
+  *) echo 'Use verify, inspect, check-source, build, test or example.' >&2; exit 1;;
+esac

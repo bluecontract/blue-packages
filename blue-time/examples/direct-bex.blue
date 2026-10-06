@@ -1,24 +1,17 @@
-# Replace the scheduleReminder operation's steps with this ordinary Compute step.
-# It uses the complete initial request only as a source of the exact message type.
-type: Contracts/Compute
+# Alternative to the Schedule Timer step. Add this field to the document:
+# requestTemplate:
+#   type: Time / Timer Request
+#   channel: clock
+#   timestamp: 0
+# A stored request is inactive until emitted. This step uses its exact type
+# reference while constructing the evaluated request as ordinary BEX data.
+type: Contracts / Compute
 do:
-  - $if:
-      cond:
-        $eq:
-          - $document: /status
-          - pending
-      then:
-        - $appendEvent:
-            $objectSet:
-              object:
-                channel: time
-                key: reminder
-                timestamp:
-                  $binding: call/request/timestamp
-                context:
-                  purpose: showReminder
-                  message:
-                    $binding: call/request/message
-              key: type
-              val:
-                $document: /activationRequest/type
+  - $appendEvent:
+      $objectSet:
+        object:
+          channel: clock
+          key: first
+          timestamp: {$add: [{$binding: timestamp}, 15000000]}
+        key: type
+        val: {$document: /requestTemplate/type}

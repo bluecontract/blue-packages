@@ -1,5 +1,11 @@
 # Blue Mandates
 
+This publication imports Coordination 0.2.0-rc.2. Native host integration for these
+new exact identities is pending. Earlier qualification reports and native-support
+records apply to their original publications, preserved under
+`../editions/pre-timeline-provider/`. Use `../tools/build_timeline_dependents.py`
+to reproduce this data package; this does not register native protocol support.
+
 Owner-approved operation delegation, implemented as Blue definitions and ordinary
 Contracts/BEX workflows with explicitly selected native Coordination support.
 
