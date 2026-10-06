@@ -16,14 +16,14 @@ signed private reads and keyless public reads.
 ## Consumer migration
 
 The root Agreements, mutual-activation, immediate-termination, reseller, agreement
-examples, Mandates and Time packages have new publications importing the selected
+examples and Time packages have new publications importing the selected
 Coordination package. Their exact identities and archive hashes are in
 [TIMELINE-PACKAGES.json](../TIMELINE-PACKAGES.json). Explicit references to changed
 export identities were rebuilt along with their dependencies.
 
 Coordination no longer owns generic business Event, Request, Response or Authority
 base types. Consumer business messages are standalone definitions; responses keep
-an explicit typed `inResponseTo`, and Mandates keeps its explicit actor field.
+an explicit typed `inResponseTo`.
 Actor subtypes represent identified entities: Principal Actor for a human and
 Agent Actor for a non-human. They do not duplicate provider identity.
 
@@ -33,6 +33,10 @@ The historical `native-support.json` is retained as historical evidence and does
 not approve the new selection. A live MyOS host must explicitly integrate and
 qualify the new Timeline Channel/provider rules before adopting these packages.
 The standalone AWS provider uses the new Coordination access protocol directly.
+
+Mandates retains the upstream predicate-context publication and its original
+Coordination dependency. Its source lock uses the preserved pre-timeline-provider
+archive; it is excluded from the timeline selection and consumer builder.
 
 ## Historical imports
 

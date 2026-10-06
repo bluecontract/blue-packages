@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check pinned publication bytes or prepare a deterministic data-only release bundle.
+"""Check pinned bytes or prepare a deterministic bundle and GitHub Release assets.
 
 Uses only the standard library. Semantic Blue validation is a separate command:
 tools/verify_packages.py with the installed Blue Python implementation.
@@ -9,6 +9,7 @@ import hashlib
 import io
 import json
 from pathlib import Path, PurePosixPath
+import re
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -148,19 +149,60 @@ def bundle(output, catalogue, payloads, root=ROOT):
     return dict(path=str(output), archiveSha256=digest(output.read_bytes()), files=len(files))
 
 
+def assets(output, catalogue, payloads, root=ROOT):
+    """Prepare a flat upload directory, preserving each selected archive exactly."""
+    require(set(payloads) == {row['path'] for row in catalogue['packages']},
+            'Release payloads differ from catalogue')
+    files = {
+        'README.md': (root / 'docs/distribution.md').read_bytes(),
+        'THIRD-PARTY-NOTICES.md': (root / 'blue-language/THIRD-PARTY-NOTICES.md').read_bytes(),
+    }
+    rows = []
+    for row in catalogue['packages']:
+        for key in ('name', 'version'):
+            require(re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._-]*', row[key]) is not None,
+                    'Unsafe release asset ' + key + ': ' + row[key])
+        name = row['name'] + '-' + row['version'] + '.bluepkg'
+        require(name not in files, 'Duplicate release asset: ' + name)
+        data = payloads[row['path']]
+        require(digest(data) == row['archiveSha256'], 'Release payload checksum differs: ' + name)
+        files[name] = data
+        rows.append(dict(row, releaseAsset=name))
+    catalogue = dict(catalogue, packages=rows)
+    files['CATALOG.json'] = wire(catalogue)
+    # An exclusive directory prevents replacing any existing publication assets.
+    output.mkdir(parents=True, exist_ok=False)
+    try:
+        for name, data in files.items():
+            (output / name).write_bytes(data)
+        result = bundle(output / 'blue-packages.zip', catalogue, payloads, root)
+        files['blue-packages.zip'] = (output / 'blue-packages.zip').read_bytes()
+        (output / 'SHA256SUMS').write_text(''.join(
+            hashlib.sha256(data).hexdigest() + '  ' + name + '\n'
+            for name, data in sorted(files.items())), encoding='utf-8')
+    except BaseException:
+        for path in output.iterdir():
+            path.unlink()
+        output.rmdir()
+        raise
+    return dict(path=str(output), files=len(files) + 1, bundle=result)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=('check', 'bundle'))
+    parser.add_argument('command', choices=('check', 'bundle', 'assets'))
     parser.add_argument('--output', type=Path)
     args = parser.parse_args()
-    if (args.command == 'bundle') != (args.output is not None):
-        parser.error('--output is required only for bundle')
+    if (args.command != 'check') != (args.output is not None):
+        parser.error('--output is required for bundle/assets and not allowed for check')
     catalogue, payloads = check()
     result = dict(verified=True, packages=len(catalogue['packages']),
                   sourceFilesChecked=catalogue['sourceFilesChecked'],
                   previewPackages=[r['name'] for r in catalogue['packages'] if r['selection'] == 'preview'])
     if args.command == 'bundle':
         result['bundle'] = bundle(args.output, catalogue, payloads)
+    elif args.command == 'assets':
+        result['assets'] = assets(args.output, catalogue, payloads)
     print(json.dumps(result, indent=2))
 
 

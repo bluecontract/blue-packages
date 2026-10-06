@@ -79,6 +79,88 @@ class ReleaseTests(unittest.TestCase):
                 release.bundle(first, {}, {}, root)
             self.assertEqual(first.read_bytes(), second.read_bytes())
 
+    def distribution_fixture(self, root):
+        (root / 'docs').mkdir()
+        (root / 'docs/distribution.md').write_text('Distribution')
+        (root / 'blue-language').mkdir()
+        (root / 'blue-language/THIRD-PARTY-NOTICES.md').write_text('Notices')
+        row, data = release.check_archive(root, self.fixture(root))
+        edition_data = b'Exact root-clause edition bytes'
+        edition = dict(row, version='0.2.0-preview.1', selection='root-clause-edition',
+                       path='editions/root-clauses/example/dist/package.bluepkg',
+                       packageBlueId='edition-id', archiveSha256=release.digest(edition_data))
+        return {'packages': [row, edition]}, {row['path']: data, edition['path']: edition_data}
+
+    def test_assets_preserve_variants_identities_and_checksums(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalogue, payloads = self.distribution_fixture(root)
+            (root / 'private.txt').write_text('Must not be published')
+            first, second = root / 'first', root / 'second'
+            release.assets(first, catalogue, payloads, root)
+            release.assets(second, catalogue, payloads, root)
+            uploaded = {p.name: p.read_bytes() for p in first.iterdir()}
+            self.assertEqual(uploaded, {p.name: p.read_bytes() for p in second.iterdir()})
+            published = json.loads(uploaded['CATALOG.json'])
+            expected_names = {'blue-packages.zip', 'CATALOG.json', 'README.md',
+                              'THIRD-PARTY-NOTICES.md', 'SHA256SUMS'}
+            for original, row in zip(catalogue['packages'], published['packages']):
+                expected_names.add(row['releaseAsset'])
+                self.assertEqual({k: v for k, v in row.items() if k != 'releaseAsset'}, original)
+                self.assertEqual(uploaded[row['releaseAsset']], payloads[row['path']])
+            self.assertEqual(set(uploaded), expected_names)
+            checksums = dict(line.split('  ', 1)[::-1]
+                             for line in uploaded['SHA256SUMS'].decode().splitlines())
+            self.assertEqual(set(checksums), set(uploaded) - {'SHA256SUMS'})
+            for name, expected in checksums.items():
+                self.assertEqual(expected, hashlib.sha256(uploaded[name]).hexdigest())
+            with zipfile.ZipFile(first / 'blue-packages.zip') as archive:
+                self.assertEqual(archive.read('CATALOG.json'), uploaded['CATALOG.json'])
+                for path, data in payloads.items():
+                    self.assertEqual(archive.read(path), data)
+
+    def test_assets_reject_colliding_or_unsafe_filenames_before_creating_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalogue, payloads = self.distribution_fixture(root)
+            output = root / 'release'
+            catalogue['packages'][1]['version'] = catalogue['packages'][0]['version']
+            with self.assertRaisesRegex(ValueError, 'Duplicate release asset'):
+                release.assets(output, catalogue, payloads, root)
+            self.assertFalse(output.exists())
+            for key, value in [('name', '../escape'), ('version', '1.0/escape'),
+                               ('version', '1.0#asset-label'), ('name', '-option')]:
+                with self.subTest(key=key, value=value):
+                    row = dict(catalogue['packages'][0], **{key: value})
+                    with self.assertRaisesRegex(ValueError, 'Unsafe release asset'):
+                        release.assets(output, {'packages': [row]},
+                                       {row['path']: payloads[row['path']]}, root)
+                    self.assertFalse(output.exists())
+
+    def test_assets_reject_changed_or_unselected_payloads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalogue, payloads = self.distribution_fixture(root)
+            output = root / 'release'
+            with self.assertRaisesRegex(ValueError, 'Release payloads differ'):
+                release.assets(output, catalogue, dict(payloads, private=b'Unselected'), root)
+            changed = dict(payloads)
+            changed[catalogue['packages'][0]['path']] = b'Changed archive'
+            with self.assertRaisesRegex(ValueError, 'Release payload checksum differs'):
+                release.assets(output, catalogue, changed, root)
+            self.assertFalse(output.exists())
+
+    def test_assets_do_not_overwrite_existing_output(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            catalogue, payloads = self.distribution_fixture(root)
+            output = root / 'release'
+            release.assets(output, catalogue, payloads, root)
+            before = {p.name: p.read_bytes() for p in output.iterdir()}
+            with self.assertRaises(FileExistsError):
+                release.assets(output, catalogue, payloads, root)
+            self.assertEqual(before, {p.name: p.read_bytes() for p in output.iterdir()})
+
 
 if __name__ == '__main__':
     unittest.main()

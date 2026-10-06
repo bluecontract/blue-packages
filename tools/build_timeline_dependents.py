@@ -14,7 +14,7 @@ sys.path.insert(0,str(ROOT/'blue-coordination/tools'))
 import package as pub
 from blue_language.physical import PhysicalCache
 from blue_runtime.core_reuse import core_reuse_scope
-NAMES=['blue-agreements','clause-mutual-activation','clause-immediate-termination','agreement-reseller','blue-mutual-activation','blue-agreement-examples','blue-mandates','blue-time']
+NAMES=['blue-agreements','clause-mutual-activation','clause-immediate-termination','agreement-reseller','blue-mutual-activation','blue-agreement-examples','blue-time']
 
 def compile_package(name):
     project=ROOT/name;cfg=json.loads((project/'blue-package.yaml').read_text())
