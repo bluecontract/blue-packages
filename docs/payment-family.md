@@ -223,6 +223,18 @@ python3 scripts/payment-family-import.py --packages-dir /path/to/blue-packages -
 
 The import is opt-in catalogue preparation; it does not alter existing accounts or migrate live PIs. Native scenarios check resulting state, rejected operations, exact replay gas/receipts/snapshots and selected snapshot restores. Core's authenticated bootstrap and timer/restart integration tests are separate checks. Detailed results belong to ignored local reports and must name the tested revisions.
 
+To inspect those recorded results visually, run from this repository:
+
+```sh
+python3 tools/build_payment_explorer.py /path/to/myos-core/reports/payment-family
+python3 -m http.server 8080 --bind 127.0.0.1 --directory build/payment-explorer
+```
+
+Open `http://127.0.0.1:8080`. Select a scenario and an input, then inspect its
+document graph, observed state, emitted events or complete source. The viewer
+displays saved native results; selecting an input does not execute a payment.
+Only scenarios with a completed native report appear in the viewer.
+
 ## Remaining product boundaries
 
 This package edition is not a production payment service. Live rails, customer web sessions, full representative governance, general read-only observer bootstrap, deployment-specific reliability, disputes and regulatory requirements are not established by these document scenarios. Java/Python behavioral parity is not claimed by Java-only qualification. All proposed future capabilities must remain distinguishable from exported, tested types.
