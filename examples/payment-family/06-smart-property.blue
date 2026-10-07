@@ -1,0 +1,88 @@
+name: Smart property rental
+type: Agreements/Agreement with Clauses
+product:
+  name: Weekend stay
+  currency: EUR
+  unitPriceMinor: 20000
+  quantity: 1
+property:
+  name: Provider delivery evidence
+  type: DocumentsDomain/Document with Clauses
+  status: Open
+  clauses:
+    progress:
+      type: State/State Machine Clause
+      parameters:
+        subject: Delivery
+        transitions:
+          Open:
+          - Delivered
+          - Failed
+          Delivered:
+          - Failed
+      bindings:
+        state: /status
+        transition:
+          deliver:
+            'on': workflow
+            channel: carrier
+            params:
+              to: Delivered
+          failDelivery:
+            'on': workflow
+            channel: carrier
+            params:
+              to: Failed
+              reason:
+                $var:
+                  name: trigger
+                  path: /reason
+  contracts:
+    carrier:
+      type: Contracts/External Channel
+      event:
+        source: carrier
+clauses:
+  propertyView:
+    type: Referrals/Procurement Summary Clause
+    bindings:
+      update:
+        propertyEvents:
+          'on': embedded
+          path: /property
+          when: false
+  payment:
+    type: Payment/Conditional Payment
+    parameters:
+      autoStart: false
+      sources:
+        property: /property
+      requireAll:
+        checkIn:
+          observe:
+            source: property
+            path: /status
+            equals: Delivered
+        customerAcceptance:
+          'on': workflow
+          channel: customer
+      releaseAfter:
+        days: 2
+    bindings:
+      start:
+        startPayment:
+          'on': workflow
+          channel: seller
+contracts:
+  customer:
+    type: Contracts/External Channel
+    event:
+      source: customer
+  seller:
+    type: Contracts/External Channel
+    event:
+      source: seller
+  guarantor:
+    type: Contracts/External Channel
+    event:
+      source: guarantor

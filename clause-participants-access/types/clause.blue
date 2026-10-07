@@ -1,0 +1,493 @@
+name: Participants with Access Clause
+type: Clauses/Clause
+description: Admits participant channels only when confirmed embedded provider access documents cover each timeline
+  and every assigned reader key. Watches their state; protected operations use Require Participant Access.
+hookAbi: document-context-1
+transitionUnconditional: true
+hookDefinition:
+  type: Contracts/Compute Definition
+  functions:
+    validateConfiguration:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $if:
+          cond:
+            $not:
+              $and:
+              - $isKind:
+                  val:
+                    $var:
+                      name: p
+                      path: /participants
+                  kind: object
+              - $gt:
+                - $size:
+                    $keys:
+                      $var:
+                        name: p
+                        path: /participants
+                - 0
+              - $isKind:
+                  val:
+                    $var:
+                      name: p
+                      path: /accessPaths
+                  kind: list
+              - $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: b
+                        path: /state
+                    kind: text
+                - $startsWith:
+                  - $var:
+                      name: b
+                      path: /state
+                  - /
+                - $and:
+                  - $isKind:
+                      val:
+                        $sliceAfter:
+                        - $var:
+                            name: b
+                            path: /state
+                        - /
+                      kind: text
+                  - $ne:
+                    - $sliceAfter:
+                      - $var:
+                          name: b
+                          path: /state
+                      - /
+                    - ''
+                  - $eq:
+                    - $size:
+                        $split:
+                          text:
+                            $sliceAfter:
+                            - $var:
+                                name: b
+                                path: /state
+                            - /
+                          separator: /
+                    - 1
+                  - $eq:
+                    - $size:
+                        $split:
+                          text:
+                            $sliceAfter:
+                            - $var:
+                                name: b
+                                path: /state
+                            - /
+                          separator: '~'
+                    - 1
+          then:
+          - $return:
+              allowed: false
+              code: INVALID_ACCESS_PARTICIPANTS
+      - $forEach:
+          item: role
+          in:
+            $keys:
+              $var:
+                name: p
+                path: /participants
+          do:
+          - $if:
+              cond:
+                $not:
+                  $and:
+                  - $and:
+                    - $isKind:
+                        val:
+                          $var: role
+                        kind: text
+                    - $ne:
+                      - $var: role
+                      - ''
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $var: role
+                            separator: /
+                      - 1
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $var: role
+                            separator: '~'
+                      - 1
+                  - $is:
+                      node:
+                        $pointerGet:
+                          object:
+                            $get:
+                              object:
+                                $var:
+                                  name: p
+                                  path: /participants
+                              key:
+                                $var: role
+                          path: /channel
+                      pattern:
+                        type: ProviderCoordination/Timeline Channel
+              then:
+              - $return:
+                  allowed: false
+                  code: INVALID_PARTICIPANT_CHANNEL
+      - $let:
+          name: valid
+          expr: true
+      - $forEach:
+          item: role
+          in:
+            $keys:
+              $var:
+                name: p
+                path: /participants
+          do:
+          - $let:
+              name: party
+              expr:
+                $get:
+                  object:
+                    $var:
+                      name: p
+                      path: /participants
+                  key:
+                    $var: role
+          - $let:
+              name: matched
+              expr: false
+          - $forEach:
+              item: path
+              in:
+                $var:
+                  name: p
+                  path: /accessPaths
+              do:
+              - $let:
+                  name: access
+                  expr:
+                    $document:
+                      $var: path
+              - $let:
+                  name: timelineFound
+                  expr: false
+              - $let:
+                  name: keysFound
+                  expr: true
+              - $forEach:
+                  item: timeline
+                  in:
+                    $pointerGet:
+                      object:
+                        $var: access
+                      path: /allowedTimelines
+                      default: []
+                  do:
+                  - $if:
+                      cond:
+                        $eq:
+                        - $nodeBlueId:
+                            $objectFromEntries:
+                              $entries:
+                                $var: timeline
+                        - $nodeBlueId:
+                            $objectFromEntries:
+                              $entries:
+                                $var:
+                                  name: party
+                                  path: /channel/timeline
+                      then:
+                      - $set:
+                          name: timelineFound
+                          expr: true
+              - $forEach:
+                  item: readerRole
+                  in:
+                    $keys:
+                      $var:
+                        name: p
+                        path: /participants
+                  do:
+                  - $let:
+                      name: reader
+                      expr:
+                        $get:
+                          object:
+                            $var:
+                              name: p
+                              path: /participants
+                          key:
+                            $var: readerRole
+                  - $if:
+                      cond:
+                        $hasKey:
+                          object:
+                            $var: reader
+                          key: readerKey
+                      then:
+                      - $let:
+                          name: keyFound
+                          expr: false
+                      - $forEach:
+                          item: key
+                          in:
+                            $pointerGet:
+                              object:
+                                $var: access
+                              path: /allowedKeys
+                              default: []
+                          do:
+                          - $if:
+                              cond:
+                                $eq:
+                                - $var: key
+                                - $var:
+                                    name: reader
+                                    path: /readerKey
+                              then:
+                              - $set:
+                                  name: keyFound
+                                  expr: true
+                      - $if:
+                          cond:
+                            $not:
+                              $var: keyFound
+                          then:
+                          - $set:
+                              name: keysFound
+                              expr: false
+              - $if:
+                  cond:
+                    $and:
+                    - $var: timelineFound
+                    - $var: keysFound
+                    - $eq:
+                      - $nodeBlueId:
+                          $objectFromEntries:
+                            $entries:
+                              $var:
+                                name: party
+                                path: /channel/timeline/provider
+                      - $nodeBlueId:
+                          $objectFromEntries:
+                            $entries:
+                              $pointerGet:
+                                object:
+                                  $var: access
+                                path: /contracts/provider/provider
+                                default: {}
+                  then:
+                  - $set:
+                      name: matched
+                      expr: true
+          - $if:
+              cond:
+                $not:
+                  $var: matched
+              then:
+              - $set:
+                  name: valid
+                  expr: false
+      - $return:
+          $choose:
+            cond:
+              $var: valid
+            then:
+              allowed: true
+              code: ''
+            else:
+              allowed: false
+              code: PARTICIPANT_ACCESS_MISSING
+    validateTransition:
+      args: {}
+      do:
+      - $return:
+          allowed: true
+          code: ''
+    plan:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $let:
+          name: contributions
+          expr: {}
+      - $forEach:
+          item: role
+          in:
+            $keys:
+              $var:
+                name: p
+                path: /participants
+          do:
+          - $set:
+              name: contributions
+              expr:
+                $objectFromEntries:
+                  $listConcat:
+                  - $entries:
+                      $var: contributions
+                  - - key:
+                        $var: role
+                      val:
+                        kind: channel
+                        contract:
+                          $pointerGet:
+                            object:
+                              $get:
+                                object:
+                                  $var:
+                                    name: p
+                                    path: /participants
+                                key:
+                                  $var: role
+                            path: /channel
+      - $set:
+          name: contributions
+          expr:
+            $objectFromEntries:
+              $listConcat:
+              - $entries:
+                  $var: contributions
+              - - key: embedded
+                  val:
+                    kind: embedding
+                    contract:
+                      $merge:
+                      - type: Contracts/Process Embedded
+                      - paths:
+                          $var:
+                            name: p
+                            path: /accessPaths
+      - $let:
+          name: i
+          expr: 0
+      - $forEach:
+          item: path
+          in:
+            $var:
+              name: p
+              path: /accessPaths
+          do:
+          - $let:
+              name: channel
+              expr:
+                $concat:
+                - $const: clauseKey
+                - Access
+                - $text:
+                    $var: i
+          - $set:
+              name: contributions
+              expr:
+                $objectFromEntries:
+                  $listConcat:
+                  - $entries:
+                      $var: contributions
+                  - - key:
+                        $var: channel
+                      val:
+                        kind: channel
+                        contract:
+                          $pointerGet:
+                            object:
+                              $document:
+                                $var: path
+                            path: /contracts/provider
+          - $set:
+              name: contributions
+              expr:
+                $objectFromEntries:
+                  $listConcat:
+                  - $entries:
+                      $var: contributions
+                  - - key:
+                        $concat:
+                        - $var: channel
+                        - Changed
+                      val:
+                        kind: handler
+                        contract:
+                          $merge:
+                          - type: Contracts/Sequential Workflow
+                          - channel:
+                              $var: channel
+                            steps:
+                            - $merge:
+                              - type: AccessParticipants/Refresh Participant Access
+                              - constants:
+                                  clauseKey:
+                                    $const: clauseKey
+                                  statePath:
+                                    $var:
+                                      name: b
+                                      path: /state
+          - $set:
+              name: i
+              expr:
+                $add:
+                - $var: i
+                - 1
+      - $return:
+          contracts:
+            $var: contributions
+          states:
+            status:
+              path:
+                $var:
+                  name: b
+                  path: /state
+              kind: object
+              initial:
+                functional: true
+                reason: ''
+          reads: []

@@ -1,0 +1,233 @@
+name: Start Document Step
+type: Contracts/Compute
+constants: {}
+do:
+- $if:
+    cond:
+      $and:
+      - $ne:
+        - $const: activation
+        - ''
+      - $not:
+          $pointerGet:
+            object:
+              $document:
+                $const: activation
+            path: /active
+            default: false
+    then:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Business Operation Rejected
+        - code: AGREEMENT_NOT_ACTIVE
+    - $return: {}
+- $if:
+    cond:
+      $and:
+      - $ne:
+        - $const: termination
+        - ''
+      - $pointerGet:
+          object:
+            $document:
+              $const: termination
+          path: /terminated
+          default: false
+    then:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Business Operation Rejected
+        - code: AGREEMENT_TERMINATED
+    - $return: {}
+- $let:
+    name: key
+    expr:
+      $binding: call/request/key
+- $if:
+    cond:
+      $not:
+        $and:
+        - $isKind:
+            val:
+              $var: key
+            kind: text
+        - $ne:
+          - $var: key
+          - ''
+        - $eq:
+          - $size:
+              $split:
+                text:
+                  $var: key
+                separator: /
+          - 1
+        - $eq:
+          - $size:
+              $split:
+                text:
+                  $var: key
+                separator: '~'
+          - 1
+    then:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Business Operation Rejected
+        - code: INVALID_DOCUMENT_KEY
+    - $return: {}
+- $let:
+    name: target
+    expr:
+      $concat:
+      - $const: collection
+      - /
+      - $var: key
+- $if:
+    cond:
+      $exists:
+        $document:
+          $var: target
+    then:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Business Operation Rejected
+        - code: DOCUMENT_KEY_ALREADY_EXISTS
+    - $return: {}
+- $let:
+    name: child
+    expr:
+      $document:
+        $const: template
+- $set:
+    name: child
+    expr:
+      $objectSet:
+        object:
+          $var: child
+        key: instanceKey
+        val:
+          $concat:
+          - $nodeBlueId:
+              $document: /contracts/initialized/document
+          - ':'
+          - $var: key
+- $set:
+    name: child
+    expr:
+      $objectSet:
+        object:
+          $var: child
+        key:
+          $const: keyField
+        val:
+          $var: key
+- $set:
+    name: child
+    expr:
+      $objectSet:
+        object:
+          $var: child
+        key: name
+        val:
+          $concat:
+          - $const: namePrefix
+          - ' '
+          - $var: key
+- $forEach:
+    item: mapping
+    in:
+      $const: arguments
+    do:
+    - $let:
+        name: argumentValue
+        expr:
+          $pointerGet:
+            object:
+              $binding: call/request
+            path:
+              $concat:
+              - /
+              - $var:
+                  name: mapping
+                  path: /name
+    - $if:
+        cond:
+          $not:
+            $and:
+            - $choose:
+                cond:
+                  $eq:
+                  - $var:
+                      name: mapping
+                      path: /kind
+                  - integer
+                then:
+                  $isKind:
+                    val:
+                      $var: argumentValue
+                    kind: integer
+                else:
+                  $isKind:
+                    val:
+                      $var: argumentValue
+                    kind: text
+            - $choose:
+                cond:
+                  $eq:
+                  - $var:
+                      name: mapping
+                      path: /kind
+                  - integer
+                then:
+                  $and:
+                  - $isKind:
+                      val:
+                        $var: argumentValue
+                      kind: integer
+                  - $gte:
+                    - $var: argumentValue
+                    - $pointerGet:
+                        object:
+                          $var: mapping
+                        path: /minimum
+                        default: 0
+                  - $lte:
+                    - $var: argumentValue
+                    - $pointerGet:
+                        object:
+                          $var: mapping
+                        path: /maximum
+                        default: 1000000000000
+                else: true
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Clauses/Business Operation Rejected
+            - code: INVALID_ARGUMENT
+        - $return: {}
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path:
+              $var:
+                name: mapping
+                path: /path
+            val:
+              $var: argumentValue
+- $set:
+    name: child
+    expr:
+      $objectSet:
+        object:
+          $var: child
+        key: startedAt
+        val:
+          $binding: timestamp
+- $appendChange:
+    op: add
+    path:
+      $var: target
+    val:
+      $var: child

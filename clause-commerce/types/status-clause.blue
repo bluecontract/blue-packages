@@ -1,0 +1,66 @@
+name: Status Clause
+type: Connections/Connected Clause
+description: A named business state machine, independently reusable for orders, milestones or lifecycle.
+bindingTypes:
+  state: pointer
+actions:
+  transition:
+    do:
+    - $let:
+        name: from
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /state
+    - $let:
+        name: to
+        expr:
+          $var:
+            name: params
+            path: /to
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $get:
+                  object:
+                    $const:
+                      name: parameters
+                      path: /transitions
+                  key:
+                    $var: from
+              val:
+                $var: to
+        message: Disallowed status transition
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          $var: to
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind:
+            $concat:
+            - $const:
+                name: parameters
+                path: /subject
+            - ' '
+            - $var: to
+          clause:
+            $const: clauseKey
+          from:
+            $var: from
+          to:
+            $var: to
+          reason:
+            $pointerGet:
+              object:
+                $var: params
+              path: /reason
+              default: ''

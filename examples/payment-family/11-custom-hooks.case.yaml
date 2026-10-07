@@ -1,0 +1,78 @@
+document: 11-custom-hooks.blue
+steps:
+- operation: startPayment
+  channel: seller
+  target: ''
+  expect:
+    /payment/policy/eligible: false
+- operation: accept
+  channel: guarantor
+  target: /payment
+- operation: initiate
+  channel: guarantor
+  target: /payment
+  request:
+    transactionId: custom-1
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+- operation: deliver
+  channel: carrier
+  target: /delivery
+- operation: acceptDelivery
+  channel: customer
+  target: ''
+- operation: capture
+  channel: customer
+  target: /payment
+  request:
+    requestId: hook-1
+    requestedMinor: 1000
+    abortAfter: true
+  expect:
+    /payment/captureNoticeCount: 0
+    /payment/payment/reserved/capture: 0
+  status: FAILED
+- operation: capture
+  channel: customer
+  target: /payment
+  request:
+    requestId: hook-1
+    requestedMinor: 1000
+    note: First delivery
+  expect:
+    /payment/captureNoticeCount: 1
+    /payment/payment/reserved/capture: 1000
+    /payment/lastCaptureNote: First delivery
+- operation: capture
+  channel: customer
+  target: /payment
+  request:
+    requestId: hook-1
+    requestedMinor: 1000
+    note: Do not overwrite on a duplicate
+  expect:
+    /payment/captureNoticeCount: 1
+    /payment/payment/reserved/capture: 1000
+    /payment/lastCaptureNote: First delivery
+  eventCount: 0
+  restore: true
+- operation: capture
+  channel: customer
+  target: /payment
+  request:
+    requestId: hook-1
+    requestedMinor: 2000
+  status: FAILED
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: hook-1
+    outcome: succeeded
+  expect:
+    /financial/net: 1000
+    /status: Open

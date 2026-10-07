@@ -1,0 +1,30 @@
+document: 03-compensation.blue
+initial: {}
+steps:
+- operation: deliver
+  channel: carrier
+  target: /delivery
+- operation: acceptDelivery
+  channel: customer
+  target: ''
+- operation: startPayment
+  channel: seller
+  target: ''
+  expect:
+    /payment/policy/eligible: true
+- operation: accept
+  channel: guarantor
+  target: /payment
+- operation: initiate
+  channel: guarantor
+  target: /payment
+  request:
+    transactionId: preexisting
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+  expect:
+    /payment/payment/reserved/capture: 10000

@@ -5,6 +5,12 @@ Current gas edition: [10M default and maximum](GAS-10M.md). Historical publicati
 Reusable Blue definitions, protocol specifications and executable business documents,
 shared by the Java and Python implementations of Blue.
 
+The new [payment family candidate](docs/payment-family.md) adds reusable Payment
+Instructions, connected clauses, MyOS parties and payments, and illustrative ACME
+Bank and manual-transfer methods. Its sources and exact build order are in
+`PAYMENT-FAMILY-SOURCES.json`. It is unpublished and separately qualified; it does
+not silently replace the default release collection or existing documents.
+
 A package gives content an exact identity and a set of named exports. It can describe
 a language, define a protocol, supply reusable types or contain an entire agreement.
 Packages are data: native protocol implementations live in the consuming runtime.

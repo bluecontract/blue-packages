@@ -1,0 +1,95 @@
+document: 02-custom-service.blue
+initial:
+  members: 2
+steps:
+- operation: startPayment
+  channel: seller
+  target: ''
+  expect:
+    /payment/policy/eligible: false
+- operation: accept
+  channel: guarantor
+  target: /payment
+- operation: initiate
+  channel: guarantor
+  target: /payment
+  request:
+    transactionId: custom-1
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+- operation: capture
+  channel: customer
+  target: /payment
+  request:
+    requestId: too-early
+    amountMinor: 1000
+  status: FAILED
+- operation: changeInstructions
+  channel: customer
+  target: ''
+  request:
+    text: Leave with reception
+  expect:
+    /instructions: Leave with reception
+- operation: deliver
+  channel: carrier
+  target: /delivery
+  expect:
+    /status: Open
+    /payment/policy/eligible: false
+- operation: changeInstructions
+  channel: customer
+  target: ''
+  request:
+    text: Too late
+  status: FAILED
+- operation: acceptDelivery
+  channel: customer
+  target: ''
+  expect:
+    /payment/policy/eligible: true
+- operation: capture
+  channel: customer
+  target: /payment
+  request:
+    requestId: part-1
+    amountMinor: 1000
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: part-1
+    outcome: succeeded
+  expect:
+    /status: Open
+    /financial/net: 1000
+- operation: capture
+  channel: customer
+  target: /payment
+  request:
+    requestId: part-2
+    amountMinor: 9000
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: part-2
+    outcome: succeeded
+  expect:
+    /status: Completed
+    /financial/net: 10000
+  restore: true
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: part-2
+    outcome: succeeded
+  expect:
+    /status: Completed
+    /financial/net: 10000
+  eventCount: 0

@@ -1,0 +1,49 @@
+name: Text Clause
+type: Connections/Connected Clause
+description: Replace agreed text with an optimistic expected-value check.
+bindingTypes:
+  text: pointer
+actions:
+  amend:
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $document:
+              $const:
+                name: bindings
+                path: /text
+          - $var:
+              name: params
+              path: /expected
+        message: Text was changed since proposal
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var:
+                  name: params
+                  path: /text
+              kind: text
+        message: Replacement must be text
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /text
+        val:
+          $var:
+            name: params
+            path: /text
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Text Amended
+          clause:
+            $const: clauseKey
+          text:
+            $var:
+              name: params
+              path: /text

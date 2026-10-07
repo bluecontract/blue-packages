@@ -1,0 +1,256 @@
+name: Payment Clause
+type: Connections/Connected Clause
+description: Create one explicitly configured payment instruction and echo its events. Execution placement is never
+  inferred.
+bindingTypes:
+  template: pointer
+  instruction: pointer
+embeds:
+- instruction
+actions:
+  initPayment:
+    do:
+    - $let:
+        name: destination
+        expr:
+          $const:
+            name: bindings
+            path: /instruction
+    - $let:
+        name: identity
+        expr:
+          $concat:
+          - $nodeBlueId:
+              $document: /contracts/initialized/document
+          - ':'
+          - $const: clauseKey
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: destination
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $concat:
+                  - $var: destination
+                  - /instanceKey
+              - $var: identity
+            message: Payment destination belongs to another document
+        - $set:
+            name: actionResult
+            expr:
+              outcome: duplicate
+        - $return: {}
+    - $let:
+        name: child
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /template
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $var: child
+              pattern:
+                type: PaymentInstruction/Payment Instruction
+        message: Payment requires a Payment Instruction template
+    - $failIf:
+        cond:
+          $exists:
+            $var:
+              name: child
+              path: /contracts/initialized
+        message: Payment requires an uninitialized instruction template
+    - $if:
+        cond:
+          $exists:
+            $const:
+              name: parameters
+              path: /amountPath
+        then:
+        - $let:
+            name: amount
+            expr:
+              $document:
+                $const:
+                  name: parameters
+                  path: /amountPath
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path: /clauses/payment/parameters/amountMinor
+                val:
+                  $var: amount
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path: /clauses/payment/parameters/limitMinor
+                val:
+                  $var: amount
+    - $let:
+        name: sources
+        expr: {}
+    - $forEach:
+        item: path
+        key: source
+        in:
+          $object:
+            $const:
+              name: parameters
+              path: /sourcePaths
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $concat:
+                    - $var: path
+                    - /contracts/initialized
+            message: Shared source must already be initialized
+        - $set:
+            name: sources
+            expr:
+              $objectSet:
+                object:
+                  $var: sources
+                key:
+                  $var: source
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: path
+    - $let:
+        name: hostSource
+        expr:
+          $const:
+            name: parameters
+            path: /hostSource
+    - $if:
+        cond:
+          $and:
+          - $exists:
+              $var: hostSource
+          - $ne:
+            - $var: hostSource
+            - ''
+        then:
+        - $let:
+            name: bank
+            expr:
+              $var:
+                name: child
+                path: /clauses/payment/parameters/guarantorChannel
+        - $failIf:
+            cond:
+              $or:
+              - $not:
+                  $exists:
+                    $document:
+                      $concat:
+                      - /contracts/
+                      - $var: bank
+              - $ne:
+                - $nodeBlueId:
+                    $document:
+                      $concat:
+                      - /contracts/
+                      - $var: bank
+                - $nodeBlueId:
+                    $document:
+                      $concat:
+                      - $const:
+                          name: bindings
+                          path: /template
+                      - /contracts/
+                      - $var: bank
+            message: Cyclic payment requires the same guarantor channel on the host
+        - $set:
+            name: sources
+            expr:
+              $objectSet:
+                object:
+                  $var: sources
+                key:
+                  $var: hostSource
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document: ''
+    - $set:
+        name: child
+        expr:
+          $merge:
+          - $var: child
+          - instanceKey:
+              $var: identity
+            sources:
+              $var: sources
+    - $appendChange:
+        op: add
+        path:
+          $var: destination
+        val:
+          $var: child
+    - $set:
+        name: actionResult
+        expr:
+          created: true
+          path:
+            $var: destination
+          outcome: acceptedNew
+    resultContract: outcome-v1
+  observe:
+    automatic:
+      'on': embedded
+      pathBinding: instruction
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: PaymentInstruction/Payment Event
+        then:
+        - $return: {}
+    - $appendEvent:
+        $merge:
+        - type: Payment/Payment Event Received
+        - kind:
+            $var:
+              name: trigger
+              path: /kind
+          clause:
+            $const: clauseKey
+          instructionPath:
+            $const:
+              name: bindings
+              path: /instruction
+          event:
+            $objectSet:
+              object: {}
+              key: blueId
+              val:
+                $nodeBlueId:
+                  $event: /event

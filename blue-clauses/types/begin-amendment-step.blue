@@ -1,0 +1,560 @@
+description: Reusable Begin Amendment Step definition for the Clauses host profile.
+do:
+- $failIf:
+    cond:
+      $ne:
+      - $size:
+          $keys:
+            $document: /clauseRuntime/work
+      - 0
+    message: REENTRANT_AMENDMENT
+- $let:
+    expr:
+      $event: /request
+    name: r
+- $if:
+    cond:
+      $and:
+      - $isKind:
+          val:
+            $var: r
+          kind: object
+      - $hasKey:
+          object:
+            $var: r
+          key: action
+    then:
+    - $let:
+        name: singleChange
+        expr:
+          action:
+            $pointerGet:
+              object:
+                $var: r
+              path: /action
+              default: ''
+          key:
+            $pointerGet:
+              object:
+                $var: r
+              path: /key
+              default: ''
+    - $if:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: r
+              path: /action
+              default: ''
+          - remove
+        then:
+        - $set:
+            name: singleChange
+            expr:
+              $objectSet:
+                object:
+                  $var: singleChange
+                key: clause
+                val:
+                  $pointerGet:
+                    object:
+                      $var: r
+                    path: /clause
+                    default: {}
+    - $set:
+        name: r
+        expr:
+          requestId:
+            $pointerGet:
+              object:
+                $var: r
+              path: /requestId
+              default: clause-change
+          expectedRevision:
+            $pointerGet:
+              object:
+                $var: r
+              path: /expectedRevision
+              default:
+                $document: /clauseRuntime/revision
+          expectedConfigurationId:
+            $pointerGet:
+              object:
+                $var: r
+              path: /expectedConfigurationId
+              default:
+                $document: /clauseRuntime/configurationId
+          changes:
+          - $var: singleChange
+- $if:
+    cond:
+      $not:
+        $isKind:
+          kind: object
+          val:
+            $var: r
+    then:
+    - $call:
+        args:
+          code: REQUEST_REQUIRED
+          request:
+            $choose:
+              cond:
+                $isKind:
+                  kind: object
+                  val:
+                    $var: r
+              else:
+                requestId: ''
+              then:
+                $var: r
+        function: reject
+    - $return: {}
+- $if:
+    cond:
+      $ne:
+      - $keys:
+          $var: r
+      - $literal:
+        - changes
+        - expectedConfigurationId
+        - expectedRevision
+        - requestId
+    then:
+    - $call:
+        args:
+          code: REQUEST_FIELDS_MISMATCH
+          request:
+            $choose:
+              cond:
+                $isKind:
+                  kind: object
+                  val:
+                    $var: r
+              else:
+                requestId: ''
+              then:
+                $var: r
+        function: reject
+    - $return: {}
+- $if:
+    cond:
+      $or:
+      - $not:
+          $isKind:
+            kind: text
+            val:
+              $var:
+                name: r
+                path: /requestId
+      - $eq:
+        - $var:
+            name: r
+            path: /requestId
+        - ''
+    then:
+    - $call:
+        args:
+          code: REQUEST_ID_REQUIRED
+          request:
+            $choose:
+              cond:
+                $isKind:
+                  kind: object
+                  val:
+                    $var: r
+              else:
+                requestId: ''
+              then:
+                $var: r
+        function: reject
+    - $return: {}
+- $if:
+    cond:
+      $or:
+      - $not:
+          $isKind:
+            kind: integer
+            val:
+              $var:
+                name: r
+                path: /expectedRevision
+      - $ne:
+        - $var:
+            name: r
+            path: /expectedRevision
+        - $document: /clauseRuntime/revision
+      - $ne:
+        - $var:
+            name: r
+            path: /expectedConfigurationId
+        - $document: /clauseRuntime/configurationId
+    then:
+    - $call:
+        args:
+          code: STALE_CONFIGURATION
+          request:
+            $choose:
+              cond:
+                $isKind:
+                  kind: object
+                  val:
+                    $var: r
+              else:
+                requestId: ''
+              then:
+                $var: r
+        function: reject
+    - $return: {}
+- $if:
+    cond:
+      $not:
+        $isKind:
+          kind: list
+          val:
+            $var:
+              name: r
+              path: /changes
+    then:
+    - $call:
+        args:
+          code: CHANGES_REQUIRED
+          request:
+            $choose:
+              cond:
+                $isKind:
+                  kind: object
+                  val:
+                    $var: r
+              else:
+                requestId: ''
+              then:
+                $var: r
+        function: reject
+    - $return: {}
+- $let:
+    expr:
+      $document: /clauses
+    name: candidate
+- $let:
+    expr: {}
+    name: seen
+- $forEach:
+    do:
+    - $if:
+        cond:
+          $not:
+            $isKind:
+              kind: object
+              val:
+                $var: change
+        then:
+        - $call:
+            args:
+              code: INVALID_CHANGE
+              request:
+                $choose:
+                  cond:
+                    $isKind:
+                      kind: object
+                      val:
+                        $var: r
+                  else:
+                    requestId: ''
+                  then:
+                    $var: r
+            function: reject
+        - $return: {}
+    - $let:
+        expr:
+          $var:
+            name: change
+            path: /key
+        name: ck
+    - $let:
+        expr:
+          $var:
+            name: change
+            path: /action
+        name: action
+    - $if:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                kind: text
+                val:
+                  $var: ck
+            - $ne:
+              - $var: ck
+              - ''
+            - $eq:
+              - $size:
+                  $split:
+                    separator: /
+                    text:
+                      $var: ck
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    separator: '~'
+                    text:
+                      $var: ck
+              - 1
+        then:
+        - $call:
+            args:
+              code: INVALID_CLAUSE_KEY
+              request:
+                $choose:
+                  cond:
+                    $isKind:
+                      kind: object
+                      val:
+                        $var: r
+                  else:
+                    requestId: ''
+                  then:
+                    $var: r
+            function: reject
+        - $return: {}
+    - $if:
+        cond:
+          $hasKey:
+            key:
+              $var: ck
+            object:
+              $var: seen
+        then:
+        - $call:
+            args:
+              code: DUPLICATE_CLAUSE_CHANGE
+              request:
+                $choose:
+                  cond:
+                    $isKind:
+                      kind: object
+                      val:
+                        $var: r
+                  else:
+                    requestId: ''
+                  then:
+                    $var: r
+            function: reject
+        - $return: {}
+    - $set:
+        expr:
+          $objectSet:
+            object:
+              $var: seen
+            key:
+              $var: ck
+            val: true
+        name: seen
+    - $if:
+        cond:
+          $not:
+            $includes:
+              list:
+                $literal:
+                - add
+                - update
+                - replace
+                - remove
+              val:
+                $var: action
+        then:
+        - $call:
+            args:
+              code: INVALID_ACTION
+              request:
+                $choose:
+                  cond:
+                    $isKind:
+                      kind: object
+                      val:
+                        $var: r
+                  else:
+                    requestId: ''
+                  then:
+                    $var: r
+            function: reject
+        - $return: {}
+    - $if:
+        cond:
+          $ne:
+          - $keys:
+              $var: change
+          - $choose:
+              cond:
+                $eq:
+                - $var: action
+                - remove
+              else:
+                $literal:
+                - action
+                - clause
+                - key
+              then:
+                $literal:
+                - action
+                - key
+        then:
+        - $call:
+            args:
+              code: CHANGE_FIELDS_MISMATCH
+              request:
+                $choose:
+                  cond:
+                    $isKind:
+                      kind: object
+                      val:
+                        $var: r
+                  else:
+                    requestId: ''
+                  then:
+                    $var: r
+            function: reject
+        - $return: {}
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - add
+          - $hasKey:
+              key:
+                $var: ck
+              object:
+                $var: candidate
+        then:
+        - $call:
+            args:
+              code: CLAUSE_ALREADY_EXISTS
+              request:
+                $choose:
+                  cond:
+                    $isKind:
+                      kind: object
+                      val:
+                        $var: r
+                  else:
+                    requestId: ''
+                  then:
+                    $var: r
+            function: reject
+        - $return: {}
+    - $if:
+        cond:
+          $and:
+          - $ne:
+            - $var: action
+            - add
+          - $not:
+              $hasKey:
+                key:
+                  $var: ck
+                object:
+                  $var: candidate
+        then:
+        - $call:
+            args:
+              code: CLAUSE_NOT_FOUND
+              request:
+                $choose:
+                  cond:
+                    $isKind:
+                      kind: object
+                      val:
+                        $var: r
+                  else:
+                    requestId: ''
+                  then:
+                    $var: r
+            function: reject
+        - $return: {}
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - remove
+        else:
+        - $set:
+            expr:
+              $objectSet:
+                object:
+                  $var: candidate
+                key:
+                  $var: ck
+                val:
+                  $var:
+                    name: change
+                    path: /clause
+            name: candidate
+        then:
+        - $set:
+            expr:
+              $pointerSet:
+                object:
+                  $var: candidate
+                op: remove
+                path:
+                  $concat:
+                  - /
+                  - $var: ck
+            name: candidate
+    in:
+      $var:
+        name: r
+        path: /changes
+    item: change
+- $appendChange:
+    op: add
+    path: /clauseRuntime/work
+    val:
+      actorChannel:
+        $event: /actorChannel
+      candidate:
+        $var: candidate
+      initializing: false
+      request:
+        $var: r
+functions:
+  reject:
+    args:
+      code:
+        type: Text
+      request: {}
+    do:
+    - $appendEvent:
+        $merge:
+        - type: Clauses/Amendment Rejected
+        - code:
+            $var: code
+          configurationId:
+            $document: /clauseRuntime/configurationId
+          requestId:
+            $choose:
+              cond:
+                $isKind:
+                  kind: text
+                  val:
+                    $pointerGet:
+                      default: ''
+                      object:
+                        $var: request
+                      path: /requestId
+              else: ''
+              then:
+                $pointerGet:
+                  default: ''
+                  object:
+                    $var: request
+                  path: /requestId
+          revision:
+            $document: /clauseRuntime/revision
+    - $return: {}
+name: Begin Amendment Step
+type: Contracts/Compute

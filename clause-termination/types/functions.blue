@@ -1,0 +1,81 @@
+name: Termination Functions
+type: Contracts/Compute Definition
+functions:
+  request:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $ne:
+          - $document:
+              $const:
+                name: bindings
+                path: /state
+          - Active
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val: WindingDown
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Termination Requested
+          clause:
+            $const: clauseKey
+    - $return:
+        outcome: acceptedNew
+  finish:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $eq:
+          - $document:
+              $const:
+                name: bindings
+                path: /state
+          - Terminated
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $document:
+              $const:
+                name: bindings
+                path: /state
+          - WindingDown
+        message: WIND_DOWN_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $document:
+              $const:
+                name: bindings
+                path: /ready
+          - true
+        message: OUTSTANDING_WORK
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val: Terminated
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Terminated
+          clause:
+            $const: clauseKey
+    - $return:
+        outcome: acceptedNew

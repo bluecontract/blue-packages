@@ -1,0 +1,136 @@
+name: Customer Session Functions
+type: Contracts/Compute Definition
+functions:
+  initialize:
+    args:
+      input: {}
+    do:
+    - $appendChange:
+        op: add
+        path: /customerSession
+        val:
+          id: ''
+          funded: false
+    - $return:
+        outcome: acceptedNew
+  provideSession:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /operator
+        message: CUSTOMER_SESSION_OPERATOR_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: ACCEPT_INSTRUCTION_FIRST
+    - $let:
+        name: id
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /sessionId
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: id
+                kind: text
+            - $ne:
+              - $var: id
+              - ''
+        message: SESSION_ID_REQUIRED
+    - $if:
+        cond:
+          $ne:
+          - $document: /customerSession/id
+          - ''
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /customerSession/id
+              - $var: id
+            message: SESSION_ID_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /customerSession/id
+        val:
+          $var: id
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Customer Payment Session Ready
+          sessionId:
+            $var: id
+    - $return:
+        outcome: acceptedNew
+  confirmFunding:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /operator
+        message: CUSTOMER_SESSION_OPERATOR_REQUIRED
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $document: /customerSession/id
+            - ''
+          - $ne:
+            - $document: /customerSession/id
+            - $pointerGet:
+                object:
+                  $var: input
+                path: /sessionId
+                default: ''
+        message: SESSION_ID_MISMATCH
+    - $if:
+        cond:
+          $eq:
+          - $document: /customerSession/funded
+          - true
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /customerSession/funded
+        val: true
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Customer Funding Confirmed
+          sessionId:
+            $document: /customerSession/id
+    - $return:
+        outcome: acceptedNew

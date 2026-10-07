@@ -1,0 +1,165 @@
+document: 20-partnership.blue
+initial:
+  members: 1
+steps:
+- operation: startProcurement
+  channel: seller
+  target: ''
+  status: FAILED
+- operation: approve_seller
+  channel: seller
+  target: ''
+  request:
+    revision: 1
+- operation: approve_referrer
+  channel: referrer
+  target: ''
+  request:
+    revision: 1
+- operation: startProcurement
+  channel: seller
+  target: ''
+- operation: approve_customer
+  channel: customer
+  target: /procurements/office
+  request:
+    revision: 1
+- operation: approve_seller
+  channel: seller
+  target: /procurements/office
+  request:
+    revision: 1
+- operation: placeOrder
+  channel: customer
+  target: /procurements/office
+  request:
+    orderId: lunch-001
+- operation: placeOrder
+  channel: customer
+  target: /procurements/office
+  request:
+    orderId: lunch-002
+- operation: startPayment
+  channel: seller
+  target: /procurements/office/orders/lunch-002
+- operation: startPayment
+  channel: seller
+  target: /procurements/office/orders/lunch-001
+- operation: deliver
+  channel: carrier
+  target: /procurements/office/orders/lunch-001/delivery
+- operation: acceptDelivery
+  channel: customer
+  target: /procurements/office/orders/lunch-001
+- operation: accept
+  channel: guarantor
+  target: /procurements/office/orders/lunch-001/payment
+- target: /procurements/office/orders/lunch-001/payment
+  channel: guarantor
+  operation: provideSession
+  request:
+    sessionId: order-session
+- target: /procurements/office/orders/lunch-001/payment
+  channel: guarantor
+  operation: confirmFunding
+  request:
+    sessionId: order-session
+- operation: initiate
+  channel: guarantor
+  target: /procurements/office/orders/lunch-001/payment
+  request:
+    transactionId: lunch-payment-001
+- operation: confirm
+  channel: guarantor
+  target: /procurements/office/orders/lunch-001/payment
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+- operation: confirm
+  channel: guarantor
+  target: /procurements/office/orders/lunch-001/payment
+  request:
+    requestId: capture-0
+    outcome: succeeded
+  expect:
+    /procurements/office/orders/lunch-001/status: Completed
+    /commissionTarget: 1000
+    /balance/accrued: 1000
+  restore: true
+- operation: reservePayout
+  channel: seller
+  target: ''
+  request:
+    requestId: october-first-payout
+    amountMinor: 1000
+  expect:
+    /balance/reserved: 1000
+    /balance/paid: 0
+- operation: payoutAuthorized
+  channel: seller
+  target: /payout
+- operation: accept
+  channel: guarantor
+  target: /payout
+- operation: approveRecipient
+  channel: referrer
+  target: /payout
+- operation: initiate
+  channel: guarantor
+  target: /payout
+  request:
+    transactionId: commission-payout-001
+- operation: confirm
+  channel: guarantor
+  target: /payout
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+- operation: confirm
+  channel: guarantor
+  target: /payout
+  request:
+    requestId: capture-0
+    outcome: succeeded
+  expect:
+    /balance/paid: 1000
+    /balance/reserved: 0
+- operation: reportOrderFailed
+  channel: seller
+  target: /procurements/office/orders/lunch-001
+  request:
+    reason: abc
+  expect:
+    /procurements/office/orders/lunch-001/payment/payment/reserved/refund: 10000
+- operation: confirm
+  channel: guarantor
+  target: /procurements/office/orders/lunch-001/payment
+  request:
+    requestId: compensate-10000-0-0
+    outcome: succeeded
+  expect:
+    /commissionTarget: 0
+    /balance/accrued: 0
+    /balance/paid: 1000
+    /procurements/office/orders/lunch-001/financial/net: 0
+- target: /procurements/office
+  operation: windDown
+  channel: customer
+- target: /procurements/office
+  operation: placeOrder
+  channel: customer
+  request:
+    orderId: after-wind-down
+  status: FAILED
+  members: 9
+watch:
+- /commissionTarget
+- /balance
+- /procurements/office/activation
+- /procurements/office/netCollected
+- /procurements/office/orders/lunch-001/status
+- /procurements/office/orders/lunch-001/financial
+- /procurements/office/orders/lunch-001/payment/payment
+- /procurements/office/orders/lunch-001/payment/policy
+- /payout/payment
+- /payout/policy

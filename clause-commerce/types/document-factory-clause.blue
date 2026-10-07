@@ -1,0 +1,269 @@
+name: Document Factory Clause
+type: Connections/Connected Clause
+description: Start independent documents from an explicit template; only allowlisted business fields may be supplied.
+bindingTypes:
+  template: pointer
+  collection: pointer
+embedsCollections:
+- collection
+actions:
+  start:
+    defaults:
+      fields: {}
+    do:
+    - $let:
+        name: key
+        expr:
+          $var:
+            name: params
+            path: /key
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: key
+                kind: text
+            - $ne:
+              - $var: key
+              - ''
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: key
+                    separator: /
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: key
+                    separator: '~'
+              - 1
+        message: Invalid document key
+    - $let:
+        name: path
+        expr:
+          $concat:
+          - $const:
+              name: bindings
+              path: /collection
+          - /
+          - $var: key
+    - $failIf:
+        cond:
+          $exists:
+            $document:
+              $var: path
+        message: Document key already used
+    - $let:
+        name: child
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /template
+    - $failIf:
+        cond:
+          $exists:
+            $var:
+              name: child
+              path: /contracts/initialized
+        message: Factory requires an uninitialized template
+    - $forEach:
+        item: role
+        in:
+          $list:
+            $const:
+              name: parameters
+              path: /inheritChannels
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: role
+                    kind: text
+                - $ne:
+                  - $var: role
+                  - ''
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var: role
+                        separator: /
+                  - 1
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var: role
+                        separator: '~'
+                  - 1
+            message: 'FACTORY_CHANNEL: invalid participant channel name'
+        - $let:
+            name: channelPath
+            expr:
+              $concat:
+              - /contracts/
+              - $var: role
+        - $let:
+            name: inherited
+            expr:
+              $document:
+                $var: channelPath
+        - $failIf:
+            cond:
+              $not:
+                $or:
+                - $is:
+                    node:
+                      $var: inherited
+                    pattern:
+                      type: Contracts/External Channel
+                - $is:
+                    node:
+                      $var: inherited
+                    pattern:
+                      type: Coordination/Timeline Channel
+                - $is:
+                    node:
+                      $var: inherited
+                    pattern:
+                      type: ProviderCoordination/Timeline Channel
+            message: 'FACTORY_CHANNEL: only explicit participant channels may be inherited'
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $pointerGet:
+                    object:
+                      $var: child
+                    path:
+                      $var: channelPath
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: child
+                    path:
+                      $var: channelPath
+                - $var: inherited
+            message: 'FACTORY_CHANNEL: template declares a different participant channel'
+        - $set:
+            name: child
+            expr:
+              $objectSet:
+                object:
+                  $var: child
+                key: contracts
+                val:
+                  $objectSet:
+                    object:
+                      $object:
+                        $var:
+                          name: child
+                          path: /contracts
+                    key:
+                      $var: role
+                    val:
+                      $var: inherited
+    - $forEach:
+        item: nextValue
+        key: field
+        in:
+          $var:
+            name: params
+            path: /fields
+        do:
+        - $failIf:
+            cond:
+              $or:
+              - $not:
+                  $includes:
+                    list:
+                      $const:
+                        name: parameters
+                        path: /allowedFields
+                    val:
+                      $var: field
+              - $includes:
+                  list:
+                  - contracts
+                  - clauses
+                  - type
+                  - itemType
+                  - keyType
+                  - valueType
+                  - value
+                  - items
+                  - blueId
+                  - blue
+                  - schema
+                  - constraints
+                  - mergePolicy
+                  - properties
+                  - $previous
+                  - $previousItems
+                  - $pos
+                  - $replace
+                  - $empty
+                  - instanceKey
+                  val:
+                    $var: field
+            message: Field not allowed by document factory
+        - $set:
+            name: child
+            expr:
+              $objectSet:
+                object:
+                  $var: child
+                key:
+                  $var: field
+                val:
+                  $var: nextValue
+    - $let:
+        name: identity
+        expr:
+          $concat:
+          - $nodeBlueId:
+              $document: /contracts/initialized/document
+          - ':'
+          - $const: clauseKey
+          - ':'
+          - $var: key
+    - $set:
+        name: child
+        expr:
+          $merge:
+          - $var: child
+          - instanceKey:
+              $var: identity
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $var: child
+    - $set:
+        name: actionResult
+        expr:
+          created: true
+          path:
+            $var: path
+          key:
+            $var: key
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Document Started
+          clause:
+            $const: clauseKey
+          entityId:
+            $var: key
+          path:
+            $var: path

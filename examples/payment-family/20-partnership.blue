@@ -1,0 +1,544 @@
+name: Catering partnership with MyOS payments
+description: Direct customer-approved Orders, separate delivery evidence, customer
+  payments, commission correction and account-to-account payout. Fixture channels
+  are explicitly test-only.
+type: Agreements/Agreement with Clauses
+terms:
+  currency: EUR
+  commissionBps: 1000
+commissionTarget: 0
+procurements: {}
+payoutAmount: 0
+settlementKey: ''
+procurementTemplate:
+  name: Catering Procurement Agreement
+  type: Agreements/Agreement with Clauses
+  lifecycle: Active
+  canTerminate: false
+  orders: {}
+  netCollected: 0
+  orderCount: 0
+  orderTemplate:
+    name: Service Order
+    type: Orders/Order with Clauses
+    amountMinor: 10000
+    status: Open
+    acceptance: Pending
+    instructions: Use the main entrance
+    financial:
+      captured: 0
+      refunded: 0
+      net: 0
+    delivery:
+      name: Provider delivery evidence
+      type: DocumentsDomain/Document with Clauses
+      status: Open
+      clauses:
+        progress:
+          type: State/State Machine Clause
+          parameters:
+            subject: Delivery
+            transitions:
+              Open:
+              - Delivered
+              - Failed
+              Delivered:
+              - Failed
+          bindings:
+            state: /status
+            transition:
+              deliver:
+                'on': workflow
+                channel: carrier
+                params:
+                  to: Delivered
+              failDelivery:
+                'on': workflow
+                channel: carrier
+                params:
+                  to: Failed
+                  reason:
+                    $var:
+                      name: trigger
+                      path: /reason
+      contracts:
+        carrier:
+          type: Contracts/External Channel
+          event:
+            source: carrier
+    clauses:
+      acceptance:
+        type: State/State Machine Clause
+        parameters:
+          subject: Acceptance
+          transitions:
+            Pending:
+            - Accepted
+            - Declined
+        bindings:
+          state: /acceptance
+          transition:
+            acceptDelivery:
+              'on': workflow
+              channel: customer
+              params:
+                to: Accepted
+            declineDelivery:
+              'on': workflow
+              channel: customer
+              params:
+                to: Declined
+      lifecycle:
+        type: State/State Machine Clause
+        parameters:
+          subject: Order
+          transitions:
+            Open:
+            - Failed
+            - Completed
+            Completed:
+            - Failed
+        bindings:
+          state: /status
+          transition:
+            reportOrderFailed:
+              'on': workflow
+              channel: seller
+              params:
+                to: Failed
+                reason:
+                  $var:
+                    name: trigger
+                    path: /reason
+            completeWhenEligible:
+              'on': event
+              event:
+                type: Commerce/Domain Event
+                kind: Order Completion Eligible
+              params:
+                to: Completed
+      instructions:
+        type: Features/Delivery Instructions Clause
+        parameters:
+          editableStates:
+          - Open
+        bindings:
+          text: /instructions
+          lifecycle: /delivery/status
+          amend:
+            changeInstructions:
+              'on': workflow
+              channel: customer
+              params:
+                text:
+                  $var:
+                    name: trigger
+                    path: /text
+      payment:
+        type: MyOS/MyOS Customer Payment
+        parameters:
+          recipient: bob
+          amountPath: /amountMinor
+          currency: EUR
+          autoStart: false
+          includeOrder: true
+          sources:
+            delivery: /delivery
+          requireAll:
+            delivered:
+              observe:
+                source: delivery
+                path: /status
+                equals: Delivered
+            accepted:
+              observe:
+                source: order
+                path: /acceptance
+                equals: Accepted
+          failWhen:
+            orderFailed:
+              'on': embedded
+              path: /sources/order
+              event:
+                type: Commerce/Domain Event
+                kind: Order Failed
+                reason: abc
+        bindings:
+          start:
+            startPayment:
+              'on': workflow
+              channel: seller
+      summary:
+        type: Referrals/Order Summary Clause
+        bindings:
+          update:
+            paymentChanged:
+              'on': event
+              event:
+                type: Payment/Payment Event Received
+            acceptanceChanged:
+              'on': event
+              event:
+                type: Commerce/Domain Event
+                kind: Acceptance Accepted
+            deliveryChanged:
+              'on': embedded
+              path: /delivery
+    contracts:
+      customer:
+        type: Contracts/External Channel
+        event:
+          source: customer
+      seller:
+        type: Contracts/External Channel
+        event:
+          source: seller
+      carrier:
+        type: Contracts/External Channel
+        event:
+          source: carrier
+      guarantor:
+        type: Contracts/External Channel
+        event:
+          source: guarantor
+    parties:
+      customer:
+        type: MyOS/MyOS Party
+        partyId: alice
+        displayName: Alice
+        myosAccountId: alice
+      seller:
+        type: MyOS/MyOS Party
+        partyId: bob
+        displayName: Bob
+        myosAccountId: bob
+      guarantor:
+        type: MyOS/MyOS Party
+        partyId: payment-operator
+        displayName: Payment-Operator
+        myosAccountId: payment-operator
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        required:
+        - customer
+        - seller
+        revision: 1
+      bindings:
+        approve:
+          approve_customer:
+            'on': workflow
+            channel: customer
+            params:
+              revision:
+                $var:
+                  name: trigger
+                  path: /revision
+          approve_seller:
+            'on': workflow
+            channel: seller
+            params:
+              revision:
+                $var:
+                  name: trigger
+                  path: /revision
+    orders:
+      type: DocumentsV3/Document Factory Clause
+      parameters:
+        allowedFields: []
+        inheritChannels:
+        - customer
+        - seller
+        - carrier
+        - guarantor
+        identityChildren:
+        - /delivery
+      bindings:
+        template: /orderTemplate
+        collection: /orders
+        start:
+          placeOrder:
+            'on': workflow
+            channel: customer
+            params:
+              key:
+                $var:
+                  name: trigger
+                  path: /orderId
+              fields: {}
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document: /activation/active
+                  - true
+                message: PROCUREMENT_NOT_ACTIVE
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document: /sources/referral/activation/active
+                  - true
+                message: REFERRAL_NOT_ACTIVE
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document: /lifecycle
+                  - Active
+                message: PROCUREMENT_WINDING_DOWN
+    summary:
+      type: Referrals/Procurement Summary Clause
+      bindings:
+        update:
+          orderChanged:
+            'on': collection
+            path: /orders
+          referralChanged:
+            'on': embedded
+            path: /sources/referral
+    termination:
+      type: Termination/Termination Clause
+      bindings:
+        request:
+          windDown:
+            'on': workflow
+            channel: customer
+        finish:
+          close:
+            'on': workflow
+            channel: seller
+  contracts:
+    customer:
+      type: Contracts/External Channel
+      event:
+        source: customer
+    seller:
+      type: Contracts/External Channel
+      event:
+        source: seller
+    carrier:
+      type: Contracts/External Channel
+      event:
+        source: carrier
+    guarantor:
+      type: Contracts/External Channel
+      event:
+        source: guarantor
+  parties:
+    customer:
+      type: MyOS/MyOS Party
+      partyId: alice
+      displayName: Alice
+      myosAccountId: alice
+    seller:
+      type: MyOS/MyOS Party
+      partyId: bob
+      displayName: Bob
+      myosAccountId: bob
+    guarantor:
+      type: MyOS/MyOS Party
+      partyId: payment-operator
+      displayName: Payment-Operator
+      myosAccountId: payment-operator
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      required:
+      - seller
+      - referrer
+      revision: 1
+    bindings:
+      approve:
+        approve_seller:
+          'on': workflow
+          channel: seller
+          params:
+            revision:
+              $var:
+                name: trigger
+                path: /revision
+        approve_referrer:
+          'on': workflow
+          channel: referrer
+          params:
+            revision:
+              $var:
+                name: trigger
+                path: /revision
+  procurement:
+    type: DocumentsV3/Document Factory Clause
+    parameters:
+      allowedFields: []
+      inheritChannels:
+      - customer
+      - seller
+      - carrier
+      - guarantor
+      sourcePaths:
+        referral: ''
+    bindings:
+      template: /procurementTemplate
+      collection: /procurements
+      start:
+        startProcurement:
+          'on': workflow
+          channel: seller
+          params:
+            key: office
+            fields: {}
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /activation/active
+                - true
+              message: REFERRAL_NOT_ACTIVE
+  commission:
+    type: Referrals/Commission Clause
+    bindings:
+      agreements: /procurements
+      rate: /terms/commissionBps
+      update:
+        procurementChanged:
+          'on': collection
+          path: /procurements
+  balance:
+    type: Balance/Balance Clause
+    parameters:
+      currency: EUR
+    bindings:
+      setTarget:
+        commissionChanged:
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Commission Target Changed
+          params:
+            key: office-catering
+            amountMinor:
+              $document: /commissionTarget
+      reserve:
+        reservePayout:
+          'on': workflow
+          channel: seller
+          params:
+            key:
+              $var:
+                name: trigger
+                path: /requestId
+            amountMinor:
+              $var:
+                name: trigger
+                path: /amountMinor
+          before:
+          - $failIf:
+              cond:
+                $and:
+                - $exists:
+                    $document: /payout
+                - $ne:
+                  - $document: /settlementKey
+                  - $var:
+                      name: trigger
+                      path: /requestId
+              message: THIS_DEMO_HAS_ONE_PAYOUT_CLAUSE
+          after:
+          - $appendChange:
+              op: replace
+              path: /payoutAmount
+              val:
+                $var:
+                  name: params
+                  path: /amountMinor
+          - $appendChange:
+              op: replace
+              path: /settlementKey
+              val:
+                $var:
+                  name: params
+                  path: /key
+      settle:
+        payoutConfirmed:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            clause: payout
+            kind: Payment Outcome
+            event:
+              action: capture
+              outcome: succeeded
+          when:
+            $eq:
+            - $document: /payout/payment/completed
+            - $document: /payoutAmount
+          params:
+            key:
+              $document: /settlementKey
+  payout:
+    type: MyOS/MyOS Account to Account Payment
+    parameters:
+      payer:
+        type: MyOS/MyOS Party
+        partyId: bob
+        displayName: Bob
+        myosAccountId: bob
+      recipient: celine
+      amountPath: /payoutAmount
+      currency: EUR
+      autoStart: false
+      recipientApprovalRequired: true
+      requireAll:
+        payoutAuthorized:
+          'on': workflow
+          channel: seller
+    bindings:
+      instruction: /payout
+      start:
+        createPayout:
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Settlement Reserved
+contracts:
+  customer:
+    type: Contracts/External Channel
+    event:
+      source: customer
+  seller:
+    type: Contracts/External Channel
+    event:
+      source: seller
+  referrer:
+    type: Contracts/External Channel
+    event:
+      source: referrer
+  carrier:
+    type: Contracts/External Channel
+    event:
+      source: carrier
+  guarantor:
+    type: Contracts/External Channel
+    event:
+      source: guarantor
+parties:
+  customer:
+    type: MyOS/MyOS Party
+    partyId: alice
+    displayName: Alice
+    myosAccountId: alice
+  seller:
+    type: MyOS/MyOS Party
+    partyId: bob
+    displayName: Bob
+    myosAccountId: bob
+  guarantor:
+    type: MyOS/MyOS Party
+    partyId: payment-operator
+    displayName: Payment-Operator
+    myosAccountId: payment-operator
+  referrer:
+    type: MyOS/MyOS Party
+    partyId: celine
+    displayName: Celine
+    myosAccountId: celine

@@ -1,0 +1,587 @@
+{
+  "version": "0.5.0-preview.1",
+  "scope": "Unpublished candidate; see docs/payment-family.md for exact implementation boundaries.",
+  "families": [
+    {
+      "id": "feature",
+      "title": "Feature / Composable",
+      "meaning": "One named, readable capability containing state, checks, operations and observations. A clause is not automatically a new document or a sandbox.",
+      "native": [
+        "Connections/Connected Clause",
+        "Clauses/Composable Clause",
+        "Features/Delivery Instructions Clause"
+      ],
+      "parameters": [
+        {
+          "name": "editableStates",
+          "type": "Text[]",
+          "default": "required for Delivery Instructions",
+          "evaluation": "installed configuration",
+          "meaning": "Host lifecycle values during which the instructions may be changed."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "text",
+          "type": "JSON Pointer",
+          "default": "/instructions",
+          "evaluation": "each action",
+          "meaning": "The writable instructions field."
+        },
+        {
+          "name": "lifecycle",
+          "type": "JSON Pointer",
+          "default": "/status",
+          "evaluation": "each action",
+          "meaning": "Read-only lifecycle guard, not a second status maintained by the instructions feature."
+        }
+      ],
+      "actions": {
+        "amend": "{text: Text}. Equal text is a duplicate; changed text is acceptedNew. Only mapped participant connections expose it."
+      },
+      "events": [
+        "Instructions Changed"
+      ],
+      "example": "examples/payment-family/02-custom-service.blue",
+      "status": "Native feature example and generic composition substrate. Custom packages provide their own typed checks and result contracts.",
+      "extensions": "An editor-facing typed action/port descriptor, compiler effect analysis and arbitrary native-step action expansion remain specification work. Do not silently treat a BEX action as isolated untrusted code."
+    },
+    {
+      "id": "participants",
+      "title": "Participants",
+      "meaning": "Names the independent parties and the channels through which their actions are accepted. A role label is not proof of identity.",
+      "native": [
+        "Parties/Party",
+        "MyOS/MyOS Party",
+        "Participants/Participants Clause",
+        "AccessParticipants/Participants with Access Clause"
+      ],
+      "parameters": [
+        {
+          "name": "required",
+          "type": "Text[]",
+          "default": "[]",
+          "evaluation": "initialization",
+          "meaning": "Role/channel names that must exist before this fixture-bound document is usable."
+        }
+      ],
+      "bindings": [],
+      "actions": {
+        "validate": "Automatic initialization check; no customer-created identity claims are accepted by this check."
+      },
+      "events": [],
+      "example": "examples/payment-family/20-partnership.blue",
+      "status": "Reuses Core admitted-channel and Timeline Access building blocks. MyOS party IDs are checked by bootstrap. Full representative governance and read-only bootstrap remain future work.",
+      "extensions": "Production principal/provider binding, provider-confirmed Timeline Access, participant replacement, reader grants and pending-to-active access are integration requirements."
+    },
+    {
+      "id": "activation",
+      "title": "Activation / Acceptance",
+      "meaning": "Collects acceptance of the intended configuration before a business feature may start.",
+      "native": [
+        "Activation/Activation Clause"
+      ],
+      "parameters": [
+        {
+          "name": "required",
+          "type": "Text[]",
+          "default": "required",
+          "evaluation": "installed configuration",
+          "meaning": "Each named role must approve. No automatic principal is inferred."
+        },
+        {
+          "name": "revision",
+          "type": "Integer",
+          "default": "1",
+          "evaluation": "installed configuration",
+          "meaning": "Revision each approval must name; stale approvals fail."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "state",
+          "type": "JSON Pointer",
+          "default": "/activation",
+          "evaluation": "owned state",
+          "meaning": "Stores revision, approvals and active flag."
+        }
+      ],
+      "actions": {
+        "approve": "{revision: Integer}; caller must be one of the required roles. Repeated approval is duplicate."
+      },
+      "events": [
+        "Terms Accepted"
+      ],
+      "example": "examples/payment-family/05-booking-amendments.blue",
+      "status": "Native mutual/multiple acceptance. Business actions explicitly check /activation/active.",
+      "extensions": "The same document can intentionally expose preparation before activation. This clause is not a global interceptor. Initializer-level immediate activation and generalized rejection/negotiation rounds are possible variants, not implicitly implemented options."
+    },
+    {
+      "id": "amendments",
+      "title": "Amendments",
+      "meaning": "Changes agreed terms through exact, approved proposals, not by editing a live file and silently reusing previous consent.",
+      "native": [
+        "AmendmentsV3/Amendments Clause"
+      ],
+      "parameters": [
+        {
+          "name": "approvers",
+          "type": "Text[]",
+          "default": "required",
+          "evaluation": "installed configuration",
+          "meaning": "Every listed party must approve the proposal."
+        },
+        {
+          "name": "paths",
+          "type": "JSON Pointer[]",
+          "default": "required",
+          "evaluation": "installed configuration",
+          "meaning": "Exact data fields that may be replaced."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "state",
+          "type": "JSON Pointer",
+          "default": "/amendments",
+          "evaluation": "owned state",
+          "meaning": "Current revision, pending proposal and accepted proposal history."
+        },
+        {
+          "name": "editable",
+          "type": "JSON Pointer",
+          "default": "/termsEditable",
+          "evaluation": "propose and approve",
+          "meaning": "Business condition that permits a terms amendment."
+        }
+      ],
+      "actions": {
+        "propose": "{proposalId: Text, expectedRevision: Integer, path: JSON Pointer, replacement: BlueValue}; allowlisted path and exact current revision.",
+        "approve": "{proposalId: Text}; caller must be an approver. Applies only after every required approval; duplicates do not reapply."
+      },
+      "events": [
+        "Amendment Proposed",
+        "Amendment Applied"
+      ],
+      "example": "examples/payment-family/05-booking-amendments.blue",
+      "status": "Native allowlisted data amendments with revision matching and multi-party approval.",
+      "extensions": "Installed Connected Clause configuration remains immutable. Arbitrary clause migration, changes to outstanding PI terms and consent-preserving source replacement are NOT implemented. A new PI revision must obtain required confirmations; a data edit never resets financial history."
+    },
+    {
+      "id": "termination",
+      "title": "Termination / Cancellation",
+      "meaning": "Stops new work and winds down outstanding obligations without pretending cancellation means funds have been returned.",
+      "native": [
+        "Termination/Termination Clause"
+      ],
+      "parameters": [],
+      "bindings": [
+        {
+          "name": "state",
+          "type": "JSON Pointer",
+          "default": "/lifecycle",
+          "evaluation": "owned state",
+          "meaning": "Active, WindingDown, then Terminated."
+        },
+        {
+          "name": "ready",
+          "type": "JSON Pointer",
+          "default": "/canTerminate",
+          "evaluation": "finish",
+          "meaning": "Application-defined predicate that outstanding work permits closure."
+        }
+      ],
+      "actions": {
+        "request": "{}; changes Active to WindingDown. Author chooses participant/event connections.",
+        "finish": "{}; requires readiness and WindingDown. Repeated terminal result is duplicate."
+      },
+      "events": [
+        "Termination Requested",
+        "Terminated"
+      ],
+      "example": "examples/payment-family/05-booking-amendments.blue",
+      "status": "Native two-phase lifecycle, with separately configured authority and readiness.",
+      "extensions": "New-order and new-payment guards must explicitly use this lifecycle. Refund, payout reconciliation and provider confirmations may remain available during and after wind-down. Arbitrary cleanup, child cancellation and legal consequences are composed business policies, not automatic deletion."
+    },
+    {
+      "id": "state",
+      "title": "State Machine",
+      "meaning": "Models one independent dimension of progress with named, validated transitions. Payment, delivery, acceptance and support should not be squeezed into one overburdened status.",
+      "native": [
+        "State/State Machine Clause"
+      ],
+      "parameters": [
+        {
+          "name": "subject",
+          "type": "Text",
+          "default": "required",
+          "evaluation": "installed configuration",
+          "meaning": "Readable event subject, e.g. Delivery or Order."
+        },
+        {
+          "name": "transitions",
+          "type": "Map<Text,Text[]>",
+          "default": "required",
+          "evaluation": "installed configuration",
+          "meaning": "Explicit directed adjacency list. The initial value is authored at the bound state field."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "state",
+          "type": "JSON Pointer",
+          "default": "/status",
+          "evaluation": "owned state",
+          "meaning": "One scalar state value for this machine."
+        }
+      ],
+      "actions": {
+        "transition": "{to: Text, reason?: BlueValue}; same state is duplicate, other transitions must be allowed. Connection supplies role guards and input mapping."
+      },
+      "events": [
+        "<subject> <to> (Commerce/Domain Event, with from/to/reason)"
+      ],
+      "example": "examples/payment-family/02-custom-service.blue",
+      "status": "Native generic transitions and duplicate-safe same-state handling.",
+      "extensions": "Entry/exit hooks are ordinary connections to transition events. Derived overall status must use business/financial predicates. Evidence review and Milestone packages are meaningful compositions, not additional foundational state interpreters."
+    },
+    {
+      "id": "product",
+      "title": "Product",
+      "meaning": "Describes what is supplied inside its host document. Other features can quote, observe or bind to it; a Product need not be a separately embedded document.",
+      "native": [
+        "Commerce/Product Clause"
+      ],
+      "parameters": [
+        {
+          "name": "currency",
+          "type": "Text",
+          "default": "required for quoting",
+          "evaluation": "installed configuration",
+          "meaning": "Currency written with the quote. Cross-currency accounting is not inferred."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "product",
+          "type": "JSON Pointer",
+          "default": "required on the general clause",
+          "evaluation": "owned data",
+          "meaning": "Object replaced by the quote action; preserve descriptions in a separate content field or use a custom product feature."
+        }
+      ],
+      "actions": {
+        "quote": "{unitPriceMinor: Integer[0..1e9], quantity: Integer[1..1000]}; calculates totalMinor and emits Product Quoted. This inherited v2 action still uses legacy hook semantics."
+      },
+      "events": [
+        "Product Quoted"
+      ],
+      "example": "examples/payment-family/06-smart-property.blue",
+      "status": "Existing native quoting primitive plus authored product data consumed by Payment; this example uses fixed amount instead.",
+      "extensions": "Rich booking availability, bundles, content amendment and stock reservation are product-specific feature packages. The delivered quoting action replaces the bound quote object: it must not inadvertently erase independent product text. New connections should prefer a strict outcome adapter before attaching once-only effects."
+    },
+    {
+      "id": "documents",
+      "title": "Documents",
+      "meaning": "Creates independently identified documents from exact templates and manages explicit links and observations.",
+      "native": [
+        "DocumentsV3/Document Factory Clause"
+      ],
+      "parameters": [
+        {
+          "name": "allowedFields",
+          "type": "Text[]",
+          "default": "[]",
+          "evaluation": "installed configuration",
+          "meaning": "Only these top-level child input fields can be supplied at creation."
+        },
+        {
+          "name": "inheritChannels",
+          "type": "Text[]",
+          "default": "[]",
+          "evaluation": "creation",
+          "meaning": "Explicit host role channels copied into the child. No wildcard authority propagation."
+        },
+        {
+          "name": "sourcePaths",
+          "type": "Map<Text,JSON Pointer>",
+          "default": "{}",
+          "evaluation": "creation",
+          "meaning": "Named already-initialized host/peer identities attached under child /sources. Empty path means this host and may establish a deliberate cycle."
+        },
+        {
+          "name": "identityChildren",
+          "type": "JSON Pointer[]",
+          "default": [],
+          "evaluation": "creation",
+          "meaning": "Uninitialized nested child document roots receiving a deterministic scoped instanceKey before initialization; e.g. /delivery."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "template",
+          "type": "JSON Pointer",
+          "default": "required",
+          "evaluation": "creation snapshot",
+          "meaning": "Complete template included in the same application source."
+        },
+        {
+          "name": "collection",
+          "type": "JSON Pointer",
+          "default": "required",
+          "evaluation": "managed children",
+          "meaning": "An initialized dictionary of generated children; keys are stable and not reused."
+        }
+      ],
+      "actions": {
+        "start": "{key: Text, fields: Object = {}}. Same existing key plus same creation intent is duplicate; conflicting reuse fails."
+      },
+      "events": [
+        "Document Started"
+      ],
+      "example": "examples/payment-family/09-membership.blue",
+      "status": "Native embedded collection factory with retained creation intent, explicit inherited channels and actual source identities.",
+      "extensions": "The full family also needs attach-existing and non-embedding creation. Those are catalogue/API requirements, not flags this implementation silently supports. A standalone creation mode needs durable publication/delivery ownership. Removing a reference is not erasing a document or canceling its obligations."
+    },
+    {
+      "id": "payment",
+      "title": "Payment",
+      "meaning": "One named payment feature backed by exactly one independently governed Payment Instruction.",
+      "native": [
+        "Payment/Payment Clause",
+        "Payment/Conditional Payment",
+        "PaymentInstruction/Payment Instruction",
+        "MyOS/MyOS Customer Payment",
+        "MyOS/MyOS Account to Account Payment",
+        "ACME/ACME Bank Payment",
+        "ManualPayments/Manual Bank Payment"
+      ],
+      "parameters": [
+        {
+          "name": "amountMinor",
+          "type": "Integer",
+          "default": "0 \u2192 quote fallback",
+          "evaluation": "PI creation snapshot",
+          "meaning": "Positive explicit amount; use a fixed amount without inventing a Product."
+        },
+        {
+          "name": "amountPath",
+          "type": "JSON Pointer",
+          "default": "empty",
+          "evaluation": "PI creation snapshot",
+          "meaning": "Host amount field. Takes precedence over direct amount/quote when supplied."
+        },
+        {
+          "name": "currency",
+          "type": "Text",
+          "default": "EUR",
+          "evaluation": "PI creation snapshot",
+          "meaning": "Currency for explicit amount. Product quote currency is used for quote fallback."
+        },
+        {
+          "name": "payer",
+          "type": "Text or MyOS Party (method-specific)",
+          "default": "customer",
+          "evaluation": "PI creation",
+          "meaning": "Generic conditional payment: host payer channel. MyOS Account to Account Payment: account ID or Party resolved against the declared roster."
+        },
+        {
+          "name": "payee",
+          "type": "Text",
+          "default": "seller",
+          "evaluation": "PI creation",
+          "meaning": "Host channel copied as PI seller."
+        },
+        {
+          "name": "recipient",
+          "type": "Text or MyOS Party",
+          "default": "required for MyOS methods",
+          "evaluation": "PI creation",
+          "meaning": "MyOS account ID or Party. Must match exactly one declared party and admitted channel. Manual Bank Payment uses a recipient channel name instead."
+        },
+        {
+          "name": "guarantor",
+          "type": "Text",
+          "default": "guarantor",
+          "evaluation": "PI creation",
+          "meaning": "Mandatory accepting/reporting party; fixture executor is combined with this role."
+        },
+        {
+          "name": "recipientApprovalRequired",
+          "type": "Boolean",
+          "default": false,
+          "evaluation": "PI creation",
+          "meaning": "Require recipient approval in addition to guarantor acceptance."
+        },
+        {
+          "name": "autoStart",
+          "type": "Boolean",
+          "default": true,
+          "evaluation": "clause initialization",
+          "meaning": "Create the PI automatically; false permits explicit start connection."
+        },
+        {
+          "name": "autoCapture",
+          "type": "Boolean",
+          "default": true,
+          "evaluation": "PI policy",
+          "meaning": "Automatic full-amount capture when all required evidence and financial conditions hold."
+        },
+        {
+          "name": "requireAll",
+          "type": "Map<Text,Connection-or-observation>",
+          "default": "required, nonempty",
+          "evaluation": "accepted events / current state",
+          "meaning": "Each named evidence fact is required. Connections are not silently combined by OR."
+        },
+        {
+          "name": "sources",
+          "type": "Map<Text,JSON Pointer>",
+          "default": "{}",
+          "evaluation": "PI creation",
+          "meaning": "Named accepted peer identities; observers refer to these names."
+        },
+        {
+          "name": "includeOrder",
+          "type": "Boolean",
+          "default": false,
+          "evaluation": "PI creation",
+          "meaning": "Explicitly connect the host as source order, forming a cycle when needed."
+        },
+        {
+          "name": "failWhen",
+          "type": "Map<Text,Connection>",
+          "default": "{}",
+          "evaluation": "accepted event",
+          "meaning": "Persistent failure/compensation intent triggers."
+        },
+        {
+          "name": "releaseAfter",
+          "type": "{days|hours|minutes|seconds: positive Integer}",
+          "default": {
+            "days": 7
+          },
+          "evaluation": "authorization confirmation anchor",
+          "meaning": "Business confirmation window. One unit only; maximum 365 days. It is NOT an assertion about a real rail authorization expiry."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "instruction",
+          "type": "JSON Pointer",
+          "default": "/payment",
+          "evaluation": "managed child",
+          "meaning": "Exactly one PI slot; never reset it to mean another payment."
+        },
+        {
+          "name": "product",
+          "type": "JSON Pointer",
+          "default": "/product",
+          "evaluation": "PI creation quote",
+          "meaning": "Optional quote fallback, not a required abstraction for payouts."
+        }
+      ],
+      "actions": {
+        "start": "Host action; creates/embeds one PI. On Payment this is automatic unless autoStart=false.",
+        "record": "PI policy action {fact: Text, confirmed: Boolean}; reusable required evidence, exposed through configured connections.",
+        "request": "PI lifecycle action {requestId: Text, action: authorize|capture|refund|void, amountMinor?: Integer}; actual names may be authorize/capture/refund/releaseAuthorization connections.",
+        "accept / initiate / confirm": "PI guarantor operations. accept consents to instruction, initiate supplies transaction correlation, confirm reports a specific command outcome.",
+        "approveRecipient": "PI recipient operation where required.",
+        "fail / advance / retry": "PI policy actions. Failure is retained; advance considers both financial outcomes and accepted evidence; retry requires a definitive failed request and consumes that failure once."
+      },
+      "events": [
+        "PaymentInstruction/Payment Event",
+        "Payment/Payment Event Received (with originating clause and instructionPath)",
+        "Evidence Recorded",
+        "Conditions Satisfied",
+        "Compensation Required"
+      ],
+      "example": "examples/payment-family/15-myos-customer.blue; 16-myos-account.blue; 18-acme-bank.blue; 19-manual-bank.blue; 20-partnership.blue",
+      "status": "Native method-specific request and confirmation protocols; customer session gate, strict retry entitlement, manual receipt confirmation, and frozen party snapshots. No live external executor.",
+      "extensions": "General installments use multiple Payment instances. Rail-specific expiry, capture/void semantics, disputes, reversal reporting, robust transport outbox and audited retry entitlements require an executor adapter. The custom PI template is the escape hatch; adding arbitrary hooks does not change a frozen accepted financial policy."
+    },
+    {
+      "id": "balance",
+      "title": "Balance / Ledger",
+      "meaning": "Tracks attributed obligations independently from the cash that a financial institution confirms. Supports exact corrections rather than repeatedly adding the same commission.",
+      "native": [
+        "Balance/Balance Clause",
+        "Referrals/Commission Clause"
+      ],
+      "parameters": [
+        {
+          "name": "currency",
+          "type": "Text",
+          "default": "authored on host in examples",
+          "evaluation": "configuration",
+          "meaning": "Human/commercial denomination; this minimal ledger does not automatically type-check every external currency. Application policy must enforce it."
+        },
+        {
+          "name": "commissionBps",
+          "type": "Integer[0..10000]",
+          "default": "host field",
+          "evaluation": "each projection",
+          "meaning": "Recipe parameter, not the general ledger. Applied per Order to accepted net payment, half-up in integer minor units."
+        }
+      ],
+      "bindings": [
+        {
+          "name": "state",
+          "type": "JSON Pointer",
+          "default": "/balance",
+          "evaluation": "owned state",
+          "meaning": "targets, accrued, paid, reserved and settlement records."
+        },
+        {
+          "name": "agreements / rate",
+          "type": "JSON Pointers",
+          "default": "required for commission recipe",
+          "evaluation": "each projection",
+          "meaning": "Accepted procurement graph and the agreed commission basis-point field."
+        }
+      ],
+      "actions": {
+        "setTarget": "{key: Text, amountMinor: nonnegative Integer}; computes a delta from that attribution\u2019s old target.",
+        "reserve": "{key: Text, amountMinor: positive Integer}; only unreserved unpaid obligation may be reserved. Conflicting ID reuse fails.",
+        "settle": "{key: Text}; marks the reserved settlement paid once. Application must connect this to accepted payment evidence, not an arbitrary untrusted event."
+      },
+      "events": [
+        "Balance Target Changed",
+        "Settlement Reserved",
+        "Settlement Confirmed",
+        "Commission Target Changed"
+      ],
+      "example": "examples/payment-family/10-ledger.blue; examples/payment-family/20-partnership.blue",
+      "status": "Native target ledger, correction, reservation and confirmed settlement. Root application binds payout confirmation to the correct PI.",
+      "extensions": "General double-entry journals, reservation release after final payment failure, disputes, FX, account protection and recoupment workflows remain scoped extensions. A post-payout correction leaves paid untouched and exposes overpayment; this is not an automatic debit of a partner bank account."
+    },
+    {
+      "id": "schedule",
+      "title": "Schedule / Timer",
+      "meaning": "Introduces an agreed time source and deadline reactions without treating the current worker clock as an authoritative business fact.",
+      "native": [
+        "Schedule/Schedule Clause",
+        "Connections/Connected Clause"
+      ],
+      "parameters": [
+        {
+          "name": "key",
+          "type": "Text",
+          "default": "required",
+          "evaluation": "installed configuration",
+          "meaning": "Readable schedule identity; not a global scheduler ID."
+        }
+      ],
+      "bindings": [],
+      "actions": {
+        "fire": "Native action emitting Schedule Fired at the accepted timestamp. Connections use the existing timer syntax: timestamp OR afterEvent+delayMs."
+      },
+      "events": [
+        "Schedule Fired"
+      ],
+      "example": "examples/payment-family/09-membership.blue (explicit period admission); payment-instruction/types/conditional-policy.blue (native confirmation timer)",
+      "status": "Native firing helper and existing timer compilation are included. Operation scenarios and a separate signed-completeness timer test qualify the payment deadline.",
+      "extensions": "General recurring calendars, timezone/DST arithmetic, backfill policies, skip/catch-up limits and stop/rearm migrations require an explicit recurrence policy. Membership example opens named periods by an authorized operation; it is NOT automatically monthly billing. Distinct periods still produce distinct Orders and PIs."
+    }
+  ]
+}

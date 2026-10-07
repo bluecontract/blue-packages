@@ -1,0 +1,37 @@
+document: 14-late-evidence.blue
+steps:
+- operation: startPayment
+  channel: seller
+  target: ''
+  expect:
+    /payment/policy/eligible: false
+- operation: accept
+  channel: guarantor
+  target: /payment
+- operation: initiate
+  channel: guarantor
+  target: /payment
+  request:
+    transactionId: custom-1
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+- operation: deliver
+  channel: carrier
+  target: /delivery
+  timestamp: 10000000
+  expect:
+    /delivery/status: Delivered
+    /payment/policy/facts/delivered: true
+    /payment/policy/eligible: false
+- operation: acceptDelivery
+  channel: customer
+  timestamp: 11000000
+  expect:
+    /acceptance: Accepted
+    /payment/policy/facts/accepted: true
+    /payment/policy/eligible: false
+    /payment/payment/reserved/capture: 0

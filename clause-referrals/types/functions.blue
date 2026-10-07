@@ -1,0 +1,233 @@
+name: Projection Functions
+type: Money/Rounding
+functions:
+  summarizeOrder:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: captured
+        expr:
+          $pointerGet:
+            object:
+              $document: ''
+            path: /payment/payment/completed
+            default: 0
+    - $let:
+        name: refunded
+        expr:
+          $pointerGet:
+            object:
+              $document: ''
+            path: /payment/payment/reversed
+            default: 0
+    - $let:
+        name: net
+        expr:
+          $subtract:
+          - $var: captured
+          - $var: refunded
+    - $let:
+        name: next
+        expr:
+          captured:
+            $var: captured
+          refunded:
+            $var: refunded
+          net:
+            $var: net
+    - $let:
+        name: old
+        expr:
+          $document: /financial
+    - $let:
+        name: complete
+        expr:
+          $and:
+          - $eq:
+            - $document: /delivery/status
+            - Delivered
+          - $eq:
+            - $document: /acceptance
+            - Accepted
+          - $gte:
+            - $var: net
+            - $document: /amountMinor
+          - $ne:
+            - $document: /status
+            - Failed
+    - $if:
+        cond:
+          $and:
+          - $var: complete
+          - $ne:
+            - $document: /status
+            - Completed
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Commerce/Domain Event
+            - kind: Order Completion Eligible
+              clause:
+                $const: clauseKey
+    - $if:
+        cond:
+          $ne:
+          - $var: next
+          - $var: old
+        then:
+        - $appendChange:
+            op: replace
+            path: /financial
+            val:
+              $var: next
+        - $appendEvent:
+            $merge:
+            - type: Commerce/Domain Event
+            - kind: Order Finance Changed
+              clause:
+                $const: clauseKey
+              netMinor:
+                $var: net
+    - $return:
+        outcome: acceptedNew
+  procurementTotals:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: net
+        expr: 0
+    - $let:
+        name: count
+        expr: 0
+    - $forEach:
+        item: order
+        in:
+          $document: /orders
+        do:
+        - $set:
+            name: net
+            expr:
+              $add:
+              - $var: net
+              - $document:
+                  $concat:
+                  - /orders/
+                  - $var: orderKey
+                  - /financial/net
+        - $set:
+            name: count
+            expr:
+              $add:
+              - $var: count
+              - 1
+        key: orderKey
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $document: /netCollected
+            - $var: net
+          - $eq:
+            - $document: /orderCount
+            - $var: count
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /netCollected
+        val:
+          $var: net
+    - $appendChange:
+        op: replace
+        path: /orderCount
+        val:
+          $var: count
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Procurement Totals Changed
+          clause:
+            $const: clauseKey
+          netMinor:
+            $var: net
+    - $return:
+        outcome: acceptedNew
+  commission:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: total
+        expr: 0
+    - $forEach:
+        item: agreement
+        in:
+          $document:
+            $const:
+              name: bindings
+              path: /agreements
+        do:
+        - $forEach:
+            item: order
+            in:
+              $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /agreements
+                - /
+                - $var: agreementKey
+                - /orders
+            do:
+            - $set:
+                name: total
+                expr:
+                  $add:
+                  - $var: total
+                  - $call:
+                      function: roundBps
+                      args:
+                        basis:
+                          $document:
+                            $concat:
+                            - $const:
+                                name: bindings
+                                path: /agreements
+                            - /
+                            - $var: agreementKey
+                            - /orders/
+                            - $var: orderKey
+                            - /financial/net
+                        bps:
+                          $document:
+                            $const:
+                              name: bindings
+                              path: /rate
+            key: orderKey
+        key: agreementKey
+    - $if:
+        cond:
+          $eq:
+          - $document: /commissionTarget
+          - $var: total
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /commissionTarget
+        val:
+          $var: total
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Commission Target Changed
+          clause:
+            $const: clauseKey
+          amountMinor:
+            $var: total
+    - $return:
+        outcome: acceptedNew

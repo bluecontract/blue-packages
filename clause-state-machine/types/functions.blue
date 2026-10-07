@@ -1,0 +1,76 @@
+name: State Machine Functions
+type: Contracts/Compute Definition
+functions:
+  transition:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: from
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /state
+    - $let:
+        name: to
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /to
+    - $if:
+        cond:
+          $eq:
+          - $var: from
+          - $var: to
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $get:
+                  object:
+                    $const:
+                      name: parameters
+                      path: /transitions
+                  key:
+                    $var: from
+              val:
+                $var: to
+        message: DISALLOWED_TRANSITION
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          $var: to
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind:
+            $concat:
+            - $const:
+                name: parameters
+                path: /subject
+            - ' '
+            - $var: to
+          clause:
+            $const: clauseKey
+          from:
+            $var: from
+          to:
+            $var: to
+          reason:
+            $pointerGet:
+              object:
+                $var: input
+              path: /reason
+              default: ''
+    - $return:
+        outcome: acceptedNew

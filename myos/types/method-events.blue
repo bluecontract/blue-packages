@@ -1,0 +1,38 @@
+name: Payment Method Events
+type: Connections/Connected Clause
+actions:
+  announce:
+    automatic:
+      'on': initialized
+      once: true
+    do:
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind:
+            $choose:
+              cond:
+                $eq:
+                - $document: /paymentDetails/method
+                - myos-customer
+              then: Customer Payment Session Requested
+              else: Account Payment Instruction Created
+          details:
+            $document: /paymentDetails
+  request:
+    automatic:
+      'on': event
+      event:
+        type: PaymentInstruction/Payment Event
+        kind: Payment Requested
+    do:
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: MyOS Execution Requested
+          method:
+            $document: /paymentDetails/method
+          request:
+            $var: trigger
+          details:
+            $document: /paymentDetails

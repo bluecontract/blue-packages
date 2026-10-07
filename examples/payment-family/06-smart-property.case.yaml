@@ -1,0 +1,39 @@
+document: 06-smart-property.blue
+initial: {}
+steps:
+- operation: deliver
+  channel: carrier
+  target: /property
+- operation: startPayment
+  channel: seller
+  target: ''
+  expect:
+    /payment/policy/facts/checkIn: true
+    /payment/policy/eligible: false
+- operation: customerAcceptance
+  channel: customer
+  target: /payment
+  expect:
+    /payment/policy/eligible: true
+- operation: accept
+  channel: guarantor
+  target: /payment
+- operation: initiate
+  channel: guarantor
+  target: /payment
+  request:
+    transactionId: rental1
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+- operation: confirm
+  channel: guarantor
+  target: /payment
+  request:
+    requestId: capture-0
+    outcome: succeeded
+  expect:
+    /payment/payment/completed: 20000

@@ -1,0 +1,294 @@
+name: Manual Transfer Functions
+type: Contracts/Compute Definition
+functions:
+  initialize:
+    args:
+      input: {}
+    do:
+    - $appendChange:
+        op: add
+        path: /manual
+        val:
+          status: AwaitingAcceptance
+          transferReference: ''
+          captured: 0
+          refunded: 0
+    - $return:
+        outcome: acceptedNew
+  accept:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /recipientChannel
+        message: MANUAL_PAYMENT_ACTOR
+    - $if:
+        cond:
+          $ne:
+          - $document: /manual/status
+          - AwaitingAcceptance
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /manual/status
+        val: AwaitingTransfer
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Manual Payment Accepted
+    - $return:
+        outcome: acceptedNew
+  reportTransfer:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /payerChannel
+        message: MANUAL_PAYMENT_ACTOR
+    - $let:
+        name: reference
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /reference
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: reference
+                kind: text
+            - $ne:
+              - $var: reference
+              - ''
+        message: TRANSFER_REFERENCE_REQUIRED
+    - $if:
+        cond:
+          $ne:
+          - $document: /manual/transferReference
+          - ''
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /manual/transferReference
+              - $var: reference
+            message: TRANSFER_REFERENCE_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - AwaitingTransfer
+              val:
+                $document: /manual/status
+        message: MANUAL_PAYMENT_STATE
+    - $appendChange:
+        op: replace
+        path: /manual/transferReference
+        val:
+          $var: reference
+    - $appendChange:
+        op: replace
+        path: /manual/status
+        val: TransferReported
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Transfer Reported
+          reference:
+            $var: reference
+    - $return:
+        outcome: acceptedNew
+  confirmReceipt:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /recipientChannel
+        message: MANUAL_PAYMENT_ACTOR
+    - $if:
+        cond:
+          $gt:
+          - $document: /manual/captured
+          - 0
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - TransferReported
+              val:
+                $document: /manual/status
+        message: MANUAL_PAYMENT_STATE
+    - $appendChange:
+        op: replace
+        path: /manual/captured
+        val:
+          $const:
+            name: parameters
+            path: /amountMinor
+    - $appendChange:
+        op: replace
+        path: /manual/status
+        val: Paid
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Payment Outcome
+          action: capture
+          outcome: succeeded
+          amountMinor:
+            $const:
+              name: parameters
+              path: /amountMinor
+    - $return:
+        outcome: acceptedNew
+  requestRefund:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /recipientChannel
+        message: MANUAL_PAYMENT_ACTOR
+    - $if:
+        cond:
+          $includes:
+            list:
+            - RefundRequested
+            - Refunded
+            val:
+              $document: /manual/status
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - Paid
+              val:
+                $document: /manual/status
+        message: MANUAL_PAYMENT_STATE
+    - $appendChange:
+        op: replace
+        path: /manual/status
+        val: RefundRequested
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Manual Refund Requested
+          amountMinor:
+            $const:
+              name: parameters
+              path: /amountMinor
+    - $return:
+        outcome: acceptedNew
+  confirmRefund:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /payerChannel
+        message: MANUAL_PAYMENT_ACTOR
+    - $if:
+        cond:
+          $eq:
+          - $document: /manual/status
+          - Refunded
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - RefundRequested
+              val:
+                $document: /manual/status
+        message: MANUAL_PAYMENT_STATE
+    - $appendChange:
+        op: replace
+        path: /manual/refunded
+        val:
+          $const:
+            name: parameters
+            path: /amountMinor
+    - $appendChange:
+        op: replace
+        path: /manual/status
+        val: Refunded
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Payment Outcome
+          action: refund
+          outcome: succeeded
+          amountMinor:
+            $const:
+              name: parameters
+              path: /amountMinor
+    - $return:
+        outcome: acceptedNew

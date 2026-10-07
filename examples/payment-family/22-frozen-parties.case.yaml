@@ -1,0 +1,51 @@
+document: 22-frozen-parties.blue
+initial:
+  members: 2
+  expect:
+    /payment/policy/eligible: false
+    /payment/paymentDetails/method: myos-account-to-account
+    /payment/paymentDetails/parties/recipient/myosAccountId: bob
+    /payment/paymentDetails/parties/payer/myosAccountId: alice
+steps:
+- target: /payment
+  channel: customer
+  operation: confirmSatisfaction
+  expect:
+    /payment/policy/eligible: true
+- target: /payment
+  channel: customer
+  operation: confirmSatisfaction
+  eventCount: 0
+- target: /payment
+  channel: guarantor
+  operation: accept
+- target: /payment
+  channel: guarantor
+  operation: initiate
+  request:
+    transactionId: t1
+  expect:
+    /payment/payment/reserved/secure: 10000
+- target: /payment
+  channel: guarantor
+  operation: confirm
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+  expect:
+    /payment/payment/reserved/capture: 10000
+- target: /payment
+  channel: guarantor
+  operation: confirm
+  request:
+    requestId: capture-0
+    outcome: succeeded
+  expect:
+    /payment/payment/completed: 10000
+    /payment/policy/status: Paid
+  restore: true
+- channel: seller
+  operation: renameSeller
+  expect:
+    /parties/seller/displayName: Updated seller label
+    /payment/paymentDetails/parties/recipient/displayName: Bob

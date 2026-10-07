@@ -1,0 +1,1297 @@
+name: Payment Functions
+type: Contracts/Compute Definition
+description: Native BEX ledger for one payment instruction. Requests reserve capacity; guarantor outcomes change
+  confirmed amounts.
+functions:
+  key:
+    args:
+      candidate:
+        type: Text
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: candidate
+                kind: text
+            - $ne:
+              - $var: candidate
+              - ''
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: /
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: '~'
+              - 1
+        message: Invalid payment identifier
+  guarantor:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $const:
+                  name: parameters
+                  path: /guarantorChannel
+        message: Guarantor workflow required
+  emit:
+    args:
+      kind:
+        type: Text
+      detail: {}
+    do:
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - $var: detail
+        - kind:
+            $var: kind
+          paymentId:
+            $document: /instanceKey
+          currency:
+            $const:
+              name: parameters
+              path: /currency
+  initialize:
+    args: {}
+    do:
+    - $let:
+        name: terms
+        expr:
+          $const: parameters
+    - $let:
+        name: amount
+        expr:
+          $var:
+            name: terms
+            path: /amountMinor
+    - $let:
+        name: limit
+        expr:
+          $var:
+            name: terms
+            path: /limitMinor
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: amount
+                kind: integer
+            - $gt:
+              - $var: amount
+              - 0
+            - $isKind:
+                val:
+                  $var: limit
+                kind: integer
+            - $gte:
+              - $var: limit
+              - $var: amount
+            - $lte:
+              - $var: limit
+              - 1000000000000
+            - $isKind:
+                val:
+                  $var:
+                    name: terms
+                    path: /currency
+                kind: text
+            - $ne:
+              - $var:
+                  name: terms
+                  path: /currency
+              - ''
+            - $isKind:
+                val:
+                  $var:
+                    name: terms
+                    path: /recipientApprovalRequired
+                kind: boolean
+        message: Invalid immutable payment terms
+    - $forEach:
+        item: role
+        in:
+        - payerChannel
+        - guarantorChannel
+        do:
+        - $let:
+            name: channel
+            expr:
+              $get:
+                object:
+                  $var: terms
+                key:
+                  $var: role
+        - $call:
+            function: key
+            args:
+              candidate:
+                $var: channel
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: channel
+            message: Missing payment participant channel
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var:
+                  name: terms
+                  path: /allowedPayees
+              kind: list
+        message: Allowed recipients must be declared
+    - $forEach:
+        item: recipient
+        in:
+          $var:
+            name: terms
+            path: /allowedPayees
+        do:
+        - $call:
+            function: key
+            args:
+              candidate:
+                $var: recipient
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: recipient
+            message: Missing recipient channel
+    - $let:
+        name: initialRecipient
+        expr:
+          $pointerGet:
+            object:
+              $var: terms
+            path: /payeeChannel
+            default: ''
+    - $failIf:
+        cond:
+          $and:
+          - $ne:
+            - $var: initialRecipient
+            - ''
+          - $not:
+              $includes:
+                list:
+                  $var:
+                    name: terms
+                    path: /allowedPayees
+                val:
+                  $var: initialRecipient
+        message: Initial recipient is not allowed
+    - $failIf:
+        cond:
+          $gt:
+          - $size:
+              $object:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /state
+          - 0
+        message: Initial financial state must be empty
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          accepted: false
+          rejected: false
+          recipientApproved: false
+          transactionId: ''
+          closed: false
+          targetMinor:
+            $var: amount
+          finalResolved: false
+          secured: 0
+          completed: 0
+          reversed: 0
+          reserved:
+            secure: 0
+            capture: 0
+            refund: 0
+            void: 0
+          locks:
+            capture: false
+            refund: false
+            details: false
+          requests: {}
+          details: {}
+          payeeChannel:
+            $pointerGet:
+              object:
+                $var: terms
+              path: /payeeChannel
+              default: ''
+    - $call:
+        function: emit
+        args:
+          kind: Payment Initialized
+          detail: {}
+  accept:
+    args:
+      approved:
+        type: Boolean
+    do:
+    - $call:
+        function: guarantor
+    - $let:
+        name: s
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /state
+    - $failIf:
+        cond:
+          $and:
+          - $var:
+              name: s
+              path: /rejected
+          - $var: approved
+        message: Rejected instruction cannot be accepted
+    - $failIf:
+        cond:
+          $and:
+          - $var:
+              name: s
+              path: /accepted
+          - $not:
+              $var: approved
+        message: Accepted instruction cannot be rejected
+    - $if:
+        cond:
+          $or:
+          - $var:
+              name: s
+              path: /accepted
+          - $var:
+              name: s
+              path: /rejected
+        then:
+        - $return:
+            changed: false
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          $merge:
+          - $var: s
+          - accepted:
+              $var: approved
+            rejected:
+              $not:
+                $var: approved
+    - $call:
+        function: emit
+        args:
+          kind:
+            $choose:
+              cond:
+                $var: approved
+              then: Instruction Accepted
+              else: Instruction Rejected
+          detail: {}
+    - $return:
+        changed: true
+  approveRecipient:
+    args: {}
+    do:
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: s
+        expr:
+          $document:
+            $var: path
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $ne:
+              - $var:
+                  name: s
+                  path: /payeeChannel
+              - ''
+            - $eq:
+              - $binding: call/channel
+              - $var:
+                  name: s
+                  path: /payeeChannel
+        message: Current recipient must approve
+    - $if:
+        cond:
+          $var:
+            name: s
+            path: /recipientApproved
+        then:
+        - $return:
+            changed: false
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $var: path
+          - /recipientApproved
+        val: true
+    - $call:
+        function: emit
+        args:
+          kind: Recipient Approved
+          detail: {}
+    - $return:
+        changed: true
+  initiate:
+    args:
+      transactionId:
+        type: Text
+    do:
+    - $call:
+        function: guarantor
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: transactionId
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: s
+        expr:
+          $document:
+            $var: path
+    - $failIf:
+        cond:
+          $not:
+            $var:
+              name: s
+              path: /accepted
+        message: Accept instruction before initiating transaction
+    - $if:
+        cond:
+          $ne:
+          - $var:
+              name: s
+              path: /transactionId
+          - ''
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: s
+                  path: /transactionId
+              - $var: transactionId
+            message: One instruction represents one transaction
+        - $return:
+            changed: false
+    - $let:
+        name: initiationGate
+        expr:
+          $pointerGet:
+            object:
+              $const: parameters
+            path: /initiationGate
+            default: ''
+    - $if:
+        cond:
+          $ne:
+          - $var: initiationGate
+          - ''
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $var: initiationGate
+              - true
+            message: PAYMENT_INITIATION_NOT_READY
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $var: path
+          - /transactionId
+        val:
+          $var: transactionId
+    - $call:
+        function: emit
+        args:
+          kind: Transaction Initiated
+          detail:
+            transactionId:
+              $var: transactionId
+    - $return:
+        changed: true
+  request:
+    args:
+      action:
+        type: Text
+      input: {}
+    do:
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: s
+        expr:
+          $document:
+            $var: path
+    - $let:
+        name: id
+        expr:
+          $var:
+            name: input
+            path: /requestId
+    - $let:
+        name: amount
+        expr:
+          $var:
+            name: input
+            path: /amountMinor
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: id
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $includes:
+                list:
+                - secure
+                - capture
+                - refund
+                - void
+                val:
+                  $var: action
+            - $isKind:
+                val:
+                  $var: amount
+                kind: integer
+            - $gt:
+              - $var: amount
+              - 0
+            - $lte:
+              - $var: amount
+              - 1000000000000
+        message: Positive integral amount and supported action required
+    - $let:
+        name: intent
+        expr:
+          action:
+            $var: action
+          amountMinor:
+            $var: amount
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $var:
+                name: s
+                path: /requests
+            key:
+              $var: id
+    - $if:
+        cond:
+          $exists:
+            $var: previous
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: previous
+                  path: /intent
+              - $var: intent
+            message: Conflicting payment request identifier
+        - $return:
+            created: false
+            requestId:
+              $var: id
+    - $let:
+        name: captureGate
+        expr:
+          $pointerGet:
+            object:
+              $const: parameters
+            path: /captureGate
+            default: ''
+    - $failIf:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - capture
+          - $ne:
+            - $var: captureGate
+            - ''
+          - $ne:
+            - $document:
+                $var: captureGate
+            - true
+        message: 'CAPTURE_CONDITIONS_NOT_MET: mandatory PI policy applies to every capture route'
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $var:
+                name: s
+                path: /accepted
+            - $ne:
+              - $var:
+                  name: s
+                  path: /transactionId
+              - ''
+        message: Accepted and initiated transaction required
+    - $failIf:
+        cond:
+          $and:
+          - $var:
+              name: s
+              path: /closed
+          - $ne:
+            - $var: action
+            - refund
+        message: Further charges are closed
+    - $failIf:
+        cond:
+          $get:
+            object:
+              $var:
+                name: s
+                path: /locks
+            key:
+              $var: action
+        message: Requested action is locked by guarantor
+    - $let:
+        name: reserved
+        expr:
+          $var:
+            name: s
+            path: /reserved
+    - $failIf:
+        cond:
+          $and:
+          - $includes:
+              list:
+              - secure
+              - capture
+              val:
+                $var: action
+          - $gt:
+            - $var:
+                name: reserved
+                path: /void
+            - 0
+        message: Resolve pending void before further charges
+    - $let:
+        name: available
+        expr: 0
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - secure
+        then:
+        - $set:
+            name: available
+            expr:
+              $subtract:
+              - $var:
+                  name: s
+                  path: /targetMinor
+              - $add:
+                - $var:
+                    name: s
+                    path: /completed
+                - $var:
+                    name: s
+                    path: /secured
+                - $var:
+                    name: reserved
+                    path: /secure
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - capture
+        then:
+        - $failIf:
+            cond:
+              $or:
+              - $eq:
+                - $var:
+                    name: s
+                    path: /payeeChannel
+                - ''
+              - $and:
+                - $const:
+                    name: parameters
+                    path: /recipientApprovalRequired
+                - $not:
+                    $var:
+                      name: s
+                      path: /recipientApproved
+            message: Selected recipient approval required
+        - $set:
+            name: available
+            expr:
+              $subtract:
+              - $var:
+                  name: s
+                  path: /secured
+              - $add:
+                - $var:
+                    name: reserved
+                    path: /capture
+                - $var:
+                    name: reserved
+                    path: /void
+        - $failIf:
+            cond:
+              $gt:
+              - $add:
+                - $var: amount
+                - $var:
+                    name: s
+                    path: /completed
+                - $var:
+                    name: reserved
+                    path: /capture
+              - $var:
+                  name: s
+                  path: /targetMinor
+            message: Capture exceeds target amount
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - refund
+        then:
+        - $set:
+            name: available
+            expr:
+              $subtract:
+              - $var:
+                  name: s
+                  path: /completed
+              - $add:
+                - $var:
+                    name: s
+                    path: /reversed
+                - $var:
+                    name: reserved
+                    path: /refund
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - void
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $add:
+                - $var:
+                    name: reserved
+                    path: /secure
+                - $var:
+                    name: reserved
+                    path: /capture
+                - $var:
+                    name: reserved
+                    path: /void
+              - 0
+            message: Resolve pending authorization and capture before void
+        - $set:
+            name: available
+            expr:
+              $var:
+                name: s
+                path: /secured
+        - $failIf:
+            cond:
+              $ne:
+              - $var: amount
+              - $var: available
+            message: Void releases the entire remaining authorization
+    - $failIf:
+        cond:
+          $gt:
+          - $var: amount
+          - $var: available
+        message: Insufficient unreserved payment capacity
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var: path
+          - /requests/
+          - $var: id
+        val:
+          intent:
+            $var: intent
+          status: pending
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $var: path
+          - /reserved/
+          - $var: action
+        val:
+          $add:
+          - $get:
+              object:
+                $var: reserved
+              key:
+                $var: action
+          - $var: amount
+    - $call:
+        function: emit
+        args:
+          kind: Payment Requested
+          detail:
+            requestId:
+              $var: id
+            action:
+              $var: action
+            amountMinor:
+              $var: amount
+    - $return:
+        created: true
+        requestId:
+          $var: id
+  confirm:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: guarantor
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: s
+        expr:
+          $document:
+            $var: path
+    - $let:
+        name: id
+        expr:
+          $var:
+            name: input
+            path: /requestId
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: id
+    - $let:
+        name: outcome
+        expr:
+          $var:
+            name: input
+            path: /outcome
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - succeeded
+              - declined
+              - failed
+              - unknown
+              val:
+                $var: outcome
+        message: Unsupported guarantor outcome
+    - $let:
+        name: request
+        expr:
+          $get:
+            object:
+              $var:
+                name: s
+                path: /requests
+            key:
+              $var: id
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: request
+        message: Unknown payment request
+    - $let:
+        name: status
+        expr:
+          $var:
+            name: request
+            path: /status
+    - $if:
+        cond:
+          $eq:
+          - $var: status
+          - $var: outcome
+        then:
+        - $return:
+            changed: false
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - pending
+              - unknown
+              val:
+                $var: status
+        message: Conflicting terminal payment outcome
+    - $let:
+        name: action
+        expr:
+          $var:
+            name: request
+            path: /intent/action
+    - $let:
+        name: amount
+        expr:
+          $var:
+            name: request
+            path: /intent/amountMinor
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $var: path
+          - /requests/
+          - $var: id
+          - /status
+        val:
+          $var: outcome
+    - $if:
+        cond:
+          $ne:
+          - $var: outcome
+          - unknown
+        then:
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $var: path
+              - /reserved/
+              - $var: action
+            val:
+              $subtract:
+              - $get:
+                  object:
+                    $var:
+                      name: s
+                      path: /reserved
+                  key:
+                    $var: action
+              - $var: amount
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - succeeded
+        then:
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - secure
+            then:
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $var: path
+                  - /secured
+                val:
+                  $add:
+                  - $var:
+                      name: s
+                      path: /secured
+                  - $var: amount
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - capture
+            then:
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $var: path
+                  - /secured
+                val:
+                  $subtract:
+                  - $var:
+                      name: s
+                      path: /secured
+                  - $var: amount
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $var: path
+                  - /completed
+                val:
+                  $add:
+                  - $var:
+                      name: s
+                      path: /completed
+                  - $var: amount
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - refund
+            then:
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $var: path
+                  - /reversed
+                val:
+                  $add:
+                  - $var:
+                      name: s
+                      path: /reversed
+                  - $var: amount
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - void
+            then:
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $var: path
+                  - /secured
+                val: 0
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $var: path
+                  - /closed
+                val: true
+    - $call:
+        function: emit
+        args:
+          kind: Payment Outcome
+          detail:
+            requestId:
+              $var: id
+            action:
+              $var: action
+            amountMinor:
+              $var: amount
+            outcome:
+              $var: outcome
+    - $return:
+        changed: true
+  configure:
+    args:
+      action:
+        type: Text
+      input: {}
+    do:
+    - $call:
+        function: guarantor
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: s
+        expr:
+          $document:
+            $var: path
+    - $failIf:
+        cond:
+          $var:
+            name: s
+            path: /rejected
+        message: Rejected instruction cannot be changed
+    - $let:
+        name: field
+        expr: ''
+    - $let:
+        name: nextValue
+        expr: {}
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - lock
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $includes:
+                    list:
+                    - capture
+                    - refund
+                    - details
+                    val:
+                      $var:
+                        name: input
+                        path: /action
+                - $isKind:
+                    val:
+                      $var:
+                        name: input
+                        path: /locked
+                    kind: boolean
+            message: Unsupported payment lock
+        - $set:
+            name: field
+            expr:
+              $concat:
+              - locks/
+              - $var:
+                  name: input
+                  path: /action
+        - $set:
+            name: nextValue
+            expr:
+              $var:
+                name: input
+                path: /locked
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - finalAmount
+        then:
+        - $set:
+            name: nextValue
+            expr:
+              $var:
+                name: input
+                path: /amountMinor
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: nextValue
+                    kind: integer
+                - $gte:
+                  - $var: nextValue
+                  - $add:
+                    - $var:
+                        name: s
+                        path: /completed
+                    - $var:
+                        name: s
+                        path: /reserved/capture
+                - $lte:
+                  - $var: nextValue
+                  - $const:
+                      name: parameters
+                      path: /limitMinor
+            message: Final amount outside approved limits or pending capture
+        - $failIf:
+            cond:
+              $and:
+              - $var:
+                  name: s
+                  path: /finalResolved
+              - $ne:
+                - $var: nextValue
+                - $var:
+                    name: s
+                    path: /targetMinor
+            message: Final amount already resolved
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $var: path
+              - /finalResolved
+            val: true
+        - $set:
+            name: field
+            expr: targetMinor
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - payee
+        then:
+        - $set:
+            name: nextValue
+            expr:
+              $var:
+                name: input
+                path: /channel
+        - $call:
+            function: key
+            args:
+              candidate:
+                $var: nextValue
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $includes:
+                    list:
+                      $const:
+                        name: parameters
+                        path: /allowedPayees
+                    val:
+                      $var: nextValue
+                - $exists:
+                    $document:
+                      $concat:
+                      - /contracts/
+                      - $var: nextValue
+                - $eq:
+                  - $add:
+                    - $var:
+                        name: s
+                        path: /completed
+                    - $var:
+                        name: s
+                        path: /reserved/capture
+                  - 0
+            message: Payee must be predeclared and selected before capture
+        - $if:
+            cond:
+              $ne:
+              - $var: nextValue
+              - $var:
+                  name: s
+                  path: /payeeChannel
+            then:
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $var: path
+                  - /recipientApproved
+                val: false
+        - $set:
+            name: field
+            expr: payeeChannel
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - details
+        then:
+        - $failIf:
+            cond:
+              $var:
+                name: s
+                path: /locks/details
+            message: Payment details are locked
+        - $set:
+            name: field
+            expr: details
+        - $set:
+            name: nextValue
+            expr:
+              $var:
+                name: input
+                path: /details
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: nextValue
+                  kind: object
+            message: Payment details must be an object
+    - $failIf:
+        cond:
+          $eq:
+          - $var: field
+          - ''
+        message: Unsupported payment configuration
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $var: path
+          - /
+          - $var: field
+        val:
+          $var: nextValue
+    - $call:
+        function: emit
+        args:
+          kind: Payment Configuration Confirmed
+          detail:
+            action:
+              $var: action
+            newValue:
+              $var: nextValue
+    - $return:
+        changed: true

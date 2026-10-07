@@ -1,0 +1,69 @@
+name: Delivery Instructions Functions
+type: Contracts/Compute Definition
+functions:
+  amend:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: s
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /text
+    - $let:
+        name: newValue
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /text
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: newValue
+              kind: text
+        message: TEXT_REQUIRED
+    - $if:
+        cond:
+          $eq:
+          - $var: s
+          - $var: newValue
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $const:
+                  name: parameters
+                  path: /editableStates
+              val:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /lifecycle
+        message: INSTRUCTIONS_FROZEN
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /text
+        val:
+          $var: newValue
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Instructions Changed
+          clause:
+            $const: clauseKey
+          text:
+            $var: newValue
+    - $return:
+        outcome: acceptedNew

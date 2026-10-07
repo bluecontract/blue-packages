@@ -1,0 +1,149 @@
+name: Activation Functions
+type: Contracts/Compute Definition
+functions:
+  initialize:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $exists:
+            $document:
+              $const:
+                name: bindings
+                path: /state
+        message: STATE_ALREADY_EXISTS
+    - $appendChange:
+        op: add
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          revision:
+            $const:
+              name: parameters
+              path: /revision
+          approved: {}
+          active: false
+    - $return:
+        outcome: acceptedNew
+  approve:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: s
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /state
+    - $let:
+        name: role
+        expr:
+          $binding: call/channel
+    - $failIf:
+        cond:
+          $ne:
+          - $const: sourceMode
+          - workflow
+        message: APPROVAL_REQUIRES_PARTICIPANT
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $const:
+                  name: parameters
+                  path: /required
+              val:
+                $var: role
+        message: NOT_AN_APPROVER
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /revision
+          - $pointerGet:
+              object:
+                $var: s
+              path: /revision
+        message: STALE_TERMS_REVISION
+    - $if:
+        cond:
+          $eq:
+          - $get:
+              object:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /approved
+              key:
+                $var: role
+          - true
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: approved
+        expr:
+          $objectSet:
+            object:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /approved
+            key:
+              $var: role
+            val: true
+    - $let:
+        name: active
+        expr: true
+    - $forEach:
+        item: required
+        in:
+          $const:
+            name: parameters
+            path: /required
+        do:
+        - $if:
+            cond:
+              $ne:
+              - $get:
+                  object:
+                    $var: approved
+                  key:
+                    $var: required
+              - true
+            then:
+            - $set:
+                name: active
+                expr: false
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          $merge:
+          - $var: s
+          - approved:
+              $var: approved
+            active:
+              $var: active
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Terms Accepted
+          clause:
+            $const: clauseKey
+          participant:
+            $var: role
+          active:
+            $var: active
+    - $return:
+        outcome: acceptedNew

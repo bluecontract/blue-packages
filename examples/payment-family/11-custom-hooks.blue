@@ -1,0 +1,393 @@
+name: Custom capture with preparation and accepted-new effects
+type: Orders/Order with Clauses
+amountMinor: 10000
+status: Open
+acceptance: Pending
+instructions: Use the main entrance
+financial:
+  captured: 0
+  refunded: 0
+  net: 0
+delivery:
+  name: Provider delivery evidence
+  type: DocumentsDomain/Document with Clauses
+  status: Open
+  clauses:
+    progress:
+      type: State/State Machine Clause
+      parameters:
+        subject: Delivery
+        transitions:
+          Open:
+          - Delivered
+          - Failed
+          Delivered:
+          - Failed
+      bindings:
+        state: /status
+        transition:
+          deliver:
+            'on': workflow
+            channel: carrier
+            params:
+              to: Delivered
+          failDelivery:
+            'on': workflow
+            channel: carrier
+            params:
+              to: Failed
+              reason:
+                $var:
+                  name: trigger
+                  path: /reason
+  contracts:
+    carrier:
+      type: Contracts/External Channel
+      event:
+        source: carrier
+paymentTemplate:
+  name: Conditional Payment Instruction
+  type: PaymentInstruction/Payment Instruction
+  clauses:
+    payment:
+      type: PaymentInstruction/Payment Lifecycle Clause
+      parameters:
+        currency: EUR
+        amountMinor: 10000
+        limitMinor: 10000
+        payerChannel: customer
+        payeeChannel: seller
+        guarantorChannel: guarantor
+        allowedPayees:
+        - seller
+        recipientApprovalRequired: false
+        required:
+        - delivered
+        - accepted
+        captureGate: /policy/eligible
+        autoCapture: false
+        windowMs: 604800000
+      bindings:
+        state: /payment
+        accept:
+          accept:
+            'on': workflow
+            channel: guarantor
+        reject:
+          reject:
+            'on': workflow
+            channel: guarantor
+        initiate:
+          initiate:
+            'on': workflow
+            channel: guarantor
+            params:
+              transactionId:
+                $var:
+                  name: trigger
+                  path: /transactionId
+        approveRecipient:
+          approveRecipient:
+            'on': workflow
+            channel: seller
+        confirm:
+          confirm:
+            'on': workflow
+            channel: guarantor
+            params:
+              requestId:
+                $var:
+                  name: trigger
+                  path: /requestId
+              outcome:
+                $var:
+                  name: trigger
+                  path: /outcome
+        requestCapture:
+          capture:
+            'on': workflow
+            channel: customer
+            params:
+              requestId:
+                $var:
+                  name: trigger
+                  path: /requestId
+              amountMinor:
+                $var:
+                  name: trigger
+                  path: /requestedMinor
+            before:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: params
+                            path: /amountMinor
+                        kind: integer
+                    - $gt:
+                      - $var:
+                          name: params
+                          path: /amountMinor
+                      - 0
+                    - $lte:
+                      - $var:
+                          name: params
+                          path: /amountMinor
+                      - 10000
+                message: CAPTURE_OUTSIDE_LOCAL_LIMIT
+            after:
+            - $appendChange:
+                op: replace
+                path: /captureNoticeCount
+                val:
+                  $add:
+                  - $document: /captureNoticeCount
+                  - 1
+            - $appendChange:
+                op: replace
+                path: /lastCaptureNote
+                val:
+                  $pointerGet:
+                    object:
+                      $var: trigger
+                    path: /note
+                    default: ''
+            - $failIf:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $var: trigger
+                      path: /abortAfter
+                      default: false
+                  - true
+                message: DELIBERATE_AFTER_FAILURE
+            - $appendEvent:
+                $merge:
+                - type: Commerce/Domain Event
+                - kind: Capture Request Recorded
+                  clause:
+                    $const: clauseKey
+                  amountMinor:
+                    $var:
+                      name: params
+                      path: /amountMinor
+        requestRefund:
+          refund:
+            'on': workflow
+            channel: seller
+            params:
+              requestId:
+                $var:
+                  name: trigger
+                  path: /requestId
+              amountMinor:
+                $var:
+                  name: trigger
+                  path: /amountMinor
+    decision:
+      type: PaymentInstruction/Conditional Policy
+      parameters:
+        currency: EUR
+        amountMinor: 10000
+        limitMinor: 10000
+        payerChannel: customer
+        payeeChannel: seller
+        guarantorChannel: guarantor
+        allowedPayees:
+        - seller
+        recipientApprovalRequired: false
+        required:
+        - delivered
+        - accepted
+        captureGate: /policy/eligible
+        autoCapture: false
+        windowMs: 604800000
+      bindings:
+        record:
+          deliveredInitial:
+            'on': initialized
+            once: true
+            params:
+              fact: delivered
+              confirmed:
+                $eq:
+                - $document: /sources/delivery/status
+                - Delivered
+          deliveredChanged:
+            'on': embedded
+            path: /sources/delivery
+            params:
+              fact: delivered
+              confirmed:
+                $eq:
+                - $document: /sources/delivery/status
+                - Delivered
+          acceptedInitial:
+            'on': initialized
+            once: true
+            params:
+              fact: accepted
+              confirmed:
+                $eq:
+                - $document: /sources/order/acceptance
+                - Accepted
+          acceptedChanged:
+            'on': embedded
+            path: /sources/order
+            params:
+              fact: accepted
+              confirmed:
+                $eq:
+                - $document: /sources/order/acceptance
+                - Accepted
+        fail:
+          failedOrder:
+            'on': embedded
+            path: /sources/order
+            event:
+              type: Commerce/Domain Event
+              kind: Order Failed
+              reason: abc
+        retry:
+          retryPayment:
+            'on': workflow
+            channel: guarantor
+            params:
+              requestId:
+                $var:
+                  name: trigger
+                  path: /requestId
+  contracts:
+    customer:
+      type: Contracts/External Channel
+      event:
+        source: customer
+    seller:
+      type: Contracts/External Channel
+      event:
+        source: seller
+    guarantor:
+      type: Contracts/External Channel
+      event:
+        source: guarantor
+  captureNoticeCount: 0
+  lastCaptureNote: ''
+clauses:
+  acceptance:
+    type: State/State Machine Clause
+    parameters:
+      subject: Acceptance
+      transitions:
+        Pending:
+        - Accepted
+        - Declined
+    bindings:
+      state: /acceptance
+      transition:
+        acceptDelivery:
+          'on': workflow
+          channel: customer
+          params:
+            to: Accepted
+        declineDelivery:
+          'on': workflow
+          channel: customer
+          params:
+            to: Declined
+  lifecycle:
+    type: State/State Machine Clause
+    parameters:
+      subject: Order
+      transitions:
+        Open:
+        - Failed
+        - Completed
+        Completed:
+        - Failed
+    bindings:
+      state: /status
+      transition:
+        reportOrderFailed:
+          'on': workflow
+          channel: seller
+          params:
+            to: Failed
+            reason:
+              $var:
+                name: trigger
+                path: /reason
+        completeWhenEligible:
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Order Completion Eligible
+          params:
+            to: Completed
+  instructions:
+    type: Features/Delivery Instructions Clause
+    parameters:
+      editableStates:
+      - Open
+    bindings:
+      text: /instructions
+      lifecycle: /delivery/status
+      amend:
+        changeInstructions:
+          'on': workflow
+          channel: customer
+          params:
+            text:
+              $var:
+                name: trigger
+                path: /text
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      hostSource: order
+      sourcePaths:
+        delivery: /delivery
+      amountPath: /amountMinor
+    bindings:
+      template: /paymentTemplate
+      instruction: /payment
+      initPayment:
+        startPayment:
+          'on': workflow
+          channel: seller
+  summary:
+    type: Referrals/Order Summary Clause
+    bindings:
+      update:
+        paymentChanged:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+        acceptanceChanged:
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Acceptance Accepted
+        deliveryChanged:
+          'on': embedded
+          path: /delivery
+contracts:
+  customer:
+    type: Contracts/External Channel
+    event:
+      source: customer
+  seller:
+    type: Contracts/External Channel
+    event:
+      source: seller
+  carrier:
+    type: Contracts/External Channel
+    event:
+      source: carrier
+  guarantor:
+    type: Contracts/External Channel
+    event:
+      source: guarantor

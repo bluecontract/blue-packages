@@ -1,0 +1,820 @@
+name: Listener Clause
+type: Clauses/Clause
+description: 'Runs either a workflow steps list or the legacy do body. Steps receive a scoped Listener Delivery:
+  $event /input is the original native event, /source is the source name. Embedded sources are constrained by bindings.context.
+  External sources are coalesced. Choose steps or do, never both.'
+hookAbi: document-context-1
+transitionUnconditional: true
+hookDefinition:
+  type: Contracts/Compute Definition
+  functions:
+    validateConfiguration:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $if:
+          cond:
+            $not:
+              $and:
+              - $isKind:
+                  val:
+                    $var:
+                      name: p
+                      path: /sources
+                  kind: list
+              - $gt:
+                - $size:
+                    $var:
+                      name: p
+                      path: /sources
+                - 0
+              - $or:
+                - $and:
+                  - $hasKey:
+                      object:
+                        $var: p
+                      key: do
+                  - $isKind:
+                      val:
+                        $var:
+                          name: p
+                          path: /do
+                      kind: list
+                  - $not:
+                      $hasKey:
+                        object:
+                          $var: p
+                        key: steps
+                - $and:
+                  - $hasKey:
+                      object:
+                        $var: p
+                      key: steps
+                  - $isKind:
+                      val:
+                        $var:
+                          name: p
+                          path: /steps
+                      kind: list
+                  - $not:
+                      $hasKey:
+                        object:
+                          $var: p
+                        key: do
+              - $or:
+                - $not:
+                    $hasKey:
+                      object:
+                        $var: b
+                      key: context
+                - $and:
+                  - $isKind:
+                      val:
+                        $var:
+                          name: b
+                          path: /context
+                      kind: text
+                  - $startsWith:
+                    - $var:
+                        name: b
+                        path: /context
+                    - /
+                  - $and:
+                    - $isKind:
+                        val:
+                          $sliceAfter:
+                          - $var:
+                              name: b
+                              path: /context
+                          - /
+                        kind: text
+                    - $ne:
+                      - $sliceAfter:
+                        - $var:
+                            name: b
+                            path: /context
+                        - /
+                      - ''
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $sliceAfter:
+                              - $var:
+                                  name: b
+                                  path: /context
+                              - /
+                            separator: /
+                      - 1
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $sliceAfter:
+                              - $var:
+                                  name: b
+                                  path: /context
+                              - /
+                            separator: '~'
+                      - 1
+          then:
+          - $return:
+              allowed: false
+              code: INVALID_LISTENER_CONFIGURATION
+      - $forEach:
+          item: channel
+          in:
+            $var:
+              name: p
+              path: /sources
+          do:
+          - $let:
+              name: source
+              expr:
+                $var:
+                  name: channel
+                  path: /name
+          - $if:
+              cond:
+                $not:
+                  $and:
+                  - $and:
+                    - $isKind:
+                        val:
+                          $var: source
+                        kind: text
+                    - $ne:
+                      - $var: source
+                      - ''
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $var: source
+                            separator: /
+                      - 1
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $var: source
+                            separator: '~'
+                      - 1
+                  - $is:
+                      node:
+                        $var: channel
+                      pattern:
+                        type: Contracts/Channel
+              then:
+              - $return:
+                  allowed: false
+                  code: INVALID_LISTENER_SOURCE
+      - $if:
+          cond:
+            $hasKey:
+              object:
+                $var: p
+              key: reactions
+          then:
+          - $if:
+              cond:
+                $not:
+                  $and:
+                  - $hasKey:
+                      object:
+                        $var: p
+                      key: steps
+                  - $isKind:
+                      val:
+                        $var:
+                          name: p
+                          path: /reactions
+                      kind: object
+              then:
+              - $return:
+                  allowed: false
+                  code: INVALID_LISTENER_REACTIONS
+          - $forEach:
+              item: reaction
+              in:
+                $keys:
+                  $var:
+                    name: p
+                    path: /reactions
+              do:
+              - $if:
+                  cond:
+                    $not:
+                      $and:
+                      - $and:
+                        - $isKind:
+                            val:
+                              $var: reaction
+                            kind: text
+                        - $ne:
+                          - $var: reaction
+                          - ''
+                        - $eq:
+                          - $size:
+                              $split:
+                                text:
+                                  $var: reaction
+                                separator: /
+                          - 1
+                        - $eq:
+                          - $size:
+                              $split:
+                                text:
+                                  $var: reaction
+                                separator: '~'
+                          - 1
+                      - $isKind:
+                          val:
+                            $get:
+                              object:
+                                $var:
+                                  name: p
+                                  path: /reactions
+                              key:
+                                $var: reaction
+                          kind: list
+                  then:
+                  - $return:
+                      allowed: false
+                      code: INVALID_LISTENER_REACTION_STEPS
+      - $return:
+          allowed: true
+          code: ''
+    validateTransition:
+      args: {}
+      do:
+      - $return:
+          allowed: true
+          code: ''
+    plan:
+      args: {}
+      do:
+      - $let:
+          name: p
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /parameters
+              default: {}
+      - $let:
+          name: b
+          expr:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+              path: /bindings
+              default: {}
+      - $if:
+          cond:
+            $hasKey:
+              object:
+                $var: p
+              key: steps
+          then:
+          - $let:
+              name: prefix
+              expr:
+                $concat:
+                - listener_
+                - $const: clauseKey
+                - _
+          - $let:
+              name: contributions
+              expr: {}
+          - $let:
+              name: externalKeys
+              expr: []
+          - $forEach:
+              item: channel
+              in:
+                $var:
+                  name: p
+                  path: /sources
+              do:
+              - $let:
+                  name: source
+                  expr:
+                    $var:
+                      name: channel
+                      path: /name
+              - $let:
+                  name: key
+                  expr:
+                    $concat:
+                    - $var: prefix
+                    - Source_
+                    - $var: source
+              - $set:
+                  name: contributions
+                  expr:
+                    $objectSet:
+                      object:
+                        $var: contributions
+                      key:
+                        $var: key
+                      val:
+                        kind: channel
+                        contract:
+                          $var: channel
+              - $if:
+                  cond:
+                    $or:
+                    - $is:
+                        node:
+                          $var: channel
+                        pattern:
+                          type: Contracts/External Channel
+                    - $is:
+                        node:
+                          $var: channel
+                        pattern:
+                          type: Contracts/Composite External Channels
+                    - $is:
+                        node:
+                          $var: channel
+                        pattern:
+                          type: Contracts/All External Channels
+                    - $is:
+                        node:
+                          $var: channel
+                        pattern:
+                          type: Coordination/Timeline Channel
+                  then:
+                  - $set:
+                      name: externalKeys
+                      expr:
+                        $listConcat:
+                        - $var: externalKeys
+                        - - $var: key
+                  else:
+                  - $set:
+                      name: contributions
+                      expr:
+                        $objectSet:
+                          object:
+                            $var: contributions
+                          key:
+                            $concat:
+                            - $var: key
+                            - Handle
+                          val:
+                            kind: handler
+                            contract:
+                              $merge:
+                              - type: Contracts/Sequential Workflow
+                              - channel:
+                                  $var: key
+                                steps:
+                                - $merge:
+                                  - type: Clauses/Dispatch Listener Step
+                                  - constants:
+                                      listenerKey:
+                                        $const: clauseKey
+                                      source:
+                                        $var: source
+                                      context:
+                                        $choose:
+                                          cond:
+                                            $is:
+                                              node:
+                                                $var: channel
+                                              pattern:
+                                                type: Contracts/Embedded Node Channel
+                                          then:
+                                            $pointerGet:
+                                              object:
+                                                $var: b
+                                              path: /context
+                                              default: ''
+                                          else: ''
+          - $if:
+              cond:
+                $gt:
+                - $size:
+                    $var: externalKeys
+                - 0
+              then:
+              - $let:
+                  name: union
+                  expr:
+                    $concat:
+                    - $var: prefix
+                    - External
+              - $set:
+                  name: contributions
+                  expr:
+                    $objectSet:
+                      object:
+                        $var: contributions
+                      key:
+                        $var: union
+                      val:
+                        kind: channel
+                        contract:
+                          $merge:
+                          - type: Contracts/Composite External Channels
+                          - channels:
+                              $var: externalKeys
+              - $set:
+                  name: contributions
+                  expr:
+                    $objectSet:
+                      object:
+                        $var: contributions
+                      key:
+                        $concat:
+                        - $var: union
+                        - Handle
+                      val:
+                        kind: handler
+                        contract:
+                          $merge:
+                          - type: Contracts/Sequential Workflow
+                          - channel:
+                              $var: union
+                            steps:
+                            - $merge:
+                              - type: Clauses/Dispatch Listener Step
+                              - constants:
+                                  listenerKey:
+                                    $const: clauseKey
+                                  source: external
+                                  context: ''
+          - $set:
+              name: contributions
+              expr:
+                $objectSet:
+                  object:
+                    $var: contributions
+                  key:
+                    $concat:
+                    - $var: prefix
+                    - Delivery
+                  val:
+                    kind: channel
+                    contract:
+                      $merge:
+                      - type: Contracts/Triggered Event Channel
+                      - event:
+                          $merge:
+                          - type: Clauses/Listener Delivery
+                          - listenerKey:
+                              $const: clauseKey
+          - $if:
+              cond:
+                $hasKey:
+                  object:
+                    $var: p
+                  key: reactions
+              then:
+              - $forEach:
+                  item: reaction
+                  in:
+                    $keys:
+                      $var:
+                        name: p
+                        path: /reactions
+                  do:
+                  - $set:
+                      name: contributions
+                      expr:
+                        $objectSet:
+                          object:
+                            $var: contributions
+                          key:
+                            $concat:
+                            - $var: prefix
+                            - Steps_
+                            - $var: reaction
+                          val:
+                            kind: handler
+                            contract:
+                              $merge:
+                              - type: Contracts/Sequential Workflow
+                              - channel:
+                                  $concat:
+                                  - $var: prefix
+                                  - Delivery
+                                event:
+                                  source:
+                                    $var: reaction
+                                steps:
+                                  $get:
+                                    object:
+                                      $var:
+                                        name: p
+                                        path: /reactions
+                                    key:
+                                      $var: reaction
+              else:
+              - $set:
+                  name: contributions
+                  expr:
+                    $objectSet:
+                      object:
+                        $var: contributions
+                      key:
+                        $concat:
+                        - $var: prefix
+                        - Steps
+                      val:
+                        kind: handler
+                        contract:
+                          $merge:
+                          - type: Contracts/Sequential Workflow
+                          - channel:
+                              $concat:
+                              - $var: prefix
+                              - Delivery
+                            steps:
+                              $var:
+                                name: p
+                                path: /steps
+          - $return:
+              contracts:
+                $var: contributions
+              states:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /states
+                  default: {}
+              reads:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /reads
+                  default: []
+      - $let:
+          name: prefix
+          expr:
+            $concat:
+            - listener_
+            - $const: clauseKey
+            - _
+      - $let:
+          name: contributions
+          expr: {}
+      - $let:
+          name: externalKeys
+          expr: []
+      - $set:
+          name: contributions
+          expr:
+            $objectSet:
+              object:
+                $var: contributions
+              key:
+                $concat:
+                - $var: prefix
+                - Body
+              val:
+                kind: definition
+                contract:
+                  $merge:
+                  - type: Contracts/Compute Definition
+                  - functions:
+                      run:
+                        args: {}
+                        do:
+                          $listConcat:
+                          - $literal:
+                            - $if:
+                                cond:
+                                  $ne:
+                                  - $const: context
+                                  - ''
+                                then:
+                                - $if:
+                                    cond:
+                                      $not:
+                                        $startsWith:
+                                        - $event: /sourcePath
+                                        - $concat:
+                                          - $const: context
+                                          - /
+                                    then:
+                                    - $return: {}
+                          - $var:
+                              name: p
+                              path: /do
+      - $forEach:
+          item: channel
+          in:
+            $var:
+              name: p
+              path: /sources
+          do:
+          - $let:
+              name: source
+              expr:
+                $var:
+                  name: channel
+                  path: /name
+          - $let:
+              name: key
+              expr:
+                $concat:
+                - $var: prefix
+                - Source_
+                - $var: source
+          - $set:
+              name: contributions
+              expr:
+                $objectSet:
+                  object:
+                    $var: contributions
+                  key:
+                    $var: key
+                  val:
+                    kind: channel
+                    contract:
+                      $var: channel
+          - $if:
+              cond:
+                $or:
+                - $is:
+                    node:
+                      $var: channel
+                    pattern:
+                      type: Contracts/External Channel
+                - $is:
+                    node:
+                      $var: channel
+                    pattern:
+                      type: Contracts/Composite External Channels
+                - $is:
+                    node:
+                      $var: channel
+                    pattern:
+                      type: Contracts/All External Channels
+                - $is:
+                    node:
+                      $var: channel
+                    pattern:
+                      type: Coordination/Timeline Channel
+              then:
+              - $set:
+                  name: externalKeys
+                  expr:
+                    $listConcat:
+                    - $var: externalKeys
+                    - - $var: key
+              else:
+              - $set:
+                  name: contributions
+                  expr:
+                    $objectSet:
+                      object:
+                        $var: contributions
+                      key:
+                        $concat:
+                        - $var: key
+                        - Handle
+                      val:
+                        kind: handler
+                        contract:
+                          $merge:
+                          - type: Contracts/Sequential Workflow
+                          - channel:
+                              $var: key
+                            steps:
+                            - $merge:
+                              - type: Contracts/Compute
+                              - definition:
+                                  $concat:
+                                  - /contracts/
+                                  - $var: prefix
+                                  - Body
+                                constants:
+                                  source:
+                                    $var: source
+                                  context:
+                                    $choose:
+                                      cond:
+                                        $is:
+                                          node:
+                                            $var: channel
+                                          pattern:
+                                            type: Contracts/Embedded Node Channel
+                                      then:
+                                        $pointerGet:
+                                          object:
+                                            $var: b
+                                          path: /context
+                                          default: ''
+                                      else: ''
+                                do:
+                                  $literal:
+                                  - $call:
+                                      function: run
+                                      args: {}
+      - $if:
+          cond:
+            $gt:
+            - $size:
+                $var: externalKeys
+            - 0
+          then:
+          - $let:
+              name: union
+              expr:
+                $concat:
+                - $var: prefix
+                - External
+          - $set:
+              name: contributions
+              expr:
+                $objectSet:
+                  object:
+                    $var: contributions
+                  key:
+                    $var: union
+                  val:
+                    kind: channel
+                    contract:
+                      $merge:
+                      - type: Contracts/Composite External Channels
+                      - channels:
+                          $var: externalKeys
+          - $set:
+              name: contributions
+              expr:
+                $objectSet:
+                  object:
+                    $var: contributions
+                  key:
+                    $concat:
+                    - $var: union
+                    - Handle
+                  val:
+                    kind: handler
+                    contract:
+                      $merge:
+                      - type: Contracts/Sequential Workflow
+                      - channel:
+                          $var: union
+                        steps:
+                        - $merge:
+                          - type: Contracts/Compute
+                          - definition:
+                              $concat:
+                              - /contracts/
+                              - $var: prefix
+                              - Body
+                            constants:
+                              source: external
+                              context: ''
+                            do:
+                              $literal:
+                              - $call:
+                                  function: run
+                                  args: {}
+      - $return:
+          contracts:
+            $var: contributions
+          states:
+            $pointerGet:
+              object:
+                $var: p
+              path: /states
+              default: {}
+          reads:
+            $pointerGet:
+              object:
+                $var: p
+              path: /reads
+              default: []

@@ -1,0 +1,225 @@
+description: Contributes explicitly configured participant channels.
+name: Participants Clause
+type: Clauses/Clause
+hookDefinition:
+  type: Contracts/Compute Definition
+  functions:
+    plan:
+      args: {}
+      do:
+      - $let:
+          expr: {}
+          name: contributions
+      - $forEach:
+          do:
+          - $set:
+              expr:
+                $objectSet:
+                  object:
+                    $var: contributions
+                  key:
+                    $var: party
+                  val:
+                    contract:
+                      $pointerGet:
+                        object:
+                          $get:
+                            key:
+                              $var: party
+                            object:
+                              $pointerGet:
+                                object:
+                                  $pointerGet:
+                                    default: {}
+                                    object:
+                                      $document: /clauseRuntime/work/candidate
+                                    path:
+                                      $concat:
+                                      - /
+                                      - $const: clauseKey
+                                path: /parameters/participants
+                        path: /channel
+                    kind: channel
+              name: contributions
+          in:
+            $keys:
+              $pointerGet:
+                object:
+                  $pointerGet:
+                    default: {}
+                    object:
+                      $document: /clauseRuntime/work/candidate
+                    path:
+                      $concat:
+                      - /
+                      - $const: clauseKey
+                path: /parameters/participants
+          item: party
+      - $return:
+          contracts:
+            $var: contributions
+          reads: []
+          states: {}
+    validateConfiguration:
+      args: {}
+      do:
+      - $if:
+          cond:
+            $not:
+              $isKind:
+                kind: object
+                val:
+                  $pointerGet:
+                    object:
+                      $pointerGet:
+                        default: {}
+                        object:
+                          $document: /clauseRuntime/work/candidate
+                        path:
+                          $concat:
+                          - /
+                          - $const: clauseKey
+                    path: /parameters/participants
+          then:
+          - $return:
+              allowed: false
+              code: PARTICIPANTS_REQUIRED
+      - $let:
+          expr: {}
+          name: seen
+      - $forEach:
+          do:
+          - $if:
+              cond:
+                $not:
+                  $and:
+                  - $isKind:
+                      kind: text
+                      val:
+                        $var: party
+                  - $ne:
+                    - $var: party
+                    - ''
+                  - $eq:
+                    - $size:
+                        $split:
+                          separator: /
+                          text:
+                            $var: party
+                    - 1
+                  - $eq:
+                    - $size:
+                        $split:
+                          separator: '~'
+                          text:
+                            $var: party
+                    - 1
+              then:
+              - $return:
+                  allowed: false
+                  code: INVALID_PARTICIPANT_KEY
+          - $let:
+              expr:
+                $get:
+                  key:
+                    $var: party
+                  object:
+                    $pointerGet:
+                      object:
+                        $pointerGet:
+                          default: {}
+                          object:
+                            $document: /clauseRuntime/work/candidate
+                          path:
+                            $concat:
+                            - /
+                            - $const: clauseKey
+                      path: /parameters/participants
+              name: participant
+          - $if:
+              cond:
+                $not:
+                  $isKind:
+                    kind: text
+                    val:
+                      $var:
+                        name: participant
+                        path: /name
+              then:
+              - $return:
+                  allowed: false
+                  code: PARTICIPANT_NAME_REQUIRED
+          - $if:
+              cond:
+                $not:
+                  $or:
+                  - $is:
+                      node:
+                        $var:
+                          name: participant
+                          path: /channel
+                      pattern:
+                        type: Contracts/External Channel
+                  - $is:
+                      node:
+                        $var:
+                          name: participant
+                          path: /channel
+                      pattern:
+                        type: Coordination/Timeline Channel
+              then:
+              - $return:
+                  allowed: false
+                  code: EXTERNAL_CHANNEL_REQUIRED
+          - $let:
+              expr:
+                $nodeBlueId:
+                  $var:
+                    name: participant
+                    path: /channel
+              name: channelId
+          - $if:
+              cond:
+                $hasKey:
+                  key:
+                    $var: channelId
+                  object:
+                    $var: seen
+              then:
+              - $return:
+                  allowed: false
+                  code: PARTICIPANTS_REQUIRE_DISTINCT_CHANNELS
+          - $set:
+              expr:
+                $objectSet:
+                  object:
+                    $var: seen
+                  key:
+                    $var: channelId
+                  val: true
+              name: seen
+          in:
+            $keys:
+              $pointerGet:
+                object:
+                  $pointerGet:
+                    default: {}
+                    object:
+                      $document: /clauseRuntime/work/candidate
+                    path:
+                      $concat:
+                      - /
+                      - $const: clauseKey
+                path: /parameters/participants
+          item: party
+      - $return:
+          allowed: true
+          code: ''
+    validateTransition:
+      args: {}
+      do:
+      - $return:
+          allowed: true
+          code: ''
+transitionUnconditional: true
+hookAbi: document-context-1

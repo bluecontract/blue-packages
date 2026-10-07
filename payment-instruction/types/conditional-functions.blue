@@ -1,0 +1,798 @@
+name: Conditional Policy Functions
+type: PaymentInstruction/Payment Functions
+functions:
+  initializePolicy:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $exists:
+            $document: /policy
+        message: POLICY_STATE_ALREADY_EXISTS
+    - $let:
+        name: facts
+        expr: {}
+    - $forEach:
+        item: key
+        in:
+          $const:
+            name: parameters
+            path: /required
+        do:
+        - $set:
+            name: facts
+            expr:
+              $objectSet:
+                object:
+                  $var: facts
+                key:
+                  $var: key
+                val: false
+    - $appendChange:
+        op: add
+        path: /policy
+        val:
+          facts:
+            $var: facts
+          eligible: false
+          failed: false
+          deadline: 0
+          serial: 0
+          retries: {}
+          status: AwaitingAuthorization
+          retriedFailures: {}
+    - $return:
+        outcome: acceptedNew
+  recordEvidence:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: p
+        expr:
+          $document: /policy
+    - $let:
+        name: key
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /fact
+    - $let:
+        name: newValue
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /confirmed
+            default: true
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /facts
+              key:
+                $var: key
+        message: UNKNOWN_EVIDENCE_PORT
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: newValue
+              kind: boolean
+        message: EVIDENCE_MUST_BE_BOOLEAN
+    - $if:
+        cond:
+          $eq:
+          - $get:
+              object:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /facts
+              key:
+                $var: key
+          - $var: newValue
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $and:
+          - $eq:
+            - $const: sourceMode
+            - workflow
+          - $and:
+            - $var: newValue
+            - $or:
+              - $pointerGet:
+                  object:
+                    $var: p
+                  path: /failed
+              - $and:
+                - $gt:
+                  - $pointerGet:
+                      object:
+                        $var: p
+                      path: /deadline
+                  - 0
+                - $gte:
+                  - $binding: timestamp
+                  - $pointerGet:
+                      object:
+                        $var: p
+                      path: /deadline
+        message: SATISFACTION_CLOSED
+    - $let:
+        name: facts
+        expr:
+          $objectSet:
+            object:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /facts
+            key:
+              $var: key
+            val:
+              $var: newValue
+    - $let:
+        name: eligible
+        expr:
+          $and:
+          - $not:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /failed
+          - $not:
+              $and:
+              - $gt:
+                - $pointerGet:
+                    object:
+                      $var: p
+                    path: /deadline
+                - 0
+              - $gte:
+                - $binding: timestamp
+                - $pointerGet:
+                    object:
+                      $var: p
+                    path: /deadline
+    - $forEach:
+        item: required
+        in:
+          $const:
+            name: parameters
+            path: /required
+        do:
+        - $if:
+            cond:
+              $ne:
+              - $get:
+                  object:
+                    $var: facts
+                  key:
+                    $var: required
+              - true
+            then:
+            - $set:
+                name: eligible
+                expr: false
+    - $appendChange:
+        op: replace
+        path: /policy/facts
+        val:
+          $var: facts
+    - $appendChange:
+        op: replace
+        path: /policy/eligible
+        val:
+          $var: eligible
+    - $call:
+        function: emit
+        args:
+          kind: Evidence Recorded
+          detail:
+            fact:
+              $var: key
+            confirmed:
+              $var: newValue
+            eligible:
+              $var: eligible
+    - $if:
+        cond:
+          $var: eligible
+        then:
+        - $call:
+            function: emit
+            args:
+              kind: Conditions Satisfied
+              detail: {}
+    - $return:
+        outcome: acceptedNew
+  failPolicy:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $document: /policy/failed
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /policy/failed
+        val: true
+    - $appendChange:
+        op: replace
+        path: /policy/eligible
+        val: false
+    - $call:
+        function: emit
+        args:
+          kind: Compensation Required
+          detail: {}
+    - $return:
+        outcome: acceptedNew
+  retryPolicy:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: guarantor
+        args: {}
+    - $let:
+        name: key
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: key
+    - $let:
+        name: failedId
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /failedRequestId
+            default: ''
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: failedId
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $concat:
+              - /policy/retries/
+              - $var: key
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $concat:
+                  - /policy/retries/
+                  - $var: key
+              - $var: failedId
+            message: RETRY_ID_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: pending
+        expr:
+          $add:
+          - $document: /payment/reserved/secure
+          - $document: /payment/reserved/capture
+          - $document: /payment/reserved/refund
+          - $document: /payment/reserved/void
+    - $failIf:
+        cond:
+          $ne:
+          - $var: pending
+          - 0
+        message: RESOLVE_PENDING_OR_UNKNOWN_BEFORE_RETRY
+    - $let:
+        name: failedRequest
+        expr:
+          $document:
+            $concat:
+            - /payment/requests/
+            - $var: failedId
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - failed
+              - declined
+              val:
+                $pointerGet:
+                  object:
+                    $var: failedRequest
+                  path: /status
+                  default: ''
+        message: NO_DEFINITIVE_FAILURE_TO_RETRY
+    - $failIf:
+        cond:
+          $exists:
+            $document:
+              $concat:
+              - /policy/retriedFailures/
+              - $var: failedId
+        message: FAILED_REQUEST_ALREADY_RETRIED
+    - $appendChange:
+        op: replace
+        path: /policy/serial
+        val:
+          $add:
+          - $document: /policy/serial
+          - 1
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /policy/retries/
+          - $var: key
+        val:
+          $var: failedId
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /policy/retriedFailures/
+          - $var: failedId
+        val:
+          $var: key
+    - $call:
+        function: emit
+        args:
+          kind: Payment Retry Requested
+          detail:
+            failedRequestId:
+              $var: failedId
+            requestId:
+              $var: key
+    - $return:
+        outcome: acceptedNew
+  advancePolicy:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: s
+        expr:
+          $document: /payment
+    - $let:
+        name: p
+        expr:
+          $document: /policy
+    - $let:
+        name: pending
+        expr:
+          $add:
+          - $pointerGet:
+              object:
+                $var: s
+              path: /reserved/secure
+          - $pointerGet:
+              object:
+                $var: s
+              path: /reserved/capture
+          - $pointerGet:
+              object:
+                $var: s
+              path: /reserved/void
+    - $let:
+        name: status
+        expr: AwaitingAuthorization
+    - $if:
+        cond:
+          $and:
+          - $pointerGet:
+              object:
+                $var: s
+              path: /accepted
+          - $ne:
+            - $pointerGet:
+                object:
+                  $var: s
+                path: /transactionId
+            - ''
+          - $not:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /closed
+          - $not:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /failed
+          - $eq:
+            - $var: pending
+            - 0
+          - $eq:
+            - $add:
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /secured
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /completed
+            - 0
+        then:
+        - $call:
+            function: request
+            args:
+              action: secure
+              input:
+                requestId:
+                  $concat:
+                  - authorization
+                  - '-'
+                  - $text:
+                      $pointerGet:
+                        object:
+                          $var: p
+                        path: /serial
+                amountMinor:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /targetMinor
+    - $if:
+        cond:
+          $and:
+          - $gt:
+            - $pointerGet:
+                object:
+                  $var: s
+                path: /secured
+            - 0
+          - $eq:
+            - $pointerGet:
+                object:
+                  $var: p
+                path: /deadline
+            - 0
+          - $not:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /eligible
+          - $not:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /failed
+        then:
+        - $appendChange:
+            op: replace
+            path: /policy/deadline
+            val:
+              $add:
+              - $binding: timestamp
+              - $multiply:
+                - $const:
+                    name: parameters
+                    path: /windowMs
+                - 1000
+        - $call:
+            function: emit
+            args:
+              kind: Confirmation Window Opened
+              detail: {}
+    - $if:
+        cond:
+          $and:
+          - $pointerGet:
+              object:
+                $var: p
+              path: /eligible
+          - $not:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /failed
+          - $const:
+              name: parameters
+              path: /autoCapture
+          - $eq:
+            - $var: pending
+            - 0
+          - $gte:
+            - $pointerGet:
+                object:
+                  $var: s
+                path: /secured
+            - $pointerGet:
+                object:
+                  $var: s
+                path: /targetMinor
+          - $or:
+            - $not:
+                $const:
+                  name: parameters
+                  path: /recipientApprovalRequired
+            - $pointerGet:
+                object:
+                  $var: s
+                path: /recipientApproved
+        then:
+        - $call:
+            function: request
+            args:
+              action: capture
+              input:
+                requestId:
+                  $concat:
+                  - capture
+                  - '-'
+                  - $text:
+                      $pointerGet:
+                        object:
+                          $var: p
+                        path: /serial
+                amountMinor:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /targetMinor
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: p
+            path: /failed
+        then:
+        - $let:
+            name: refund
+            expr:
+              $subtract:
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /completed
+              - $add:
+                - $pointerGet:
+                    object:
+                      $var: s
+                    path: /reversed
+                - $pointerGet:
+                    object:
+                      $var: s
+                    path: /reserved/refund
+        - $if:
+            cond:
+              $and:
+              - $gt:
+                - $var: refund
+                - 0
+              - $eq:
+                - $var: pending
+                - 0
+            then:
+            - $call:
+                function: request
+                args:
+                  action: refund
+                  input:
+                    requestId:
+                      $concat:
+                      - compensate-
+                      - $text:
+                          $pointerGet:
+                            object:
+                              $var: s
+                            path: /completed
+                      - '-'
+                      - $text:
+                          $pointerGet:
+                            object:
+                              $var: s
+                            path: /reversed
+                      - '-'
+                      - $text:
+                          $pointerGet:
+                            object:
+                              $var: p
+                            path: /serial
+                    amountMinor:
+                      $var: refund
+        - $if:
+            cond:
+              $and:
+              - $gt:
+                - $pointerGet:
+                    object:
+                      $var: s
+                    path: /secured
+                - 0
+              - $eq:
+                - $var: pending
+                - 0
+            then:
+            - $call:
+                function: request
+                args:
+                  action: void
+                  input:
+                    requestId:
+                      $concat:
+                      - release
+                      - '-'
+                      - $text:
+                          $pointerGet:
+                            object:
+                              $var: p
+                            path: /serial
+                    amountMinor:
+                      $pointerGet:
+                        object:
+                          $var: s
+                        path: /secured
+    - $let:
+        name: now
+        expr:
+          $resultValue: /payment
+    - $if:
+        cond:
+          $gt:
+          - $pointerGet:
+              object:
+                $var: now
+              path: /secured
+          - 0
+        then:
+        - $set:
+            name: status
+            expr: AwaitingEvidence
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: p
+            path: /eligible
+        then:
+        - $set:
+            name: status
+            expr: AwaitingAuthorization
+    - $if:
+        cond:
+          $and:
+          - $pointerGet:
+              object:
+                $var: p
+              path: /eligible
+          - $const:
+              name: parameters
+              path: /recipientApprovalRequired
+          - $not:
+              $pointerGet:
+                object:
+                  $var: now
+                path: /recipientApproved
+        then:
+        - $set:
+            name: status
+            expr: AwaitingRecipientApproval
+    - $if:
+        cond:
+          $gt:
+          - $pointerGet:
+              object:
+                $var: now
+              path: /reserved/capture
+          - 0
+        then:
+        - $set:
+            name: status
+            expr: CapturePending
+    - $if:
+        cond:
+          $gte:
+          - $pointerGet:
+              object:
+                $var: now
+              path: /completed
+          - $pointerGet:
+              object:
+                $var: now
+              path: /targetMinor
+        then:
+        - $set:
+            name: status
+            expr: Paid
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: p
+            path: /failed
+        then:
+        - $set:
+            name: status
+            expr: Compensating
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $add:
+                  - $pointerGet:
+                      object:
+                        $var: now
+                      path: /reserved/secure
+                  - $pointerGet:
+                      object:
+                        $var: now
+                      path: /reserved/capture
+                  - $pointerGet:
+                      object:
+                        $var: now
+                      path: /reserved/refund
+                  - $pointerGet:
+                      object:
+                        $var: now
+                      path: /reserved/void
+                - 0
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: now
+                    path: /secured
+                - 0
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: now
+                    path: /completed
+                - $pointerGet:
+                    object:
+                      $var: now
+                    path: /reversed
+            then:
+            - $set:
+                name: status
+                expr: Compensated
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: now
+            path: /rejected
+        then:
+        - $set:
+            name: status
+            expr: Rejected
+    - $if:
+        cond:
+          $ne:
+          - $document: /policy/status
+          - $var: status
+        then:
+        - $appendChange:
+            op: replace
+            path: /policy/status
+            val:
+              $var: status
+    - $return:
+        outcome: acceptedNew

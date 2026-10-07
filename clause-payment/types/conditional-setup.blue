@@ -1,0 +1,977 @@
+name: Conditional Payment Setup
+type: Contracts/Compute Definition
+description: Validate the small public configuration and instantiate exact standard PI definitions. Financial
+  behavior stays in the PI package.
+functions:
+  validateRole:
+    args:
+      candidate:
+        type: Text
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $ne:
+              - $var: candidate
+              - ''
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: /
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: '~'
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: .
+              - 1
+        message: 'PAYMENT_ROLE: use an ordinary participant channel name'
+  duration:
+    args:
+      duration: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $var: duration
+          - 1
+        message: 'PAYMENT_DURATION: provide one of days, hours, minutes or seconds'
+    - $let:
+        name: milliseconds
+        expr: 0
+    - $forEach:
+        key: unit
+        item: count
+        in:
+          $var: duration
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $includes:
+                    list:
+                    - days
+                    - hours
+                    - minutes
+                    - seconds
+                    val:
+                      $var: unit
+                - $isKind:
+                    val:
+                      $var: count
+                    kind: integer
+                - $gt:
+                  - $var: count
+                  - 0
+                - $lte:
+                  - $var: count
+                  - 31536000
+            message: 'PAYMENT_DURATION: duration must be a positive integer in a supported unit'
+        - $set:
+            name: milliseconds
+            expr:
+              $multiply:
+              - $var: count
+              - $get:
+                  object:
+                    days: 86400000
+                    hours: 3600000
+                    minutes: 60000
+                    seconds: 1000
+                  key:
+                    $var: unit
+    - $failIf:
+        cond:
+          $gt:
+          - $var: milliseconds
+          - 31536000000
+        message: 'PAYMENT_DURATION: maximum supported window is 365 days'
+    - $return:
+        $var: milliseconds
+  buildInstruction:
+    args:
+      configOverride: {}
+      details: {}
+      methodClauses: {}
+      termsOverride: {}
+    do:
+    - $let:
+        name: config
+        expr:
+          $merge:
+          - payer: customer
+            payee: seller
+            guarantor: guarantor
+            releaseAfter:
+              days: 7
+            recipientApprovalRequired: false
+            autoStart: true
+            sources: {}
+            includeOrder: false
+            autoCapture: true
+            failWhen: {}
+            requireAll: {}
+            amountMinor: 0
+            currency: EUR
+            amountPath: ''
+          - $object:
+              $document:
+                $concat:
+                - /clauses/
+                - $const: clauseKey
+                - /parameters
+          - $var: configOverride
+    - $forEach:
+        item: key
+        in:
+          $keys:
+            $var: config
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - payer
+                  - payee
+                  - guarantor
+                  - releaseAfter
+                  - recipientApprovalRequired
+                  - autoStart
+                  - sources
+                  - includeOrder
+                  - requireAll
+                  - failWhen
+                  - autoCapture
+                  - amountMinor
+                  - currency
+                  - amountPath
+                  - recipient
+                  val:
+                    $var: key
+            message:
+              $concat:
+              - 'PAYMENT_PARAMETER: unknown parameter '
+              - $var: key
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: config
+              path: /recipient
+              default: ''
+          - ''
+        message: 'PAYMENT_RECIPIENT: use a method-specific clause to resolve recipient'
+    - $forEach:
+        item: key
+        in:
+        - autoStart
+        - recipientApprovalRequired
+        - includeOrder
+        - autoCapture
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $get:
+                      object:
+                        $var: config
+                      key:
+                        $var: key
+                  kind: boolean
+            message:
+              $concat:
+              - 'PAYMENT_BOOLEAN: '
+              - $var: key
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $const: sourceMode
+            - initialized
+          - $not:
+              $var:
+                name: config
+                path: /autoStart
+        then:
+        - $return:
+            outcome: skipped
+    - $let:
+        name: destination
+        expr:
+          $const:
+            name: bindings
+            path: /instruction
+    - $let:
+        name: identityPath
+        expr:
+          $concat:
+          - /connectionState_
+          - $const: clauseKey
+          - /instructionIdentity
+    - $let:
+        name: identity
+        expr:
+          $choose:
+            cond:
+              $exists:
+                $document:
+                  $var: identityPath
+            then:
+              $document:
+                $var: identityPath
+            else:
+              $concat:
+              - $nodeBlueId:
+                  $document: ''
+              - ':'
+              - $const: clauseKey
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: destination
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $concat:
+                  - $var: destination
+                  - /instanceKey
+              - $var: identity
+            message: 'PAYMENT_DESTINATION: another document occupies the PI path'
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: product
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /product
+    - $let:
+        name: boundAmount
+        expr:
+          $var:
+            name: config
+            path: /amountPath
+    - $let:
+        name: amount
+        expr:
+          $choose:
+            cond:
+              $ne:
+              - $var: boundAmount
+              - ''
+            then:
+              $document:
+                $var: boundAmount
+            else:
+              $choose:
+                cond:
+                  $gt:
+                  - $var:
+                      name: config
+                      path: /amountMinor
+                  - 0
+                then:
+                  $var:
+                    name: config
+                    path: /amountMinor
+                else:
+                  $multiply:
+                  - $var:
+                      name: product
+                      path: /unitPriceMinor
+                  - $var:
+                      name: product
+                      path: /quantity
+    - $let:
+        name: currency
+        expr:
+          $choose:
+            cond:
+              $and:
+              - $eq:
+                - $var: boundAmount
+                - ''
+              - $eq:
+                - $var:
+                    name: config
+                    path: /amountMinor
+                - 0
+            then:
+              $var:
+                name: product
+                path: /currency
+            else:
+              $var:
+                name: config
+                path: /currency
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: amount
+                kind: integer
+            - $gt:
+              - $var: amount
+              - 0
+            - $lte:
+              - $var: amount
+              - 1000000000000
+            - $isKind:
+                val:
+                  $var: currency
+                kind: text
+            - $ne:
+              - $var: currency
+              - ''
+        message: INVALID_PAYMENT_TERMS
+    - $let:
+        name: window
+        expr:
+          $call:
+            function: duration
+            args:
+              duration:
+                $var:
+                  name: config
+                  path: /releaseAfter
+    - $let:
+        name: terms
+        expr:
+          $merge:
+          - currency:
+              $var: currency
+            amountMinor:
+              $var: amount
+            limitMinor:
+              $var: amount
+            payerChannel:
+              $var:
+                name: config
+                path: /payer
+            payeeChannel:
+              $var:
+                name: config
+                path: /payee
+            guarantorChannel:
+              $var:
+                name: config
+                path: /guarantor
+            allowedPayees:
+            - $var:
+                name: config
+                path: /payee
+            recipientApprovalRequired:
+              $var:
+                name: config
+                path: /recipientApprovalRequired
+            windowMs:
+              $var: window
+            required:
+              $keys:
+                $var:
+                  name: config
+                  path: /requireAll
+            captureGate: /policy/eligible
+            autoCapture:
+              $var:
+                name: config
+                path: /autoCapture
+          - $var: termsOverride
+    - $let:
+        name: capture
+        expr:
+          $var:
+            name: config
+            path: /requireAll
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: capture
+                kind: object
+            - $gt:
+              - $size:
+                  $var: capture
+              - 0
+        message: 'PAYMENT_CAPTURE: provide named capture connections'
+    - $let:
+        name: roles
+        expr:
+        - $var:
+            name: config
+            path: /payer
+        - $var:
+            name: config
+            path: /payee
+        - $var:
+            name: config
+            path: /guarantor
+    - $let:
+        name: captureConnections
+        expr: {}
+    - $forEach:
+        key: fact
+        item: spec
+        in:
+          $var: capture
+        do:
+        - $call:
+            function: validateRole
+            args:
+              candidate:
+                $var: fact
+        - $if:
+            cond:
+              $exists:
+                $var:
+                  name: spec
+                  path: /observe
+            then:
+            - $let:
+                name: ob
+                expr:
+                  $var:
+                    name: spec
+                    path: /observe
+            - $let:
+                name: source
+                expr:
+                  $concat:
+                  - /sources/
+                  - $var:
+                      name: ob
+                      path: /source
+            - $let:
+                name: expr
+                expr:
+                  $literal:
+                    $eq:
+                    - $document: PLACEHOLDER
+                    - null
+            - $set:
+                name: expr
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: expr
+                    path: /$eq/0/$document
+                    val:
+                      $concat:
+                      - $var: source
+                      - $var:
+                          name: ob
+                          path: /path
+            - $set:
+                name: expr
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: expr
+                    path: /$eq/1
+                    val:
+                      $var:
+                        name: ob
+                        path: /equals
+            - $let:
+                name: mapping
+                expr:
+                  fact:
+                    $var: fact
+                  confirmed:
+                    $var: expr
+            - $set:
+                name: captureConnections
+                expr:
+                  $objectSet:
+                    object:
+                      $var: captureConnections
+                    key:
+                      $concat:
+                      - $var: fact
+                      - Initial
+                    val:
+                      'on': initialized
+                      once: true
+                      params:
+                        $var: mapping
+            - $set:
+                name: captureConnections
+                expr:
+                  $objectSet:
+                    object:
+                      $var: captureConnections
+                    key:
+                      $var: fact
+                    val:
+                      'on': embedded
+                      path:
+                        $var: source
+                      params:
+                        $var: mapping
+            else:
+            - $failIf:
+                cond:
+                  $exists:
+                    $var:
+                      name: spec
+                      path: /params
+                message: 'EVIDENCE_PORT: argument mapping is owned by the reviewed preset'
+            - $set:
+                name: captureConnections
+                expr:
+                  $objectSet:
+                    object:
+                      $var: captureConnections
+                    key:
+                      $var: fact
+                    val:
+                      $merge:
+                      - $var: spec
+                      - params:
+                          fact:
+                            $var: fact
+                          confirmed: true
+            - $if:
+                cond:
+                  $eq:
+                  - $var:
+                      name: spec
+                      path: /on
+                  - workflow
+                then:
+                - $set:
+                    name: roles
+                    expr:
+                      $listConcat:
+                      - $var: roles
+                      - - $var:
+                            name: spec
+                            path: /channel
+    - $forEach:
+        key: failureKey
+        item: spec
+        in:
+          $var:
+            name: config
+            path: /failWhen
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: spec
+                  path: /on
+              - workflow
+            then:
+            - $set:
+                name: roles
+                expr:
+                  $listConcat:
+                  - $var: roles
+                  - - $var:
+                        name: spec
+                        path: /channel
+    - $let:
+        name: channels
+        expr: {}
+    - $forEach:
+        item: role
+        in:
+          $var: roles
+        do:
+        - $call:
+            function: validateRole
+            args:
+              candidate:
+                $var: role
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: role
+            message:
+              $concat:
+              - 'PAYMENT_CHANNEL: missing participant '
+              - $var: role
+        - $failIf:
+            cond:
+              $not:
+                $or:
+                - $is:
+                    node:
+                      $document:
+                        $concat:
+                        - /contracts/
+                        - $var: role
+                    pattern:
+                      type: Contracts/External Channel
+                - $is:
+                    node:
+                      $document:
+                        $concat:
+                        - /contracts/
+                        - $var: role
+                    pattern:
+                      type: Coordination/Timeline Channel
+                - $is:
+                    node:
+                      $document:
+                        $concat:
+                        - /contracts/
+                        - $var: role
+                    pattern:
+                      type: ProviderCoordination/Timeline Channel
+            message: 'PAYMENT_CHANNEL: participants must use external or authenticated timeline channels'
+        - $set:
+            name: channels
+            expr:
+              $objectSet:
+                object:
+                  $var: channels
+                key:
+                  $var: role
+                val:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: role
+    - $let:
+        name: sources
+        expr: {}
+    - $forEach:
+        key: sourceName
+        item: path
+        in:
+          $var:
+            name: config
+            path: /sources
+        do:
+        - $call:
+            function: validateRole
+            args:
+              candidate:
+                $var: sourceName
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $concat:
+                    - $var: path
+                    - /contracts/initialized
+            message: 'PAYMENT_SOURCE: shared source must already be initialized; use autoStart false and start
+              explicitly'
+        - $set:
+            name: sources
+            expr:
+              $objectSet:
+                object:
+                  $var: sources
+                key:
+                  $var: sourceName
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: path
+    - $if:
+        cond:
+          $var:
+            name: config
+            path: /includeOrder
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document: /contracts/initialized
+            message: 'PAYMENT_CYCLE: initialize the Order first; set autoStart false and bind start'
+        - $failIf:
+            cond:
+              $hasKey:
+                object:
+                  $var: sources
+                key: order
+            message: 'PAYMENT_SOURCE: order is reserved by includeOrder'
+        - $set:
+            name: sources
+            expr:
+              $objectSet:
+                object:
+                  $var: sources
+                key: order
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document: ''
+    - $let:
+        name: child
+        expr:
+          $literal:
+            name: Payment Instruction
+            type: PaymentInstruction/Payment Instruction
+            clauses:
+              payment:
+                type: PaymentInstruction/Payment Lifecycle Clause
+                bindings:
+                  state: /payment
+                  accept:
+                    accept:
+                      'on': workflow
+                      channel: guarantor
+                  reject:
+                    reject:
+                      'on': workflow
+                      channel: guarantor
+                  initiate:
+                    initiate:
+                      'on': workflow
+                      channel: guarantor
+                      params:
+                        transactionId:
+                          $var:
+                            name: trigger
+                            path: /transactionId
+                  approveRecipient:
+                    approveRecipient:
+                      'on': workflow
+                      channel: seller
+                  confirm:
+                    confirm:
+                      'on': workflow
+                      channel: guarantor
+                      params:
+                        requestId:
+                          $var:
+                            name: trigger
+                            path: /requestId
+                        outcome:
+                          $var:
+                            name: trigger
+                            path: /outcome
+              decision:
+                type: PaymentInstruction/Conditional Policy
+                bindings:
+                  state: /payment
+                  retry:
+                    retryPayment:
+                      'on': workflow
+                      channel: guarantor
+                      params:
+                        requestId:
+                          $var:
+                            name: trigger
+                            path: /requestId
+                        failedRequestId:
+                          $var:
+                            name: trigger
+                            path: /failedRequestId
+    - $set:
+        name: child
+        expr:
+          $merge:
+          - $var: child
+          - instanceKey:
+              $var: identity
+            sources:
+              $var: sources
+            contracts:
+              $var: channels
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/payment/parameters
+            val:
+              $var: terms
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/decision/parameters
+            val:
+              $var: terms
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/payment/bindings/accept/accept/channel
+            val:
+              $var:
+                name: config
+                path: /guarantor
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/payment/bindings/reject/reject/channel
+            val:
+              $var:
+                name: config
+                path: /guarantor
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/payment/bindings/initiate/initiate/channel
+            val:
+              $var:
+                name: config
+                path: /guarantor
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/payment/bindings/confirm/confirm/channel
+            val:
+              $var:
+                name: config
+                path: /guarantor
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/payment/bindings/approveRecipient/approveRecipient/channel
+            val:
+              $var:
+                name: config
+                path: /payee
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/decision/bindings/record
+            val:
+              $var: captureConnections
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/decision/bindings/retry/retryPayment/channel
+            val:
+              $var:
+                name: config
+                path: /guarantor
+    - $let:
+        name: failures
+        expr:
+          $objectSet:
+            object:
+              $var:
+                name: config
+                path: /failWhen
+            key: authorizationDeadline
+            val:
+              'on': timer
+              afterEvent:
+                'on': event
+                event:
+                  type: PaymentInstruction/Payment Event
+                  kind: Confirmation Window Opened
+              delayMs:
+                $var: window
+              policy: first
+              once: true
+              cancelOn:
+                'on': event
+                event:
+                  type: PaymentInstruction/Payment Event
+                  kind: Conditions Satisfied
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/decision/bindings/fail
+            val:
+              $var: failures
+    - $set:
+        name: child
+        expr:
+          $merge:
+          - $var: child
+          - paymentDetails:
+              $var: details
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses
+            val:
+              $merge:
+              - $var:
+                  name: child
+                  path: /clauses
+              - $var: methodClauses
+    - $appendChange:
+        op: add
+        path:
+          $var: identityPath
+        val:
+          $var: identity
+    - $appendChange:
+        op: add
+        path:
+          $var: destination
+        val:
+          $var: child
+    - $return:
+        created: true
+        path:
+          $var: destination
+        outcome: acceptedNew

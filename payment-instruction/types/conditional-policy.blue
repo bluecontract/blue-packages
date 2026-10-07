@@ -1,0 +1,71 @@
+name: Conditional Policy
+type: Connections/Connected Clause
+bindingTypes:
+  state: pointer
+defaultBindings:
+  state: /payment
+actionDefinition:
+  type: PaymentInstruction/Conditional Policy Functions
+actions:
+  initialize:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: initializePolicy
+            args:
+              input:
+                $var: params
+    automatic:
+      'on': initialized
+      once: true
+  record:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: recordEvidence
+            args:
+              input:
+                $var: params
+  fail:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: failPolicy
+            args:
+              input:
+                $var: params
+  advance:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: advancePolicy
+            args:
+              input:
+                $var: params
+    automatic:
+      'on': event
+      event:
+        type: PaymentInstruction/Payment Event
+  retry:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: retryPolicy
+            args:
+              input:
+                $var: params

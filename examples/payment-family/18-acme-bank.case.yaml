@@ -1,0 +1,44 @@
+document: 18-acme-bank.blue
+initial:
+  members: 2
+  expect:
+    /payment/policy/eligible: false
+    /payment/paymentDetails/method: acme-bank
+steps:
+- target: /payment
+  channel: customer
+  operation: confirmSatisfaction
+  expect:
+    /payment/policy/eligible: true
+- target: /payment
+  channel: customer
+  operation: confirmSatisfaction
+  eventCount: 0
+- target: /payment
+  channel: guarantor
+  operation: accept
+- target: /payment
+  channel: guarantor
+  operation: initiate
+  request:
+    transactionId: t1
+  expect:
+    /payment/payment/reserved/secure: 10000
+- target: /payment
+  channel: guarantor
+  operation: confirm
+  request:
+    requestId: authorization-0
+    outcome: succeeded
+  expect:
+    /payment/payment/reserved/capture: 10000
+- target: /payment
+  channel: guarantor
+  operation: confirm
+  request:
+    requestId: capture-0
+    outcome: succeeded
+  expect:
+    /payment/payment/completed: 10000
+    /payment/policy/status: Paid
+  restore: true
