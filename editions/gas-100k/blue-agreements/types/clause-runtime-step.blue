@@ -1,0 +1,3770 @@
+{
+  "name": "Clause Runtime Step",
+  "type": "Contracts/Compute",
+  "functions": {
+    "resolveFill": {
+      "args": {
+        "spec": {},
+        "bindings": {},
+        "params": {}
+      },
+      "expr": {
+        "$choose": {
+          "cond": {
+            "$hasKey": {
+              "object": {
+                "$var": "spec"
+              },
+              "key": "binding"
+            }
+          },
+          "then": {
+            "$choose": {
+              "cond": {
+                "$eq": [
+                  {
+                    "$pointerGet": {
+                      "object": {
+                        "$var": "spec"
+                      },
+                      "path": "/asKey",
+                      "default": false
+                    }
+                  },
+                  true
+                ]
+              },
+              "then": {
+                "$sliceAfter": [
+                  {
+                    "$get": {
+                      "object": {
+                        "$var": "bindings"
+                      },
+                      "key": {
+                        "$var": {
+                          "name": "spec",
+                          "path": "/binding"
+                        }
+                      }
+                    }
+                  },
+                  "/contracts/"
+                ]
+              },
+              "else": {
+                "$get": {
+                  "object": {
+                    "$var": "bindings"
+                  },
+                  "key": {
+                    "$var": {
+                      "name": "spec",
+                      "path": "/binding"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "else": {
+            "$choose": {
+              "cond": {
+                "$hasKey": {
+                  "object": {
+                    "$var": "spec"
+                  },
+                  "key": "parameter"
+                }
+              },
+              "then": {
+                "$get": {
+                  "object": {
+                    "$var": "params"
+                  },
+                  "key": {
+                    "$var": {
+                      "name": "spec",
+                      "path": "/parameter"
+                    }
+                  }
+                }
+              },
+              "else": {
+                "$var": {
+                  "name": "spec",
+                  "path": "/literal"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "install": {
+      "do": [
+        {
+          "$if": {
+            "cond": {
+              "$eq": [
+                {
+                  "$document": "/clauseRuntime/amending"
+                },
+                true
+              ]
+            },
+            "then": [
+              {
+                "$return": {}
+              }
+            ]
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$isKind": {
+                  "val": {
+                    "$document": "/clauses"
+                  },
+                  "kind": "object"
+                }
+              }
+            },
+            "message": "CLAUSES_MUST_BE_OBJECT"
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$isKind": {
+                  "val": {
+                    "$document": "/parameters"
+                  },
+                  "kind": "object"
+                }
+              }
+            },
+            "message": "PARAMETERS_MUST_BE_OBJECT"
+          }
+        },
+        {
+          "$let": {
+            "name": "old",
+            "expr": {
+              "$choose": {
+                "cond": {
+                  "$exists": {
+                    "$document": "/clauseRuntime"
+                  }
+                },
+                "then": {
+                  "$document": "/clauseRuntime"
+                },
+                "else": {
+                  "$literal": {
+                    "contracts": {},
+                    "states": {},
+                    "entries": {},
+                    "revision": 0,
+                    "configId": ""
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "oldStates",
+            "expr": {
+              "$pointerGet": {
+                "object": {
+                  "$var": "old"
+                },
+                "path": "/states",
+                "default": {
+                  "$emptyObject": true
+                }
+              }
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "oldBindings",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$var": "oldStates"
+              }
+            },
+            "item": "oldPath",
+            "do": [
+              {
+                "$let": {
+                  "name": "os",
+                  "expr": {
+                    "$get": {
+                      "object": {
+                        "$var": "oldStates"
+                      },
+                      "key": {
+                        "$var": "oldPath"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "name": "oldBindings",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "oldBindings"
+                      },
+                      "key": {
+                        "$concat": [
+                          {
+                            "$var": {
+                              "name": "os",
+                              "path": "/owner"
+                            }
+                          },
+                          "/",
+                          {
+                            "$var": {
+                              "name": "os",
+                              "path": "/binding"
+                            }
+                          }
+                        ]
+                      },
+                      "val": {
+                        "$var": "oldPath"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$let": {
+            "name": "configurations",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$document": "/clauses"
+              }
+            },
+            "item": "configKey",
+            "do": [
+              {
+                "$set": {
+                  "name": "configurations",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "configurations"
+                      },
+                      "key": {
+                        "$var": "configKey"
+                      },
+                      "val": {
+                        "typeId": {
+                          "$nodeBlueId": {
+                            "$document": {
+                              "$concat": [
+                                "/clauses/",
+                                {
+                                  "$var": "configKey"
+                                },
+                                "/type"
+                              ]
+                            }
+                          }
+                        },
+                        "parameters": {
+                          "$document": {
+                            "$concat": [
+                              "/clauses/",
+                              {
+                                "$var": "configKey"
+                              },
+                              "/parameters"
+                            ]
+                          }
+                        },
+                        "bindings": {
+                          "$document": {
+                            "$concat": [
+                              "/clauses/",
+                              {
+                                "$var": "configKey"
+                              },
+                              "/bindings"
+                            ]
+                          }
+                        },
+                        "text": {
+                          "$pointerGet": {
+                            "object": {
+                              "$document": {
+                                "$concat": [
+                                  "/clauses/",
+                                  {
+                                    "$var": "configKey"
+                                  }
+                                ]
+                              }
+                            },
+                            "path": "/text",
+                            "default": ""
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$let": {
+            "name": "configId",
+            "expr": {
+              "$nodeBlueId": {
+                "clauses": {
+                  "$var": "configurations"
+                },
+                "parameters": {
+                  "$document": "/parameters"
+                },
+                "channels": {
+                  "$document": "/channels"
+                }
+              }
+            }
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$eq": [
+                {
+                  "$var": "configId"
+                },
+                {
+                  "$pointerGet": {
+                    "object": {
+                      "$var": "old"
+                    },
+                    "path": "/configId",
+                    "default": ""
+                  }
+                }
+              ]
+            },
+            "then": [
+              {
+                "$return": {}
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$pointerGet": {
+                  "object": {
+                    "$var": "old"
+                  },
+                  "path": "/entries",
+                  "default": {
+                    "$emptyObject": true
+                  }
+                }
+              }
+            },
+            "item": "oldClause",
+            "do": [
+              {
+                "$let": {
+                  "name": "entry",
+                  "expr": {
+                    "$get": {
+                      "object": {
+                        "$pointerGet": {
+                          "object": {
+                            "$var": "old"
+                          },
+                          "path": "/entries",
+                          "default": {
+                            "$emptyObject": true
+                          }
+                        }
+                      },
+                      "key": {
+                        "$var": "oldClause"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$pointerGet": {
+                      "object": {
+                        "$var": "entry"
+                      },
+                      "path": "/freezePaths",
+                      "default": {
+                        "$emptyList": true
+                      }
+                    }
+                  },
+                  "item": "fp",
+                  "do": [
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$eq": [
+                            {
+                              "$document": {
+                                "$var": "fp"
+                              }
+                            },
+                            true
+                          ]
+                        },
+                        "message": "CONFIGURATION_FROZEN"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$literal": [
+                "_life",
+                "_initializeClauses",
+                "_clauseChanges",
+                "_parameterChanges",
+                "_reconcileClauses",
+                "_reconcileParameters",
+                "_installation"
+              ]
+            },
+            "item": "seed",
+            "do": [
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$eq": [
+                        {
+                          "$nodeBlueId": {
+                            "$document": {
+                              "$concat": [
+                                "/contracts/",
+                                {
+                                  "$var": "seed"
+                                }
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "$nodeBlueId": {
+                            "$document": {
+                              "$concat": [
+                                "/type/contracts/",
+                                {
+                                  "$var": "seed"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "message": "BOOTSTRAP_OVERRIDE"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$let": {
+            "name": "wanted",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "categories",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "owners",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "states",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "entries",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$literal": [
+                "A",
+                "B"
+              ]
+            },
+            "item": "side",
+            "do": [
+              {
+                "$set": {
+                  "name": "wanted",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "wanted"
+                      },
+                      "key": {
+                        "$concat": [
+                          "/contracts/amend",
+                          {
+                            "$var": "side"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "$get": {
+                          "object": {
+                            "$document": "/type/amendTemplates"
+                          },
+                          "key": {
+                            "$var": "side"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "name": "categories",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "categories"
+                      },
+                      "key": {
+                        "$concat": [
+                          "/contracts/amend",
+                          {
+                            "$var": "side"
+                          }
+                        ]
+                      },
+                      "val": "handler"
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "name": "owners",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "owners"
+                      },
+                      "key": {
+                        "$concat": [
+                          "/contracts/amend",
+                          {
+                            "$var": "side"
+                          }
+                        ]
+                      },
+                      "val": "@framework"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$literal": [
+                "A",
+                "B"
+              ]
+            },
+            "item": "side",
+            "do": [
+              {
+                "$let": {
+                  "name": "ch",
+                  "expr": {
+                    "$document": {
+                      "$concat": [
+                        "/channels/",
+                        {
+                          "$var": "side"
+                        }
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$exists": {
+                        "$var": "ch"
+                      }
+                    }
+                  },
+                  "message": "PARTY_CHANNEL_REQUIRED"
+                }
+              },
+              {
+                "$set": {
+                  "name": "wanted",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "wanted"
+                      },
+                      "key": {
+                        "$concat": [
+                          "/contracts/party",
+                          {
+                            "$var": "side"
+                          }
+                        ]
+                      },
+                      "val": {
+                        "$var": "ch"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "name": "categories",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "categories"
+                      },
+                      "key": {
+                        "$concat": [
+                          "/contracts/party",
+                          {
+                            "$var": "side"
+                          }
+                        ]
+                      },
+                      "val": "channel"
+                    }
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "name": "owners",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "owners"
+                      },
+                      "key": {
+                        "$concat": [
+                          "/contracts/party",
+                          {
+                            "$var": "side"
+                          }
+                        ]
+                      },
+                      "val": "@channels"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$ne": [
+                  {
+                    "$nodeBlueId": {
+                      "$document": "/channels/A"
+                    }
+                  },
+                  {
+                    "$nodeBlueId": {
+                      "$document": "/channels/B"
+                    }
+                  }
+                ]
+              }
+            },
+            "message": "PARTIES_REQUIRE_DISTINCT_CHANNELS"
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$and": [
+                {
+                  "$exists": {
+                    "$document": "/channels/A/actor"
+                  }
+                },
+                {
+                  "$exists": {
+                    "$document": "/channels/B/actor"
+                  }
+                }
+              ]
+            },
+            "then": [
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$ne": [
+                        {
+                          "$nodeBlueId": {
+                            "$document": "/channels/A/actor"
+                          }
+                        },
+                        {
+                          "$nodeBlueId": {
+                            "$document": "/channels/B/actor"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "message": "PARTIES_REQUIRE_DISTINCT_ACTORS"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$document": "/clauses"
+              }
+            },
+            "item": "clauseKey",
+            "do": [
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$and": [
+                        {
+                          "$isKind": {
+                            "val": {
+                              "$var": "clauseKey"
+                            },
+                            "kind": "text"
+                          }
+                        },
+                        {
+                          "$ne": [
+                            {
+                              "$var": "clauseKey"
+                            },
+                            ""
+                          ]
+                        },
+                        {
+                          "$eq": [
+                            {
+                              "$size": {
+                                "$split": {
+                                  "text": {
+                                    "$var": "clauseKey"
+                                  },
+                                  "separator": "/"
+                                }
+                              }
+                            },
+                            1
+                          ]
+                        },
+                        {
+                          "$eq": [
+                            {
+                              "$size": {
+                                "$split": {
+                                  "text": {
+                                    "$var": "clauseKey"
+                                  },
+                                  "separator": "~"
+                                }
+                              }
+                            },
+                            1
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "message": "CLAUSE_KEY_MUST_BE_SIMPLE"
+                }
+              },
+              {
+                "$let": {
+                  "name": "clause",
+                  "expr": {
+                    "$get": {
+                      "object": {
+                        "$document": "/clauses"
+                      },
+                      "key": {
+                        "$var": "clauseKey"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$let": {
+                  "name": "clauseType",
+                  "expr": {
+                    "$nodeBlueId": {
+                      "$pointerGet": {
+                        "object": {
+                          "$var": "clause"
+                        },
+                        "path": "/type"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$includes": {
+                        "list": {
+                          "$document": "/clauseTypes"
+                        },
+                        "val": {
+                          "$var": "clauseType"
+                        }
+                      }
+                    }
+                  },
+                  "message": "CLAUSE_TYPE_NOT_APPROVED"
+                }
+              },
+              {
+                "$let": {
+                  "name": "blueprint",
+                  "expr": {
+                    "$document": {
+                      "$concat": [
+                        "/clauses/",
+                        {
+                          "$var": "clauseKey"
+                        },
+                        "/type"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "$let": {
+                  "name": "bindings",
+                  "expr": {
+                    "$pointerGet": {
+                      "object": {
+                        "$var": "clause"
+                      },
+                      "path": "/bindings"
+                    }
+                  }
+                }
+              },
+              {
+                "$let": {
+                  "name": "params",
+                  "expr": {
+                    "$emptyObject": true
+                  }
+                }
+              },
+              {
+                "$let": {
+                  "name": "constantParams",
+                  "expr": {
+                    "$emptyObject": true
+                  }
+                }
+              },
+              {
+                "$let": {
+                  "name": "freezes",
+                  "expr": {
+                    "$emptyList": true
+                  }
+                }
+              },
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$isKind": {
+                        "val": {
+                          "$var": "bindings"
+                        },
+                        "kind": "object"
+                      }
+                    }
+                  },
+                  "message": "BINDINGS_REQUIRED"
+                }
+              },
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$eq": [
+                        {
+                          "$keys": {
+                            "$var": "bindings"
+                          }
+                        },
+                        {
+                          "$keys": {
+                            "$pointerGet": {
+                              "object": {
+                                "$var": "blueprint"
+                              },
+                              "path": "/bindingDefinitions"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "message": "BINDING_NAMES_MISMATCH"
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$keys": {
+                      "$pointerGet": {
+                        "object": {
+                          "$var": "blueprint"
+                        },
+                        "path": "/bindingDefinitions"
+                      }
+                    }
+                  },
+                  "item": "bname",
+                  "do": [
+                    {
+                      "$let": {
+                        "name": "bd",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$pointerGet": {
+                                "object": {
+                                  "$var": "blueprint"
+                                },
+                                "path": "/bindingDefinitions"
+                              }
+                            },
+                            "key": {
+                              "$var": "bname"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$let": {
+                        "name": "bp",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$var": "bindings"
+                            },
+                            "key": {
+                              "$var": "bname"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$eq": [
+                            {
+                              "$var": "bd"
+                            },
+                            "contract"
+                          ]
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$and": [
+                                    {
+                                      "$isKind": {
+                                        "val": {
+                                          "$var": "bp"
+                                        },
+                                        "kind": "text"
+                                      }
+                                    },
+                                    {
+                                      "$startsWith": [
+                                        {
+                                          "$var": "bp"
+                                        },
+                                        "/contracts/"
+                                      ]
+                                    },
+                                    {
+                                      "$and": [
+                                        {
+                                          "$isKind": {
+                                            "val": {
+                                              "$sliceAfter": [
+                                                {
+                                                  "$var": "bp"
+                                                },
+                                                "/contracts/"
+                                              ]
+                                            },
+                                            "kind": "text"
+                                          }
+                                        },
+                                        {
+                                          "$ne": [
+                                            {
+                                              "$sliceAfter": [
+                                                {
+                                                  "$var": "bp"
+                                                },
+                                                "/contracts/"
+                                              ]
+                                            },
+                                            ""
+                                          ]
+                                        },
+                                        {
+                                          "$eq": [
+                                            {
+                                              "$size": {
+                                                "$split": {
+                                                  "text": {
+                                                    "$sliceAfter": [
+                                                      {
+                                                        "$var": "bp"
+                                                      },
+                                                      "/contracts/"
+                                                    ]
+                                                  },
+                                                  "separator": "/"
+                                                }
+                                              }
+                                            },
+                                            1
+                                          ]
+                                        },
+                                        {
+                                          "$eq": [
+                                            {
+                                              "$size": {
+                                                "$split": {
+                                                  "text": {
+                                                    "$sliceAfter": [
+                                                      {
+                                                        "$var": "bp"
+                                                      },
+                                                      "/contracts/"
+                                                    ]
+                                                  },
+                                                  "separator": "~"
+                                                }
+                                              }
+                                            },
+                                            1
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "$not": {
+                                        "$includes": {
+                                          "list": {
+                                            "$literal": [
+                                              "/contracts/_life",
+                                              "/contracts/_initializeClauses",
+                                              "/contracts/_clauseChanges",
+                                              "/contracts/_parameterChanges",
+                                              "/contracts/_reconcileClauses",
+                                              "/contracts/_reconcileParameters",
+                                              "/contracts/_installation",
+                                              "/contracts/initialized",
+                                              "/contracts/checkpoint",
+                                              "/contracts/terminated",
+                                              "/contracts/generalization",
+                                              "/contracts/embedded",
+                                              "/contracts/partyA",
+                                              "/contracts/partyB",
+                                              "/contracts/amendA",
+                                              "/contracts/amendB"
+                                            ]
+                                          },
+                                          "val": {
+                                            "$var": "bp"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "INVALID_CONTRACT_BINDING"
+                            }
+                          }
+                        ],
+                        "else": [
+                          {
+                            "$if": {
+                              "cond": {
+                                "$eq": [
+                                  {
+                                    "$var": "bd"
+                                  },
+                                  "state"
+                                ]
+                              },
+                              "then": [
+                                {
+                                  "$failIf": {
+                                    "cond": {
+                                      "$not": {
+                                        "$and": [
+                                          {
+                                            "$isKind": {
+                                              "val": {
+                                                "$var": "bp"
+                                              },
+                                              "kind": "text"
+                                            }
+                                          },
+                                          {
+                                            "$startsWith": [
+                                              {
+                                                "$var": "bp"
+                                              },
+                                              "/"
+                                            ]
+                                          },
+                                          {
+                                            "$and": [
+                                              {
+                                                "$isKind": {
+                                                  "val": {
+                                                    "$sliceAfter": [
+                                                      {
+                                                        "$var": "bp"
+                                                      },
+                                                      "/"
+                                                    ]
+                                                  },
+                                                  "kind": "text"
+                                                }
+                                              },
+                                              {
+                                                "$ne": [
+                                                  {
+                                                    "$sliceAfter": [
+                                                      {
+                                                        "$var": "bp"
+                                                      },
+                                                      "/"
+                                                    ]
+                                                  },
+                                                  ""
+                                                ]
+                                              },
+                                              {
+                                                "$eq": [
+                                                  {
+                                                    "$size": {
+                                                      "$split": {
+                                                        "text": {
+                                                          "$sliceAfter": [
+                                                            {
+                                                              "$var": "bp"
+                                                            },
+                                                            "/"
+                                                          ]
+                                                        },
+                                                        "separator": "/"
+                                                      }
+                                                    }
+                                                  },
+                                                  1
+                                                ]
+                                              },
+                                              {
+                                                "$eq": [
+                                                  {
+                                                    "$size": {
+                                                      "$split": {
+                                                        "text": {
+                                                          "$sliceAfter": [
+                                                            {
+                                                              "$var": "bp"
+                                                            },
+                                                            "/"
+                                                          ]
+                                                        },
+                                                        "separator": "~"
+                                                      }
+                                                    }
+                                                  },
+                                                  1
+                                                ]
+                                              }
+                                            ]
+                                          },
+                                          {
+                                            "$not": {
+                                              "$includes": {
+                                                "list": {
+                                                  "$literal": [
+                                                    "/type",
+                                                    "/contracts",
+                                                    "/clauses",
+                                                    "/initialClauses",
+                                                    "/parameters",
+                                                    "/channels",
+                                                    "/clauseRuntime",
+                                                    "/clauseTypes",
+                                                    "/declaredBootstrapContracts"
+                                                  ]
+                                                },
+                                                "val": {
+                                                  "$var": "bp"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "message": "INVALID_STATE_BINDING"
+                                  }
+                                }
+                              ],
+                              "else": [
+                                {
+                                  "$if": {
+                                    "cond": {
+                                      "$eq": [
+                                        {
+                                          "$var": "bd"
+                                        },
+                                        "field"
+                                      ]
+                                    },
+                                    "then": [
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$not": {
+                                              "$and": [
+                                                {
+                                                  "$isKind": {
+                                                    "val": {
+                                                      "$var": "bp"
+                                                    },
+                                                    "kind": "text"
+                                                  }
+                                                },
+                                                {
+                                                  "$startsWith": [
+                                                    {
+                                                      "$var": "bp"
+                                                    },
+                                                    "/"
+                                                  ]
+                                                },
+                                                {
+                                                  "$ne": [
+                                                    {
+                                                      "$var": "bp"
+                                                    },
+                                                    "/"
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "message": "INVALID_FIELD_BINDING"
+                                        }
+                                      },
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$not": {
+                                              "$exists": {
+                                                "$document": {
+                                                  "$var": "bp"
+                                                }
+                                              }
+                                            }
+                                          },
+                                          "message": "FIELD_BINDING_MISSING"
+                                        }
+                                      }
+                                    ],
+                                    "else": [
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$not": {
+                                              "$and": [
+                                                {
+                                                  "$eq": [
+                                                    {
+                                                      "$var": "bd"
+                                                    },
+                                                    "channel"
+                                                  ]
+                                                },
+                                                {
+                                                  "$includes": {
+                                                    "list": {
+                                                      "$literal": [
+                                                        "partyA",
+                                                        "partyB"
+                                                      ]
+                                                    },
+                                                    "val": {
+                                                      "$var": "bp"
+                                                    }
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "message": "INVALID_CHANNEL_BINDING"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$eq": [
+                        {
+                          "$keys": {
+                            "$pointerGet": {
+                              "object": {
+                                "$var": "clause"
+                              },
+                              "path": "/parameters"
+                            }
+                          }
+                        },
+                        {
+                          "$keys": {
+                            "$pointerGet": {
+                              "object": {
+                                "$var": "blueprint"
+                              },
+                              "path": "/parameterDefinitions"
+                            }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "message": "PARAMETER_NAMES_MISMATCH"
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$keys": {
+                      "$pointerGet": {
+                        "object": {
+                          "$var": "blueprint"
+                        },
+                        "path": "/parameterDefinitions"
+                      }
+                    }
+                  },
+                  "item": "pname",
+                  "do": [
+                    {
+                      "$let": {
+                        "name": "pd",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$pointerGet": {
+                                "object": {
+                                  "$var": "blueprint"
+                                },
+                                "path": "/parameterDefinitions"
+                              }
+                            },
+                            "key": {
+                              "$var": "pname"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$let": {
+                        "name": "ps",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$pointerGet": {
+                                "object": {
+                                  "$var": "clause"
+                                },
+                                "path": "/parameters"
+                              }
+                            },
+                            "key": {
+                              "$var": "pname"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$isKind": {
+                              "val": {
+                                "$var": "ps"
+                              },
+                              "kind": "object"
+                            }
+                          }
+                        },
+                        "message": "PARAMETER_SOURCE_REQUIRED"
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$or": [
+                              {
+                                "$eq": [
+                                  {
+                                    "$keys": {
+                                      "$var": "ps"
+                                    }
+                                  },
+                                  {
+                                    "$literal": [
+                                      "from"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$keys": {
+                                      "$var": "ps"
+                                    }
+                                  },
+                                  {
+                                    "$literal": [
+                                      "literal"
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$keys": {
+                                      "$var": "ps"
+                                    }
+                                  },
+                                  {
+                                    "$literal": [
+                                      "field"
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "message": "INVALID_PARAMETER_SOURCE"
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$hasKey": {
+                            "object": {
+                              "$var": "ps"
+                            },
+                            "key": "from"
+                          }
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$or": [
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "ps",
+                                            "path": "/from"
+                                          }
+                                        },
+                                        "/parameters"
+                                      ]
+                                    },
+                                    {
+                                      "$and": [
+                                        {
+                                          "$isKind": {
+                                            "val": {
+                                              "$var": {
+                                                "name": "ps",
+                                                "path": "/from"
+                                              }
+                                            },
+                                            "kind": "text"
+                                          }
+                                        },
+                                        {
+                                          "$startsWith": [
+                                            {
+                                              "$var": {
+                                                "name": "ps",
+                                                "path": "/from"
+                                              }
+                                            },
+                                            "/parameters/"
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "PARAMETER_SOURCE_OUTSIDE_PARAMETERS"
+                            }
+                          },
+                          {
+                            "$let": {
+                              "name": "pv",
+                              "expr": {
+                                "$document": {
+                                  "$var": {
+                                    "name": "ps",
+                                    "path": "/from"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ],
+                        "else": [
+                          {
+                            "$if": {
+                              "cond": {
+                                "$hasKey": {
+                                  "object": {
+                                    "$var": "ps"
+                                  },
+                                  "key": "field"
+                                }
+                              },
+                              "then": [
+                                {
+                                  "$failIf": {
+                                    "cond": {
+                                      "$not": {
+                                        "$eq": [
+                                          {
+                                            "$var": {
+                                              "name": "pd",
+                                              "path": "/kind"
+                                            }
+                                          },
+                                          "pointer"
+                                        ]
+                                      }
+                                    },
+                                    "message": "FIELD_SOURCE_REQUIRES_POINTER_PARAMETER"
+                                  }
+                                },
+                                {
+                                  "$let": {
+                                    "name": "pv",
+                                    "expr": {
+                                      "$var": {
+                                        "name": "ps",
+                                        "path": "/field"
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "$failIf": {
+                                    "cond": {
+                                      "$not": {
+                                        "$and": [
+                                          {
+                                            "$isKind": {
+                                              "val": {
+                                                "$var": "pv"
+                                              },
+                                              "kind": "text"
+                                            }
+                                          },
+                                          {
+                                            "$startsWith": [
+                                              {
+                                                "$var": "pv"
+                                              },
+                                              "/"
+                                            ]
+                                          },
+                                          {
+                                            "$ne": [
+                                              {
+                                                "$var": "pv"
+                                              },
+                                              "/"
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "message": "INVALID_FIELD_POINTER"
+                                  }
+                                },
+                                {
+                                  "$failIf": {
+                                    "cond": {
+                                      "$not": {
+                                        "$exists": {
+                                          "$document": {
+                                            "$var": "pv"
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "message": "PARAMETER_FIELD_MISSING"
+                                  }
+                                }
+                              ],
+                              "else": [
+                                {
+                                  "$let": {
+                                    "name": "pv",
+                                    "expr": {
+                                      "$var": {
+                                        "name": "ps",
+                                        "path": "/literal"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$eq": [
+                              {
+                                "$kind": {
+                                  "$var": "pv"
+                                }
+                              },
+                              {
+                                "$choose": {
+                                  "cond": {
+                                    "$eq": [
+                                      {
+                                        "$var": {
+                                          "name": "pd",
+                                          "path": "/kind"
+                                        }
+                                      },
+                                      "workflow"
+                                    ]
+                                  },
+                                  "then": "object",
+                                  "else": {
+                                    "$choose": {
+                                      "cond": {
+                                        "$eq": [
+                                          {
+                                            "$var": {
+                                              "name": "pd",
+                                              "path": "/kind"
+                                            }
+                                          },
+                                          "pointer"
+                                        ]
+                                      },
+                                      "then": "text",
+                                      "else": {
+                                        "$var": {
+                                          "name": "pd",
+                                          "path": "/kind"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "message": "PARAMETER_KIND_MISMATCH"
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$eq": [
+                            {
+                              "$var": {
+                                "name": "pd",
+                                "path": "/kind"
+                              }
+                            },
+                            "pointer"
+                          ]
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$and": [
+                                    {
+                                      "$startsWith": [
+                                        {
+                                          "$var": "pv"
+                                        },
+                                        "/"
+                                      ]
+                                    },
+                                    {
+                                      "$ne": [
+                                        {
+                                          "$var": "pv"
+                                        },
+                                        "/"
+                                      ]
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "INVALID_FIELD_POINTER"
+                            }
+                          },
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$exists": {
+                                    "$document": {
+                                      "$var": "pv"
+                                    }
+                                  }
+                                }
+                              },
+                              "message": "PARAMETER_FIELD_MISSING"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$eq": [
+                            {
+                              "$var": {
+                                "name": "pd",
+                                "path": "/kind"
+                              }
+                            },
+                            "workflow"
+                          ]
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$hasKey": {
+                                    "object": {
+                                      "$var": "pd"
+                                    },
+                                    "key": "type"
+                                  }
+                                }
+                              },
+                              "message": "WORKFLOW_TYPE_REQUIRED"
+                            }
+                          },
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$eq": [
+                                    {
+                                      "$nodeBlueId": {
+                                        "$pointerGet": {
+                                          "object": {
+                                            "$var": "pv"
+                                          },
+                                          "path": "/type"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "$nodeBlueId": {
+                                        "$var": {
+                                          "name": "pd",
+                                          "path": "/type"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "WORKFLOW_TYPE_MISMATCH"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$hasKey": {
+                            "object": {
+                              "$var": "pd"
+                            },
+                            "key": "enum"
+                          }
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$includes": {
+                                    "list": {
+                                      "$var": {
+                                        "name": "pd",
+                                        "path": "/enum"
+                                      }
+                                    },
+                                    "val": {
+                                      "$var": "pv"
+                                    }
+                                  }
+                                }
+                              },
+                              "message": "PARAMETER_NOT_ALLOWED"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$hasKey": {
+                            "object": {
+                              "$var": "pd"
+                            },
+                            "key": "min"
+                          }
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$gte": [
+                                    {
+                                      "$var": "pv"
+                                    },
+                                    {
+                                      "$var": {
+                                        "name": "pd",
+                                        "path": "/min"
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "PARAMETER_BELOW_MINIMUM"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$hasKey": {
+                            "object": {
+                              "$var": "pd"
+                            },
+                            "key": "max"
+                          }
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$lte": [
+                                    {
+                                      "$var": "pv"
+                                    },
+                                    {
+                                      "$var": {
+                                        "name": "pd",
+                                        "path": "/max"
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "PARAMETER_ABOVE_MAXIMUM"
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$set": {
+                        "name": "params",
+                        "expr": {
+                          "$objectSet": {
+                            "object": {
+                              "$var": "params"
+                            },
+                            "key": {
+                              "$var": "pname"
+                            },
+                            "val": {
+                              "$var": "pv"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$ne": [
+                            {
+                              "$var": {
+                                "name": "pd",
+                                "path": "/kind"
+                              }
+                            },
+                            "workflow"
+                          ]
+                        },
+                        "then": [
+                          {
+                            "$set": {
+                              "name": "constantParams",
+                              "expr": {
+                                "$objectSet": {
+                                  "object": {
+                                    "$var": "constantParams"
+                                  },
+                                  "key": {
+                                    "$var": "pname"
+                                  },
+                                  "val": {
+                                    "$var": "pv"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$pointerGet": {
+                      "object": {
+                        "$var": "blueprint"
+                      },
+                      "path": "/freezeBindings",
+                      "default": {
+                        "$emptyList": true
+                      }
+                    }
+                  },
+                  "item": "fb",
+                  "do": [
+                    {
+                      "$set": {
+                        "name": "freezes",
+                        "expr": {
+                          "$listConcat": [
+                            {
+                              "$var": "freezes"
+                            },
+                            [
+                              {
+                                "$get": {
+                                  "object": {
+                                    "$var": "bindings"
+                                  },
+                                  "key": {
+                                    "$var": "fb"
+                                  }
+                                }
+                              }
+                            ]
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$keys": {
+                      "$pointerGet": {
+                        "object": {
+                          "$var": "blueprint"
+                        },
+                        "path": "/stateDefinitions"
+                      }
+                    }
+                  },
+                  "item": "sname",
+                  "do": [
+                    {
+                      "$let": {
+                        "name": "sp",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$var": "bindings"
+                            },
+                            "key": {
+                              "$var": "sname"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$let": {
+                        "name": "sd",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$pointerGet": {
+                                "object": {
+                                  "$var": "blueprint"
+                                },
+                                "path": "/stateDefinitions"
+                              }
+                            },
+                            "key": {
+                              "$var": "sname"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$ne": [
+                            {
+                              "$get": {
+                                "object": {
+                                  "$pointerGet": {
+                                    "object": {
+                                      "$var": "blueprint"
+                                    },
+                                    "path": "/bindingDefinitions"
+                                  }
+                                },
+                                "key": {
+                                  "$var": "sname"
+                                }
+                              }
+                            },
+                            "state"
+                          ]
+                        },
+                        "message": "STATE_REQUIRES_STATE_BINDING"
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$ne": [
+                            {
+                              "$kind": {
+                                "$var": {
+                                  "name": "sd",
+                                  "path": "/initial"
+                                }
+                              }
+                            },
+                            {
+                              "$var": {
+                                "name": "sd",
+                                "path": "/kind"
+                              }
+                            }
+                          ]
+                        },
+                        "message": "INVALID_STATE_INITIAL_VALUE"
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$not": {
+                              "$hasKey": {
+                                "object": {
+                                  "$var": "states"
+                                },
+                                "key": {
+                                  "$var": "sp"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "message": "STATE_OWNER_COLLISION"
+                      }
+                    },
+                    {
+                      "$set": {
+                        "name": "states",
+                        "expr": {
+                          "$objectSet": {
+                            "object": {
+                              "$var": "states"
+                            },
+                            "key": {
+                              "$var": "sp"
+                            },
+                            "val": {
+                              "owner": {
+                                "$var": "clauseKey"
+                              },
+                              "binding": {
+                                "$var": "sname"
+                              },
+                              "kind": {
+                                "$var": {
+                                  "name": "sd",
+                                  "path": "/kind"
+                                }
+                              },
+                              "typeId": {
+                                "$var": "clauseType"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$let": {
+                        "name": "priorPath",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$var": "oldBindings"
+                            },
+                            "key": {
+                              "$concat": [
+                                {
+                                  "$var": "clauseKey"
+                                },
+                                "/",
+                                {
+                                  "$var": "sname"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$or": [
+                              {
+                                "$not": {
+                                  "$exists": {
+                                    "$var": "priorPath"
+                                  }
+                                }
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$var": "priorPath"
+                                  },
+                                  {
+                                    "$var": "sp"
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "message": "STATE_REBIND_REQUIRES_MIGRATION"
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$exists": {
+                            "$document": {
+                              "$var": "sp"
+                            }
+                          }
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$hasKey": {
+                                    "object": {
+                                      "$pointerGet": {
+                                        "object": {
+                                          "$var": "old"
+                                        },
+                                        "path": "/states",
+                                        "default": {
+                                          "$emptyObject": true
+                                        }
+                                      }
+                                    },
+                                    "key": {
+                                      "$var": "sp"
+                                    }
+                                  }
+                                }
+                              },
+                              "message": "PRESEEDED_STATE_NOT_ALLOWED"
+                            }
+                          },
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$eq": [
+                                    {
+                                      "$pointerGet": {
+                                        "object": {
+                                          "$get": {
+                                            "object": {
+                                              "$pointerGet": {
+                                                "object": {
+                                                  "$var": "old"
+                                                },
+                                                "path": "/states",
+                                                "default": {
+                                                  "$emptyObject": true
+                                                }
+                                              }
+                                            },
+                                            "key": {
+                                              "$var": "sp"
+                                            }
+                                          }
+                                        },
+                                        "path": "/owner"
+                                      }
+                                    },
+                                    {
+                                      "$var": "clauseKey"
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "STATE_OWNER_CHANGED"
+                            }
+                          },
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$eq": [
+                                    {
+                                      "$pointerGet": {
+                                        "object": {
+                                          "$get": {
+                                            "object": {
+                                              "$var": "oldStates"
+                                            },
+                                            "key": {
+                                              "$var": "sp"
+                                            }
+                                          }
+                                        },
+                                        "path": "/typeId",
+                                        "default": {
+                                          "$var": "clauseType"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "$var": "clauseType"
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "STATE_TYPE_CHANGED"
+                            }
+                          },
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$eq": [
+                                    {
+                                      "$kind": {
+                                        "$document": {
+                                          "$var": "sp"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "$var": {
+                                        "name": "sd",
+                                        "path": "/kind"
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              "message": "STATE_KIND_MISMATCH"
+                            }
+                          }
+                        ],
+                        "else": [
+                          {
+                            "$appendChange": {
+                              "op": "add",
+                              "path": {
+                                "$var": "sp"
+                              },
+                              "val": {
+                                "$var": {
+                                  "name": "sd",
+                                  "path": "/initial"
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$keys": {
+                      "$pointerGet": {
+                        "object": {
+                          "$var": "blueprint"
+                        },
+                        "path": "/features"
+                      }
+                    }
+                  },
+                  "item": "featureName",
+                  "do": [
+                    {
+                      "$let": {
+                        "name": "feature",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$pointerGet": {
+                                "object": {
+                                  "$var": "blueprint"
+                                },
+                                "path": "/features"
+                              }
+                            },
+                            "key": {
+                              "$var": "featureName"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$ne": [
+                            {
+                              "$get": {
+                                "object": {
+                                  "$pointerGet": {
+                                    "object": {
+                                      "$var": "blueprint"
+                                    },
+                                    "path": "/bindingDefinitions"
+                                  }
+                                },
+                                "key": {
+                                  "$var": "featureName"
+                                }
+                              }
+                            },
+                            "contract"
+                          ]
+                        },
+                        "message": "FEATURE_REQUIRES_CONTRACT_BINDING"
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$includes": {
+                              "list": {
+                                "$literal": [
+                                  "channel",
+                                  "handler"
+                                ]
+                              },
+                              "val": {
+                                "$var": {
+                                  "name": "feature",
+                                  "path": "/category"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "message": "INVALID_FEATURE_CATEGORY"
+                      }
+                    },
+                    {
+                      "$let": {
+                        "name": "target",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$var": "bindings"
+                            },
+                            "key": {
+                              "$var": "featureName"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$and": [
+                              {
+                                "$isKind": {
+                                  "val": {
+                                    "$var": "target"
+                                  },
+                                  "kind": "text"
+                                }
+                              },
+                              {
+                                "$startsWith": [
+                                  {
+                                    "$var": "target"
+                                  },
+                                  "/contracts/"
+                                ]
+                              },
+                              {
+                                "$and": [
+                                  {
+                                    "$isKind": {
+                                      "val": {
+                                        "$sliceAfter": [
+                                          {
+                                            "$var": "target"
+                                          },
+                                          "/contracts/"
+                                        ]
+                                      },
+                                      "kind": "text"
+                                    }
+                                  },
+                                  {
+                                    "$ne": [
+                                      {
+                                        "$sliceAfter": [
+                                          {
+                                            "$var": "target"
+                                          },
+                                          "/contracts/"
+                                        ]
+                                      },
+                                      ""
+                                    ]
+                                  },
+                                  {
+                                    "$eq": [
+                                      {
+                                        "$size": {
+                                          "$split": {
+                                            "text": {
+                                              "$sliceAfter": [
+                                                {
+                                                  "$var": "target"
+                                                },
+                                                "/contracts/"
+                                              ]
+                                            },
+                                            "separator": "/"
+                                          }
+                                        }
+                                      },
+                                      1
+                                    ]
+                                  },
+                                  {
+                                    "$eq": [
+                                      {
+                                        "$size": {
+                                          "$split": {
+                                            "text": {
+                                              "$sliceAfter": [
+                                                {
+                                                  "$var": "target"
+                                                },
+                                                "/contracts/"
+                                              ]
+                                            },
+                                            "separator": "~"
+                                          }
+                                        }
+                                      },
+                                      1
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "$not": {
+                                  "$includes": {
+                                    "list": {
+                                      "$literal": [
+                                        "/contracts/_life",
+                                        "/contracts/_initializeClauses",
+                                        "/contracts/_clauseChanges",
+                                        "/contracts/_parameterChanges",
+                                        "/contracts/_reconcileClauses",
+                                        "/contracts/_reconcileParameters",
+                                        "/contracts/_installation",
+                                        "/contracts/initialized",
+                                        "/contracts/checkpoint",
+                                        "/contracts/terminated",
+                                        "/contracts/generalization",
+                                        "/contracts/embedded",
+                                        "/contracts/partyA",
+                                        "/contracts/partyB",
+                                        "/contracts/amendA",
+                                        "/contracts/amendB"
+                                      ]
+                                    },
+                                    "val": {
+                                      "$var": "target"
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "message": "INVALID_FEATURE_TARGET"
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$not": {
+                              "$hasKey": {
+                                "object": {
+                                  "$var": "wanted"
+                                },
+                                "key": {
+                                  "$var": "target"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "message": "CONTRACT_BINDING_COLLISION"
+                      }
+                    },
+                    {
+                      "$let": {
+                        "name": "template",
+                        "expr": {
+                          "$choose": {
+                            "cond": {
+                              "$hasKey": {
+                                "object": {
+                                  "$var": "feature"
+                                },
+                                "key": "parameter"
+                              }
+                            },
+                            "then": {
+                              "$get": {
+                                "object": {
+                                  "$var": "params"
+                                },
+                                "key": {
+                                  "$var": {
+                                    "name": "feature",
+                                    "path": "/parameter"
+                                  }
+                                }
+                              }
+                            },
+                            "else": {
+                              "$var": {
+                                "name": "feature",
+                                "path": "/template"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$forEach": {
+                        "in": {
+                          "$pointerGet": {
+                            "object": {
+                              "$var": "feature"
+                            },
+                            "path": "/fills",
+                            "default": {
+                              "$emptyList": true
+                            }
+                          }
+                        },
+                        "item": "fill",
+                        "do": [
+                          {
+                            "$set": {
+                              "name": "template",
+                              "expr": {
+                                "$pointerSet": {
+                                  "object": {
+                                    "$var": "template"
+                                  },
+                                  "path": {
+                                    "$var": {
+                                      "name": "fill",
+                                      "path": "/path"
+                                    }
+                                  },
+                                  "val": {
+                                    "$call": {
+                                      "function": "resolveFill",
+                                      "args": {
+                                        "spec": {
+                                          "$var": "fill"
+                                        },
+                                        "bindings": {
+                                          "$var": "bindings"
+                                        },
+                                        "params": {
+                                          "$var": "params"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$forEach": {
+                        "in": {
+                          "$pointerGet": {
+                            "object": {
+                              "$var": "feature"
+                            },
+                            "path": "/constantsAt",
+                            "default": {
+                              "$emptyList": true
+                            }
+                          }
+                        },
+                        "item": "cp",
+                        "do": [
+                          {
+                            "$set": {
+                              "name": "template",
+                              "expr": {
+                                "$pointerSet": {
+                                  "object": {
+                                    "$var": "template"
+                                  },
+                                  "path": {
+                                    "$var": "cp"
+                                  },
+                                  "val": {
+                                    "$merge": [
+                                      {
+                                        "$pointerGet": {
+                                          "object": {
+                                            "$var": "template"
+                                          },
+                                          "path": {
+                                            "$var": "cp"
+                                          },
+                                          "default": {
+                                            "$emptyObject": true
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "parameters": {
+                                          "$var": "constantParams"
+                                        },
+                                        "bindings": {
+                                          "$var": "bindings"
+                                        },
+                                        "clauseKey": {
+                                          "$var": "clauseKey"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    },
+                    {
+                      "$set": {
+                        "name": "wanted",
+                        "expr": {
+                          "$objectSet": {
+                            "object": {
+                              "$var": "wanted"
+                            },
+                            "key": {
+                              "$var": "target"
+                            },
+                            "val": {
+                              "$var": "template"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$set": {
+                        "name": "categories",
+                        "expr": {
+                          "$objectSet": {
+                            "object": {
+                              "$var": "categories"
+                            },
+                            "key": {
+                              "$var": "target"
+                            },
+                            "val": {
+                              "$var": {
+                                "name": "feature",
+                                "path": "/category"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$set": {
+                        "name": "owners",
+                        "expr": {
+                          "$objectSet": {
+                            "object": {
+                              "$var": "owners"
+                            },
+                            "key": {
+                              "$var": "target"
+                            },
+                            "val": {
+                              "$var": "clauseKey"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$set": {
+                  "name": "entries",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "entries"
+                      },
+                      "key": {
+                        "$var": "clauseKey"
+                      },
+                      "val": {
+                        "typeId": {
+                          "$var": "clauseType"
+                        },
+                        "parameters": {
+                          "$var": "params"
+                        },
+                        "bindings": {
+                          "$var": "bindings"
+                        },
+                        "freezePaths": {
+                          "$var": "freezes"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$var": "entries"
+              }
+            },
+            "item": "ck",
+            "do": [
+              {
+                "$let": {
+                  "name": "cl",
+                  "expr": {
+                    "$get": {
+                      "object": {
+                        "$document": "/clauses"
+                      },
+                      "key": {
+                        "$var": "ck"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$keys": {
+                      "$document": {
+                        "$concat": [
+                          "/clauses/",
+                          {
+                            "$var": "ck"
+                          },
+                          "/type/bindingDefinitions"
+                        ]
+                      }
+                    }
+                  },
+                  "item": "bk",
+                  "do": [
+                    {
+                      "$if": {
+                        "cond": {
+                          "$eq": [
+                            {
+                              "$get": {
+                                "object": {
+                                  "$document": {
+                                    "$concat": [
+                                      "/clauses/",
+                                      {
+                                        "$var": "ck"
+                                      },
+                                      "/type/bindingDefinitions"
+                                    ]
+                                  }
+                                },
+                                "key": {
+                                  "$var": "bk"
+                                }
+                              }
+                            },
+                            "state"
+                          ]
+                        },
+                        "then": [
+                          {
+                            "$failIf": {
+                              "cond": {
+                                "$not": {
+                                  "$hasKey": {
+                                    "object": {
+                                      "$var": "states"
+                                    },
+                                    "key": {
+                                      "$get": {
+                                        "object": {
+                                          "$pointerGet": {
+                                            "object": {
+                                              "$var": "cl"
+                                            },
+                                            "path": "/bindings"
+                                          }
+                                        },
+                                        "key": {
+                                          "$var": "bk"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              "message": "UNOWNED_STATE_BINDING"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$forEach": {
+                  "in": {
+                    "$pointerGet": {
+                      "object": {
+                        "$get": {
+                          "object": {
+                            "$var": "entries"
+                          },
+                          "key": {
+                            "$var": "ck"
+                          }
+                        }
+                      },
+                      "path": "/freezePaths"
+                    }
+                  },
+                  "item": "freezePath",
+                  "do": [
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$ne": [
+                            {
+                              "$pointerGet": {
+                                "object": {
+                                  "$get": {
+                                    "object": {
+                                      "$var": "states"
+                                    },
+                                    "key": {
+                                      "$var": "freezePath"
+                                    }
+                                  }
+                                },
+                                "path": "/kind"
+                              }
+                            },
+                            "boolean"
+                          ]
+                        },
+                        "message": "FREEZE_REQUIRES_BOOLEAN_STATE"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$var": "oldStates"
+              }
+            },
+            "item": "oldState",
+            "do": [
+              {
+                "$if": {
+                  "cond": {
+                    "$not": {
+                      "$hasKey": {
+                        "object": {
+                          "$var": "states"
+                        },
+                        "key": {
+                          "$var": "oldState"
+                        }
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "$let": {
+                        "name": "retired",
+                        "expr": {
+                          "$get": {
+                            "object": {
+                              "$var": "oldStates"
+                            },
+                            "key": {
+                              "$var": "oldState"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$not": {
+                              "$hasKey": {
+                                "object": {
+                                  "$var": "entries"
+                                },
+                                "key": {
+                                  "$var": {
+                                    "name": "retired",
+                                    "path": "/owner"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "message": "STATE_REBIND_REQUIRES_MIGRATION"
+                      }
+                    },
+                    {
+                      "$set": {
+                        "name": "states",
+                        "expr": {
+                          "$objectSet": {
+                            "object": {
+                              "$var": "states"
+                            },
+                            "key": {
+                              "$var": "oldState"
+                            },
+                            "val": {
+                              "$merge": [
+                                {
+                                  "$var": "retired"
+                                },
+                                {
+                                  "retired": true
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$let": {
+            "name": "nextContracts",
+            "expr": {
+              "$emptyObject": true
+            }
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$document": "/contracts"
+              }
+            },
+            "item": "rootKey",
+            "do": [
+              {
+                "$if": {
+                  "cond": {
+                    "$not": {
+                      "$hasKey": {
+                        "object": {
+                          "$pointerGet": {
+                            "object": {
+                              "$var": "old"
+                            },
+                            "path": "/contracts",
+                            "default": {
+                              "$emptyObject": true
+                            }
+                          }
+                        },
+                        "key": {
+                          "$concat": [
+                            "/contracts/",
+                            {
+                              "$var": "rootKey"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "$set": {
+                        "name": "nextContracts",
+                        "expr": {
+                          "$objectSet": {
+                            "object": {
+                              "$var": "nextContracts"
+                            },
+                            "key": {
+                              "$var": "rootKey"
+                            },
+                            "val": {
+                              "$objectSet": {
+                                "object": {
+                                  "$emptyObject": true
+                                },
+                                "key": "blueId",
+                                "val": {
+                                  "$nodeBlueId": {
+                                    "$document": {
+                                      "$concat": [
+                                        "/contracts/",
+                                        {
+                                          "$var": "rootKey"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$var": "wanted"
+              }
+            },
+            "item": "newPath",
+            "do": [
+              {
+                "$failIf": {
+                  "cond": {
+                    "$and": [
+                      {
+                        "$exists": {
+                          "$document": {
+                            "$var": "newPath"
+                          }
+                        }
+                      },
+                      {
+                        "$not": {
+                          "$hasKey": {
+                            "object": {
+                              "$pointerGet": {
+                                "object": {
+                                  "$var": "old"
+                                },
+                                "path": "/contracts",
+                                "default": {
+                                  "$emptyObject": true
+                                }
+                              }
+                            },
+                            "key": {
+                              "$var": "newPath"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "message": "GENERATED_CONTRACT_COLLIDES_WITH_ROOT_CONTRACT"
+                }
+              },
+              {
+                "$set": {
+                  "name": "nextContracts",
+                  "expr": {
+                    "$objectSet": {
+                      "object": {
+                        "$var": "nextContracts"
+                      },
+                      "key": {
+                        "$sliceAfter": [
+                          {
+                            "$var": "newPath"
+                          },
+                          "/contracts/"
+                        ]
+                      },
+                      "val": {
+                        "$objectSet": {
+                          "object": {
+                            "$emptyObject": true
+                          },
+                          "key": "blueId",
+                          "val": {
+                            "$nodeBlueId": {
+                              "$get": {
+                                "object": {
+                                  "$var": "wanted"
+                                },
+                                "key": {
+                                  "$var": "newPath"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "replace",
+            "path": "/contracts",
+            "val": {
+              "$var": "nextContracts"
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "revision",
+            "expr": {
+              "$add": [
+                {
+                  "$pointerGet": {
+                    "object": {
+                      "$var": "old"
+                    },
+                    "path": "/revision",
+                    "default": 0
+                  }
+                },
+                1
+              ]
+            }
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": "/clauseRuntime",
+            "val": {
+              "$objectSet": {
+                "object": {
+                  "$emptyObject": true
+                },
+                "key": "blueId",
+                "val": {
+                  "$nodeBlueId": {
+                    "contracts": {
+                      "$var": "owners"
+                    },
+                    "categories": {
+                      "$var": "categories"
+                    },
+                    "states": {
+                      "$var": "states"
+                    },
+                    "entries": {
+                      "$var": "entries"
+                    },
+                    "configId": {
+                      "$var": "configId"
+                    },
+                    "revision": {
+                      "$pointerGet": {
+                        "object": {
+                          "$var": "old"
+                        },
+                        "path": "/revision",
+                        "default": 0
+                      }
+                    },
+                    "configurations": {
+                      "$var": "configurations"
+                    },
+                    "format": "agreements.clauses/1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": "/clauseRuntime/revision",
+            "val": {
+              "$var": "revision"
+            }
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$pointerGet": {
+                  "object": {
+                    "$var": "old"
+                  },
+                  "path": "/configurations",
+                  "default": {
+                    "$emptyObject": true
+                  }
+                }
+              }
+            },
+            "item": "changedKey",
+            "do": [
+              {
+                "$if": {
+                  "cond": {
+                    "$not": {
+                      "$hasKey": {
+                        "object": {
+                          "$var": "configurations"
+                        },
+                        "key": {
+                          "$var": "changedKey"
+                        }
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "$appendEvent": {
+                        "$merge": [
+                          {
+                            "$literal": {
+                              "type": "Agreements/Clause Removed"
+                            }
+                          },
+                          {
+                            "kind": "Clause Removed",
+                            "clauseKey": {
+                              "$var": "changedKey"
+                            },
+                            "revision": {
+                              "$var": "revision"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$var": "configurations"
+              }
+            },
+            "item": "changedKey",
+            "do": [
+              {
+                "$if": {
+                  "cond": {
+                    "$not": {
+                      "$hasKey": {
+                        "object": {
+                          "$pointerGet": {
+                            "object": {
+                              "$var": "old"
+                            },
+                            "path": "/configurations",
+                            "default": {
+                              "$emptyObject": true
+                            }
+                          }
+                        },
+                        "key": {
+                          "$var": "changedKey"
+                        }
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "$appendEvent": {
+                        "$merge": [
+                          {
+                            "$literal": {
+                              "type": "Agreements/Clause Added"
+                            }
+                          },
+                          {
+                            "kind": "Clause Added",
+                            "clauseKey": {
+                              "$var": "changedKey"
+                            },
+                            "revision": {
+                              "$var": "revision"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "else": [
+                    {
+                      "$if": {
+                        "cond": {
+                          "$ne": [
+                            {
+                              "$nodeBlueId": {
+                                "$get": {
+                                  "object": {
+                                    "$var": "configurations"
+                                  },
+                                  "key": {
+                                    "$var": "changedKey"
+                                  }
+                                }
+                              }
+                            },
+                            {
+                              "$nodeBlueId": {
+                                "$get": {
+                                  "object": {
+                                    "$pointerGet": {
+                                      "object": {
+                                        "$var": "old"
+                                      },
+                                      "path": "/configurations",
+                                      "default": {
+                                        "$emptyObject": true
+                                      }
+                                    }
+                                  },
+                                  "key": {
+                                    "$var": "changedKey"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "then": [
+                          {
+                            "$appendEvent": {
+                              "$merge": [
+                                {
+                                  "$literal": {
+                                    "type": "Agreements/Clause Edited"
+                                  }
+                                },
+                                {
+                                  "kind": "Clause Edited",
+                                  "clauseKey": {
+                                    "$var": "changedKey"
+                                  },
+                                  "revision": {
+                                    "$var": "revision"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$appendEvent": {
+            "$merge": [
+              {
+                "$literal": {
+                  "type": "Agreements/Clauses Installed"
+                }
+              },
+              {
+                "kind": "Clauses Installed",
+                "revision": {
+                  "$var": "revision"
+                },
+                "configurationId": {
+                  "$var": "configId"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "initialize": {
+      "do": [
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$not": {
+                  "$exists": {
+                    "$document": "/clauseRuntime"
+                  }
+                }
+              }
+            },
+            "message": "PRESEEDED_RUNTIME_NOT_ALLOWED"
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$and": [
+                {
+                  "$eq": [
+                    {
+                      "$size": {
+                        "$keys": {
+                          "$document": "/clauses"
+                        }
+                      }
+                    },
+                    0
+                  ]
+                },
+                {
+                  "$ne": [
+                    {
+                      "$size": {
+                        "$keys": {
+                          "$document": "/initialClauses"
+                        }
+                      }
+                    },
+                    0
+                  ]
+                }
+              ]
+            },
+            "then": [
+              {
+                "$appendChange": {
+                  "op": "add",
+                  "path": "/clauses",
+                  "val": {
+                    "$objectSet": {
+                      "object": {
+                        "$emptyObject": true
+                      },
+                      "key": "blueId",
+                      "val": {
+                        "$nodeBlueId": {
+                          "$document": "/initialClauses"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            ],
+            "else": [
+              {
+                "$call": {
+                  "function": "install",
+                  "args": {}
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

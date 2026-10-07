@@ -1,0 +1,24 @@
+# Replace the scheduleReminder operation's steps with this ordinary Compute step.
+# It uses the complete initial request only as a source of the exact message type.
+type: Contracts/Compute
+do:
+  - $if:
+      cond:
+        $eq:
+          - $document: /status
+          - pending
+      then:
+        - $appendEvent:
+            $objectSet:
+              object:
+                channel: time
+                key: reminder
+                timestamp:
+                  $binding: call/request/timestamp
+                context:
+                  purpose: showReminder
+                  message:
+                    $binding: call/request/message
+              key: type
+              val:
+                $document: /activationRequest/type

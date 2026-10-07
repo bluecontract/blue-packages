@@ -1,0 +1,331 @@
+specification:
+  blueId: 5aLyxVDGR4ToKSMDoaXKFBWUPBcp3yCF8rdXfAoTT4nQ
+name: Qualification Mandate
+type: Mandates/Operation Mandate
+description: 'Optional one-check preset: an attributed positive qualified result installs
+  owner-reviewed scopeOnSuccess. Unknown is reconciled, never treated as success.'
+evidenceRequirement:
+  schema:
+    required: true
+  operationId:
+    type: Text
+    schema:
+      required: true
+      minLength: 1
+  operationRevision:
+    type: Integer
+    schema:
+      required: true
+      minimum: 1
+  document: {}
+scopeOnSuccess:
+  type: Mandates/Scope
+  schema:
+    required: true
+stage:
+  type: Text
+pendingEvidence: {}
+evidenceResponse: {}
+contracts:
+  evidenceProviderChannel:
+    type: coordination/Timeline Channel
+    schema:
+      required: true
+  initializeQualification:
+    type: contracts/Sequential Workflow
+    channel: lifecycle
+    event:
+      type: contracts/Document Processing Initiated
+    steps:
+    - type: contracts/Compute
+      do:
+      - $appendChange:
+          op: add
+          path: /stage
+          val: AwaitingEvidence
+      - $appendChange:
+          op: add
+          path: /scope
+          val:
+            $emptyObject: true
+      - $appendChange:
+          op: add
+          path: /pendingEvidence
+          val:
+            $emptyObject: true
+      - $appendChange:
+          op: add
+          path: /evidenceResponse
+          val:
+            $emptyObject: true
+    order: 20
+  requestEvidence:
+    type: contracts/Sequential Workflow Operation
+    channel: authorizedActorChannel
+    request: {}
+    steps:
+    - type: contracts/Compute
+      do:
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $document: /status
+              - Active
+          message: MANDATE_NOT_ACTIVE
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $keys:
+                  $binding: call/request
+              - []
+          message: EMPTY_REQUEST_REQUIRED
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $document: /stage
+              - AwaitingEvidence
+          message: EVIDENCE_ALREADY_REQUESTED
+      - $let:
+          name: request
+          expr:
+            $objectSet:
+              object:
+                $objectSet:
+                  object:
+                    $objectSet:
+                      object:
+                        $objectSet:
+                          object:
+                            $literal: &id001
+                              type: Mandates/Evidence Requested
+                              requestId: uninitialized
+                              recipientChannel: evidenceProviderChannel
+                              responseOperation: provideEvidence
+                              operationId: uninitialized
+                              operationRevision: 1
+                              document:
+                                subject: placeholder
+                          key: requestId
+                          val:
+                            $nodeBlueId:
+                              $event: ''
+                      key: operationId
+                      val:
+                        $document: /evidenceRequirement/operationId
+                  key: operationRevision
+                  val:
+                    $document: /evidenceRequirement/operationRevision
+              key: document
+              val:
+                $document: /evidenceRequirement/document
+      - $appendChange:
+          op: add
+          path: /pendingEvidence
+          val:
+            $var: request
+      - $appendChange:
+          op: replace
+          path: /stage
+          val: EvidencePending
+      - $appendEvent:
+          $var: request
+  provideEvidence:
+    type: contracts/Sequential Workflow Operation
+    channel: evidenceProviderChannel
+    request:
+      type: Mandates/Evidence Responded
+    steps:
+    - type: contracts/Compute
+      do:
+      - $let:
+          name: reply
+          expr:
+            $binding: call/request
+      - $if:
+          cond:
+            $exists:
+              $document: /evidenceResponse/executionId
+          then:
+          - $if:
+              cond:
+                $eq:
+                - $nodeBlueId:
+                    $document: /evidenceResponse
+                - $nodeBlueId:
+                    $var: reply
+              then:
+              - $return: true
+          - $failIf:
+              cond:
+                $not:
+                  $eq:
+                  - $document: /evidenceResponse/executionId
+                  - $var:
+                      name: reply
+                      path: /executionId
+              message: EXECUTION_MISMATCH
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $document: /status
+              - Active
+          message: MANDATE_NOT_ACTIVE
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $document: /stage
+              - EvidencePending
+          message: NO_PENDING_EVIDENCE
+      - $if:
+          cond:
+            $eq:
+            - $var:
+                name: reply
+                path: /executionStatus
+            - Succeeded
+          then:
+          - $failIf:
+              cond:
+                $not:
+                  $eq:
+                  - $keys:
+                      $var:
+                        name: reply
+                        path: /result
+                  - - qualified
+              message: QUALIFIED_RESULT_REQUIRED
+          - $failIf:
+              cond:
+                $not:
+                  $isKind:
+                    val:
+                      $var:
+                        name: reply
+                        path: /result/qualified
+                    kind: boolean
+              message: QUALIFIED_BOOLEAN_REQUIRED
+          else:
+          - $failIf:
+              cond:
+                $not:
+                  $eq:
+                  - $keys:
+                      $var:
+                        name: reply
+                        path: /result
+                  - []
+              message: NON_SUCCESS_RESULT_MUST_BE_EMPTY
+      - $let:
+          name: expected
+          expr:
+            $objectSet:
+              object:
+                $objectSet:
+                  object:
+                    $objectSet:
+                      object:
+                        $objectSet:
+                          object:
+                            $literal:
+                              type: Mandates/Evidence Responded
+                              inResponseTo: *id001
+                              executionId: uninitialized
+                              executionStatus: Unknown
+                              result: {}
+                          key: inResponseTo
+                          val:
+                            $document: /pendingEvidence
+                      key: executionId
+                      val:
+                        $var:
+                          name: reply
+                          path: /executionId
+                  key: executionStatus
+                  val:
+                    $var:
+                      name: reply
+                      path: /executionStatus
+              key: result
+              val:
+                $choose:
+                  cond:
+                    $eq:
+                    - $var:
+                        name: reply
+                        path: /executionStatus
+                    - Succeeded
+                  then:
+                    qualified:
+                      $var:
+                        name: reply
+                        path: /result/qualified
+                  else:
+                    $emptyObject: true
+      - $failIf:
+          cond:
+            $not:
+              $eq:
+              - $nodeBlueId:
+                  $var: expected
+              - $nodeBlueId:
+                  $var: reply
+          message: RESPONSE_REQUEST_MISMATCH
+      - $appendChange:
+          op: add
+          path: /evidenceResponse
+          val:
+            $var: reply
+      - $appendEvent:
+          $var: reply
+      - $if:
+          cond:
+            $eq:
+            - $var:
+                name: reply
+                path: /executionStatus
+            - Unknown
+          then:
+          - $appendChange:
+              op: replace
+              path: /scope
+              val:
+                $emptyObject: true
+          else:
+          - $if:
+              cond:
+                $and:
+                - $eq:
+                  - $var:
+                      name: reply
+                      path: /executionStatus
+                  - Succeeded
+                - $eq:
+                  - $var:
+                      name: reply
+                      path: /result/qualified
+                  - true
+              then:
+              - $appendChange:
+                  op: replace
+                  path: /scope
+                  val:
+                    $document: /scopeOnSuccess
+              - $appendChange:
+                  op: replace
+                  path: /stage
+                  val: EvidencePassed
+              else:
+              - $appendChange:
+                  op: replace
+                  path: /scope
+                  val:
+                    $emptyObject: true
+              - $appendChange:
+                  op: replace
+                  path: /stage
+                  val: NeedsReview

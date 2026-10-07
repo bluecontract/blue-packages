@@ -50,6 +50,16 @@ def selections(root):
     edition = json.loads((root / 'ROOT-CLAUSE-PACKAGES.json').read_text())
     require(edition['nativeRuntimeModified'] is False, 'Business edition cannot register native support')
     rows.extend(dict(row, selection=edition['edition']) for row in edition['packages'])
+    timeline = json.loads((root / 'TIMELINE-PACKAGES.json').read_text())
+    require(timeline['nativeRuntimeModified'] is False, 'Timeline data cannot register native support')
+    for row in timeline['packages']:
+        path = row.get('path', row['name'] + '/dist/package.bluepkg')
+        existing = next((entry for entry in rows if entry['path'] == path), None)
+        if existing is not None:
+            require(all(existing[key] == row[key] for key in ('packageBlueId', 'archiveSha256')),
+                    'Conflicting timeline selection: ' + path)
+        else:
+            rows.append(dict(row, path=path, selection='timeline-candidate'))
     require(len({(r['selection'], r['name']) for r in rows}) == len(rows), 'Duplicate selected package name')
     require(len({r['path'] for r in rows}) == len(rows), 'Duplicate archive path')
     return sorted(rows, key=lambda row: row['name'])

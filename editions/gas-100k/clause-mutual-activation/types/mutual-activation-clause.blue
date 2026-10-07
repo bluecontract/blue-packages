@@ -1,0 +1,178 @@
+{
+  "name": "Mutual Activation Clause",
+  "type": "Agreements/Clause",
+  "description": "Root-local bilateral negotiation, exact revision approvals and activation. Generates several root workflows and a local state listener.",
+  "parameterDefinitions": {
+    "initialTerms": {
+      "kind": "object"
+    },
+    "termSchema": {
+      "kind": "object"
+    }
+  },
+  "parameters": {},
+  "bindings": {},
+  "bindingDefinitions": {
+    "state": "state",
+    "activated": "state",
+    "terminated": "state",
+    "acceptedTerms": "state",
+    "acceptedRevision": "state",
+    "history": "state",
+    "closed": "state",
+    "channelA": "channel",
+    "channelB": "channel",
+    "initialize": "contract",
+    "actA": "contract",
+    "actB": "contract",
+    "stateUpdates": "contract",
+    "completeActivation": "contract"
+  },
+  "stateDefinitions": {
+    "state": {
+      "kind": "object",
+      "initial": {}
+    },
+    "activated": {
+      "kind": "boolean",
+      "initial": false
+    },
+    "acceptedTerms": {
+      "kind": "object",
+      "initial": {}
+    },
+    "acceptedRevision": {
+      "kind": "object",
+      "initial": {}
+    },
+    "history": {
+      "kind": "list",
+      "initial": []
+    },
+    "closed": {
+      "kind": "boolean",
+      "initial": false
+    }
+  },
+  "freezeBindings": [
+    "activated",
+    "closed",
+    "terminated"
+  ],
+  "features": {
+    "initialize": {
+      "template": {
+        "type": "Contracts/Sequential Workflow",
+        "channel": "_installation",
+        "steps": [
+          {
+            "type": "Contracts/Compute",
+            "definition": {
+              "type": "MutualActivation/Root Activation Setup"
+            },
+            "entry": "initialize",
+            "constants": {}
+          }
+        ]
+      },
+      "category": "handler",
+      "fills": [],
+      "constantsAt": [
+        "/steps/0/constants"
+      ]
+    },
+    "actA": {
+      "template": {
+        "type": "Contracts/Sequential Workflow Operation",
+        "channel": "partyA",
+        "steps": [
+          {
+            "type": "Contracts/Compute",
+            "definition": {
+              "type": "MutualActivation/Root Activation Logic"
+            },
+            "entry": "actA",
+            "constants": {}
+          }
+        ]
+      },
+      "category": "handler",
+      "fills": [
+        {
+          "path": "/channel",
+          "binding": "channelA"
+        }
+      ],
+      "constantsAt": [
+        "/steps/0/constants"
+      ]
+    },
+    "actB": {
+      "template": {
+        "type": "Contracts/Sequential Workflow Operation",
+        "channel": "partyB",
+        "steps": [
+          {
+            "type": "Contracts/Compute",
+            "definition": {
+              "type": "MutualActivation/Root Activation Logic"
+            },
+            "entry": "actB",
+            "constants": {}
+          }
+        ]
+      },
+      "category": "handler",
+      "fills": [
+        {
+          "path": "/channel",
+          "binding": "channelB"
+        }
+      ],
+      "constantsAt": [
+        "/steps/0/constants"
+      ]
+    },
+    "stateUpdates": {
+      "template": {
+        "type": "Contracts/Document Update Channel",
+        "path": "/activationState"
+      },
+      "category": "channel",
+      "fills": [
+        {
+          "path": "/path",
+          "binding": "state"
+        }
+      ],
+      "constantsAt": []
+    },
+    "completeActivation": {
+      "template": {
+        "type": "Contracts/Sequential Workflow",
+        "channel": "activationStateUpdates",
+        "steps": [
+          {
+            "type": "Contracts/Compute",
+            "definition": {
+              "type": "MutualActivation/Root Activation Completion"
+            },
+            "entry": "complete",
+            "constants": {}
+          }
+        ]
+      },
+      "category": "handler",
+      "fills": [
+        {
+          "path": "/channel",
+          "binding": "stateUpdates",
+          "asKey": true
+        }
+      ],
+      "constantsAt": [
+        "/steps/0/constants"
+      ]
+    }
+  }
+}

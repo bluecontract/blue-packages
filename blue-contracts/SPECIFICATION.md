@@ -1,6 +1,6 @@
 # Blue Contracts 1.0
 
-**Edition:** `blue-contracts/2026-09-26-standalone-1`  
+**Edition:** `blue-contracts/2026-10-07-gas-10m-1`  
 **Normative form:** one complete specification with executable algorithm appendices
 
 ## Abstract
@@ -51,7 +51,7 @@ A package distributes this specification; it does not install a processor. The p
 
 This edition selects Blue Language package `8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4` and its complete specification Text `H7WiYQ6GiWypRdFyWRcv99dsvTv6WnJYnu9eLYPQmWnc`. Language is a direct prerequisite: document admission, effective types, specialization, exact references, specification metadata, cyclic identities and BlueIds use its defined operations.
 
-This edition requires Blue BEX package `BvEGHEYgu4pg5QrW6cNcPho8tTBjcUuVtX645CmwDid8`, protocol specification `Bw4AZNwewBkkWcbAak2XZtHuQyPisS7PNvQfux3tESUj`, and normative rules Text `FcGJPnNHZ9KzB8JSwXsdvrbXQSqBYXrESPZJF35brUUk`. Every BEX-bearing position in an invocation uses that evaluator contract and the host interfaces defined here. Selecting another package or operator table MUST NOT substitute another BEX mode. BEX values and proposed effects are not automatically admitted Blue values; the output boundaries below are mandatory.
+This edition requires Blue BEX package `6m7CxeDA9F74LyfU1H5zYGmo6ozXr4zJFbh7j6F6QJ7a`, protocol specification `H4bhWaD45C4MbrWYgj3Z6kXY9NoBa6gYms9mnbRMyta7`, and normative rules Text `7m8k8P8b8Kn2jHF96EQogWTpsouytXmDFQ3qdmWdY5A3`. Every BEX-bearing position in an invocation uses that evaluator contract and the host interfaces defined here. Selecting another package or operator table MUST NOT substitute another BEX mode. BEX values and proposed effects are not automatically admitted Blue values; the output boundaries below are mandatory.
 
 Coordination is not a prerequisite of Contracts. A higher-level host may establish external ordering, authority and durable histories; it supplies the original accepted event and timestamp through the public transition defined here. Contracts does not query a timeline provider or assign actor authority on its own.
 
@@ -540,9 +540,13 @@ All extension callbacks obey the same frame and completion boundary. An UPDATE e
 <a id="section-17"></a>
 ## 17. Logical gas and host-independent resource semantics
 
-**C29.** the logical gas schedule appendix and the metering appendix define the exact logical meter. The shared maximum and default remain **100,000**. There are no unrelated structural/resource ceilings. Gas MUST NOT be increased beyond the specified maximum, disabled, or charged by host time or memory. Existing numerical tariffs are retained unless an explicitly recorded and qualified metering correction is necessary. Any such correction must define its exact counter, units, charge position and order before publication; preserve BEX value/evaluation semantics and distinguish the changed gas edition from physical optimization.
+This edition raises the shared default and maximum from 100,000 to 10,000,000 gas units per entire atomic attempt, including embedded members and cyclic rounds. Numerical tariffs, debit ordering, rejected-charge accounting and rollback are unchanged. Explicit smaller invocation budgets and member-local ceilings remain supported.
 
-One shared ledger covers the complete rooted attempt; the default/maximum shared allowance remains 100000. Member ceilings are additional constraints on that same logical ledger. A charge is `(ordinal, namespace, counter, units, amount, owner)` and is debited before its work. Retain the defined shared/local exhaustion tie-break and rejected-charge accounting. Rollback does not refund admitted work.
+Prior editions retain their original identities and 100,000 maximum. Hosts MUST select the rules and budget maximum bound to a document's edition and MUST NOT silently upgrade retained snapshots, invocations or receipts. The allowance is permission for logical work, not a CPU or memory reservation or a guarantee of physical completion.
+
+**C29.** the logical gas schedule appendix and the metering appendix define the exact logical meter. The shared maximum and default remain **10,000,000**. There are no unrelated structural/resource ceilings. Gas MUST NOT be increased beyond the specified maximum, disabled, or charged by host time or memory. Existing numerical tariffs are retained unless an explicitly recorded and qualified metering correction is necessary. Any such correction must define its exact counter, units, charge position and order before publication; preserve BEX value/evaluation semantics and distinguish the changed gas edition from physical optimization.
+
+One shared ledger covers the complete rooted attempt; the default/maximum shared allowance remains 10000000. Member ceilings are additional constraints on that same logical ledger. A charge is `(ordinal, namespace, counter, units, amount, owner)` and is debited before its work. Retain the defined shared/local exhaustion tie-break and rejected-charge accounting. Rollback does not refund admitted work.
 
 The canonical logical schedule is the dependency order, local turn order and component-round order in the annex. Chunk dispatch, transport, wall time and physical cache reads create no extra semantic charges. A cached chunk supplies the same verified logical segment; replay it against the attempt's current ledger **before** accepting any effects. It cannot skip work, reset allowances, erase a rejected prefix or be merged twice. Runtime callback namespaces and sealed runtimeLedger rules follow the metering appendix.
 
@@ -550,7 +554,7 @@ A standalone `process(B, e, t)` includes its own setup and root projection. Its 
 
 The protocol has no separate maximum document/edge count, contract-map size, workflow-step count, patch/emission/route/dispatch count, turn/round count, content/path/filter/program depth, executable-body size, token length or generalization-search length. Keep the required syntax/normalization and exact value/format rules; remove only the unrelated resource ceilings. Explicit authored constraints and supported stricter member gas budgets remain enforceable.
 
-The standard whole-attempt gas maximum is still 100,000, not 100,000 per member, page, chunk or component round. Existing explicitly selected lower test/invocation budgets and member-local ceilings remain supported and bound into execution evidence; a machine-specific shortage must not silently lower the authoritative budget. Exactly spending the remaining gas is allowed if no further charged work is required; the next unaffordable charge is rejected before its corresponding work. Do not change the existing tie-break or first-rejected-charge record.
+The standard whole-attempt gas maximum is still 10,000,000, not 10,000,000 per member, page, chunk or component round. Existing explicitly selected lower test/invocation budgets and member-local ceilings remain supported and bound into execution evidence; a machine-specific shortage must not silently lower the authoritative budget. Exactly spending the remaining gas is allowed if no further charged work is required; the next unaffordable charge is rejected before its corresponding work. Do not change the existing tie-break or first-rejected-charge record.
 
 All repeatable semantic progress formerly protected only by a removed count guard must have a defined positive logical charge or a finite structural termination argument. A scalar-expression base charge is not evidence that arbitrary-size arithmetic, copying or materialization is adequately metered. Review these paths before claiming gas-bounded processing. Reuse defined counters/quantities where they already describe the work; do not derive costs from Language's physical step count, a worker timeout, cache warmth or bytes actually fetched from a warm/cold database.
 
@@ -911,7 +915,7 @@ RUN_CYCLIC_UNIT(U):
     expose one UnitCompletion to outside containers
 ```
 
-A member without work does not rerun its external operation merely because a peer changed state. At the round boundary all member references are made coherent; pure identity/reference changes do not create another round. Internally generated events and lifecycle work do. All applicable member-local gas ceilings and the shared 100,000 maximum remain live across rounds; no independent structural turn/round limit applies.
+A member without work does not rerun its external operation merely because a peer changed state. At the round boundary all member references are made coherent; pure identity/reference changes do not create another round. Internally generated events and lifecycle work do. All applicable member-local gas ceilings and the shared 10,000,000 maximum remain live across rounds; no independent structural turn/round limit applies.
 
 Within a round, peer and self-edge reads use V, never a result produced earlier in the member-key loop. Local owned-field reads use the current frame as usual. At the next round, peers see the just sealed V'. This is deterministic even if turn calculations are physically parallel; logical acceptance/metering remains member-key ordered.
 
@@ -1032,14 +1036,14 @@ on physical resource interruption before completion:
     if a publication was attempted and may have committed, reconcile first
 ```
 
-Logical-work inventory is not physical cache inventory. Keep the old meter for work whose charge is already specified; optional cached results must produce the same successful/rejected prefix as uncached execution. Any uncovered input-dependent primitive needs an explicitly specified metering correction before final conformance is claimed, not an arbitrary size ceiling or a hardware-dependent tariff. Work done by a standalone Language authoring call or provider prefix acquisition is not silently put into an unrelated Contracts invocation's 100,000 ledger.
+Logical-work inventory is not physical cache inventory. Keep the old meter for work whose charge is already specified; optional cached results must produce the same successful/rejected prefix as uncached execution. Any uncovered input-dependent primitive needs an explicitly specified metering correction before final conformance is claimed, not an arbitrary size ceiling or a hardware-dependent tariff. Work done by a standalone Language authoring call or provider prefix acquisition is not silently put into an unrelated Contracts invocation's 10,000,000 ledger.
 
 <a id="metering"></a>
 ## Appendix B. Logical metering and schedule
 
 ### Common ledger
 
-There is one shared live ledger for the entire `process` or `initialize` attempt, maximum/default 100000, plus optional member-local ceilings. Charge before work. Retain the defined owner field, admitted prefix, first rejected charge, tie-break, domain-integer checks and extension namespace rules in `reference/model.py` and `reference/runtime.py`.
+There is one shared live ledger for the entire `process` or `initialize` attempt, maximum/default 10000000, plus optional member-local ceilings. Charge before work. Retain the defined owner field, admitted prefix, first rejected charge, tie-break, domain-integer checks and extension namespace rules in `reference/model.py` and `reference/runtime.py`.
 
 Failed state rolls back, not admitted work. NEEDS_RESOURCES has an incompatible's no-completed-ledger disposition. Physical queue storage, network transfer, cache hits and task IDs are not tariffs. Logical input facts and validation proofs are distinct from physical caches.
 
@@ -1079,7 +1083,7 @@ The reference logical order is A01 setup, initialization units, input units, mem
 
 A cached segment with a different logical proof inventory, dependency context, profile, seed selection or budget-prefix semantics cannot be copied unchanged. Re-execute the local kernel or derive/verify its exact normal-form work through the implementation's supported equivalent path. It is never sufficient to set gas to the cache lookup cost. A previously admitted segment cannot merge twice for the same logical chunk; distinct receiving occurrences still have their own application costs.
 
-Retain the defined rejected-charge behavior: stop before the first work item that exceeds shared or owner-local remaining gas, return its exact rejected charge, and expose no state/output. Speculative work beyond that point is physical diagnostic work only. Do not execute an unbounded speculative callback merely to discover a ledger. It must follow the declared live or verifiable work-ledger contract; the 100,000 shared ceiling is not reset for it. Physical interruption abandons speculation and is not a semantic rejection.
+Retain the defined rejected-charge behavior: stop before the first work item that exceeds shared or owner-local remaining gas, return its exact rejected charge, and expose no state/output. Speculative work beyond that point is physical diagnostic work only. Do not execute an unbounded speculative callback merely to discover a ledger. It must follow the declared live or verifiable work-ledger contract; the 10,000,000 shared ceiling is not reset for it. Physical interruption abandons speculation and is not a semantic rejection.
 
 Consequently:
 
@@ -1101,9 +1105,9 @@ Run direct/chunk differential cases at ample gas, exact-success allowance, one u
 
 ### No unrelated protocol ceilings
 
-The structural `limits` entries are removed from the current manifest. Preserve `sharedMaximum: 100000`, all existing numerical weights, the default maximum, legitimate smaller bound budgets and member ceilings. Keep caches and I/O pages bounded independently: their size changes neither legal content nor completed logical gas.
+The structural `limits` entries are removed from the current manifest. Preserve `sharedMaximum: 10000000`, all existing numerical weights, the default maximum, legitimate smaller bound budgets and member ceilings. Keep caches and I/O pages bounded independently: their size changes neither legal content nor completed logical gas.
 
-A valid computation may exceed an old document, step, depth or numeric-text limit while remaining within gas. It must not hit that obsolete semantic guard. A computation whose prescribed logical work exceeds 100,000 still fails at the real first unaffordable charge. Neither a bigger machine nor more chunks changes that boundary.
+A valid computation may exceed an old document, step, depth or numeric-text limit while remaining within gas. It must not hit that obsolete semantic guard. A computation whose prescribed logical work exceeds 10,000,000 still fails at the real first unaffordable charge. Neither a bigger machine nor more chunks changes that boundary.
 
 A host unable to calculate or retain a valid under-budget outcome has not established a gas failure. Report incompleteness/operational fault, preserve pending input and stable state, and retry only with valid captured semantics. Do not publish a completed ledger assembled from a partial trace or estimate missing work using CPU time.
 
@@ -1113,7 +1117,7 @@ Meter every operation before performing its charged work. Existing graph/header,
 
 ### Resource-proportional charging
 
-The standard/default maximum remains 100000. Structural `limits` is empty.
+The standard/default maximum remains 10000000. Structural `limits` is empty.
 BEX adds the unit-weight counters `integerWork`, `textWork`, `valueMember`, with
 quantities and debit ordering defined in its resource-revision section. The same
 Contracts meter and current owner receive those debits; no nested budget resets.
@@ -1343,8 +1347,8 @@ removes accidental duplicate establishment, not actual reads or new construction
 ```json
 {
   "profile": "contracts-deterministic-gas-4",
-  "status": "Fourth corrective edition: representation-independent selected-descendant identity evidence and exact-value transfers; retains occurrence-based comparison, prepaid construction and shared maximum 100000.",
-  "sharedMaximum": 100000,
+  "status": "Ten-million-gas edition: shared default and maximum 10000000; numerical tariffs, charge ordering and rollback are unchanged.",
+  "sharedMaximum": 10000000,
   "weights": {
     "processInvocation": 20,
     "deliverySnapshotEntry": 1,
@@ -3484,7 +3488,7 @@ from blue_bex import GasExhausted
 from blue_bex.gas import DEFAULT as BEX_GAS
 
 SAFE=(1<<53)-1
-DEFAULT_LIMIT=100000
+DEFAULT_LIMIT=10000000
 LIMITS = {}  # No universal structural ceilings; retained compatibility export.
 GAS_PROFILE=json.loads((Path(__file__).resolve().parents[1]/'GAS_MANIFEST.json').read_text())
 TARIFF=GAS_PROFILE['weights']
@@ -3776,14 +3780,14 @@ from .graph import Graph,Archive,prepare_bundle,components
 from .channels import refresh_lifetimes,signature,checkpoint,event_observation,recognize_call,select_seeds
 
 class Processor:
-    def __init__(self, language=None, *, gas_limit=100000, local_limits=None, local_driver=False):
+    def __init__(self, language=None, *, gas_limit=10000000, local_limits=None, local_driver=False):
         self.blue=Bridge(language); self.registry=Registry(self.blue)
         self.archive=Archive(); self.bex=Bex()
         from .receiving import CompletionStore
         self._completion_store=CompletionStore()
         self._completion_reader=None
         self.local_driver=bool(local_driver)
-        integer(gas_limit, 0, 100000)
+        integer(gas_limit, 0, 10000000)
         self.gas_limit=gas_limit; self.local_limits=deepcopy(local_limits or {})
     def typed(self,type_name,**fields):return self.registry.typed(type_name,**fields)
     def install_runtime(self,binding,implementation):self.registry.install(binding,implementation)
@@ -5406,9 +5410,9 @@ def host_boundary(fn):
 | `src/blue_contracts/reference/generalization.py` | `1f24b86271755ae5f1b5132c31de85d12d05d2a19c7c4b5d493201b953dff887` |
 | `src/blue_contracts/reference/graph.py` | `106b07e478bf77e2314b28044e0338429958ac58397db83f142ae0d5d8247b17` |
 | `src/blue_contracts/reference/language.py` | `2ae90402ede1299c0cd43c770406e0572ea8b68a384ce0d4bc01734da4b2f889` |
-| `src/blue_contracts/reference/model.py` | `5dc49fa84e457f8c362b88b961e9036a1812a5697958a76cf0f3119a9dcdc145` |
+| `src/blue_contracts/reference/model.py` | `3ad2eead8b944e6c11d3c09684fc108142fda3e0c86dfae18728c3447953ca5e` |
 | `src/blue_contracts/reference/policy.py` | `2423e9d280e20db1d08d8d6c42a8a8e4ab8e53d5f335866a27dd0eb7f2433121` |
-| `src/blue_contracts/reference/processor.py` | `f9f8e70373d970f7cc0ee1a8322317418da154934af2506c8731ebbed755952c` |
+| `src/blue_contracts/reference/processor.py` | `8999ff7375c7af79ab09f76d3dc07394357dcf61dcbfab8659548634ad339655` |
 | `src/blue_contracts/reference/receiving.py` | `f5d56b66afd83cc0128883018b412282145238f6a956e4077bb530996039c7ff` |
 | `src/blue_contracts/reference/registry.py` | `93a3b8bad491d80782778e8032798f4671ee2a996f39694d44baa2f700bced6a` |
 | `src/blue_contracts/reference/runtime.py` | `0b33f51fb2d99a01d1867ac24767b4158139de9165eef0f93f86750bf24b9196` |

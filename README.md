@@ -1,5 +1,7 @@
 # Blue Packages
 
+Current gas edition: [10M default and maximum](GAS-10M.md). Historical publications retain their original budgets.
+
 Reusable Blue definitions, protocol specifications and executable business documents,
 shared by the Java and Python implementations of Blue.
 

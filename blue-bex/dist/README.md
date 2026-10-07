@@ -22,6 +22,8 @@ Python 3.13 or newer is required by the included reference; pytest is required o
 
 ## Release qualification
 
-This distribution is version `1.0.0-rc.1`. Its specification is complete; passing finite cases is not a universal conformance certificate. See `QUALIFICATION.md` and `VERIFICATION.md` in the source workspace for tested scope and host-integration limits.
+This distribution is version `1.0.0-rc.2`. Its specification is complete; passing finite cases is not a universal conformance certificate. See `QUALIFICATION.md` and `VERIFICATION.md` in the source workspace for tested scope and host-integration limits.
 
 Changing the documentation changes package identity, not the evaluator's selected native rules. Changing this normative specification changes its identity. Loading the package does not install a BEX implementation or authorize an intrinsic.
+
+The default standalone gas allowance is 10,000,000. Under Contracts, the caller supplies the shared ledger; BEX never resets it. Previous publications remain in `editions/gas-100k/`.

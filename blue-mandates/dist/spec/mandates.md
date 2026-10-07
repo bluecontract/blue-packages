@@ -134,7 +134,7 @@ from authority predicates. Runtime evaluation must yield the Boolean value true,
 not truthy text, an integer, or an object. A runtime error, unprovided binding,
 non-Boolean result or exhausted budget never authorizes. Predicate BEX uses the
 same pinned evaluator as the selected Contracts implementation. Each evaluation
-retains the unchanged 100,000 gas ceiling; this does not implement a cumulative
+retains the unchanged 10,000,000 gas ceiling; this does not implement a cumulative
 user-level spending or resource budget.
 
 The authority-predicate host MUST provide Language-backed matching for `$is`
@@ -149,7 +149,7 @@ captured resolution context. `$nodeBlueId` MUST use Language identity, not a has
 of a materialized JSON value; Integer and Number identities remain distinct.
 The document and candidate bindings MUST be the actual values defined in §6.
 
-Each evaluation MUST use one fresh ledger with the 100,000-gas limit above.
+Each evaluation MUST use one fresh ledger with the 10,000,000-gas limit above.
 Context view construction, demanded reads, Language matching (including function
 argument matching), identity construction and BEX evaluation MUST all debit that
 ledger using the selected Contracts logical-work tariffs and pinned BEX costs.
@@ -488,9 +488,11 @@ predicted: invalid computed scope cannot publish. The holder must review custom
 workflows and intended mutable parameters before approval. Whole-program approval
 is meaningful only with that reviewed behavior, not with a friendly type name.
 
-The inherited Contracts gas ceiling remains 100,000. Native admission, historical
+The inherited Contracts gas ceiling remains 10,000,000. Native admission, historical
 proof preparation, predicate compilation and scope validation are also host work;
 this delivery does not claim that all such host CPU/memory is included in Contracts'
 per-invocation gas or implement aggregate customer resource budgeting. Apply host
 resource admission separately. Physical inability must not become a fabricated
 semantic denial or permission to skip an unresolved input.
+
+This edition selects the exact 10M gas prerequisites. Previously published content retains its original semantics.

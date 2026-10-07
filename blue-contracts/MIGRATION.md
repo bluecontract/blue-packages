@@ -1,17 +1,9 @@
-# Explicit Contracts edition adoption
+# Ten-million-gas edition adoption
 
-This publication creates new identities because the governing specification is now one complete normative document. The original publication used an older rules Text plus external supplements. The new Text includes the same selected algorithms, transition model, metering rules and exact BEX dependency.
+Version 1.0.0-rc.2 selects a shared default and maximum of 10,000,000 gas units for an entire atomic Contracts attempt. Numerical tariffs, charge ordering, rollback and explicit smaller budgets are unchanged. Language and BEX dependencies retain their exact identities.
 
-`migration.json` lists all 32 old/new native type IDs and the specification identities. It is an audit diff, not an instruction to retarget old references. All 32 recipes retain their original structural role and fields; their governing specification and references to regenerated parents are deliberately rebound.
+The former publication and its 100,000 maximum remain under `editions/gas-100k/blue-contracts`. Existing snapshots and invocations must keep that edition. The new specification, all 32 native types and dependent packages receive new identities; replacing references inside already published data is not migration.
 
-To run this edition in the included Python example:
+The executable specification uses the frozen reference plus the two explicit source overrides and gas manifest in `reference/`, listed in `docs/sources.json`. `runtime-copy` constructs an isolated executable tree with these exact bytes. Never alter the frozen reference.
 
-1. Preserve the frozen reference.
-2. Create a separate runtime source tree with `./blue-package runtime-copy /absolute/path/to/new-runtime/src`.
-3. In that derived tree only, the complete Contracts specification resource is replaced with this edition's `SPECIFICATION.md`; all algorithm source bytes remain unchanged.
-4. The unchanged catalogue generator calculates the new native types. The demonstration checks all 32 against package exports before processing.
-5. Compile source aliases to exact events before sending them to fresh workers. A consumer does not inherit the author's aliases.
-
-The ordinary `./blue-package demo` performs these steps in a temporary directory, runs a counter operation, transports chunks to fresh workers, compares cold replay, and checks a one-less-gas rollback. It is an integration demonstration, not a production profile installer.
-
-Java adoption must register this precise specification/type collection under a new supported selection and qualify it through the same tests. Do not append arbitrary package IDs to a whitelist while leaving old native bindings in use. Old snapshots and Coordination histories must remain with their previous selection unless an explicit migration is designed.
+Consumers must select the new native edition and republish dependent authored documents. Validate portable replay, exact and restrictive budgets, and physical resource use before upgrading a persistent host. Raising gas does not correct host memory failures.

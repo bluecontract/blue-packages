@@ -1,0 +1,1044 @@
+{
+  "name": "Immediate Termination Clause",
+  "type": {
+    "blueId": "36fo5jJvDySVHjjR4sfAE3ZQaLx47ZQS8Ghk2S5nGPx1"
+  },
+  "description": "An active agreement installs this child from exact mutually approved terms. A permitted principal can terminate immediately without counterparty approval. The parent verifies and commits the agreement outcome.",
+  "declaredContracts": [
+    "partyA",
+    "partyB",
+    "lifecycle",
+    "initialize",
+    "terminateA",
+    "terminateB",
+    "logic"
+  ],
+  "allowedParty": {
+    "type": "Text",
+    "schema": {
+      "enum": [
+        "A",
+        "B",
+        "EITHER"
+      ]
+    }
+  },
+  "termsId": {
+    "type": "Text"
+  },
+  "round": {
+    "type": "Integer"
+  },
+  "contracts": {
+    "partyA": {
+      "type": "Coordination/Timeline Channel"
+    },
+    "partyB": {
+      "type": "Coordination/Timeline Channel"
+    },
+    "lifecycle": {
+      "type": "Contracts/Lifecycle Event Channel",
+      "event": {
+        "type": "Contracts/Document Processing Initiated"
+      }
+    },
+    "initialize": {
+      "type": "Contracts/Sequential Workflow",
+      "channel": "lifecycle",
+      "steps": [
+        {
+          "type": "Contracts/Compute",
+          "definition": "logic",
+          "entry": "initialize"
+        }
+      ]
+    },
+    "terminateA": {
+      "type": "Contracts/Sequential Workflow Operation",
+      "channel": "partyA",
+      "steps": [
+        {
+          "type": "Contracts/Compute",
+          "definition": "logic",
+          "do": [
+            {
+              "$call": {
+                "function": "terminate",
+                "args": {
+                  "side": "A"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "terminateB": {
+      "type": "Contracts/Sequential Workflow Operation",
+      "channel": "partyB",
+      "steps": [
+        {
+          "type": "Contracts/Compute",
+          "definition": "logic",
+          "do": [
+            {
+              "$call": {
+                "function": "terminate",
+                "args": {
+                  "side": "B"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "logic": {
+      "type": "Contracts/Compute Definition",
+      "constants": {
+        "noticeType": {
+          "type": "ImmediateTermination/Termination Exercised"
+        }
+      },
+      "functions": {
+        "initialize": {
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isEmpty": {
+                      "$filter": {
+                        "in": {
+                          "$keys": {
+                            "$document": "/contracts"
+                          }
+                        },
+                        "item": "key",
+                        "where": {
+                          "$not": {
+                            "$includes": {
+                              "list": {
+                                "$listConcat": [
+                                  {
+                                    "$document": "/type/declaredContracts"
+                                  },
+                                  [
+                                    "initialized",
+                                    "checkpoint",
+                                    "terminated"
+                                  ]
+                                ]
+                              },
+                              "val": {
+                                "$var": "key"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "message": "UNAPPROVED_CONTRACT_DECLARATION"
+              }
+            },
+            {
+              "$forEach": {
+                "in": {
+                  "$document": "/type/declaredContracts"
+                },
+                "item": "guardContract",
+                "do": [
+                  {
+                    "$if": {
+                      "cond": {
+                        "$not": {
+                          "$includes": {
+                            "list": [
+                              "partyA",
+                              "partyB"
+                            ],
+                            "val": {
+                              "$var": "guardContract"
+                            }
+                          }
+                        }
+                      },
+                      "then": [
+                        {
+                          "$failIf": {
+                            "cond": {
+                              "$not": {
+                                "$eq": [
+                                  {
+                                    "$nodeBlueId": {
+                                      "$document": {
+                                        "$concat": [
+                                          "/contracts/",
+                                          {
+                                            "$var": "guardContract"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$nodeBlueId": {
+                                      "$document": {
+                                        "$concat": [
+                                          "/type/contracts/",
+                                          {
+                                            "$var": "guardContract"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "message": "EXECUTABLE_OVERRIDE_NOT_ALLOWED"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$document": "/agreementId"
+                      },
+                      "kind": "text"
+                    }
+                  }
+                },
+                "message": "AGREEMENT_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$ne": [
+                      {
+                        "$document": "/agreementId"
+                      },
+                      ""
+                    ]
+                  }
+                },
+                "message": "AGREEMENT_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$ne": [
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyA"
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyB"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "TWO_DISTINCT_PARTIES_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/contracts/partyA/actor"
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyA"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "PARTY_A_CHANNEL_MISMATCH"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/contracts/partyB/actor"
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyB"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "PARTY_B_CHANNEL_MISMATCH"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$includes": {
+                      "list": [
+                        "A",
+                        "B",
+                        "EITHER"
+                      ],
+                      "val": {
+                        "$document": "/allowedParty"
+                      }
+                    }
+                  }
+                },
+                "message": "INVALID_TERMINATION_PARTY"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$document": "/termsId"
+                      },
+                      "kind": "text"
+                    }
+                  }
+                },
+                "message": "ACCEPTED_TERMS_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$ne": [
+                      {
+                        "$document": "/termsId"
+                      },
+                      ""
+                    ]
+                  }
+                },
+                "message": "ACCEPTED_TERMS_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$document": "/round"
+                      },
+                      "kind": "integer"
+                    }
+                  }
+                },
+                "message": "ACCEPTED_ROUND_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$gt": [
+                      {
+                        "$document": "/round"
+                      },
+                      0
+                    ]
+                  }
+                },
+                "message": "ACCEPTED_ROUND_REQUIRED"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/state",
+                "val": {
+                  "phase": "OPEN",
+                  "termination": {}
+                }
+              }
+            }
+          ]
+        },
+        "terminate": {
+          "args": {
+            "side": {
+              "type": "Text"
+            }
+          },
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isEmpty": {
+                      "$filter": {
+                        "in": {
+                          "$keys": {
+                            "$document": "/contracts"
+                          }
+                        },
+                        "item": "key",
+                        "where": {
+                          "$not": {
+                            "$includes": {
+                              "list": {
+                                "$listConcat": [
+                                  {
+                                    "$document": "/type/declaredContracts"
+                                  },
+                                  [
+                                    "initialized",
+                                    "checkpoint",
+                                    "terminated"
+                                  ]
+                                ]
+                              },
+                              "val": {
+                                "$var": "key"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "message": "UNAPPROVED_CONTRACT_DECLARATION"
+              }
+            },
+            {
+              "$forEach": {
+                "in": {
+                  "$document": "/type/declaredContracts"
+                },
+                "item": "guardContract",
+                "do": [
+                  {
+                    "$if": {
+                      "cond": {
+                        "$not": {
+                          "$includes": {
+                            "list": [
+                              "partyA",
+                              "partyB"
+                            ],
+                            "val": {
+                              "$var": "guardContract"
+                            }
+                          }
+                        }
+                      },
+                      "then": [
+                        {
+                          "$failIf": {
+                            "cond": {
+                              "$not": {
+                                "$eq": [
+                                  {
+                                    "$nodeBlueId": {
+                                      "$document": {
+                                        "$concat": [
+                                          "/contracts/",
+                                          {
+                                            "$var": "guardContract"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$nodeBlueId": {
+                                      "$document": {
+                                        "$concat": [
+                                          "/type/contracts/",
+                                          {
+                                            "$var": "guardContract"
+                                          }
+                                        ]
+                                      }
+                                    }
+                                  }
+                                ]
+                              }
+                            },
+                            "message": "EXECUTABLE_OVERRIDE_NOT_ALLOWED"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$document": "/agreementId"
+                      },
+                      "kind": "text"
+                    }
+                  }
+                },
+                "message": "AGREEMENT_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$ne": [
+                      {
+                        "$document": "/agreementId"
+                      },
+                      ""
+                    ]
+                  }
+                },
+                "message": "AGREEMENT_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$ne": [
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyA"
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyB"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "TWO_DISTINCT_PARTIES_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/contracts/partyA/actor"
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyA"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "PARTY_A_CHANNEL_MISMATCH"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/contracts/partyB/actor"
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$document": "/partyB"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "PARTY_B_CHANNEL_MISMATCH"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$includes": {
+                      "list": [
+                        "A",
+                        "B",
+                        "EITHER"
+                      ],
+                      "val": {
+                        "$document": "/allowedParty"
+                      }
+                    }
+                  }
+                },
+                "message": "INVALID_TERMINATION_PARTY"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$document": "/termsId"
+                      },
+                      "kind": "text"
+                    }
+                  }
+                },
+                "message": "ACCEPTED_TERMS_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$ne": [
+                      {
+                        "$document": "/termsId"
+                      },
+                      ""
+                    ]
+                  }
+                },
+                "message": "ACCEPTED_TERMS_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$document": "/round"
+                      },
+                      "kind": "integer"
+                    }
+                  }
+                },
+                "message": "ACCEPTED_ROUND_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$gt": [
+                      {
+                        "$document": "/round"
+                      },
+                      0
+                    ]
+                  }
+                },
+                "message": "ACCEPTED_ROUND_REQUIRED"
+              }
+            },
+            {
+              "$let": {
+                "name": "req",
+                "expr": {
+                  "$binding": "call/request"
+                }
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$var": "req"
+                      },
+                      "kind": "object"
+                    }
+                  }
+                },
+                "message": "REQUEST_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isKind": {
+                      "val": {
+                        "$var": {
+                          "name": "req",
+                          "path": "/requestId"
+                        }
+                      },
+                      "kind": "text"
+                    }
+                  }
+                },
+                "message": "REQUEST_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$ne": [
+                      {
+                        "$var": {
+                          "name": "req",
+                          "path": "/requestId"
+                        }
+                      },
+                      ""
+                    ]
+                  }
+                },
+                "message": "REQUEST_ID_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$isEmpty": {
+                      "$filter": {
+                        "in": {
+                          "$keys": {
+                            "$var": "req"
+                          }
+                        },
+                        "item": "key",
+                        "where": {
+                          "$not": {
+                            "$includes": {
+                              "list": [
+                                "requestId",
+                                "termsId",
+                                "reason"
+                              ],
+                              "val": {
+                                "$var": "key"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "message": "UNKNOWN_TERMINATION_REQUEST_FIELD"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$or": [
+                      {
+                        "$not": {
+                          "$hasKey": {
+                            "object": {
+                              "$var": "req"
+                            },
+                            "key": "reason"
+                          }
+                        }
+                      },
+                      {
+                        "$isKind": {
+                          "val": {
+                            "$var": {
+                              "name": "req",
+                              "path": "/reason"
+                            }
+                          },
+                          "kind": "text"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "REASON_MUST_BE_TEXT"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$var": {
+                          "name": "req",
+                          "path": "/termsId"
+                        }
+                      },
+                      {
+                        "$document": "/termsId"
+                      }
+                    ]
+                  }
+                },
+                "message": "STALE_TERMS"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$or": [
+                      {
+                        "$eq": [
+                          {
+                            "$document": "/allowedParty"
+                          },
+                          "EITHER"
+                        ]
+                      },
+                      {
+                        "$eq": [
+                          {
+                            "$document": "/allowedParty"
+                          },
+                          {
+                            "$var": "side"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "message": "TERMINATION_NOT_PERMITTED"
+              }
+            },
+            {
+              "$let": {
+                "name": "requestHash",
+                "expr": {
+                  "$nodeBlueId": {
+                    "$var": "req"
+                  }
+                }
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$eq": [
+                    {
+                      "$document": "/state/phase"
+                    },
+                    "TERMINATED"
+                  ]
+                },
+                "then": [
+                  {
+                    "$failIf": {
+                      "cond": {
+                        "$not": {
+                          "$and": [
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/state/termination/party"
+                                },
+                                {
+                                  "$var": "side"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/state/termination/requestId"
+                                },
+                                {
+                                  "$var": {
+                                    "name": "req",
+                                    "path": "/requestId"
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "message": "TERMINATION_CLOSED"
+                    }
+                  },
+                  {
+                    "$failIf": {
+                      "cond": {
+                        "$not": {
+                          "$eq": [
+                            {
+                              "$document": "/state/termination/requestHash"
+                            },
+                            {
+                              "$var": "requestHash"
+                            }
+                          ]
+                        }
+                      },
+                      "message": "REQUEST_ID_REUSE"
+                    }
+                  },
+                  {
+                    "$return": true
+                  }
+                ]
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$document": "/state/phase"
+                      },
+                      "OPEN"
+                    ]
+                  }
+                },
+                "message": "TERMINATION_CLOSED"
+              }
+            },
+            {
+              "$let": {
+                "name": "record",
+                "expr": {
+                  "agreementId": {
+                    "$document": "/agreementId"
+                  },
+                  "party": {
+                    "$var": "side"
+                  },
+                  "actor": {
+                    "$choose": {
+                      "cond": {
+                        "$eq": [
+                          {
+                            "$var": "side"
+                          },
+                          "A"
+                        ]
+                      },
+                      "then": {
+                        "$document": "/partyA"
+                      },
+                      "else": {
+                        "$document": "/partyB"
+                      }
+                    }
+                  },
+                  "requestId": {
+                    "$var": {
+                      "name": "req",
+                      "path": "/requestId"
+                    }
+                  },
+                  "requestHash": {
+                    "$var": "requestHash"
+                  },
+                  "termsId": {
+                    "$document": "/termsId"
+                  },
+                  "round": {
+                    "$document": "/round"
+                  },
+                  "allowedParty": {
+                    "$document": "/allowedParty"
+                  },
+                  "reason": {
+                    "$default": [
+                      {
+                        "$var": {
+                          "name": "req",
+                          "path": "/reason"
+                        }
+                      },
+                      ""
+                    ]
+                  },
+                  "timestampUs": {
+                    "$binding": "timestamp"
+                  },
+                  "eventId": {
+                    "$nodeBlueId": {
+                      "$binding": "processingEvent"
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/state",
+                "val": {
+                  "phase": "TERMINATED",
+                  "termination": {
+                    "$var": "record"
+                  }
+                }
+              }
+            },
+            {
+              "$appendEvent": {
+                "$objectSet": {
+                  "object": {
+                    "$var": "record"
+                  },
+                  "key": "type",
+                  "val": {
+                    "$const": {
+                      "name": "noticeType",
+                      "path": "/type"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

@@ -22,6 +22,10 @@ Python 3.13 or newer is required; pytest is required for tests. Normal verificat
 
 ## Release status
 
-Version `1.0.0-rc.1` is a clean, specification-bound publication candidate. The known enum-metering ordering defect in the supplied Python host boundary prevents an unconditional deterministic-runtime certification. See `QUALIFICATION.md`. This package does not hide that defect by fixing a hash seed or changing the 100,000-gas maximum.
+Version `1.0.0-rc.2` is a clean, specification-bound publication candidate. The known enum-metering ordering defect in the supplied Python host boundary prevents an unconditional deterministic-runtime certification. See `QUALIFICATION.md`. This package does not hide that defect by fixing a hash seed or claiming that a larger gas allowance corrects metering defects.
 
 A Java runtime must explicitly bind these new native type identities and specification before it claims support. Successful generic package verification alone is not execution support. Old snapshots and old fixtures remain attached to their previous release.
+
+## Gas allowance
+
+The shared default and maximum is **10,000,000 gas units** per atomic attempt. Smaller explicit budgets remain valid. The previous 100,000-gas edition is preserved under `editions/gas-100k/blue-contracts` in the package home; it must be selected explicitly for replay. See `MIGRATION.md`.

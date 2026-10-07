@@ -1,0 +1,379 @@
+{
+  "name": "Root Activation Setup",
+  "type": "Contracts/Compute Definition",
+  "functions": {
+    "revision": {
+      "args": {
+        "terms": {}
+      },
+      "expr": {
+        "$nodeBlueId": {
+          "agreement": {
+            "$document": "/agreementId"
+          },
+          "agreementType": {
+            "$nodeBlueId": {
+              "$document": "/type"
+            }
+          },
+          "configurationId": {
+            "$document": "/clauseRuntime/configId"
+          },
+          "partyAChannel": {
+            "$document": "/channels/A"
+          },
+          "partyBChannel": {
+            "$document": "/channels/B"
+          },
+          "terms": {
+            "$var": "terms"
+          }
+        }
+      }
+    },
+    "initialize": {
+      "do": [
+        {
+          "$let": {
+            "name": "s",
+            "expr": {
+              "target": {
+                "$const": {
+                  "name": "parameters",
+                  "path": "/initialTerms"
+                }
+              }
+            }
+          }
+        },
+        {
+          "$forEach": {
+            "in": {
+              "$keys": {
+                "$const": {
+                  "name": "parameters",
+                  "path": "/termSchema"
+                }
+              }
+            },
+            "item": "tk",
+            "do": [
+              {
+                "$let": {
+                  "name": "rule",
+                  "expr": {
+                    "$get": {
+                      "object": {
+                        "$const": {
+                          "name": "parameters",
+                          "path": "/termSchema"
+                        }
+                      },
+                      "key": {
+                        "$var": "tk"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$let": {
+                  "name": "tv",
+                  "expr": {
+                    "$get": {
+                      "object": {
+                        "$var": {
+                          "name": "s",
+                          "path": "/target"
+                        }
+                      },
+                      "key": {
+                        "$var": "tk"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$eq": [
+                        {
+                          "$kind": {
+                            "$var": "tv"
+                          }
+                        },
+                        {
+                          "$var": {
+                            "name": "rule",
+                            "path": "/kind"
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "message": "NEGOTIATED_TERM_KIND"
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$hasKey": {
+                      "object": {
+                        "$var": "rule"
+                      },
+                      "key": "enum"
+                    }
+                  },
+                  "then": [
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$includes": {
+                              "list": {
+                                "$var": {
+                                  "name": "rule",
+                                  "path": "/enum"
+                                }
+                              },
+                              "val": {
+                                "$var": "tv"
+                              }
+                            }
+                          }
+                        },
+                        "message": "NEGOTIATED_TERM_NOT_ALLOWED"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$hasKey": {
+                      "object": {
+                        "$var": "rule"
+                      },
+                      "key": "min"
+                    }
+                  },
+                  "then": [
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$gte": [
+                              {
+                                "$var": "tv"
+                              },
+                              {
+                                "$var": {
+                                  "name": "rule",
+                                  "path": "/min"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "message": "NEGOTIATED_TERM_RANGE"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$hasKey": {
+                      "object": {
+                        "$var": "rule"
+                      },
+                      "key": "max"
+                    }
+                  },
+                  "then": [
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$lte": [
+                              {
+                                "$var": "tv"
+                              },
+                              {
+                                "$var": {
+                                  "name": "rule",
+                                  "path": "/max"
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "message": "NEGOTIATED_TERM_RANGE"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$eq": [
+                {
+                  "$document": {
+                    "$const": {
+                      "name": "bindings",
+                      "path": "/activated"
+                    }
+                  }
+                },
+                true
+              ]
+            },
+            "message": "ALREADY_ACTIVATED"
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$eq": [
+                {
+                  "$document": {
+                    "$const": {
+                      "name": "bindings",
+                      "path": "/terminated"
+                    }
+                  }
+                },
+                true
+              ]
+            },
+            "message": "AGREEMENT_TERMINATED"
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$exists": {
+                "$pointerGet": {
+                  "object": {
+                    "$document": {
+                      "$const": {
+                        "name": "bindings",
+                        "path": "/state"
+                      }
+                    }
+                  },
+                  "path": "/phase"
+                }
+              }
+            },
+            "then": [
+              {
+                "$appendChange": {
+                  "op": "add",
+                  "path": {
+                    "$const": {
+                      "name": "bindings",
+                      "path": "/history"
+                    }
+                  },
+                  "val": {
+                    "$listConcat": [
+                      {
+                        "$document": {
+                          "$const": {
+                            "name": "bindings",
+                            "path": "/history"
+                          }
+                        }
+                      },
+                      [
+                        {
+                          "$document": {
+                            "$const": {
+                              "name": "bindings",
+                              "path": "/state"
+                            }
+                          }
+                        }
+                      ]
+                    ]
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": {
+              "$const": {
+                "name": "bindings",
+                "path": "/state"
+              }
+            },
+            "val": {
+              "$pointerSet": {
+                "object": {
+                  "phase": "NEGOTIATING",
+                  "round": 1,
+                  "settled": {
+                    "$const": {
+                      "name": "parameters",
+                      "path": "/initialTerms"
+                    }
+                  },
+                  "target": {
+                    "$const": {
+                      "name": "parameters",
+                      "path": "/initialTerms"
+                    }
+                  },
+                  "targetId": {
+                    "$call": {
+                      "function": "revision",
+                      "args": {
+                        "terms": {
+                          "$const": {
+                            "name": "parameters",
+                            "path": "/initialTerms"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "pending": false,
+                  "proposal": {},
+                  "proposer": "",
+                  "signals": {
+                    "A": "NONE",
+                    "B": "NONE"
+                  },
+                  "records": {
+                    "A": {},
+                    "B": {}
+                  },
+                  "seen": {},
+                  "consent": {},
+                  "message": ""
+                },
+                "path": "/round",
+                "val": {
+                  "$document": "/clauseRuntime/revision"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

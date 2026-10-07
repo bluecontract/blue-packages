@@ -1,0 +1,154 @@
+{
+  "contracts": {
+    "agentChannel": {
+      "actor": {
+        "blueId": "C5BFA79JybBfBd5TjWyJu1fB5BQ38vtbjVBmuqW63yUT"
+      },
+      "timeline": {
+        "blueId": "J7RdYJ3KwQ5DeAezxABZ3WkD1RnH3scBtGwo7sukmp7R"
+      },
+      "type": {
+        "blueId": "59beUBLVth3dgvHUecAuADPSLcNc7cGi3sS7EAKQt5mx"
+      }
+    },
+    "approveOrder": {
+      "channel": "sellerChannel",
+      "request": {},
+      "steps": [
+        {
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$ne": [
+                    {
+                      "$keys": {
+                        "$binding": "call/request"
+                      }
+                    },
+                    []
+                  ]
+                },
+                "message": "EMPTY_REQUEST"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$ne": [
+                    {
+                      "$document": "/phase"
+                    },
+                    "Proposed"
+                  ]
+                },
+                "message": "WRONG_ORDER_PHASE"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/phase",
+                "val": "Approved"
+              }
+            },
+            {
+              "$appendEvent": {
+                "$literal": {
+                  "type": {
+                    "blueId": "57rY9LUnFtC6hUAL3GsRDiVdQCiF1yTm5DUsRj1zaH4b"
+                  }
+                }
+              }
+            }
+          ],
+          "type": {
+            "blueId": "92eWpSLhfvP2TDsSzZiVVh5ue4hdZTZHDm1Foft3SeLp"
+          }
+        }
+      ],
+      "type": {
+        "blueId": "7EzGCoMRkPtknVU2JeL4TeswL2T57YGp9XUrJHU9LCra"
+      }
+    },
+    "releaseForFulfilment": {
+      "channel": "sellerChannel",
+      "request": {
+        "method": "standard"
+      },
+      "steps": [
+        {
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$ne": [
+                    {
+                      "$keys": {
+                        "$binding": "call/request"
+                      }
+                    },
+                    [
+                      "method"
+                    ]
+                  ]
+                },
+                "message": "ONLY_METHOD"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$ne": [
+                    {
+                      "$document": "/phase"
+                    },
+                    "Approved"
+                  ]
+                },
+                "message": "WRONG_ORDER_PHASE"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/phase",
+                "val": "Released"
+              }
+            },
+            {
+              "$appendEvent": {
+                "$literal": {
+                  "type": {
+                    "blueId": "7ZeA7k8BkLeYW9AZ8utRCH93QVwk9C3HSinJ7C14pmjZ"
+                  }
+                }
+              }
+            }
+          ],
+          "type": {
+            "blueId": "92eWpSLhfvP2TDsSzZiVVh5ue4hdZTZHDm1Foft3SeLp"
+          }
+        }
+      ],
+      "type": {
+        "blueId": "7EzGCoMRkPtknVU2JeL4TeswL2T57YGp9XUrJHU9LCra"
+      }
+    },
+    "sellerChannel": {
+      "actor": {
+        "blueId": "BMaeMLH8sHyAS5Bk1vt69vohbZFkZ7JC4Eqfr9K1c1kd"
+      },
+      "timeline": {
+        "blueId": "AVqAw8tu4p2mrXKDxcn78wL8KKigcQp9ojQiaL1NRyby"
+      },
+      "type": {
+        "blueId": "59beUBLVth3dgvHUecAuADPSLcNc7cGi3sS7EAKQt5mx"
+      }
+    }
+  },
+  "currency": "EUR",
+  "name": "Example Order JH-042",
+  "phase": "Proposed",
+  "total": 840
+}

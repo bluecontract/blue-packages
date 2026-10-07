@@ -78,7 +78,7 @@ arguments may read the current event, call, document and earlier step results
 using the current Contracts expression frame. It may not read a wall clock,
 perform host I/O, register a timer immediately, or reinterpret its context as
 future executable code. Standard BEX gas must be charged before work, against
-the same invocation budget; the step does not receive a second 100,000 budget.
+the same invocation budget; the step does not receive a second 10,000,000 budget.
 Any effects in an expression-root evaluation are rejected.
 
 A helper emitting the same completed request through ordinary Compute must have
@@ -238,7 +238,7 @@ terminal semantic results. Preserve account-scoped authority/access and budgets.
 
 ## 9. Metering and qualification
 
-The Contracts 100,000 shared gas ceiling is unchanged. BEX evaluation, message
+The Contracts 10,000,000 shared gas ceiling is unchanged. BEX evaluation, message
 construction, validation and accepted effect processing must be charged through
 the chosen runtime before proportional work. Candidate discovery/proof retrieval
 is host work subject to host and account budgets, not an invented unbounded
@@ -247,3 +247,5 @@ cardinality ceiling is introduced. Exact native tariffs, metering of admission
 validation, cyclic progress, durable storage and cross-language parity must be
 qualified before native support is advertised. The conformance harness's fixture
 counters are not a calibrated production gas policy.
+
+This edition selects the exact 10M gas prerequisites. Previously published content retains its original semantics.

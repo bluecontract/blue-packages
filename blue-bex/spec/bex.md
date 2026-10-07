@@ -1,6 +1,6 @@
 # Blue BEX 1.0
 
-**Edition:** `blue-bex/2026-09-26-standalone-1`  
+**Edition:** `blue-bex/2026-10-07-gas-10m-1`  
 **Normative form:** one complete specification with executable algorithm appendices
 
 ## Abstract
@@ -242,7 +242,7 @@ Collection equality keeps its ordered short-circuit comparisons. A host can prov
 <a id="section-22"></a>
 ## 22. Shared host metering
 
-When invoked by Contracts, BEX uses the same bounded meter: **100,000 maximum/default** for the complete Contracts attempt, with supported stricter local limits. No BEX frame, intrinsic, compiled-program cache or lower standalone-Gas setting can detach from or reset the parent ledger. Standalone BEX API budget configuration remains a separate API contract; it cannot enlarge the standard Contracts allowance.
+When invoked by Contracts, BEX uses the same bounded meter: **10,000,000 maximum/default** for the complete Contracts attempt, with supported stricter local limits. No BEX frame, intrinsic, compiled-program cache or lower standalone-Gas setting can detach from or reset the parent ledger. Standalone BEX API budget configuration remains a separate API contract; it cannot enlarge the standard Contracts allowance.
 
 Work charges apply independently of physical resource controls. Conversion, Integer arithmetic, collections, strings and output sizing use the exact counters, quantities and charge positions defined here. Implementations MUST NOT substitute after-the-fact bit-length caps or wall-clock timeouts for the specified ledger. Any changed tariff requires a separately identified specification and conformance vectors. Preserve ordinary validation failure order and short-circuit behavior; no charges execute in an unselected branch.
 
@@ -251,7 +251,7 @@ Compiler structure checks remain semantically complete, including unused branche
 <a id="section-23"></a>
 ## 23. Resource-proportional work accounting
 
-Contracts continues to supply one shared meter with a maximum of 100000. BEX
+Contracts continues to supply one shared meter with a maximum of 10000000. BEX
 compilation and host prerequisite acquisition are outside that invocation ledger.
 A host interruption is incomplete execution, never a BEX semantic rejection.
 
@@ -325,7 +325,7 @@ be admissible Blue scalar documents; the Language output boundary is unchanged.
 Both corrections use the existing weight-1 counters and invoking owner, shared
 ledger and local-before-shared cap precedence. Rejection preserves the admitted
 prefix and exact first unaffordable charge. Host interruption is incomplete work,
-not an invented completed rejection. A 100000 allowance is not a time/RAM bound.
+not an invented completed rejection. A 10000000 allowance is not a time/RAM bound.
 
 
 <a id="section-25"></a>
@@ -784,7 +784,7 @@ class GasExhausted(BexError):
 
 @dataclass
 class Gas:
-    limit: int = 100000
+    limit: int = 10000000
     used: int = 0
     trace: list = field(default_factory=list)
     rejected: dict | None = None
@@ -875,7 +875,7 @@ class Engine:
         return Compiler(intrinsic_ids=self.intrinsics).compile(source,definition=definition,entry=entry)
 
     @host_boundary
-    def execute(self,program,context=None,*,gas=None,gas_limit=100000,definition=None,entry=None):
+    def execute(self,program,context=None,*,gas=None,gas_limit=10000000,definition=None,entry=None):
         if isinstance(program,Program):
             # Program is a transport value, not an unforgeable admission ticket.
             program=self.compile(program.source,entry=program.selected_entry)
@@ -1640,8 +1640,8 @@ def host_boundary(fn):
 |---|---|
 | `src/blue_bex/__init__.py` | `820ef8825a174b5f9666b9b713d51e20bcf8fa6c509b79128fb373433033e8d8` |
 | `src/blue_bex/compiler.py` | `6af97e5067510b862cbb0edc808fc7903f4f0be51c8ff45a31df07be9bdfa55d` |
-| `src/blue_bex/gas.py` | `a88cc053aea3fb70dfe7c1d73cb91c14b3269949f2f4c387fedef82a965713a8` |
-| `src/blue_bex/runtime.py` | `799d62a67961576b3f1b0da8c93b03c7289b01a1831ad14bd08825738e4f376e` |
+| `src/blue_bex/gas.py` | `2acbcc45fb293a9e5ab19461a41b5043a36964b291b27112b47750602d885799` |
+| `src/blue_bex/runtime.py` | `7a7ffc5783f4a1e663052be0a1acc9b713770e0dc33bfe8baa3cf8f5db8a5184` |
 | `src/blue_bex/values.py` | `59fc4bee80e54e5e9d64824ee18aed8a195220137f0eaaf5f1e58adb11951b8a` |
 | `src/blue_host/__init__.py` | `ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607` |
 

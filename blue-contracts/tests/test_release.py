@@ -24,7 +24,7 @@ def test_included_algorithms_are_exact():
     text=(ROOT/'SPECIFICATION.md').read_text()
     assert len(source['modules']) in (6,18)
     for name,digest in source['modules'].items():
-        data=(ROOT.parent/'verification/reference/blue-contracts/python'/name).read_bytes()
+        data=((ROOT/source['overrides'][name]) if name in source.get('overrides',{}) else (ROOT.parent/'verification/reference/blue-contracts/python'/name)).read_bytes()
         assert digest==hashlib.sha256(data).hexdigest() or digest=='sha256:'+hashlib.sha256(data).hexdigest()
         assert '```python\n'+data.decode().rstrip()+'\n```' in text
 
@@ -94,3 +94,25 @@ def test_explicit_empty_source_url_does_not_inherit_git_remote(monkeypatch):
     inferred = package_v2._source_info(ROOT, 'fixed-revision', None)
     assert explicit == {'revision': 'fixed-revision', 'repository': ''}
     assert inferred == {'revision': 'fixed-revision', 'repository': 'https://github.com/example/local-checkout'}
+
+
+def test_preserved_hundred_thousand_edition():
+    prior=ROOT.parent/'editions/gas-100k'/ROOT.name
+    release=json.loads((prior/'release.json').read_text())
+    raw=(prior/'dist/package.bluepkg').read_bytes()
+    assert 'sha256:'+hashlib.sha256(raw).hexdigest()==release['archiveSha256']
+    assert b'100000' in (prior/'SPECIFICATION.md').read_bytes()
+    assert release['packageBlueId']!=json.loads((ROOT/'release.json').read_text())['packageBlueId']
+
+
+def test_new_default_and_maximum():
+    text=(ROOT/'SPECIFICATION.md').read_text()
+    assert '10,000,000' in text
+    if ROOT.name=='blue-contracts':
+        manifest=json.loads((ROOT/'reference/GAS_MANIFEST.json').read_text())
+        assert manifest['sharedMaximum']==10_000_000
+        prior=ROOT.parent/'editions/gas-100k/blue-contracts/SPECIFICATION.md'
+        blocks=re.findall(r'```json\n(.*?)\n```',prior.read_text(),re.S)
+        old=next(json.loads(b) for b in blocks if '"sharedMaximum"' in b)
+        assert manifest['weights']==old['weights']
+        assert 'integer(gas_limit, 0, 10000000)' in text

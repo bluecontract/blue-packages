@@ -7,7 +7,7 @@ import bootstrap
 from package_core import build,read_package,wire,config,mount,PackageError
 from package_v2 import requirements,lock_v2
 ROOT=bootstrap.ROOT
-REVISION='blue-protocols-2026-09-26-standalone-1'
+REVISION='blue-contracts-2026-10-07-gas-10m-1'
 def package_path():return ROOT/'dist/package.bluepkg'
 def checked_package(path=None):
  p=read_package(path or package_path());r=json.loads((ROOT/'release.json').read_text())
@@ -25,6 +25,14 @@ def runtime_tree(output):
    shutil.copyfile(ROOT.parent/'verification/reference/blue-contracts/python/apps/workbench'/f,wb/f)
   shutil.copyfile(ROOT/'SPECIFICATION.md',output/'blue_contracts/COMPLETE_SPECIFICATION.md')
   shutil.copytree(ROOT.parent/'verification/reference/blue-contracts/python/tools',output.parent/'tools',dirs_exist_ok=True)
+ # Apply only the explicitly published source overrides after copying the frozen base.
+ for layer in ('blue-bex', 'blue-contracts'):
+  project=ROOT.parent/layer
+  selection=json.loads((project/'docs/sources.json').read_text())
+  for original,relative in {**selection.get('overrides',{}),**selection.get('resourceOverrides',{})}.items():
+   if not original.startswith('src/'):raise ValueError('Invalid runtime override')
+   destination=output/original[4:];destination.parent.mkdir(parents=True,exist_ok=True)
+   shutil.copyfile(project/relative,destination)
  return output
 
 def main():
