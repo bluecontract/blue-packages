@@ -470,6 +470,10 @@ Each source below lives in `examples/apps/` beside a `.case.yaml` scenario, a `.
 
 The local Contracts runner uses explicit test transports. It tests business semantics and deterministic replay. The authenticated bootstrap integration separately verifies account lookup, reader-key grants, provider access documents and account routing. Timers require the native Time service; changing an operating-system clock or injecting a look-alike event is not an equivalent test.
 
+An HTTP bootstrap uses `POST /api/blue/v1/documents/bootstrap` with the serialized `document` and an optional `packages` array of exact catalogue BlueIds. The launcher supplies those IDs; the YAML stays readable as `Package / Type`. The server installs the complete selected dependency closure before resolving names. Activation supplies the parties, so a separate `participants` object is not required for these examples. Keep the same idempotency key and identical body when resuming an interrupted start.
+
+A successful bootstrap means the documents are registered; initial processing and access-proof propagation can still be running. Before approving, wait for the relevant document to become functional and finish processing, then review its current state. A concurrent update can invalidate that exact version. The correct response is to review again, not silently approve a newer state or disable the version check.
+
 The example launcher displays complete source and a step-by-step operation list. Starting it creates a real document, installs the exact verified declarative package closure in the participating workspaces, and redirects to that document. Sign-up retains the selected example. A user chooses the accounts for each role before starting. Using separate accounts is necessary to exercise genuine inter-account permissions; one account in several roles is only a convenient local walkthrough.
 
 | Family | Public types | Purpose | Complete examples in this guide |
