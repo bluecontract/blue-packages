@@ -18,7 +18,7 @@ This is an **unpublished candidate**, version `0.5.0-preview.2`. Its package sou
 | `clause-commerce`, `clause-features`, `clause-balance`, `clause-referrals`, `clause-schedule`, `blue-money` | Corresponding manifest namespaces | Product and business features, attributed obligations, financial projections, time actions and exact money arithmetic. |
 | `clause-participants`, `clause-participants-access` | `Participants`, `AccessParticipants` | Existing admitted-channel validation and explicit Timeline Access guards, rebuilt against this clause edition. |
 
-`PAYMENT-FAMILY-SOURCES.json` is the build order. `PAYMENT-FAMILY-PACKAGES.json` records exact identities, archives and the qualified native dependency selection. `blue-agreements` provides the clause-enabled Agreement host without replacing the older `blue-agreements` publication. Old editions and existing documents keep their identities.
+`PACKAGE-SOURCES.json` is the current build order and `PACKAGES.json` is the complete catalogue. `PAYMENT-FAMILY-PACKAGES.json` is its generated business-package view. `blue-agreements` provides the current clause-enabled Agreement host. Historical archives keep their exact identities in consumer runtimes for existing documents; there are no alternative current source editions. Mandates remains in the independent `blue-mandates` package and is not an implicit payment dependency.
 
 ## One payment, one PI
 
