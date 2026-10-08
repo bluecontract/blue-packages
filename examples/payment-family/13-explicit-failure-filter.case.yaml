@@ -9,20 +9,19 @@ steps:
 - operation: acceptDelivery
   channel: customer
   target: ''
-- operation: accept
+- operation: acceptPaymentInstruction
   channel: guarantor
   target: /payment
-- operation: initiate
+- operation: recordTransactionInitiated
   channel: guarantor
   target: /payment
   request:
     transactionId: comp-1
-- operation: confirm
+- operation: secureFunds
   channel: guarantor
   target: /payment
   request:
     requestId: authorization-0
-    outcome: succeeded
   expect:
     /payment/payment/reserved/capture: 10000
 - operation: reportOrderFailed
@@ -30,20 +29,19 @@ steps:
   target: ''
   request:
     reason: customer-dispute
-- operation: confirm
+- operation: recordPaymentCompletionUnknown
   channel: guarantor
   target: /payment
   request:
     requestId: capture-0
-    outcome: unknown
+    reason: Provider reported unknown
   expect:
     /payment/payment/reserved/capture: 10000
-- operation: confirm
+- operation: completePayment
   channel: guarantor
   target: /payment
   request:
     requestId: capture-0
-    outcome: succeeded
   expect:
     /payment/payment/completed: 10000
     /payment/payment/reserved/refund: 0

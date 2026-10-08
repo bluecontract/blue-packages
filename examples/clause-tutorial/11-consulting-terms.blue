@@ -1,0 +1,98 @@
+name: Consulting scope with bilateral change control
+type: Agreements/Agreement with Clauses
+terms:
+  scope: Review one service
+  hours: 4
+termsEditable: true
+lifecycle: Active
+canTerminate: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      required:
+      - customer
+      - seller
+      revision: 1
+    bindings:
+      approve:
+        approve_customer:
+          'on': workflow
+          channel: customer
+          params:
+            revision:
+              $var:
+                name: trigger
+                path: /revision
+        approve_seller:
+          'on': workflow
+          channel: seller
+          params:
+            revision:
+              $var:
+                name: trigger
+                path: /revision
+  amendments:
+    type: AmendmentsV3/Amendments Clause
+    parameters:
+      approvers:
+      - customer
+      - seller
+      paths:
+      - /terms
+    bindings:
+      propose:
+        proposeChange:
+          'on': workflow
+          channel: seller
+          params:
+            proposalId:
+              $var:
+                name: trigger
+                path: /proposalId
+            expectedRevision:
+              $var:
+                name: trigger
+                path: /expectedRevision
+            path: /terms
+            replacement:
+              $var:
+                name: trigger
+                path: /replacement
+      approve:
+        approveChangeCustomer:
+          'on': workflow
+          channel: customer
+          params:
+            proposalId:
+              $var:
+                name: trigger
+                path: /proposalId
+        approveChangeSeller:
+          'on': workflow
+          channel: seller
+          params:
+            proposalId:
+              $var:
+                name: trigger
+                path: /proposalId
+  termination:
+    type: Termination/Termination Clause
+    bindings:
+      request:
+        cancel:
+          'on': workflow
+          channel: customer
+      finish:
+        close:
+          'on': workflow
+          channel: seller
+contracts:
+  customer:
+    type: Contracts/External Channel
+    event:
+      source: customer
+  seller:
+    type: Contracts/External Channel
+    event:
+      source: seller

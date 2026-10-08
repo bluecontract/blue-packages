@@ -1,0 +1,128 @@
+name: Work items and appointments
+type: Agreements/Agreement with Clauses
+taskTemplate:
+  name: Work item
+  type: DocumentsDomain/Document with Clauses
+  itemId: template
+  instanceKey: template
+  message: ''
+  clauses:
+    hello:
+      type: Connections/Hello Clause
+      bindings:
+        text: /message
+        say:
+          greet:
+            'on': workflow
+            channel: owner
+            params:
+              text:
+                $var:
+                  name: trigger
+                  path: /text
+  contracts:
+    owner:
+      type: Contracts/External Channel
+      event:
+        source: owner
+visitTemplate:
+  name: Work item
+  type: DocumentsDomain/Document with Clauses
+  itemId: template
+  instanceKey: template
+  message: ''
+  clauses:
+    hello:
+      type: Connections/Hello Clause
+      bindings:
+        text: /message
+        say:
+          greet:
+            'on': workflow
+            channel: owner
+            params:
+              text:
+                $var:
+                  name: trigger
+                  path: /text
+  contracts:
+    owner:
+      type: Contracts/External Channel
+      event:
+        source: owner
+clauses:
+  tasks:
+    type: Clauses/Document Factory Clause
+    parameters:
+      operation: startTask
+      namePrefix: Task
+      keyField: itemId
+    bindings:
+      actor: owner
+      template: /taskTemplate
+      context: /tasks
+  tasksWatch:
+    type: Clauses/Listener Clause
+    parameters:
+      sources:
+      - name: greeting
+        type: Contracts/Embedded Node Channel
+        event:
+          type: Connections/Hello Said
+      states:
+        count:
+          path: /tasksGreetings
+          kind: integer
+          initial: 0
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /tasksGreetings
+            val:
+              $add:
+              - $document: /tasksGreetings
+              - 1
+    bindings:
+      context: /tasks
+  visits:
+    type: Clauses/Document Factory Clause
+    parameters:
+      operation: startVisit
+      namePrefix: Visit
+      keyField: itemId
+    bindings:
+      actor: owner
+      template: /visitTemplate
+      context: /visits
+  visitsWatch:
+    type: Clauses/Listener Clause
+    parameters:
+      sources:
+      - name: greeting
+        type: Contracts/Embedded Node Channel
+        event:
+          type: Connections/Hello Said
+      states:
+        count:
+          path: /visitsGreetings
+          kind: integer
+          initial: 0
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /visitsGreetings
+            val:
+              $add:
+              - $document: /visitsGreetings
+              - 1
+    bindings:
+      context: /visits
+contracts:
+  owner:
+    type: Contracts/External Channel
+    event:
+      source: owner

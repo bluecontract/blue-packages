@@ -1,0 +1,52 @@
+document: 17-acme-milestone.blue
+initial:
+  members: 2
+  expect:
+    /payment/policy/eligible: false
+    /payment/paymentDetails/method: acme-bank
+  events:
+  - kind: Bank Payment Instruction Created
+    event:
+      bank: ACME
+steps:
+- target: /payment
+  channel: customer
+  operation: approveMilestone
+  expect:
+    /payment/policy/eligible: true
+- target: /payment
+  channel: customer
+  operation: approveMilestone
+  eventCount: 0
+- target: /payment
+  channel: guarantor
+  operation: acceptPaymentInstruction
+- target: /payment
+  channel: guarantor
+  operation: recordTransactionInitiated
+  request:
+    transactionId: t1
+  expect:
+    /payment/payment/reserved/secure: 7500
+  events:
+  - kind: Bank Execution Requested
+    event:
+      request:
+        action: secure
+        amountMinor: 7500
+- target: /payment
+  channel: guarantor
+  operation: secureFunds
+  request:
+    requestId: authorization-0
+  expect:
+    /payment/payment/reserved/capture: 7500
+- target: /payment
+  channel: guarantor
+  operation: completePayment
+  request:
+    requestId: capture-0
+  expect:
+    /payment/payment/completed: 7500
+    /payment/policy/status: Paid
+  restore: true

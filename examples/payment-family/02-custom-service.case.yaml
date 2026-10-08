@@ -7,20 +7,19 @@ steps:
   target: ''
   expect:
     /payment/policy/eligible: false
-- operation: accept
+- operation: acceptPaymentInstruction
   channel: guarantor
   target: /payment
-- operation: initiate
+- operation: recordTransactionInitiated
   channel: guarantor
   target: /payment
   request:
     transactionId: custom-1
-- operation: confirm
+- operation: secureFunds
   channel: guarantor
   target: /payment
   request:
     requestId: authorization-0
-    outcome: succeeded
 - operation: capture
   channel: customer
   target: /payment
@@ -58,12 +57,11 @@ steps:
   request:
     requestId: part-1
     amountMinor: 1000
-- operation: confirm
+- operation: completePayment
   channel: guarantor
   target: /payment
   request:
     requestId: part-1
-    outcome: succeeded
   expect:
     /status: Open
     /financial/net: 1000
@@ -73,22 +71,20 @@ steps:
   request:
     requestId: part-2
     amountMinor: 9000
-- operation: confirm
+- operation: completePayment
   channel: guarantor
   target: /payment
   request:
     requestId: part-2
-    outcome: succeeded
   expect:
     /status: Completed
     /financial/net: 10000
   restore: true
-- operation: confirm
+- operation: completePayment
   channel: guarantor
   target: /payment
   request:
     requestId: part-2
-    outcome: succeeded
   expect:
     /status: Completed
     /financial/net: 10000

@@ -1,5 +1,5 @@
 {
-  "version": "0.5.0-preview.2",
+  "version": "0.6.0-preview.4",
   "scope": "Unpublished candidate; see docs/payment-family.md for exact implementation boundaries.",
   "families": [
     {
@@ -484,17 +484,17 @@
       "actions": {
         "start": "Host action; creates/embeds one PI. On Payment this is automatic unless autoStart=false.",
         "record": "PI policy action {fact: Text, confirmed: Boolean}; reusable required evidence, exposed through configured connections.",
-        "request": "PI lifecycle action {requestId: Text, action: authorize|capture|refund|void, amountMinor?: Integer}; actual names may be authorize/capture/refund/releaseAuthorization connections.",
-        "accept / initiate / confirm": "PI guarantor operations. accept consents to instruction, initiate supplies transaction correlation, confirm reports a specific command outcome.",
+        "request": "PI actions requestSecureFunds, requestCompletePayment, requestCancelBeforeCompletion and requestReverseAfterCompletion. requestCapture/requestRefund remain authoring aliases. Request IDs correlate immutable intent.",
         "approveRecipient": "PI recipient operation where required.",
-        "fail / advance / retry": "PI policy actions. Failure is retained; advance considers both financial outcomes and accepted evidence; retry requires a definitive failed request and consumes that failure once."
+        "fail / advance / retry": "PI policy actions. Failure is retained; advance considers both financial outcomes and accepted evidence; retry requires a definitive failed request and consumes that failure once.",
+        "guarantorOperations": "36 named operations; see docs/payment-protocol.md. Completion, failure, decline and unknown outcomes are separate operations. Each validates the matching recorded request.",
+        "controlRequests": "Payer requests recipient/details/final-amount/lock changes. Named guarantor decisions apply the exact stored proposal; requests alone do not modify confirmed state."
       },
       "events": [
-        "PaymentInstruction/Payment Event",
-        "Payment/Payment Event Received (with originating clause and instructionPath)",
-        "Evidence Recorded",
-        "Conditions Satisfied",
-        "Compensation Required"
+        "PaymentInstruction/Payment Request",
+        "PaymentInstruction/Payment Response",
+        "50 concrete message types listed in docs/payment-protocol.md",
+        "Payment/Payment Event Received (preserves the exact inner message type, clause and instructionPath)"
       ],
       "example": "examples/payment-family/15-myos-customer.blue; 16-myos-account.blue; 18-acme-bank.blue; 19-manual-bank.blue; 20-partnership.blue",
       "status": "Native method-specific request and confirmation protocols; customer session gate, strict retry entitlement, manual receipt confirmation, and frozen party snapshots. No live external executor.",

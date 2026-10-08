@@ -98,10 +98,10 @@ The selected parties and payment details are copied into the new PI. Editing the
 ### MyOS Customer Payment
 
 1. The host starts a PI and it emits a customer-session request.
-2. The operator accepts the instruction through `accept`.
+2. The operator accepts the instruction through `acceptPaymentInstruction`.
 3. The operator supplies a stable session reference through `provideSession`.
 4. After the external customer flow, the operator reports `confirmFunding` for that same session.
-5. Only then can `initiate` bind the payment transaction and cause the authorization request.
+5. Only then can `recordTransactionInitiated` bind the payment transaction and cause the authorization request.
 6. The operator confirms authorization. Capture waits for all configured evidence.
 7. A capture request is followed by a separately confirmed result.
 
@@ -238,3 +238,7 @@ Only scenarios with a completed native report appear in the viewer.
 ## Remaining product boundaries
 
 This package edition is not a production payment service. Live rails, customer web sessions, full representative governance, general read-only observer bootstrap, deployment-specific reliability, disputes and regulatory requirements are not established by these document scenarios. Java/Python behavioral parity is not claimed by Java-only qualification. All proposed future capabilities must remain distinguishable from exported, tested types.
+
+## Explicit payment protocol
+
+The current payment preview exports distinct requests/responses and named guarantor operations. See [the full protocol, examples and migration guide](payment-protocol.md). New integrations use `secureFunds`, `completePayment`, their decline/failure variants, and the explicit control exchanges; the generic `confirm` operation is no longer installed.

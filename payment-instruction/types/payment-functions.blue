@@ -56,6 +56,127 @@ functions:
         type: Text
       detail: {}
     do:
+    - $let:
+        name: messageName
+        expr:
+          $get:
+            object:
+              Instruction Accepted: Payment Instruction Accepted
+              Instruction Rejected: Payment Instruction Rejected
+              Transaction Initiated: Transaction Initiated
+              Payment Request: Payment Request
+              Payment Response: Payment Response
+              Payment Instruction Acceptance Requested: Payment Instruction Acceptance Requested
+              Payee Assignment Requested: Payee Assignment Requested
+              Transaction Details Update Requested: Transaction Details Update Requested
+              Secure Funds Requested: Secure Funds Requested
+              Complete Payment Requested: Complete Payment Requested
+              Cancel Before Completion Requested: Cancel Before Completion Requested
+              Reverse After Completion Requested: Reverse After Completion Requested
+              Final Amount Resolution Requested: Final Amount Resolution Requested
+              Payment Completion Lock Requested: Payment Completion Lock Requested
+              Payment Completion Unlock Requested: Payment Completion Unlock Requested
+              Payment Reversal Lock Requested: Payment Reversal Lock Requested
+              Payment Reversal Unlock Requested: Payment Reversal Unlock Requested
+              Transaction Details Update Lock Requested: Transaction Details Update Lock Requested
+              Transaction Details Update Unlock Requested: Transaction Details Update Unlock Requested
+              Payment Instruction Accepted: Payment Instruction Accepted
+              Payment Instruction Rejected: Payment Instruction Rejected
+              Payee Assignment Confirmed: Payee Assignment Confirmed
+              Payee Assignment Rejected: Payee Assignment Rejected
+              Transaction Details Updated: Transaction Details Updated
+              Transaction Details Update Rejected: Transaction Details Update Rejected
+              Transaction Details Update Failed: Transaction Details Update Failed
+              Transaction Initiation Failed: Transaction Initiation Failed
+              Funds Secured: Funds Secured
+              Payment Completed: Payment Completed
+              Payment Cancelled Before Completion: Payment Cancelled Before Completion
+              Payment Reversed After Completion: Payment Reversed After Completion
+              Final Amount Resolved: Final Amount Resolved
+              Final Amount Resolution Rejected: Final Amount Resolution Rejected
+              Funds Securing Declined: Funds Securing Declined
+              Funds Securing Failed: Funds Securing Failed
+              Funds Securing Unknown: Funds Securing Unknown
+              Payment Completion Declined: Payment Completion Declined
+              Payment Completion Failed: Payment Completion Failed
+              Payment Completion Unknown: Payment Completion Unknown
+              Payment Cancellation Declined: Payment Cancellation Declined
+              Payment Cancellation Failed: Payment Cancellation Failed
+              Payment Cancellation Unknown: Payment Cancellation Unknown
+              Payment Reversal Declined: Payment Reversal Declined
+              Payment Reversal Failed: Payment Reversal Failed
+              Payment Reversal Unknown: Payment Reversal Unknown
+              Payment Completion Locked: Payment Completion Locked
+              Payment Completion Unlocked: Payment Completion Unlocked
+              Payment Completion Lock Change Failed: Payment Completion Lock Change Failed
+              Payment Reversal Locked: Payment Reversal Locked
+              Payment Reversal Unlocked: Payment Reversal Unlocked
+              Payment Reversal Lock Change Failed: Payment Reversal Lock Change Failed
+              Transaction Details Update Locked: Transaction Details Update Locked
+              Transaction Details Update Unlocked: Transaction Details Update Unlocked
+              Transaction Details Update Lock Change Failed: Transaction Details Update Lock Change Failed
+            key:
+              $var: kind
+    - $if:
+        cond:
+          $eq:
+          - $var: kind
+          - Payment Requested
+        then:
+        - $set:
+            name: messageName
+            expr:
+              $get:
+                object:
+                  secure: Secure Funds Requested
+                  capture: Complete Payment Requested
+                  void: Cancel Before Completion Requested
+                  refund: Reverse After Completion Requested
+                key:
+                  $var:
+                    name: detail
+                    path: /action
+    - $if:
+        cond:
+          $eq:
+          - $var: kind
+          - Payment Outcome
+        then:
+        - $set:
+            name: messageName
+            expr:
+              $get:
+                object:
+                  $get:
+                    object:
+                      secure:
+                        succeeded: Funds Secured
+                        declined: Funds Securing Declined
+                        failed: Funds Securing Failed
+                        unknown: Funds Securing Unknown
+                      capture:
+                        succeeded: Payment Completed
+                        declined: Payment Completion Declined
+                        failed: Payment Completion Failed
+                        unknown: Payment Completion Unknown
+                      void:
+                        succeeded: Payment Cancelled Before Completion
+                        declined: Payment Cancellation Declined
+                        failed: Payment Cancellation Failed
+                        unknown: Payment Cancellation Unknown
+                      refund:
+                        succeeded: Payment Reversed After Completion
+                        declined: Payment Reversal Declined
+                        failed: Payment Reversal Failed
+                        unknown: Payment Reversal Unknown
+                    key:
+                      $var:
+                        name: detail
+                        path: /action
+                key:
+                  $var:
+                    name: detail
+                    path: /outcome
     - $appendEvent:
         $merge:
         - type: PaymentInstruction/Payment Event
@@ -68,6 +189,121 @@ functions:
             $const:
               name: parameters
               path: /currency
+        - $choose:
+            cond:
+              $exists:
+                $var: messageName
+            then:
+              $get:
+                object:
+                  Payment Request:
+                    type: PaymentInstruction/Payment Request
+                  Payment Response:
+                    type: PaymentInstruction/Payment Response
+                  Payment Instruction Acceptance Requested:
+                    type: PaymentInstruction/Payment Instruction Acceptance Requested
+                  Payee Assignment Requested:
+                    type: PaymentInstruction/Payee Assignment Requested
+                  Transaction Details Update Requested:
+                    type: PaymentInstruction/Transaction Details Update Requested
+                  Secure Funds Requested:
+                    type: PaymentInstruction/Secure Funds Requested
+                  Complete Payment Requested:
+                    type: PaymentInstruction/Complete Payment Requested
+                  Cancel Before Completion Requested:
+                    type: PaymentInstruction/Cancel Before Completion Requested
+                  Reverse After Completion Requested:
+                    type: PaymentInstruction/Reverse After Completion Requested
+                  Final Amount Resolution Requested:
+                    type: PaymentInstruction/Final Amount Resolution Requested
+                  Payment Completion Lock Requested:
+                    type: PaymentInstruction/Payment Completion Lock Requested
+                  Payment Completion Unlock Requested:
+                    type: PaymentInstruction/Payment Completion Unlock Requested
+                  Payment Reversal Lock Requested:
+                    type: PaymentInstruction/Payment Reversal Lock Requested
+                  Payment Reversal Unlock Requested:
+                    type: PaymentInstruction/Payment Reversal Unlock Requested
+                  Transaction Details Update Lock Requested:
+                    type: PaymentInstruction/Transaction Details Update Lock Requested
+                  Transaction Details Update Unlock Requested:
+                    type: PaymentInstruction/Transaction Details Update Unlock Requested
+                  Payment Instruction Accepted:
+                    type: PaymentInstruction/Payment Instruction Accepted
+                  Payment Instruction Rejected:
+                    type: PaymentInstruction/Payment Instruction Rejected
+                  Payee Assignment Confirmed:
+                    type: PaymentInstruction/Payee Assignment Confirmed
+                  Payee Assignment Rejected:
+                    type: PaymentInstruction/Payee Assignment Rejected
+                  Transaction Details Updated:
+                    type: PaymentInstruction/Transaction Details Updated
+                  Transaction Details Update Rejected:
+                    type: PaymentInstruction/Transaction Details Update Rejected
+                  Transaction Details Update Failed:
+                    type: PaymentInstruction/Transaction Details Update Failed
+                  Transaction Initiated:
+                    type: PaymentInstruction/Transaction Initiated
+                  Transaction Initiation Failed:
+                    type: PaymentInstruction/Transaction Initiation Failed
+                  Funds Secured:
+                    type: PaymentInstruction/Funds Secured
+                  Payment Completed:
+                    type: PaymentInstruction/Payment Completed
+                  Payment Cancelled Before Completion:
+                    type: PaymentInstruction/Payment Cancelled Before Completion
+                  Payment Reversed After Completion:
+                    type: PaymentInstruction/Payment Reversed After Completion
+                  Final Amount Resolved:
+                    type: PaymentInstruction/Final Amount Resolved
+                  Final Amount Resolution Rejected:
+                    type: PaymentInstruction/Final Amount Resolution Rejected
+                  Funds Securing Declined:
+                    type: PaymentInstruction/Funds Securing Declined
+                  Funds Securing Failed:
+                    type: PaymentInstruction/Funds Securing Failed
+                  Funds Securing Unknown:
+                    type: PaymentInstruction/Funds Securing Unknown
+                  Payment Completion Declined:
+                    type: PaymentInstruction/Payment Completion Declined
+                  Payment Completion Failed:
+                    type: PaymentInstruction/Payment Completion Failed
+                  Payment Completion Unknown:
+                    type: PaymentInstruction/Payment Completion Unknown
+                  Payment Cancellation Declined:
+                    type: PaymentInstruction/Payment Cancellation Declined
+                  Payment Cancellation Failed:
+                    type: PaymentInstruction/Payment Cancellation Failed
+                  Payment Cancellation Unknown:
+                    type: PaymentInstruction/Payment Cancellation Unknown
+                  Payment Reversal Declined:
+                    type: PaymentInstruction/Payment Reversal Declined
+                  Payment Reversal Failed:
+                    type: PaymentInstruction/Payment Reversal Failed
+                  Payment Reversal Unknown:
+                    type: PaymentInstruction/Payment Reversal Unknown
+                  Payment Completion Locked:
+                    type: PaymentInstruction/Payment Completion Locked
+                  Payment Completion Unlocked:
+                    type: PaymentInstruction/Payment Completion Unlocked
+                  Payment Completion Lock Change Failed:
+                    type: PaymentInstruction/Payment Completion Lock Change Failed
+                  Payment Reversal Locked:
+                    type: PaymentInstruction/Payment Reversal Locked
+                  Payment Reversal Unlocked:
+                    type: PaymentInstruction/Payment Reversal Unlocked
+                  Payment Reversal Lock Change Failed:
+                    type: PaymentInstruction/Payment Reversal Lock Change Failed
+                  Transaction Details Update Locked:
+                    type: PaymentInstruction/Transaction Details Update Locked
+                  Transaction Details Update Unlocked:
+                    type: PaymentInstruction/Transaction Details Update Unlocked
+                  Transaction Details Update Lock Change Failed:
+                    type: PaymentInstruction/Transaction Details Update Lock Change Failed
+                key:
+                  $var: messageName
+            else:
+              type: PaymentInstruction/Payment Event
   initialize:
     args: {}
     do:
@@ -254,18 +490,60 @@ functions:
                 $var: terms
               path: /payeeChannel
               default: ''
+          controlRequests: {}
+          initiationFailures: {}
+          cancellationPending: false
     - $call:
         function: emit
         args:
           kind: Payment Initialized
           detail: {}
+    - $call:
+        function: emit
+        args:
+          kind: Payment Instruction Acceptance Requested
+          detail:
+            requestId: acceptance
   accept:
     args:
       approved:
         type: Boolean
+      input: {}
     do:
     - $call:
         function: guarantor
+    - $let:
+        name: decision
+        expr:
+          approved:
+            $var: approved
+          reason:
+            $pointerGet:
+              object:
+                $var: input
+              path: /reason
+              default: ''
+    - $if:
+        cond:
+          $not:
+            $var: approved
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: input
+                        path: /reason
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: input
+                      path: /reason
+                  - ''
+            message: Rejection requires a reason
     - $let:
         name: s
         expr:
@@ -300,6 +578,14 @@ functions:
               name: s
               path: /rejected
         then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: s
+                  path: /acceptanceResponse
+              - $var: decision
+            message: Conflicting acceptance response
         - $return:
             changed: false
     - $appendChange:
@@ -316,6 +602,8 @@ functions:
             rejected:
               $not:
                 $var: approved
+            acceptanceResponse:
+              $var: decision
     - $call:
         function: emit
         args:
@@ -325,7 +613,14 @@ functions:
                 $var: approved
               then: Instruction Accepted
               else: Instruction Rejected
-          detail: {}
+          detail:
+            requestId: acceptance
+            reason:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /reason
+                default: ''
     - $return:
         changed: true
   approveRecipient:
@@ -386,6 +681,7 @@ functions:
     args:
       transactionId:
         type: Text
+      input: {}
     do:
     - $call:
         function: guarantor
@@ -412,6 +708,62 @@ functions:
               name: s
               path: /accepted
         message: Accept instruction before initiating transaction
+    - $let:
+        name: attachment
+        expr:
+          transactionId:
+            $var: transactionId
+          railType:
+            $pointerGet:
+              object:
+                $var: input
+              path: /railType
+              default: unspecified
+          attachmentPoint:
+            $pointerGet:
+              object:
+                $var: input
+              path: /attachmentPoint
+              default: unspecified
+          providerReference:
+            $pointerGet:
+              object:
+                $var: input
+              path: /providerReference
+              default:
+                $var: transactionId
+          initiatedAmount:
+            $pointerGet:
+              object:
+                $var: input
+              path: /initiatedAmount
+              default:
+                $const:
+                  name: parameters
+                  path: /amountMinor
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: attachment
+                    path: /initiatedAmount
+                kind: integer
+            - $gte:
+              - $var:
+                  name: attachment
+                  path: /initiatedAmount
+              - 0
+            - $lte:
+              - $var:
+                  name: attachment
+                  path: /initiatedAmount
+              - $const:
+                  name: parameters
+                  path: /limitMinor
+        message: Invalid initiated amount
     - $if:
         cond:
           $ne:
@@ -420,6 +772,14 @@ functions:
               path: /transactionId
           - ''
         then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: s
+                  path: /attachment
+              - $var: attachment
+            message: Conflicting transaction attachment
         - $failIf:
             cond:
               $ne:
@@ -459,13 +819,20 @@ functions:
           - /transactionId
         val:
           $var: transactionId
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var: path
+          - /attachment
+        val:
+          $var: attachment
     - $call:
         function: emit
         args:
           kind: Transaction Initiated
           detail:
-            transactionId:
-              $var: transactionId
+            $var: attachment
     - $return:
         changed: true
   request:
@@ -494,9 +861,37 @@ functions:
     - $let:
         name: amount
         expr:
-          $var:
-            name: input
-            path: /amountMinor
+          $pointerGet:
+            object:
+              $var: input
+            path: /amount
+            default:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /amountMinor
+                default:
+                  $choose:
+                    cond:
+                      $eq:
+                      - $var: action
+                      - void
+                    then:
+                      $pointerGet:
+                        object:
+                          $get:
+                            object:
+                              $var:
+                                name: s
+                                path: /requests
+                            key:
+                              $var: id
+                        path: /intent/amountMinor
+                        default:
+                          $var:
+                            name: s
+                            path: /secured
+                    else: null
     - $call:
         function: key
         args:
@@ -518,9 +913,17 @@ functions:
                 val:
                   $var: amount
                 kind: integer
-            - $gt:
-              - $var: amount
-              - 0
+            - $or:
+              - $gt:
+                - $var: amount
+                - 0
+              - $and:
+                - $eq:
+                  - $var: action
+                  - void
+                - $eq:
+                  - $var: amount
+                  - 0
             - $lte:
               - $var: amount
               - 1000000000000
@@ -532,6 +935,23 @@ functions:
             $var: action
           amountMinor:
             $var: amount
+          reason:
+            $pointerGet:
+              object:
+                $var: input
+              path: /reason
+              default: ''
+    - $failIf:
+        cond:
+          $exists:
+            $get:
+              object:
+                $var:
+                  name: s
+                  path: /controlRequests
+              key:
+                $var: id
+        message: Request identifier already used by a control request
     - $let:
         name: previous
         expr:
@@ -629,11 +1049,9 @@ functions:
               - capture
               val:
                 $var: action
-          - $gt:
-            - $var:
-                name: reserved
-                path: /void
-            - 0
+          - $var:
+              name: s
+              path: /cancellationPending
         message: Resolve pending void before further charges
     - $let:
         name: available
@@ -741,6 +1159,12 @@ functions:
         then:
         - $failIf:
             cond:
+              $var:
+                name: s
+                path: /cancellationPending
+            message: Resolve pending cancellation before another cancellation
+        - $failIf:
+            cond:
               $ne:
               - $add:
                 - $var:
@@ -798,6 +1222,19 @@ functions:
               key:
                 $var: action
           - $var: amount
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - void
+        then:
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $var: path
+              - /cancellationPending
+            val: true
     - $call:
         function: emit
         args:
@@ -809,6 +1246,14 @@ functions:
               $var: action
             amountMinor:
               $var: amount
+            amount:
+              $var: amount
+            reason:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /reason
+                default: ''
     - $return:
         created: true
         requestId:
@@ -876,6 +1321,17 @@ functions:
               $var: request
         message: Unknown payment request
     - $let:
+        name: response
+        expr:
+          outcome:
+            $var: outcome
+          reason:
+            $pointerGet:
+              object:
+                $var: input
+              path: /reason
+              default: ''
+    - $let:
         name: status
         expr:
           $var:
@@ -887,6 +1343,14 @@ functions:
           - $var: status
           - $var: outcome
         then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: request
+                  path: /response
+              - $var: response
+            message: Conflicting duplicate payment response
         - $return:
             changed: false
     - $failIf:
@@ -911,6 +1375,16 @@ functions:
           $var:
             name: request
             path: /intent/amountMinor
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var: path
+          - /requests/
+          - $var: id
+          - /response
+        val:
+          $var: response
     - $appendChange:
         op: replace
         path:
@@ -1036,19 +1510,63 @@ functions:
                   - $var: path
                   - /closed
                 val: true
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - void
+          - $ne:
+            - $var: outcome
+            - unknown
+        then:
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $var: path
+              - /cancellationPending
+            val: false
     - $call:
         function: emit
         args:
           kind: Payment Outcome
           detail:
-            requestId:
-              $var: id
-            action:
-              $var: action
-            amountMinor:
-              $var: amount
-            outcome:
-              $var: outcome
+            $merge:
+            - requestId:
+                $var: id
+              action:
+                $var: action
+              amountMinor:
+                $var: amount
+              outcome:
+                $var: outcome
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+            - $choose:
+                cond:
+                  $eq:
+                  - $var: outcome
+                  - succeeded
+                then:
+                  $objectSet:
+                    object: {}
+                    key:
+                      $get:
+                        object:
+                          secure: amountSecured
+                          capture: amountCompleted
+                          refund: amountReversed
+                          void: amountCancelled
+                        key:
+                          $var: action
+                    val:
+                      $var: amount
+                else: {}
     - $return:
         changed: true
   configure:
@@ -1185,6 +1703,12 @@ functions:
           - $var: action
           - payee
         then:
+        - $failIf:
+            cond:
+              $var:
+                name: s
+                path: /locks/details
+            message: Payment details are locked
         - $set:
             name: nextValue
             expr:
@@ -1284,14 +1808,5 @@ functions:
           - $var: field
         val:
           $var: nextValue
-    - $call:
-        function: emit
-        args:
-          kind: Payment Configuration Confirmed
-          detail:
-            action:
-              $var: action
-            newValue:
-              $var: nextValue
     - $return:
         changed: true

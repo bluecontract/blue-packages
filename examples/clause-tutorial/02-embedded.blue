@@ -1,0 +1,132 @@
+name: Hello from embedded documents
+type: Agreements/Agreement with Clauses
+message: ''
+log: []
+supplier:
+  name: Supplier
+  status: waiting
+  contracts:
+    input:
+      type: Contracts/External Channel
+      event:
+        source: supplier
+    report:
+      type: Contracts/Sequential Workflow Operation
+      channel: input
+      steps:
+      - type: Contracts/Compute
+        do:
+        - $appendChange:
+            op: replace
+            path: /status
+            val: ready
+        - $appendEvent:
+            kind: Ready
+            text: Supplier ready
+orders:
+  first:
+    name: First order
+    contracts:
+      input:
+        type: Contracts/External Channel
+        event:
+          source: order1
+      report:
+        type: Contracts/Sequential Workflow Operation
+        channel: input
+        steps:
+        - type: Contracts/Compute
+          do:
+          - $appendEvent:
+              kind: Order Unknown
+              text: First order
+  second:
+    name: Second order
+    contracts:
+      input:
+        type: Contracts/External Channel
+        event:
+          source: order2
+      report:
+        type: Contracts/Sequential Workflow Operation
+        channel: input
+        steps:
+        - type: Contracts/Compute
+          do:
+          - $appendEvent:
+              kind: Order Unknown
+              text: Second order
+ordersArchive:
+  old:
+    name: Old order
+    contracts:
+      input:
+        type: Contracts/External Channel
+        event:
+          source: archive
+      report:
+        type: Contracts/Sequential Workflow Operation
+        channel: input
+        steps:
+        - type: Contracts/Compute
+          do:
+          - $appendEvent:
+              kind: Order Unknown
+              text: Must not match /orders
+clauses:
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        ready:
+          'on': initialized
+          params:
+            text: Connections ready
+        supplierReady:
+          'on': embedded
+          path: /supplier
+          event:
+            kind: Ready
+          params:
+            text:
+              $event: /event/text
+        anyOrderUnknown:
+          'on': collection
+          path: /orders
+          event:
+            kind: Order Unknown
+          params:
+            text:
+              $concat:
+              - $event: /sourcePath
+              - ': '
+              - $var:
+                  name: trigger
+                  path: /text
+        childFieldIsNotALocalChange:
+          'on': change
+          path: /supplier/status
+          params:
+            text: This must never run
+contracts:
+  embedded:
+    type: Contracts/Process Embedded
+    collectionPaths:
+    - /ordersArchive
+  helloEvents:
+    type: Contracts/Triggered Event Channel
+    order: 0
+    event:
+      type: Connections/Hello Said
+  logHello:
+    type: Contracts/Sequential Workflow
+    channel: helloEvents
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: add
+          path: /log/-
+          val:
+            $event: /text

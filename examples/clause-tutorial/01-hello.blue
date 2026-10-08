@@ -1,0 +1,100 @@
+name: Hello connections
+type: Agreements/Agreement with Clauses
+message: ''
+observed: ''
+status: draft
+clauses:
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        acceptDelivery:
+          'on': workflow
+          channel: owner
+          request:
+            type: Connections/Greeting Request
+          params:
+            text:
+              $binding: call/request/text
+          before:
+          - $failIf:
+              cond:
+                $not:
+                  $binding: call/request/approved
+              message: Approval required
+          after:
+          - $appendChange:
+              op: replace
+              path: /observed
+              val:
+                $resultValue: /message
+        typedPing:
+          'on': event
+          event:
+            type: Connections/Ping
+          params:
+            text:
+              $event: /text
+        onceApproved:
+          'on': event
+          event:
+            kind: Order Approved
+          once: true
+          params:
+            text: Approved once
+        whenFailed:
+          'on': event
+          event:
+            kind: Order Failed
+            reason: abc
+          params:
+            text:
+              $concat:
+              - 'Failed: '
+              - $event: /reason
+        statusChanged:
+          'on': change
+          path: /status
+          when:
+            $eq:
+            - $event: /after
+            - delivered
+          params:
+            text: Status is delivered
+        externalSignal:
+          'on': channel
+          channel: signals
+          event:
+            kind: External Hello
+          params:
+            text:
+              $event: /text
+contracts:
+  owner:
+    type: Contracts/External Channel
+    event:
+      source: owner
+  signals:
+    type: Contracts/External Channel
+    event:
+      source: sensor
+  publish:
+    type: Contracts/Sequential Workflow Operation
+    channel: owner
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendEvent:
+          $binding: call/request
+  setStatus:
+    type: Contracts/Sequential Workflow Operation
+    channel: owner
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: replace
+          path: /status
+          val:
+            $binding: call/request/status

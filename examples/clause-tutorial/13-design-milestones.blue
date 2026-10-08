@@ -1,0 +1,67 @@
+name: Design agreement with independently accepted milestones
+type: Agreements/Agreement with Clauses
+periods: {}
+periodTemplate:
+  name: One design milestone
+  type: Orders/Order with Clauses
+  product:
+    name: Design milestone
+    currency: EUR
+    unitPriceMinor: 6000
+    quantity: 1
+  clauses:
+    payment:
+      type: Payment/Conditional Payment
+      parameters:
+        requireAll:
+          acceptPeriod:
+            'on': workflow
+            channel: customer
+  contracts:
+    customer:
+      type: Contracts/External Channel
+      event:
+        source: customer
+    seller:
+      type: Contracts/External Channel
+      event:
+        source: seller
+    guarantor:
+      type: Contracts/External Channel
+      event:
+        source: guarantor
+clauses:
+  periods:
+    type: DocumentsV3/Document Factory Clause
+    parameters:
+      allowedFields: []
+      inheritChannels:
+      - customer
+      - seller
+      - guarantor
+    bindings:
+      template: /periodTemplate
+      collection: /periods
+      start:
+        openPeriod:
+          'on': workflow
+          channel: seller
+          params:
+            key:
+              $var:
+                name: trigger
+                path: /period
+            fields: {}
+contracts:
+  customer:
+    type: Contracts/External Channel
+    event:
+      source: customer
+  seller:
+    type: Contracts/External Channel
+    event:
+      source: seller
+  guarantor:
+    type: Contracts/External Channel
+    event:
+      source: guarantor

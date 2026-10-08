@@ -1,0 +1,106 @@
+name: Hello with timers
+type: Agreements/Agreement with Clauses
+message: ''
+log: []
+clauses:
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        fixedDeadline:
+          'on': timer
+          timestamp: 30000000
+          params:
+            text: Fixed deadline
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val:
+                connection: fixed
+                at:
+                  $binding: timestamp
+        firstReminder:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              kind: Delivery Reported
+          delayMs: 2000
+          policy: first
+          params:
+            text:
+              $concat:
+              - 'First report: '
+              - $var:
+                  name: trigger
+                  path: /text
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val:
+                connection: first
+                at:
+                  $binding: timestamp
+        latestReminder:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              kind: Delivery Reported
+          delayMs: 2000
+          policy: latest
+          once: true
+          params:
+            text:
+              $concat:
+              - 'Latest report: '
+              - $var:
+                  name: trigger
+                  path: /text
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val:
+                connection: latest
+                at:
+                  $binding: timestamp
+        cancelledReminder:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              kind: Cancel Example
+          delayMs: 3000
+          cancelOn:
+            'on': event
+            event:
+              kind: Cancel Reminder
+          params:
+            text: This timer must be cancelled
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val:
+                connection: cancelled
+                at:
+                  $binding: timestamp
+contracts:
+  owner:
+    type: Contracts/External Channel
+    event:
+      source: owner
+  publish:
+    type: Contracts/Sequential Workflow Operation
+    channel: owner
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendEvent:
+          $binding: call/request
+description: Native signed-provider fixture substitutes contracts.owner; timestamps
+  are microseconds, delays are milliseconds.

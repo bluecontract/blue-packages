@@ -25,7 +25,7 @@ def main():
         shutil.copyfile(ROOT/'tools/payment-explorer'/name,args.output/name)
     (args.output/'docs').mkdir(exist_ok=True)
     shutil.copyfile(ROOT/'docs/payment-family.md',args.output/'docs/payment-family.md')
-    payload=dict(version='0.5.0-preview.2',cases=rows,catalogue=json.loads((ROOT/'catalogue/payment-family.json').read_text()))
+    payload=dict(version='0.6.0-preview.4',cases=rows,catalogue=json.loads((ROOT/'catalogue/payment-family.json').read_text()))
     (args.output/'data.js').write_text('window.BLUE_DEMO = '+json.dumps(payload,ensure_ascii=False).replace('</','<\\/')+';\n')
     print(f'{len(rows)} native traces: {args.output / "index.html"}')
 

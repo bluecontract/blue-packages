@@ -4,7 +4,9 @@ One current package set lives at the repository root. `PACKAGE-SOURCES.json`
 selects the source directories; `PACKAGES.json` pins the complete built set.
 There are no alternative source editions to choose between.
 
-Start with [the payment and clauses guide](docs/payment-family.md),
+Start with the [complete clause tutorial](docs/clauses-tutorial.md): all 38 clause types,
+87 use-case references, complete applications, and executable Java walkthroughs.
+Then read [the payment-family guide](docs/payment-family.md),
 [the repository layout](docs/layout.md), and [consolidation notes](docs/consolidation.md).
 
 The foundation is Language, BEX, Contracts (10,000,000 default gas), Coordination,
@@ -25,6 +27,7 @@ BLUE_JAVA_CLASSPATH=... bash tools/build-payment-family.sh
 python3 tools/sync_catalogues.py
 python3 tools/release.py check
 python3 tools/check_payment_family.py
+python3 tools/check_clause_tutorial.py
 python3 -m unittest discover -s tools -p 'test_release.py'
 ```
 

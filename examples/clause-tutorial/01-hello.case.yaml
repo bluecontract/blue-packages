@@ -1,0 +1,120 @@
+document: 01-hello.blue
+initial:
+  expect:
+    /message: ''
+    /observed: ''
+steps:
+- timestamp: 1000000
+  expect:
+    /message: Hi Ada
+    /observed: Hi Ada
+  operation: acceptDelivery
+  channel: owner
+  request:
+    type: Connections/Greeting Request
+    text: Hi Ada
+    approved: true
+  source: owner
+  target: ''
+- timestamp: 2000000
+  status: FAILED
+  expect:
+    /message: Hi Ada
+    /observed: Hi Ada
+  operation: acceptDelivery
+  channel: owner
+  request:
+    type: Connections/Greeting Request
+    text: Must not change
+    approved: false
+  source: owner
+  target: ''
+- timestamp: 3000000
+  expect:
+    /message: Hi Ada
+  operation: publish
+  channel: owner
+  request:
+    kind: Order Failed
+    reason: wrong
+  source: owner
+  target: ''
+- timestamp: 4000000
+  expect:
+    /message: 'Failed: abc'
+  operation: publish
+  channel: owner
+  request:
+    kind: Order Failed
+    reason: abc
+  source: owner
+  target: ''
+- timestamp: 5000000
+  expect:
+    /message: Approved once
+    /connectionState_hello/say.onceApproved/fired: true
+  operation: publish
+  channel: owner
+  request:
+    kind: Order Approved
+    sequence: 1
+  source: owner
+  target: ''
+- timestamp: 6000000
+  expect:
+    /message: From the sensor
+  event:
+    source: sensor
+    kind: External Hello
+    text: From the sensor
+- timestamp: 7000000
+  expect:
+    /message: From the sensor
+  operation: publish
+  channel: owner
+  request:
+    kind: Order Approved
+    sequence: 2
+  source: owner
+  target: ''
+- timestamp: 8000000
+  expect:
+    /message: Status is delivered
+  operation: setStatus
+  channel: owner
+  request:
+    status: delivered
+  source: owner
+  target: ''
+- timestamp: 9000000
+  expect:
+    /message: Typed ping
+  operation: publish
+  channel: owner
+  request:
+    type: Connections/Ping
+    text: Typed ping
+  source: owner
+  target: ''
+- timestamp: 10000000
+  expect:
+    /message: Typed ping
+  operation: publish
+  channel: owner
+  request:
+    type: Connections/Other Ping
+    text: Wrong type
+  source: owner
+  target: ''
+- timestamp: 11000000
+  status: FAILED
+  diagnostic: INVALID_REQUEST
+  expect:
+    /message: Typed ping
+  operation: acceptDelivery
+  channel: owner
+  request:
+    type: Connections/Other Ping
+    text: Wrong request type
+  source: owner
+  target: ''

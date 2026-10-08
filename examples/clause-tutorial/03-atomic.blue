@@ -1,0 +1,53 @@
+name: Hello atomicity
+type: Agreements/Agreement with Clauses
+message: ''
+observed: ''
+clauses:
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        tryHello:
+          'on': workflow
+          channel: owner
+          once: true
+          params:
+            text:
+              $var:
+                name: trigger
+                path: /text
+          before:
+          - $appendChange:
+              op: replace
+              path: /observed
+              val: started
+          after:
+          - $failIf:
+              cond:
+                $var:
+                  name: trigger
+                  path: /fail
+              message: Reject after the action
+          - $appendChange:
+              op: replace
+              path: /observed
+              val: completed
+        eligibleHello:
+          'on': workflow
+          channel: owner
+          once: true
+          params:
+            text:
+              $var:
+                name: trigger
+                path: /text
+          when:
+            $var:
+              name: trigger
+              path: /ready
+contracts:
+  owner:
+    type: Contracts/External Channel
+    event:
+      source: owner

@@ -51,7 +51,7 @@ steps:
 - operation: acceptDelivery
   channel: customer
   target: /procurements/office/orders/lunch-001
-- operation: accept
+- operation: acceptPaymentInstruction
   channel: guarantor
   target: /procurements/office/orders/lunch-001/payment
 - target: /procurements/office/orders/lunch-001/payment
@@ -64,23 +64,21 @@ steps:
   operation: confirmFunding
   request:
     sessionId: order-session
-- operation: initiate
+- operation: recordTransactionInitiated
   channel: guarantor
   target: /procurements/office/orders/lunch-001/payment
   request:
     transactionId: lunch-payment-001
-- operation: confirm
+- operation: secureFunds
   channel: guarantor
   target: /procurements/office/orders/lunch-001/payment
   request:
     requestId: authorization-0
-    outcome: succeeded
-- operation: confirm
+- operation: completePayment
   channel: guarantor
   target: /procurements/office/orders/lunch-001/payment
   request:
     requestId: capture-0
-    outcome: succeeded
   expect:
     /procurements/office/orders/lunch-001/status: Completed
     /commissionTarget: 1000
@@ -98,29 +96,27 @@ steps:
 - operation: payoutAuthorized
   channel: seller
   target: /payout
-- operation: accept
+- operation: acceptPaymentInstruction
   channel: guarantor
   target: /payout
 - operation: approveRecipient
   channel: referrer
   target: /payout
-- operation: initiate
+- operation: recordTransactionInitiated
   channel: guarantor
   target: /payout
   request:
     transactionId: commission-payout-001
-- operation: confirm
+- operation: secureFunds
   channel: guarantor
   target: /payout
   request:
     requestId: authorization-0
-    outcome: succeeded
-- operation: confirm
+- operation: completePayment
   channel: guarantor
   target: /payout
   request:
     requestId: capture-0
-    outcome: succeeded
   expect:
     /balance/paid: 1000
     /balance/reserved: 0
@@ -131,12 +127,11 @@ steps:
     reason: abc
   expect:
     /procurements/office/orders/lunch-001/payment/payment/reserved/refund: 10000
-- operation: confirm
+- operation: reverseAfterCompletion
   channel: guarantor
   target: /procurements/office/orders/lunch-001/payment
   request:
     requestId: compensate-10000-0-0
-    outcome: succeeded
   expect:
     /commissionTarget: 0
     /balance/accrued: 0

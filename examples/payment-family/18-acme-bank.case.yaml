@@ -4,6 +4,9 @@ initial:
   expect:
     /payment/policy/eligible: false
     /payment/paymentDetails/method: acme-bank
+  events:
+  - clause: payment
+    kind: Bank Payment Instruction Created
 steps:
 - target: /payment
   channel: customer
@@ -16,28 +19,33 @@ steps:
   eventCount: 0
 - target: /payment
   channel: guarantor
-  operation: accept
+  operation: acceptPaymentInstruction
 - target: /payment
   channel: guarantor
-  operation: initiate
+  operation: recordTransactionInitiated
   request:
     transactionId: t1
   expect:
     /payment/payment/reserved/secure: 10000
+  events:
+  - clause: payment
+    kind: Bank Execution Requested
+    event:
+      request:
+        action: secure
+        requestId: authorization-0
 - target: /payment
   channel: guarantor
-  operation: confirm
+  operation: secureFunds
   request:
     requestId: authorization-0
-    outcome: succeeded
   expect:
     /payment/payment/reserved/capture: 10000
 - target: /payment
   channel: guarantor
-  operation: confirm
+  operation: completePayment
   request:
     requestId: capture-0
-    outcome: succeeded
   expect:
     /payment/payment/completed: 10000
     /payment/policy/status: Paid

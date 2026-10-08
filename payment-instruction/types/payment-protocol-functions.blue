@@ -1,0 +1,888 @@
+name: Payment Protocol Functions
+type: PaymentInstruction/Payment Functions
+description: Typed PayNote-style request/decision exchanges. Only the admitted guarantor may report outcomes.
+functions:
+  recordOutcome:
+    args:
+      action:
+        type: Text
+      outcome:
+        type: Text
+      input: {}
+    do:
+    - $call:
+        function: guarantor
+    - $let:
+        name: request
+        expr:
+          $get:
+            object:
+              $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /state
+                - /requests
+            key:
+              $var:
+                name: input
+                path: /requestId
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: request
+              path: /intent/action
+          - $var: action
+        message: Outcome operation does not match requested payment action
+    - $forEach:
+        item: field
+        in:
+        - amount
+        - amountMinor
+        - amountSecured
+        - amountCompleted
+        - amountReversed
+        do:
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: input
+                key:
+                  $var: field
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $get:
+                      object:
+                        $var: input
+                      key:
+                        $var: field
+                  - $var:
+                      name: request
+                      path: /intent/amountMinor
+                message: Confirmation amount differs from recorded request
+    - $if:
+        cond:
+          $ne:
+          - $var: outcome
+          - succeeded
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: input
+                        path: /reason
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: input
+                      path: /reason
+                  - ''
+            message: A non-success payment outcome requires a reason
+    - $return:
+        $call:
+          function: confirm
+          args:
+            input:
+              $merge:
+              - $var: input
+              - outcome:
+                  $var: outcome
+  requestControl:
+    args:
+      action:
+        type: Text
+      input: {}
+    do:
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: s
+        expr:
+          $document:
+            $var: path
+    - $let:
+        name: id
+        expr:
+          $var:
+            name: input
+            path: /requestId
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: id
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - payee
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $const:
+                      name: parameters
+                      path: /allowedPayees
+                  val:
+                    $var:
+                      name: input
+                      path: /payeeRef
+            message: Proposed payee must be a declared recipient
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - details
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var:
+                      name: input
+                      path: /transactionDetails
+                  kind: object
+            message: Transaction details must be an object
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - finalAmount
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: input
+                        path: /finalAmount
+                    kind: integer
+                - $gte:
+                  - $var:
+                      name: input
+                      path: /finalAmount
+                  - 0
+                - $lte:
+                  - $var:
+                      name: input
+                      path: /finalAmount
+                  - $const:
+                      name: parameters
+                      path: /limitMinor
+            message: Final amount proposal outside approved limits
+    - $failIf:
+        cond:
+          $var:
+            name: s
+            path: /rejected
+        message: Rejected instruction cannot request changes
+    - $let:
+        name: intent
+        expr:
+          action:
+            $var: action
+          input:
+            $var: input
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $var:
+                name: s
+                path: /controlRequests
+            key:
+              $var: id
+    - $if:
+        cond:
+          $exists:
+            $var: previous
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: previous
+                  path: /intent
+              - $var: intent
+            message: Conflicting control request identifier
+        - $return:
+            created: false
+    - $failIf:
+        cond:
+          $exists:
+            $get:
+              object:
+                $var:
+                  name: s
+                  path: /requests
+              key:
+                $var: id
+        message: Request identifier already used by a financial request
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var: path
+          - /controlRequests/
+          - $var: id
+        val:
+          intent:
+            $var: intent
+          status: pending
+    - $call:
+        function: emit
+        args:
+          kind:
+            $get:
+              object:
+                payee: Payee Assignment Requested
+                details: Transaction Details Update Requested
+                finalAmount: Final Amount Resolution Requested
+                completionLock: Payment Completion Lock Requested
+                completionUnlock: Payment Completion Unlock Requested
+                reversalLock: Payment Reversal Lock Requested
+                reversalUnlock: Payment Reversal Unlock Requested
+                detailsUpdateLock: Transaction Details Update Lock Requested
+                detailsUpdateUnlock: Transaction Details Update Unlock Requested
+              key:
+                $var: action
+          detail:
+            $var: input
+    - $return:
+        created: true
+  decideControl:
+    args:
+      action:
+        type: Text
+      outcome:
+        type: Text
+      input: {}
+    do:
+    - $call:
+        function: guarantor
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: input
+            key: reason
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var:
+                      name: input
+                      path: /reason
+                  kind: text
+            message: Response reason must be text
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: id
+        expr:
+          $var:
+            name: input
+            path: /requestId
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: id
+    - $let:
+        name: r
+        expr:
+          $document:
+            $concat:
+            - $var: path
+            - /controlRequests/
+            - $var: id
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: r
+              path: /intent/action
+          - $var: action
+        message: Control response does not match a pending request
+    - $let:
+        name: response
+        expr:
+          outcome:
+            $var: outcome
+          reason:
+            $pointerGet:
+              object:
+                $var: input
+              path: /reason
+              default: ''
+    - $if:
+        cond:
+          $ne:
+          - $var:
+              name: r
+              path: /status
+          - pending
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: r
+                  path: /response
+              - $var: response
+            message: Conflicting terminal control response
+        - $return:
+            changed: false
+    - $if:
+        cond:
+          $ne:
+          - $var: outcome
+          - succeeded
+        then:
+        - $failIf:
+            cond:
+              $eq:
+              - $var:
+                  name: response
+                  path: /reason
+              - ''
+            message: Rejected or failed control response requires a reason
+    - $let:
+        name: proposal
+        expr:
+          $var:
+            name: r
+            path: /intent/input
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - succeeded
+        then:
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - payee
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: payee
+                  input:
+                    channel:
+                      $var:
+                        name: proposal
+                        path: /payeeRef
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - details
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: details
+                  input:
+                    details:
+                      $var:
+                        name: proposal
+                        path: /transactionDetails
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - finalAmount
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: finalAmount
+                  input:
+                    amountMinor:
+                      $var:
+                        name: proposal
+                        path: /finalAmount
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - completionLock
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: lock
+                  input:
+                    action: capture
+                    locked: true
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - completionUnlock
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: lock
+                  input:
+                    action: capture
+                    locked: false
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - reversalLock
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: lock
+                  input:
+                    action: refund
+                    locked: true
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - reversalUnlock
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: lock
+                  input:
+                    action: refund
+                    locked: false
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - detailsUpdateLock
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: lock
+                  input:
+                    action: details
+                    locked: true
+        - $if:
+            cond:
+              $eq:
+              - $var: action
+              - detailsUpdateUnlock
+            then:
+            - $call:
+                function: configure
+                args:
+                  action: lock
+                  input:
+                    action: details
+                    locked: false
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $var: path
+          - /controlRequests/
+          - $var: id
+          - /status
+        val:
+          $var: outcome
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var: path
+          - /controlRequests/
+          - $var: id
+          - /response
+        val:
+          $var: response
+    - $let:
+        name: timeDetail
+        expr: {}
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - detailsUpdateUnlock
+          - $eq:
+            - $var: outcome
+            - succeeded
+        then:
+        - $set:
+            name: timeDetail
+            expr:
+              unlockedAt:
+                $binding: timestamp
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - detailsUpdateLock
+          - $eq:
+            - $var: outcome
+            - succeeded
+        then:
+        - $set:
+            name: timeDetail
+            expr:
+              lockedAt:
+                $binding: timestamp
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - reversalUnlock
+          - $eq:
+            - $var: outcome
+            - succeeded
+        then:
+        - $set:
+            name: timeDetail
+            expr:
+              unlockedAt:
+                $binding: timestamp
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - reversalLock
+          - $eq:
+            - $var: outcome
+            - succeeded
+        then:
+        - $set:
+            name: timeDetail
+            expr:
+              lockedAt:
+                $binding: timestamp
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - completionUnlock
+          - $eq:
+            - $var: outcome
+            - succeeded
+        then:
+        - $set:
+            name: timeDetail
+            expr:
+              unlockedAt:
+                $binding: timestamp
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - completionLock
+          - $eq:
+            - $var: outcome
+            - succeeded
+        then:
+        - $set:
+            name: timeDetail
+            expr:
+              lockedAt:
+                $binding: timestamp
+    - $call:
+        function: emit
+        args:
+          kind:
+            $get:
+              object:
+                $get:
+                  object:
+                    payee:
+                      succeeded: Payee Assignment Confirmed
+                      declined: Payee Assignment Rejected
+                    details:
+                      succeeded: Transaction Details Updated
+                      declined: Transaction Details Update Rejected
+                      failed: Transaction Details Update Failed
+                    finalAmount:
+                      succeeded: Final Amount Resolved
+                      declined: Final Amount Resolution Rejected
+                    completionLock:
+                      succeeded: Payment Completion Locked
+                      failed: Payment Completion Lock Change Failed
+                    completionUnlock:
+                      succeeded: Payment Completion Unlocked
+                      failed: Payment Completion Lock Change Failed
+                    reversalLock:
+                      succeeded: Payment Reversal Locked
+                      failed: Payment Reversal Lock Change Failed
+                    reversalUnlock:
+                      succeeded: Payment Reversal Unlocked
+                      failed: Payment Reversal Lock Change Failed
+                    detailsUpdateLock:
+                      succeeded: Transaction Details Update Locked
+                      failed: Transaction Details Update Lock Change Failed
+                    detailsUpdateUnlock:
+                      succeeded: Transaction Details Update Unlocked
+                      failed: Transaction Details Update Lock Change Failed
+                  key:
+                    $var: action
+              key:
+                $var: outcome
+          detail:
+            $merge:
+            - $merge:
+              - $var: proposal
+              - $var: response
+            - $var: timeDetail
+    - $return:
+        changed: true
+  recordInitiationFailure:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: guarantor
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: input
+            key: reason
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var:
+                      name: input
+                      path: /reason
+                  kind: text
+            message: Response reason must be text
+    - $let:
+        name: path
+        expr:
+          $const:
+            name: bindings
+            path: /state
+    - $let:
+        name: id
+        expr:
+          $var:
+            name: input
+            path: /requestId
+    - $call:
+        function: key
+        args:
+          candidate:
+            $var: id
+    - $failIf:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /reason
+              default: ''
+          - ''
+        message: Initiation failure requires a reason
+    - $let:
+        name: prior
+        expr:
+          $document:
+            $concat:
+            - $var: path
+            - /initiationFailures/
+            - $var: id
+    - $if:
+        cond:
+          $exists:
+            $var: prior
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var: prior
+              - $var: input
+            message: Conflicting initiation failure identifier
+        - $return:
+            changed: false
+    - $failIf:
+        cond:
+          $not:
+            $document:
+              $concat:
+              - $var: path
+              - /accepted
+        message: Accept instruction before recording initiation failure
+    - $failIf:
+        cond:
+          $ne:
+          - $document:
+              $concat:
+              - $var: path
+              - /transactionId
+          - ''
+        message: A transaction is already attached
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var: path
+          - /initiationFailures/
+          - $var: id
+        val:
+          $var: input
+    - $call:
+        function: emit
+        args:
+          kind: Transaction Initiation Failed
+          detail:
+            $var: input
+    - $return:
+        changed: true
+  failPaymentCompletionLockChangeResponse:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: controlAction
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /state
+                - /controlRequests/
+                - $var:
+                    name: input
+                    path: /requestId
+            path: /intent/action
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - completionLock
+              - completionUnlock
+              val:
+                $var: controlAction
+        message: Mismatched lock-change response
+    - $return:
+        $call:
+          function: decideControl
+          args:
+            action:
+              $var: controlAction
+            outcome: failed
+            input:
+              $var: input
+  failPaymentReversalLockChangeResponse:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: controlAction
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /state
+                - /controlRequests/
+                - $var:
+                    name: input
+                    path: /requestId
+            path: /intent/action
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - reversalLock
+              - reversalUnlock
+              val:
+                $var: controlAction
+        message: Mismatched lock-change response
+    - $return:
+        $call:
+          function: decideControl
+          args:
+            action:
+              $var: controlAction
+            outcome: failed
+            input:
+              $var: input
+  failTransactionDetailsUpdateLockChangeResponse:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: controlAction
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /state
+                - /controlRequests/
+                - $var:
+                    name: input
+                    path: /requestId
+            path: /intent/action
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - detailsUpdateLock
+              - detailsUpdateUnlock
+              val:
+                $var: controlAction
+        message: Mismatched lock-change response
+    - $return:
+        $call:
+          function: decideControl
+          args:
+            action:
+              $var: controlAction
+            outcome: failed
+            input:
+              $var: input

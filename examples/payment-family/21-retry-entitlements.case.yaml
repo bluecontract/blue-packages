@@ -4,18 +4,18 @@ initial:
 steps:
 - target: /payment
   channel: guarantor
-  operation: accept
+  operation: acceptPaymentInstruction
 - target: /payment
   channel: guarantor
-  operation: initiate
+  operation: recordTransactionInitiated
   request:
     transactionId: retry-test
 - target: /payment
   channel: guarantor
-  operation: confirm
+  operation: failSecureFunds
   request:
     requestId: authorization-0
-    outcome: failed
+    reason: Provider reported failed
 - target: /payment
   channel: guarantor
   operation: retryPayment
@@ -48,10 +48,9 @@ steps:
   status: FAILED
 - target: /payment
   channel: guarantor
-  operation: confirm
+  operation: secureFunds
   request:
     requestId: authorization-1
-    outcome: succeeded
 - target: /payment
   channel: guarantor
   operation: retryPayment
@@ -71,10 +70,9 @@ steps:
   operation: confirmSatisfaction
 - target: /payment
   channel: guarantor
-  operation: confirm
+  operation: completePayment
   request:
     requestId: capture-1
-    outcome: succeeded
   expect:
     /payment/policy/status: Paid
   restore: true

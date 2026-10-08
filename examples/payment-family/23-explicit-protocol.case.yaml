@@ -1,0 +1,492 @@
+document: 23-explicit-protocol.blue
+initial:
+  events:
+  - kind: Payment Instruction Acceptance Requested
+    requestId: acceptance
+  eventTypes:
+  - PaymentInstruction/Payment Instruction Acceptance Requested
+steps:
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  events:
+  - kind: Instruction Accepted
+  eventTypes:
+  - PaymentInstruction/Payment Instruction Accepted
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: protocol-transaction
+    railType: test
+    attachmentPoint: instruction
+    providerReference: provider-1
+  eventTypes:
+  - PaymentInstruction/Transaction Initiated
+- operation: requestSecureFunds
+  channel: customer
+  request:
+    requestId: secure-declined
+    amount: 10000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: secure
+    requestId: secure-declined
+    amount: 10000
+  eventTypes:
+  - PaymentInstruction/Secure Funds Requested
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: secure-declined
+  status: FAILED
+- operation: requestTransactionDetailsUpdate
+  channel: customer
+  request:
+    requestId: secure-declined
+    transactionDetails: {}
+  status: FAILED
+- operation: declineSecureFunds
+  channel: guarantor
+  request:
+    requestId: secure-declined
+    reason: Provider declined
+  events:
+  - kind: Payment Outcome
+    action: secure
+    outcome: declined
+  eventTypes:
+  - PaymentInstruction/Funds Securing Declined
+- operation: declineSecureFunds
+  channel: guarantor
+  request:
+    requestId: secure-declined
+    reason: Provider declined
+  eventCount: 0
+- operation: requestSecureFunds
+  channel: customer
+  request:
+    requestId: secure-failed
+    amount: 10000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: secure
+    requestId: secure-failed
+    amount: 10000
+  eventTypes:
+  - PaymentInstruction/Secure Funds Requested
+- operation: failSecureFunds
+  channel: guarantor
+  request:
+    requestId: secure-failed
+    reason: Provider failed
+  events:
+  - kind: Payment Outcome
+    action: secure
+    outcome: failed
+  eventTypes:
+  - PaymentInstruction/Funds Securing Failed
+- operation: failSecureFunds
+  channel: guarantor
+  request:
+    requestId: secure-failed
+    reason: Provider failed
+  eventCount: 0
+- operation: requestSecureFunds
+  channel: customer
+  request:
+    requestId: secure-unknown
+    amount: 10000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: secure
+    requestId: secure-unknown
+    amount: 10000
+  eventTypes:
+  - PaymentInstruction/Secure Funds Requested
+- operation: recordFundsSecuringUnknown
+  channel: guarantor
+  request:
+    requestId: secure-unknown
+    reason: Provider unknown
+  events:
+  - kind: Payment Outcome
+    action: secure
+    outcome: unknown
+  expect:
+    /payment/reserved/secure: 10000
+  eventTypes:
+  - PaymentInstruction/Funds Securing Unknown
+- operation: recordFundsSecuringUnknown
+  channel: guarantor
+  request:
+    requestId: secure-unknown
+    reason: Provider unknown
+  eventCount: 0
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: secure-unknown
+    amountSecured: 999
+  status: FAILED
+  expect:
+    /payment/reserved/secure: 10000
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: secure-unknown
+  events:
+  - kind: Payment Outcome
+    action: secure
+    outcome: succeeded
+  eventTypes:
+  - PaymentInstruction/Funds Secured
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: secure-unknown
+  eventCount: 0
+- operation: recordFundsSecuringUnknown
+  channel: guarantor
+  request:
+    requestId: secure-unknown
+    reason: Provider unknown
+  status: FAILED
+- operation: requestCompletePayment
+  channel: customer
+  request:
+    requestId: capture-declined
+    amount: 4000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: capture
+    requestId: capture-declined
+    amount: 4000
+  eventTypes:
+  - PaymentInstruction/Complete Payment Requested
+- operation: declineCompletePayment
+  channel: guarantor
+  request:
+    requestId: capture-declined
+    reason: Provider declined
+  events:
+  - kind: Payment Outcome
+    action: capture
+    outcome: declined
+  eventTypes:
+  - PaymentInstruction/Payment Completion Declined
+- operation: declineCompletePayment
+  channel: guarantor
+  request:
+    requestId: capture-declined
+    reason: Provider declined
+  eventCount: 0
+- operation: requestCompletePayment
+  channel: customer
+  request:
+    requestId: capture-failed
+    amount: 4000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: capture
+    requestId: capture-failed
+    amount: 4000
+  eventTypes:
+  - PaymentInstruction/Complete Payment Requested
+- operation: failCompletePayment
+  channel: guarantor
+  request:
+    requestId: capture-failed
+    reason: Provider failed
+  events:
+  - kind: Payment Outcome
+    action: capture
+    outcome: failed
+  eventTypes:
+  - PaymentInstruction/Payment Completion Failed
+- operation: failCompletePayment
+  channel: guarantor
+  request:
+    requestId: capture-failed
+    reason: Provider failed
+  eventCount: 0
+- operation: requestCompletePayment
+  channel: customer
+  request:
+    requestId: capture-unknown
+    amount: 4000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: capture
+    requestId: capture-unknown
+    amount: 4000
+  eventTypes:
+  - PaymentInstruction/Complete Payment Requested
+- operation: recordPaymentCompletionUnknown
+  channel: guarantor
+  request:
+    requestId: capture-unknown
+    reason: Provider unknown
+  events:
+  - kind: Payment Outcome
+    action: capture
+    outcome: unknown
+  expect:
+    /payment/reserved/capture: 4000
+  eventTypes:
+  - PaymentInstruction/Payment Completion Unknown
+- operation: recordPaymentCompletionUnknown
+  channel: guarantor
+  request:
+    requestId: capture-unknown
+    reason: Provider unknown
+  eventCount: 0
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: capture-unknown
+  events:
+  - kind: Payment Outcome
+    action: capture
+    outcome: succeeded
+  eventTypes:
+  - PaymentInstruction/Payment Completed
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: capture-unknown
+  eventCount: 0
+- operation: recordPaymentCompletionUnknown
+  channel: guarantor
+  request:
+    requestId: capture-unknown
+    reason: Provider unknown
+  status: FAILED
+- operation: requestReverseAfterCompletion
+  channel: customer
+  request:
+    requestId: refund-declined
+    amount: 1000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: refund
+    requestId: refund-declined
+    amount: 1000
+  eventTypes:
+  - PaymentInstruction/Reverse After Completion Requested
+- operation: declineReverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-declined
+    reason: Provider declined
+  events:
+  - kind: Payment Outcome
+    action: refund
+    outcome: declined
+  eventTypes:
+  - PaymentInstruction/Payment Reversal Declined
+- operation: declineReverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-declined
+    reason: Provider declined
+  eventCount: 0
+- operation: requestReverseAfterCompletion
+  channel: customer
+  request:
+    requestId: refund-failed
+    amount: 1000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: refund
+    requestId: refund-failed
+    amount: 1000
+  eventTypes:
+  - PaymentInstruction/Reverse After Completion Requested
+- operation: failReverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-failed
+    reason: Provider failed
+  events:
+  - kind: Payment Outcome
+    action: refund
+    outcome: failed
+  eventTypes:
+  - PaymentInstruction/Payment Reversal Failed
+- operation: failReverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-failed
+    reason: Provider failed
+  eventCount: 0
+- operation: requestReverseAfterCompletion
+  channel: customer
+  request:
+    requestId: refund-unknown
+    amount: 1000
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: refund
+    requestId: refund-unknown
+    amount: 1000
+  eventTypes:
+  - PaymentInstruction/Reverse After Completion Requested
+- operation: recordPaymentReversalUnknown
+  channel: guarantor
+  request:
+    requestId: refund-unknown
+    reason: Provider unknown
+  events:
+  - kind: Payment Outcome
+    action: refund
+    outcome: unknown
+  expect:
+    /payment/reserved/refund: 1000
+  eventTypes:
+  - PaymentInstruction/Payment Reversal Unknown
+- operation: recordPaymentReversalUnknown
+  channel: guarantor
+  request:
+    requestId: refund-unknown
+    reason: Provider unknown
+  eventCount: 0
+- operation: reverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-unknown
+  events:
+  - kind: Payment Outcome
+    action: refund
+    outcome: succeeded
+  eventTypes:
+  - PaymentInstruction/Payment Reversed After Completion
+- operation: reverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-unknown
+  eventCount: 0
+- operation: recordPaymentReversalUnknown
+  channel: guarantor
+  request:
+    requestId: refund-unknown
+    reason: Provider unknown
+  status: FAILED
+- operation: requestCancelBeforeCompletion
+  channel: customer
+  request:
+    requestId: void-declined
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: void
+    requestId: void-declined
+    amount: 6000
+  eventTypes:
+  - PaymentInstruction/Cancel Before Completion Requested
+- operation: declineCancelBeforeCompletion
+  channel: guarantor
+  request:
+    requestId: void-declined
+    reason: Provider declined
+  events:
+  - kind: Payment Outcome
+    action: void
+    outcome: declined
+  eventTypes:
+  - PaymentInstruction/Payment Cancellation Declined
+- operation: declineCancelBeforeCompletion
+  channel: guarantor
+  request:
+    requestId: void-declined
+    reason: Provider declined
+  eventCount: 0
+- operation: requestCancelBeforeCompletion
+  channel: customer
+  request:
+    requestId: void-failed
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: void
+    requestId: void-failed
+    amount: 6000
+  eventTypes:
+  - PaymentInstruction/Cancel Before Completion Requested
+- operation: failCancelBeforeCompletion
+  channel: guarantor
+  request:
+    requestId: void-failed
+    reason: Provider failed
+  events:
+  - kind: Payment Outcome
+    action: void
+    outcome: failed
+  eventTypes:
+  - PaymentInstruction/Payment Cancellation Failed
+- operation: failCancelBeforeCompletion
+  channel: guarantor
+  request:
+    requestId: void-failed
+    reason: Provider failed
+  eventCount: 0
+- operation: requestCancelBeforeCompletion
+  channel: customer
+  request:
+    requestId: void-unknown
+    reason: Protocol walkthrough
+  events:
+  - kind: Payment Requested
+    action: void
+    requestId: void-unknown
+    amount: 6000
+  eventTypes:
+  - PaymentInstruction/Cancel Before Completion Requested
+- operation: recordPaymentCancellationUnknown
+  channel: guarantor
+  request:
+    requestId: void-unknown
+    reason: Provider unknown
+  events:
+  - kind: Payment Outcome
+    action: void
+    outcome: unknown
+  expect:
+    /payment/reserved/void: 6000
+  eventTypes:
+  - PaymentInstruction/Payment Cancellation Unknown
+- operation: recordPaymentCancellationUnknown
+  channel: guarantor
+  request:
+    requestId: void-unknown
+    reason: Provider unknown
+  eventCount: 0
+- operation: cancelBeforeCompletion
+  channel: guarantor
+  request:
+    requestId: void-unknown
+  events:
+  - kind: Payment Outcome
+    action: void
+    outcome: succeeded
+  eventTypes:
+  - PaymentInstruction/Payment Cancelled Before Completion
+- operation: cancelBeforeCompletion
+  channel: guarantor
+  request:
+    requestId: void-unknown
+  eventCount: 0
+- operation: recordPaymentCancellationUnknown
+  channel: guarantor
+  request:
+    requestId: void-unknown
+    reason: Provider unknown
+  status: FAILED
+  restore: true

@@ -1,0 +1,100 @@
+document: 06-service-desk.blue
+initial: {}
+steps:
+- operation: serviceQuote
+  channel: owner
+  request:
+    price: 5000
+    quantity: 2
+  expect:
+    /product/totalMinor: 10000
+- operation: materialsQuote
+  channel: owner
+  request:
+    price: 750
+    quantity: 3
+  expect:
+    /materials/totalMinor: 2250
+- operation: serviceQuote
+  channel: owner
+  request:
+    price: -1
+    quantity: 2
+  status: FAILED
+- operation: stockAdjust
+  channel: owner
+  request:
+    delta: -2
+  expect:
+    /stock: 3
+- operation: stockAdjust
+  channel: owner
+  request:
+    delta: -4
+  status: FAILED
+- operation: visitsAdjust
+  channel: owner
+  request:
+    delta: 1
+  expect:
+    /visits: 1
+- operation: termsAmend
+  channel: owner
+  request:
+    expected: Original terms
+    text: Payment within seven days
+  expect:
+    /terms: Payment within seven days
+- operation: termsAmend
+  channel: owner
+  request:
+    expected: Original terms
+    text: Stale edit
+  status: FAILED
+- operation: copyAmend
+  channel: owner
+  request:
+    expected: ''
+    text: Welcome to the service desk
+  expect:
+    /message: Welcome to the service desk
+- operation: changeInstructions
+  channel: owner
+  request:
+    text: Side door
+  expect:
+    /instructions: Side door
+- operation: publish
+  channel: owner
+  request: {}
+  expect:
+    /status: Published
+- operation: changeInstructions
+  channel: owner
+  request:
+    text: Too late
+  status: FAILED
+- operation: approveMilestone
+  channel: owner
+  request: {}
+  expect:
+    /milestone: Accepted
+- operation: approveMilestone
+  channel: owner
+  request: {}
+  eventCount: 0
+- operation: sendReminder
+  channel: owner
+  request: {}
+  events:
+  - kind: Schedule Fired
+    scheduleKey: offer-follow-up
+- operation: archive
+  channel: owner
+  request: {}
+  expect:
+    /status: Archived
+  events:
+  - kind: Schedule Fired
+    scheduleKey: archive-review
+  restore: true

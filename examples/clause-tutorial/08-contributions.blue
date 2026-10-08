@@ -1,0 +1,72 @@
+name: Conversation and support notes
+type: Agreements/Agreement with Clauses
+clauses:
+  parties:
+    type: Participants/Participants Clause
+    parameters:
+      participants:
+        owner:
+          name: Account owner
+          channel:
+            type: Contracts/External Channel
+            event:
+              source: owner
+        reviewer:
+          name: Reviewer
+          channel:
+            type: Contracts/External Channel
+            event:
+              source: reviewer
+    bindings: {}
+  conversation:
+    type: Clauses/Composable Clause
+    parameters:
+      states:
+        text:
+          path: /conversation
+          kind: text
+          initial: ''
+      contracts:
+        recordConversation:
+          kind: handler
+          contract:
+            type: Contracts/Sequential Workflow Operation
+            channel: owner
+            steps:
+            - type: Contracts/Compute
+              do:
+              - $appendChange:
+                  op: replace
+                  path: /conversation
+                  val:
+                    $binding: call/request/text
+              - $appendEvent:
+                  kind: Conversation Updated
+                  feature: recordConversation
+    bindings: {}
+  support:
+    type: Clauses/Composable Clause
+    parameters:
+      states:
+        text:
+          path: /support
+          kind: text
+          initial: ''
+      contracts:
+        recordSupport:
+          kind: handler
+          contract:
+            type: Contracts/Sequential Workflow Operation
+            channel: owner
+            steps:
+            - type: Contracts/Compute
+              do:
+              - $appendChange:
+                  op: replace
+                  path: /support
+                  val:
+                    $binding: call/request/text
+              - $appendEvent:
+                  kind: Conversation Updated
+                  feature: recordSupport
+    bindings: {}
