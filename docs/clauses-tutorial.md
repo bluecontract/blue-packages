@@ -472,21 +472,21 @@ The local Contracts runner uses explicit test transports. It tests business sema
 
 The example launcher displays complete source and a step-by-step operation list. Starting it creates a real document, installs the exact verified declarative package closure in the participating workspaces, and redirects to that document. Sign-up retains the selected example. A user chooses the accounts for each role before starting. Using separate accounts is necessary to exercise genuine inter-account permissions; one account in several roles is only a convenient local walkthrough.
 
-| Family | Public types | Purpose |
-|---|---|---|
-| Hello World | `Connections/Hello Clause` | Bind a greeting action to workflows and document signals. |
-| Feature | `Features/Feature Clause` | Group native actions into a named business feature. |
-| Activation | `Activation/Activation Clause` | Parties, representatives, reader access and acceptance. |
-| Representation | `Representation/Representation Clause` | Explicit owner-approved operation delegation; not implied by a representative listing. |
-| Amendments | `Amendments/Amendments Clause` | Propose and approve changes to editable terms. |
-| Termination | `Termination/Termination Clause` | Request closure and finish after outstanding obligations permit it. |
-| Status | `State/Status Clause` | Validate named state transitions. |
-| Product | `Commerce/Product Clause` | Maintain a validated product quote. |
-| Documents | `Documents/Documents Clause` | Start named child documents and reuse party snapshots. |
-| Payment | `Payment/Payment Clause`, `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment`, `ManualPayments/Manual Bank Payment` | Create one payment instruction with request connections; provider-specific variants share one family. |
-| Ledger | `Ledger/Ledger Clause` | Accrual targets, reservations and confirmed settlement accounting. |
-| Schedule | `Schedule/Schedule Clause` | Emit scheduled business signals using signed time completeness. |
-| Shipping | `Shipping/Shipping Clause` | Create a shipping instruction and relay correlated carrier requests and responses. |
+| Family | Public types | Purpose | Complete examples in this guide |
+|---|---|---|---|
+| Hello World | `Connections/Hello Clause` | Bind a greeting action to workflows and document signals. | [00-hello](#00-hello), [08-participants-agents](#08-participants-agents), [11-hello-events](#11-hello-events), [12-hello-change](#12-hello-change) |
+| Feature | `Features/Feature Clause` | Group native actions into a named business feature. | [01-order-payment](#01-order-payment), [05-smart-home](#05-smart-home), [06-membership](#06-membership), [09-evidence-mandate](#09-evidence-mandate) |
+| Activation | `Activation/Activation Clause` | Parties, representatives, reader access and acceptance. | [00-hello](#00-hello), [01-order-payment](#01-order-payment), [02-reseller-ledger](#02-reseller-ledger), [03-milestone-payments](#03-milestone-payments) |
+| Representation | `Representation/Representation Clause` | Explicit owner-approved operation delegation; not implied by a representative listing. | [09-evidence-mandate](#09-evidence-mandate) |
+| Amendments | `Amendments/Amendments Clause` | Propose and approve changes to editable terms. | [07-booking-amendment](#07-booking-amendment), [18-amendments](#18-amendments) |
+| Termination | `Termination/Termination Clause` | Request closure and finish after outstanding obligations permit it. | [06-membership](#06-membership), [17-termination](#17-termination) |
+| Status | `State/Status Clause` | Validate named state transitions. | [03-milestone-payments](#03-milestone-payments), [09-evidence-mandate](#09-evidence-mandate), [20-status-branch](#20-status-branch) |
+| Product | `Commerce/Product Clause` | Maintain a validated product quote. | [15-product](#15-product) |
+| Documents | `Documents/Documents Clause` | Start named child documents and reuse party snapshots. | [02-reseller-ledger](#02-reseller-ledger), [04-bundle-order](#04-bundle-order), [05-smart-home](#05-smart-home), [06-membership](#06-membership) |
+| Payment | `Payment/Payment Clause`, `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment`, `ManualPayments/Manual Bank Payment` | Create one payment instruction with request connections; provider-specific variants share one family. | [01-order-payment](#01-order-payment), [02-reseller-ledger](#02-reseller-ledger), [03-milestone-payments](#03-milestone-payments), [04-bundle-order](#04-bundle-order) |
+| Ledger | `Ledger/Ledger Clause` | Accrual targets, reservations and confirmed settlement accounting. | [02-reseller-ledger](#02-reseller-ledger), [10-net-settlement](#10-net-settlement), [16-ledger](#16-ledger) |
+| Schedule | `Schedule/Schedule Clause` | Emit scheduled business signals using signed time completeness. | [26-timers](#26-timers) |
+| Shipping | `Shipping/Shipping Clause` | Create a shipping instruction and relay correlated carrier requests and responses. | [25-shipping](#25-shipping) |
 
 ## 9. Complete application documents
 

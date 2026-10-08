@@ -11,7 +11,20 @@ def cell(value):
 def build():
     intro=(ROOT/'docs/clauses-guide-source.md').read_text()
     families=json.loads((ROOT/'PUBLIC-CLAUSES.json').read_text())['families']
-    table='| Family | Public types | Purpose |\n|---|---|---|\n'+'\n'.join('| '+f['name']+' | '+', '.join('`'+t+'`' for t in f['types'])+' | '+f['purpose']+' |' for f in families)
+    def types(value):
+        if isinstance(value,dict):
+            result={value['type']} if isinstance(value.get('type'),str) else set()
+            for item in value.values():result.update(types(item))
+            return result
+        if isinstance(value,list):return set().union(*(types(item) for item in value))
+        return set()
+    sources=[(p,types(load(p))) for p in sorted((ROOT/'examples/apps').glob('*.blue'))]
+    rows=[]
+    for family in families:
+        matches=[p for p,used in sources if used.intersection(family['types'])]
+        links=', '.join('['+p.stem+'](#'+p.stem+')' for p in matches[:4])
+        rows.append('| '+family['name']+' | '+', '.join('`'+t+'`' for t in family['types'])+' | '+family['purpose']+' | '+links+' |')
+    table='| Family | Public types | Purpose | Complete examples in this guide |\n|---|---|---|---|\n'+'\n'.join(rows)
     examples=[]
     for p in sorted((ROOT/'examples/apps').glob('*.blue')):
         text='### '+p.stem+'\n\nSource: [`'+p.name+'`](../examples/apps/'+p.name+').\n\n'+code(p.relative_to(ROOT))
