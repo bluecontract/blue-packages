@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Export the selected unpublished packages and clause examples to an explicit Core checkout."""
-import argparse, hashlib, json, shutil, sys
+import argparse, hashlib, json, sys
 from pathlib import Path
 from check_clause_tutorial import SourceLoader
 import yaml
 ROOT=Path(__file__).resolve().parents[1]
 def read(p): return yaml.load(p.read_text(),Loader=SourceLoader)
+def write_changed(path, data):
+    raw=data.encode() if isinstance(data,str) else data
+    if not path.exists() or path.read_bytes()!=raw:path.write_bytes(raw)
 def export(core):
     catalog=json.loads((ROOT/'PACKAGES.json').read_text())
     by_ns={r['namespace']:r for r in catalog['packages']}
@@ -24,8 +27,8 @@ def export(core):
         previous=next((r for r in existing if r['id']==ident),None)
         if previous is not None and previous['blueId']!=record['blueId'] and 'preview' not in row['version']:raise ValueError('Cannot replace published package '+ident)
         existing=[r for r in existing if r['id']!=ident]+[record]
-        shutil.copyfile(archive,out/(ident+'.bluepkg'))
-    (out/'catalog.json').write_text(json.dumps(existing,indent=2)+'\n')
+        write_changed(out/(ident+'.bluepkg'),archive.read_bytes())
+    write_changed(out/'catalog.json',json.dumps(existing,indent=2)+'\n')
     def namespaces(value,result):
         if isinstance(value,str) and '/' in value and value.split('/')[0] in by_ns:result.add(value.split('/')[0])
         elif isinstance(value,dict):
@@ -72,7 +75,7 @@ def export(core):
         if path.is_file() and path.suffix in {'.blue','.yaml'} and path.name not in current:
             path.unlink()
     for path in (ROOT/'examples/apps').iterdir():
-        if path.suffix in {'.blue','.yaml'}:shutil.copyfile(path,fixtures/path.name)
+        if path.suffix in {'.blue','.yaml'}:write_changed(fixtures/path.name,path.read_bytes())
     mounts={}
     for ns,row in by_ns.items():
         manifest=manifests[ns]
@@ -87,7 +90,7 @@ def export(core):
         digest='sha256:'+hashlib.sha256(destination.read_bytes()).hexdigest()
         if digest!=row['archiveSha256']:raise ValueError('Core native dependency differs: '+ns)
         mounts[ns]=dict(path=str(destination.relative_to(core)),blueId=row['packageBlueId'],archiveSha256=digest)
-    (fixtures/'packages.json').write_text(json.dumps(dict(mounts=mounts),indent=2)+'\n')
+    write_changed(fixtures/'packages.json',json.dumps(dict(mounts=mounts),indent=2)+'\n')
     examples=[]
     for path in sorted(list((ROOT/'examples/apps').glob('*.case.yaml'))+list((ROOT/'examples/apps').glob('*.time.yaml'))+list((ROOT/'examples/apps').glob('*.native.yaml'))):
         case=read(path);source=(path.parent/case['document']).read_text();doc=read(path.parent/case['document'])
@@ -100,7 +103,7 @@ def export(core):
             roles.append(dict(name=role,label=party.get('displayName',role),kind='lead'))
             for rep in party.get('representatives',{}):roles.append(dict(name=role+'__'+rep,label=role+' · '+rep,kind='representative'))
         examples.append(dict(id=path.name.removesuffix('.case.yaml').removesuffix('.time.yaml').removesuffix('.native.yaml'),title=doc['name'],description=descriptions.get(path.name[:2],doc['name']),source=source,roles=roles,packages=selected,steps=case.get('steps',[]),distinctRoles={'09':[['buyer','buyer__agent']],'22':[['customer','seller']]}.get(path.name[:2],[])))
-    target=core/'core-ui/src/data/clause-examples.json';target.parent.mkdir(exist_ok=True);target.write_text(json.dumps(examples,indent=2)+'\n')
+    target=core/'core-ui/src/data/clause-examples.json';target.parent.mkdir(exist_ok=True);write_changed(target,json.dumps(examples,indent=2)+'\n')
     print('Exported',len(examples),'documents and verified candidate packages to',core)
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('core',type=Path);export(p.parse_args().core.resolve())
