@@ -1,9 +1,11 @@
 # Payment Instruction
 
-One independently governed payment, with explicit PayNote-style requests, typed guarantor responses, reservations, conditional completion and persistent compensation.
+One payment, with a complete typed request and response protocol. Concrete payment requests inherit `Payment Request` → `Events/Request` → `Events/Event`; responses follow the corresponding response hierarchy.
 
-The public catalogue contains 52 message types (including the two common envelopes). The Payment Lifecycle Clause exposes 36 named guarantor operations. Shared BEX accounting validates correlation, available capacity and authority. A request never means money has moved.
+`Payment Instruction` owns the financial ledger and 36 named guarantor operations. `Payment Instruction with Clauses` extends that standard document and adds clause assembly. The internal Payment Request Actions clause contributes only requested behavior. It does not grant guarantor authority.
 
-See [the complete protocol and migration guide](../docs/payment-protocol.md), [payment-family integration](../docs/payment-family.md), and the standalone `examples/payment-family/23-explicit-protocol.blue` walkthrough.
+The protocol contains 50 concrete message types plus its two domain bases. Requests reserve eligible capacity; only authorized outcomes establish what happened. Unknown outcomes remain available for reconciliation.
 
-Unpublished candidate. Authored Blue/BEX definitions are authoritative. External execution requires an actual adapter; supplied local scenarios use a test guarantor.
+Read the [protocol reference](../docs/payment-protocol.md), the [clause tutorial](../docs/clauses-tutorial.md), and executable scenarios `examples/apps/27-payment-protocol`, `28-payment-controls`, and `29-payment-rejection`.
+
+These are unpublished package candidates and provider-neutral test workflows, not a live payment adapter.

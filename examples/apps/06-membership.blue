@@ -1,0 +1,162 @@
+name: A free trial, explicit membership and separate period payments
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  periods:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /periodTemplate
+      collection: /periods
+      start:
+        renew:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /membership
+                - Joined
+              message: MEMBERSHIP_OPT_IN_REQUIRED
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /lifecycle
+                - Active
+              message: MEMBERSHIP_CLOSED
+  termination:
+    type: Termination/Termination Clause
+    bindings:
+      request:
+        requestTermination:
+          'on': workflow
+          party: customer
+      finish:
+        finishTermination:
+          'on': workflow
+          party: customer
+  membership:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        attend:
+          do:
+          - $appendChange:
+              op: add
+              path: /trial
+              val: Attended
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Trial Attended
+        join:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /trial
+                - Attended
+              message: TRIAL_ATTENDANCE_REQUIRED
+          - $appendChange:
+              op: add
+              path: /membership
+              val: Joined
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Membership Joined
+    bindings:
+      attend:
+        recordTrialAttendance:
+          'on': workflow
+          party: seller
+      join:
+        joinMembership:
+          'on': workflow
+          party: customer
+periods: {}
+periodTemplate:
+  name: Service order
+  type: Orders/Order with Clauses
+  product:
+    name: One English lesson
+    quantity: 1
+    unitPriceMinor: 10000
+    currency: EUR
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        amountMinor: 10000
+        currency: EUR
+      bindings:
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: customer
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          confirmSatisfaction:
+            'on': workflow
+            party: customer
+            params:
+              requestId: capture-1
+              amountMinor: 10000
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /satisfied
+                  - true
+                message: SATISFACTION_REQUIRED
+            after:
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Delivery Accepted
+        requestRefund:
+          refund:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+lifecycle: Active
+canTerminate: true
+trial: Offered
+membership: NotJoined

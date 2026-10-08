@@ -1,0 +1,114 @@
+document: 05-smart-home.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: openHouse
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: payment
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 10000
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 10000
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: checkIn
+  channel: seller
+  request:
+    reservation: wrong
+  requireExactDocumentVersion: true
+  target: /houses/rental
+  status: FAILED
+- operation: checkIn
+  channel: seller
+  request:
+    reservation: rental-7
+  requireExactDocumentVersion: true
+  target: /houses/rental
+  expect:
+    /payment/payment/reserved/capture: 10000
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: check-in
+    amountCompleted: 10000
+  requireExactDocumentVersion: true
+  expect:
+    /payment/payment/completed: 10000
+  target: /payment
+- operation: requestTemperature
+  channel: customer__assistant
+  request:
+    requestId: too-hot
+    temperatureC: 35
+  requireExactDocumentVersion: true
+  status: FAILED
+  target: /houses/rental
+- operation: requestTemperature
+  channel: customer__assistant
+  request:
+    requestId: comfortable
+    temperatureC: 22
+  requireExactDocumentVersion: true
+  expect:
+    /houses/rental/requestedC: 22
+    /houses/rental/reportedC: 20
+  target: /houses/rental
+- operation: confirmTemperature
+  channel: seller
+  request:
+    requestId: unrelated
+  requireExactDocumentVersion: true
+  status: FAILED
+  target: /houses/rental
+- operation: confirmTemperature
+  channel: seller
+  request:
+    requestId: comfortable
+  requireExactDocumentVersion: true
+  expect:
+    /houses/rental/reportedC: 22
+    /houses/rental/temperatureRequest/status: Confirmed
+  target: /houses/rental

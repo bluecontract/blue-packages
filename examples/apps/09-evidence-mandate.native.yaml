@@ -1,0 +1,49 @@
+document: 09-evidence-mandate.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_buyer
+  channel: buyer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_supplier
+  channel: supplier
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: startEvidence
+  channel: buyer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: acceptEvidence
+  channel: buyer
+  request: {}
+  requireExactDocumentVersion: true
+  status: FAILED
+- operation: deliver
+  channel: supplier
+  request: {}
+  requireExactDocumentVersion: true
+  target: /evidence/shipment
+- operation: prepareMandate
+  channel: buyer
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /mandate/status: Pending
+- operation: approveMandate
+  channel: authorityHolderChannel
+  request: {}
+  requireExactDocumentVersion: true
+  source: buyer
+  target: /mandate
+  expect:
+    /mandate/status: Active
+- operation: acceptEvidence
+  channel: buyer
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /accepted: true

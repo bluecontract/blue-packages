@@ -1,0 +1,134 @@
+document: 04-bundle-order.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_hotel
+  channel: hotel
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_restaurant
+  channel: restaurant
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: bookHotel
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: bookRestaurant
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  target: /orders/hotel
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /orders/hotel/payment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: hotel
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /orders/hotel/payment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 30000
+  requireExactDocumentVersion: true
+  target: /orders/hotel/payment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 30000
+  requireExactDocumentVersion: true
+  target: /orders/hotel/payment
+- operation: confirmSatisfaction
+  channel: customer
+  request:
+    satisfied: true
+  requireExactDocumentVersion: true
+  target: /orders/hotel/payment
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: capture-1
+    amountCompleted: 30000
+  requireExactDocumentVersion: true
+  target: /orders/hotel/payment
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  target: /orders/dinner
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /orders/dinner/payment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: dinner
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /orders/dinner/payment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 8000
+  requireExactDocumentVersion: true
+  target: /orders/dinner/payment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 8000
+  requireExactDocumentVersion: true
+  target: /orders/dinner/payment
+- operation: confirmSatisfaction
+  channel: customer
+  request:
+    satisfied: true
+  requireExactDocumentVersion: true
+  target: /orders/dinner/payment
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: capture-1
+    amountCompleted: 8000
+  requireExactDocumentVersion: true
+  target: /orders/dinner/payment
+- operation: refund
+  channel: hotel
+  request:
+    requestId: not-yours
+    amountMinor: 100
+  requireExactDocumentVersion: true
+  target: /orders/dinner/payment
+  expect:
+    /orders/dinner/payment/payment/reversed: 0

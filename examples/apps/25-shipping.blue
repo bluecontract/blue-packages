@@ -1,0 +1,82 @@
+name: A physical order with carrier-confirmed shipping
+type: Orders/Order with Clauses
+destination: 22 Blue Street
+shippingTemplate:
+  name: Parcel delivery
+  type: Shipping/Shipping Instruction with Clauses
+  destination: 22 Blue Street
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    requests:
+      type: Shipping/Shipping Request Actions
+      bindings:
+        requestShipment:
+          bookShipment:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestCancellation:
+          cancelShipment:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestAddressChange:
+          changeAddress:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+delivered: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        carrier:
+          type: Parties/Party
+          displayName: Carrier
+      required:
+      - seller
+      - customer
+      - carrier
+  shipping:
+    type: Shipping/Shipping Clause
+    bindings:
+      template: /shippingTemplate
+      instruction: /shipment
+      start:
+        startShipping:
+          'on': workflow
+          party: seller
+  delivery:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        confirm:
+          do:
+          - $appendChange:
+              op: replace
+              path: /delivered
+              val: true
+    bindings:
+      confirm:
+        delivered:
+          'on': embedded
+          path: /shipment
+          event:
+            type: Shipping/Shipment Delivered

@@ -1,0 +1,29 @@
+document: 00-hello.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_owner
+  channel: owner
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: sayHello
+  channel: owner
+  request:
+    text: Hello Alice
+    approved: true
+  expect:
+    /message: Hello Alice
+    /audit: Hello Alice
+  restore: true
+  requireExactDocumentVersion: true
+- operation: sayHello
+  channel: owner
+  request:
+    text: Rejected
+    approved: false
+  expect:
+    /message: Hello Alice
+  status: FAILED
+  requireExactDocumentVersion: true

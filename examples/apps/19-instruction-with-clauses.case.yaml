@@ -1,0 +1,40 @@
+document: 19-instruction-with-clauses.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  expect:
+    /payment/accepted: true
+  requireExactDocumentVersion: true
+- operation: greet
+  channel: customer
+  request: {}
+  expect:
+    /message: Hello World
+  requireExactDocumentVersion: true
+- operation: updateParty_customer
+  channel: customer
+  request:
+    party: customer
+    replacement:
+      displayName: Replacement
+  status: FAILED
+  requireExactDocumentVersion: true

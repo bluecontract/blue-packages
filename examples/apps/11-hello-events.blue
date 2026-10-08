@@ -1,0 +1,47 @@
+name: Hello when an Order fails
+type: Agreements/Agreement with Clauses
+message: ''
+signals: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  signal:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        report:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Order Failed
+                reason:
+                  $var:
+                    name: trigger
+                    path: /reason
+    bindings:
+      report:
+        reportFailure:
+          'on': workflow
+          party: owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        failed:
+          'on': event
+          event:
+            type: Events/Event
+            kind: Order Failed
+            reason: abc
+          once: true
+          params:
+            text: The order needs attention

@@ -1,0 +1,151 @@
+name: Shipping Instruction
+description: One correlated shipment. Only the carrier records delivery outcomes; a request is never a
+  delivery confirmation.
+instanceKey:
+  type: Text
+shipment: {}
+contracts:
+  confirmShipment:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: accepted
+            input:
+              $binding: call/request
+  rejectShipment:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: rejected
+            input:
+              $binding: call/request
+  recordDispatched:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: dispatched
+            input:
+              $binding: call/request
+  confirmDelivery:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: delivered
+            input:
+              $binding: call/request
+  failShipment:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: failed
+            input:
+              $binding: call/request
+  confirmCancellation:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: cancelled
+            input:
+              $binding: call/request
+  rejectCancellation:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: cancellationRejected
+            input:
+              $binding: call/request
+  confirmAddressChange:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: addressChanged
+            input:
+              $binding: call/request
+  rejectAddressChange:
+    type: Contracts/Sequential Workflow Operation
+    channel: carrier
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: Shipping/Shipping Functions
+      do:
+      - $call:
+          function: respond
+          args:
+            outcome: addressRejected
+            input:
+              $binding: call/request
+  __shippingLife:
+    type: Contracts/Lifecycle Event Channel
+    event:
+      type: Contracts/Document Processing Initiated
+  __shippingInitialize:
+    type: Contracts/Sequential Workflow
+    channel: __shippingLife
+    order: -1000
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange:
+          op: add
+          path: /shipment
+          val:
+            status: new
+            requests: {}
+            trackingId: ''

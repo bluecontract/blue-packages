@@ -1,0 +1,95 @@
+name: MyOS Account to Account Payment for a lesson
+type: Orders/Order with Clauses
+product:
+  name: One English lesson
+  quantity: 1
+  unitPriceMinor: 10000
+  currency: EUR
+satisfied: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: MyOS/MyOS Party
+          displayName: Customer
+          myosAccountId: test-customer
+        seller:
+          type: MyOS/MyOS Party
+          displayName: Seller
+          myosAccountId: test-seller
+        guarantor:
+          type: MyOS/MyOS Party
+          displayName: Guarantor
+          myosAccountId: test-guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  payment:
+    type: MyOS/MyOS Account to Account Payment
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+      recipient: seller
+      payer: customer
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        confirmSatisfaction:
+          'on': workflow
+          party: customer
+          params:
+            requestId: capture-1
+            amountMinor: 10000
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $var:
+                    name: trigger
+                    path: /satisfied
+                - true
+              message: SATISFACTION_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Customer Satisfaction
+                satisfied: true
+      requestRefund:
+        refund:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+  satisfaction:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        remember:
+          do:
+          - $appendChange:
+              op: replace
+              path: /satisfied
+              val: true
+    bindings:
+      remember:
+        satisfied:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            kind: Customer Satisfaction

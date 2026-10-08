@@ -1,0 +1,226 @@
+name: Rental capture after a matching smart-home check-in
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+          representatives:
+            assistant:
+              type: Parties/Representative
+              displayName: Guest assistant
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  houses:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /houseTemplate
+      collection: /houses
+      start:
+        openHouse:
+          'on': workflow
+          party: customer
+          params:
+            key: rental
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        checkIn:
+          in: agreement
+          'on': embedded
+          path: /houses/rental
+          event:
+            type: Events/Event
+            kind: Check In Confirmed
+            reservation: rental-7
+          params:
+            requestId: check-in
+            amountMinor: 10000
+houses: {}
+houseTemplate:
+  name: Smart home
+  type: Agreements/Agreement with Clauses
+  reservation: rental-7
+  checkedIn: false
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    access:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          checkIn:
+            do:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /reservation
+                  - $document: /reservation
+                message: RESERVATION_MISMATCH
+            - $appendChange:
+                op: add
+                path: /checkedIn
+                val: true
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Check In Confirmed
+                  reservation:
+                    $document: /reservation
+      bindings:
+        checkIn:
+          checkIn:
+            'on': workflow
+            party: seller
+    temperature:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          request:
+            do:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document: /checkedIn
+                  - true
+                message: ACTIVE_STAY_REQUIRED
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /temperatureC
+                        kind: integer
+                    - $gte:
+                      - $var:
+                          name: trigger
+                          path: /temperatureC
+                      - 18
+                    - $lte:
+                      - $var:
+                          name: trigger
+                          path: /temperatureC
+                      - 23
+                message: TEMPERATURE_OUTSIDE_AGREED_RANGE
+            - $failIf:
+                cond:
+                  $eq:
+                  - $document: /temperatureRequest/status
+                  - Pending
+                message: TEMPERATURE_REQUEST_PENDING
+            - $appendChange:
+                op: add
+                path: /temperatureRequest
+                val:
+                  requestId:
+                    $var:
+                      name: trigger
+                      path: /requestId
+                  temperatureC:
+                    $var:
+                      name: trigger
+                      path: /temperatureC
+                  status: Pending
+            - $appendChange:
+                op: add
+                path: /requestedC
+                val:
+                  $var:
+                    name: trigger
+                    path: /temperatureC
+            - $appendEvent:
+                $merge:
+                - type: Events/Request
+                - kind: Temperature Change Requested
+                  requestId:
+                    $var:
+                      name: trigger
+                      path: /requestId
+                  temperatureC:
+                    $var:
+                      name: trigger
+                      path: /temperatureC
+          confirm:
+            do:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /requestId
+                  - $document: /temperatureRequest/requestId
+                message: TEMPERATURE_REQUEST_MISMATCH
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document: /temperatureRequest/status
+                  - Pending
+                message: TEMPERATURE_REQUEST_NOT_PENDING
+            - $appendChange:
+                op: add
+                path: /reportedC
+                val:
+                  $document: /temperatureRequest/temperatureC
+            - $appendChange:
+                op: add
+                path: /temperatureRequest/status
+                val: Confirmed
+            - $appendEvent:
+                $merge:
+                - type: Events/Response
+                - kind: Temperature Change Confirmed
+                  requestId:
+                    $var:
+                      name: trigger
+                      path: /requestId
+                  temperatureC:
+                    $document: /reportedC
+      bindings:
+        request:
+          requestTemperature:
+            'on': workflow
+            party: customer__assistant
+        confirm:
+          confirmTemperature:
+            'on': workflow
+            party: seller
+  reportedC: 20
+  requestedC: 20
+  temperatureRequest: {}

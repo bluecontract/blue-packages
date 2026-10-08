@@ -1,3801 +1,30 @@
-# Build executable agreements from reusable clauses
+# Build connected applications with clauses
 
-A practical handbook for the current Blue clause packages
+This is the guide to the single current clause package set in this repository. It replaces the earlier catalogue of overlapping, narrowly named clauses. Package sources live at the repository root. `PUBLIC-CLAUSES.json` selects the public families; `PACKAGES.json` pins their exact built identities.
 
-**Write the business relationship once. Run it as a document. Reuse its behavior everywhere.**
+The packages are unpublished candidates. The examples are real Blue source documents, accompanied by executable Java scenarios. Local scenario validation, authenticated multi-account integration, and AWS deployment are separate checks. A passing local example does not certify a banking integration or a production deployment.
 
-An Order can describe a product, accept a customer's approval, start its Payment Instruction, observe delivery and calculate what remains payable. A referral agreement can create many such Orders, calculate commission from confirmed outcomes and start a separate payout. The same payment family can serve an English lesson, a design milestone or a property booking. The domain changes; the composition mechanism stays recognizable.
+## 1. The idea: describe a feature once, connect it where it belongs
 
-That is the proposition of clauses: small, named pieces of business behavior that contribute to an executable document. Their configuration belongs beside the business terms. Their implementations belong in reusable, identified packages. Their effects can be inspected and replayed.
+An agreement is both readable terms and executable behavior. A clause gives a feature a meaningful name and a reusable implementation. Its parameters describe the policy. Its property bindings connect that policy to the document. Its action connections specify **when**, **who**, and **with what input** the feature runs.
 
-This handbook describes the **current, unpublished `0.5.0-preview.2` package candidate**. It is a guide to implemented capabilities and executable examples, not a promise that a production payment service or every proposed governance feature already exists. Names such as `DocumentsV3` and `AmendmentsV3` are current namespace labels retained for compatibility, not separate source editions. The current sources live at the repository root.
+An action is a collection of steps. It does not have to be a user workflow. The same `say` action can run when a person requests it, when an event is emitted, when a property changes, when a child document emits a matching event, or when a durable timer fires. The clause engine lowers those connections to ordinary Blue contracts. Authors of applications write clauses; authors of reusable clauses use the existing native BEX and Contracts semantics.
 
-## Read this in three passes
+There is no JavaScript business-rule generator. The Java package builder assembles and verifies the `.blue` source files. The executable lowering logic is itself in the `Connections/Connected Clause` package definition. The application does not decide whether a customer has satisfied a payment condition: the document does.
 
-1. Start with the small Hello and lesson documents. Understand an action, a connection and a binding.
-2. Browse the reference for the business capabilities you need. It covers all **38 exported clause types: 35 concrete or specialized clauses and three bases**. Internal payment helpers are identified as such.
-3. Follow the complete applications and local execution instructions. Each `.case.yaml` file is an executable walkthrough containing requests, expected state, expected failures and, where appropriate, expected events.
+This gives us one common process:
 
-Code blocks labelled **fragment** need their surrounding document. Code blocks labelled **complete document** can be read as complete authoring sources. Fixture channels are local test inputs, not authenticated user identities. The access template additionally needs signed provider data supplied by its native test fixture.
+1. Choose a document type with clause support.
+2. Define parties and acceptance with Activation.
+3. Add meaningful features such as Product, Payment, Shipping, or a custom Feature.
+4. Bind each reusable action to the relevant workflow or signal.
+5. Validate the configuration, then execute deterministically and publish the resulting state and events.
 
-## 1. Your first executable clause
+An operation is admitted by its authenticated channel. A clause cannot turn a user-supplied party name into authority. A failed action rolls back its attempted state changes and emitted events. Replaying the same accepted input against the same exact package and document state must produce the same result and gas.
 
-The smallest useful example has a field, a clause instance and an admitted input channel.
+## 2. Hello World, including its entire clause definition
 
-<!-- source:examples/clause-tutorial/05-first-clause.blue# -->
-
-**Complete document** — [examples/clause-tutorial/05-first-clause.blue](../examples/clause-tutorial/05-first-clause.blue)
-
-```yaml
-name: Hello with one callable action
-type: Agreements/Agreement with Clauses
-message: ''
-clauses:
-  hello:
-    type: Connections/Hello Clause
-    bindings:
-      text: /message
-      say:
-        greet:
-          'on': workflow
-          channel: owner
-contracts:
-  owner:
-    type: Contracts/External Channel
-    event:
-      source: owner
-```
-
-
-`hello` is the instance name. `Connections/Hello Clause` identifies the reusable type. `text: /message` binds the clause to a location in this document. `say` is the action supplied by the clause. `greet` is this document's name for the connection that exposes it as a callable operation. `channel: owner` determines which admitted channel may invoke it.
-
-Calling `greet` runs the clause's `say` steps, updates `/message` to the default greeting and emits `Connections/Hello Said`. The document does not contain a copy of the greeting implementation.
-
-The familiar `Package/Type` spelling is an authoring convenience. Execution uses exact resolved package/type identities. Selecting a newer package does not silently rewrite an already identified document or its history.
-
-A local case can express a call succinctly:
-
-```yaml
-operation: greet
-channel: owner
-expect:
-  /message: Hello World
-```
-
-This is **test-runner input**, not a new Blue operation-request schema. The runner builds the actual `Contracts/Operation Request`, including the current target document identity. Native tests use signed timeline inputs instead.
-
-## 2. What a clause is, and what it is not
-
-A clause is a reusable participant in document construction and behavior. Its type can contribute state, input channels, handlers, embedded-document processing, validation and business actions. The clause-enabled host coordinates those contributions.
-
-A useful way to design one is:
-
-| Part | Question it answers | Example |
-| --- | --- | --- |
-| Parameters | What policy or fixed configuration applies here? | Currency, transition graph, required approval channels. |
-| Bindings | Which document locations or contracts does it use? | `/message`, `/product`, `/payment`, an actor channel. |
-| Actions | What reusable behavior does it provide? | Say hello, propose an amendment, request capture. |
-| Connections | When, by whom and with what input does an action run? | A customer operation, a delivery event, a deadline. |
-| Validation | What makes configuration or a transition acceptable? | A valid pointer, an allowed transition, an unchanged expected value. |
-| Outputs | What can other clauses observe? | State, typed events, a new independently identified document. |
-
-These are design responsibilities. They are not six mandatory YAML fields on every type. The connected-clause family exposes `actions` in type definitions and uses `bindings` for connections. Older root-hook clauses such as `Participants Clause` and `Composable Clause` expose a different, still supported contribution interface. Consult the actual reference rather than adding an unsupported `on` field to an arbitrary clause.
-
-The host keeps authored configuration in `/clauses`. Its clause-change protocol validates proposed additions, updates and removals, asks the affected clauses to validate their transitions, and applies an accepted contribution plan. That is different from allowing an arbitrary workflow to overwrite its own executable contracts. Removal can have lifecycle consequences: who owns the state, whether an outstanding obligation may be abandoned, and what handlers remain must be part of the clause's rules. The short examples mostly configure clauses at initialization; they do not claim that every possible live upgrade has been qualified.
-
-A clause is also not necessarily a child document. Hello, counters and state machines normally operate in the host. Payment creates and observes a distinct Payment Instruction. A document factory creates independently identified children. This separation lets the domain author choose boundaries deliberately.
-
-## 3. One action, many ways to connect it
-
-The connected-clause form is:
-
-```yaml
-clauses:
-  hello:
-    type: Connections/Hello Clause
-    bindings:
-      text: /message
-      say:
-        greet:
-          on: workflow
-          channel: owner
-```
-
-`greet` is not the reusable implementation. It is one installation of the reusable `say` action. Add another named connection under `say` to reuse those steps with a different trigger. Omitting a connection does not automatically expose a callable operation. Some types also declare automatic internal connections for required lifecycle behavior.
-
-### The supported trigger forms
-
-| `on` | Trigger | Essential configuration | A common use |
-| --- | --- | --- | --- |
-| `workflow` | An admitted operation request | `channel`; optional typed `request` | Customer confirms satisfaction. |
-| `event` | An event emitted within the document | Optional `event` pattern | React to `Order Failed` with `reason: abc`. |
-| `embedded` | Delivery from one embedded document | `path`; optional `event` pattern | Observe one Payment Instruction. |
-| `collection` | Delivery from children of an embedded collection | `path`; optional `event` pattern | Observe every Order under `/orders`. |
-| `change` | A change to a selected local document path | `path`; optional `when` | React when `/status` becomes delivered. |
-| `initialized` | Initialization of this document | Often `once: true` | Read evidence that already exists at startup. |
-| `timer` | A durable deadline | `timestamp`, or `afterEvent` plus `delayMs` | Release an authorization after a waiting window. |
-| `channel` | Input delivered through a named channel | `channel`; optional `event` pattern | Read a sensor's admitted signal. |
-
-An event pattern is a structural match, not an arbitrary JavaScript predicate. Use `when` with BEX when the selection requires computed logic. Collection scope follows an embedded path boundary: `/orders` does not mean `/ordersArchive`. It is a processing relationship, not a global subscription to all similarly named documents.
-
-The following **clause fragment** installs requests, typed events, filtered events, changes and an external channel in one actual example:
-
-<!-- source:examples/clause-tutorial/01-hello.blue#/clauses/hello -->
-
-**Fragment** — [examples/clause-tutorial/01-hello.blue](../examples/clause-tutorial/01-hello.blue) · `/clauses/hello`
-
-```yaml
-type: Connections/Hello Clause
-bindings:
-  text: /message
-  say:
-    acceptDelivery:
-      'on': workflow
-      channel: owner
-      request:
-        type: Connections/Greeting Request
-      params:
-        text:
-          $binding: call/request/text
-      before:
-      - $failIf:
-          cond:
-            $not:
-              $binding: call/request/approved
-          message: Approval required
-      after:
-      - $appendChange:
-          op: replace
-          path: /observed
-          val:
-            $resultValue: /message
-    typedPing:
-      'on': event
-      event:
-        type: Connections/Ping
-      params:
-        text:
-          $event: /text
-    onceApproved:
-      'on': event
-      event:
-        kind: Order Approved
-      once: true
-      params:
-        text: Approved once
-    whenFailed:
-      'on': event
-      event:
-        kind: Order Failed
-        reason: abc
-      params:
-        text:
-          $concat:
-          - 'Failed: '
-          - $event: /reason
-    statusChanged:
-      'on': change
-      path: /status
-      when:
-        $eq:
-        - $event: /after
-        - delivered
-      params:
-        text: Status is delivered
-    externalSignal:
-      'on': channel
-      channel: signals
-      event:
-        kind: External Hello
-      params:
-        text:
-          $event: /text
-```
-
-
-The complete [Hello walkthrough](../examples/clause-tutorial/01-hello.case.yaml) proves successful approval, rejected approval, matching and nonmatching failure reasons, one-time delivery, path changes, typed events and wrong request-type rejection.
-
-### Map input first; validate before; react after
-
-Three similarly named concepts must stay distinct:
-
-- `parameters` configure the installed clause: for example a transition graph or payment currency.
-- A connection's `params` compute arguments for this particular action invocation.
-- A workflow request is the caller's input. It must be validated and mapped; its contents are not automatically trusted policy.
-
-Connected actions expose the normalized input as `$var: {name: trigger, path: ...}`. A workflow also offers `$binding: call/request/...`. `$event` refers to the delivered event; embedded delivery can include an envelope, so prefer the documented normalized trigger when writing a reusable mapping. `$resultValue` reads the action's published result in an `after` hook.
-
-`when` skips a connection when its condition is false. `before` runs after parameters are mapped and can reject the attempt with `$failIf`. The action then performs its own mandatory checks and effects. `after` adds local follow-up behavior. A failed transactional attempt does not publish its attempted state changes or events.
-
-The Hello walkthrough checks rejection before the action. The [atomic walkthrough](../examples/clause-tutorial/03-atomic.case.yaml) checks failure after the action: neither leaks a partial greeting. It also checks a skipped condition and one-time execution.
-
-Do not assume every action has identical duplicate semantics. Financial actions and other `outcome-v1` actions distinguish a new accepted command from a duplicate; their `after` hook runs for `acceptedNew`. An ordinary repeatable greeting can run repeatedly. `once: true` is connection state, not an external payment idempotency protocol.
-
-### Use native workflow steps when the shortcut is not enough
-
-The short connection syntax is an authoring layer over ordinary Blue behavior. A document can also define `Contracts/Sequential Workflow Operation` with several native steps. The [native-steps document](../examples/clause-tutorial/04-native-steps.blue) validates a request, invokes the reusable action through the existing mechanism and continues with further work.
-
-You do not need a new special-purpose clause for every small sequence. Use a domain clause for stable business meaning; use an ordinary workflow or `Composable Clause` for document-specific glue. Put substantial repeated behavior into a package, rather than repeating it across ten `before` hooks.
-
-### Timers: first, latest, fixed and cancelled
-
-A timer can use an absolute timestamp or be armed by another connection. `policy: first` preserves the first qualifying event for the waiting window. `policy: latest` moves the deadline and captured trigger to the latest qualifying event. `cancelOn` removes the pending timer when its configured signal arrives. Use the explicit one-time option when lifetime behavior must be unambiguous.
-
-<!-- source:examples/clause-tutorial/14-timers.blue#/clauses/hello/bindings/say -->
-
-**Fragment** — [examples/clause-tutorial/14-timers.blue](../examples/clause-tutorial/14-timers.blue) · `/clauses/hello/bindings/say`
-
-```yaml
-fixedDeadline:
-  'on': timer
-  timestamp: 30000000
-  params:
-    text: Fixed deadline
-  after:
-  - $appendChange:
-      op: add
-      path: /log/-
-      val:
-        connection: fixed
-        at:
-          $binding: timestamp
-firstReminder:
-  'on': timer
-  afterEvent:
-    'on': event
-    event:
-      kind: Delivery Reported
-  delayMs: 2000
-  policy: first
-  params:
-    text:
-      $concat:
-      - 'First report: '
-      - $var:
-          name: trigger
-          path: /text
-  after:
-  - $appendChange:
-      op: add
-      path: /log/-
-      val:
-        connection: first
-        at:
-          $binding: timestamp
-latestReminder:
-  'on': timer
-  afterEvent:
-    'on': event
-    event:
-      kind: Delivery Reported
-  delayMs: 2000
-  policy: latest
-  once: true
-  params:
-    text:
-      $concat:
-      - 'Latest report: '
-      - $var:
-          name: trigger
-          path: /text
-  after:
-  - $appendChange:
-      op: add
-      path: /log/-
-      val:
-        connection: latest
-        at:
-          $binding: timestamp
-cancelledReminder:
-  'on': timer
-  afterEvent:
-    'on': event
-    event:
-      kind: Cancel Example
-  delayMs: 3000
-  cancelOn:
-    'on': event
-    event:
-      kind: Cancel Reminder
-  params:
-    text: This timer must be cancelled
-  after:
-  - $appendChange:
-      op: add
-      path: /log/-
-      val:
-        connection: cancelled
-        at:
-          $binding: timestamp
-```
-
-
-Here absolute timestamps and the processing clock are in **microseconds**; `delayMs` is in **milliseconds**. The tiny absolute timestamp belongs to the controlled test clock, not a calendar date for a live deployment.
-
-Timers need a host that supplies time and sufficient signed timeline completeness. A scheduler must not jump past an earlier input that could cancel or change the decision. The native tutorial test advances the clock, imports signed provider ranges and checks first/latest behavior, cancellation and the final fixed deadline. It does not simulate a deadline by directly injecting a business event.
-
-## 4. Payment makes the boundary concrete
-
-A Payment clause represents one payment and observes one Payment Instruction (PI). The host describes why the payment matters. The PI owns the financial lifecycle, permissions, accepted details, outstanding requests and confirmed outcomes.
-
-The small lesson below asks the customer to confirm satisfaction. Its workflow is installed **inside the PI**. Calling it there records the condition; the host Payment clause relays PI events with the clause/instruction context. Other host components can listen to the relayed event. The built-in relay selects `PaymentInstruction/Payment Event`; it does not automatically echo every arbitrary untyped event. In this example the local `Satisfaction Audit` hook remains a PI-local event, while the typed evidence and conditions events are relayed. Use the typed event contract or an explicit listener when adding a custom host-visible notification.
-
-<!-- source:examples/clause-tutorial/12-english-lesson.blue# -->
-
-**Complete document** — [examples/clause-tutorial/12-english-lesson.blue](../examples/clause-tutorial/12-english-lesson.blue)
-
-```yaml
-name: 'English lesson: payment after customer satisfaction'
-type: Orders/Order with Clauses
-product:
-  name: One English conversation lesson
-  currency: EUR
-  unitPriceMinor: 4000
-  quantity: 1
-afterCount: 0
-clauses:
-  payment:
-    type: Payment/Conditional Payment
-    parameters:
-      requireAll:
-        confirmSatisfaction:
-          'on': workflow
-          channel: customer
-          after:
-          - $appendEvent:
-              kind: Satisfaction Audit
-contracts:
-  customer:
-    type: Contracts/External Channel
-    event:
-      source: customer
-  seller:
-    type: Contracts/External Channel
-    event:
-      source: seller
-  guarantor:
-    type: Contracts/External Channel
-    event:
-      source: guarantor
-```
-
-
-The test calls the condition twice to prove duplicate handling, asks the test guarantor to accept and initiate the instruction, then supplies separate authorization and capture confirmations. The amount is €40: `4000` minor units, not a floating-point `40.00`.
-
-### Three relationships with the host
-
-| Relationship | Configuration | Result |
-| --- | --- | --- |
-| PI-local behavior | A workflow condition in `requireAll`, or explicit PI clause connections | The operation lives in the PI; no parent cycle is necessary. |
-| PI depends on its host | Explicit `includeOrder` in a preset, or `hostSource` in general Payment | PI embeds an identified host reference; because the host embeds PI, this is a cycle. |
-| PI depends on shared evidence | Explicit `sources` or general Payment `sourcePaths` | PI observes an independently identified document; the host can observe the same source. |
-
-The payment preset also offers conveniences around these connections. For example, `requireAll.checkIn.observe` can name a `source`, a `path` and an expected value with `equals`; setup turns that state requirement into initialization and later observation behavior. `observe` in this position is payment-specific configuration, not a ninth generic `on` mode. `autoStart: false` plus an explicit `bindings.start` connection postpones PI creation until the chosen operation or event.
-
-The implementation does not guess that arbitrary code should move between documents. Configuration determines where it is installed and which sources it receives. A PI-local workflow's document reads refer to PI state. Referring to `/delivery` in the host requires an explicit source relationship; identical-looking paths do not imply shared state.
-
-The following explicit PI fragment maps request amounts and adds preparation and accepted-new effects:
-
-<!-- source:examples/payment-family/11-custom-hooks.blue#/paymentTemplate/clauses/payment/bindings/requestCapture -->
-
-**Fragment** — [examples/payment-family/11-custom-hooks.blue](../examples/payment-family/11-custom-hooks.blue) · `/paymentTemplate/clauses/payment/bindings/requestCapture`
-
-```yaml
-capture:
-  'on': workflow
-  channel: customer
-  params:
-    requestId:
-      $var:
-        name: trigger
-        path: /requestId
-    amountMinor:
-      $var:
-        name: trigger
-        path: /requestedMinor
-  before:
-  - $failIf:
-      cond:
-        $not:
-          $and:
-          - $isKind:
-              val:
-                $var:
-                  name: params
-                  path: /amountMinor
-              kind: integer
-          - $gt:
-            - $var:
-                name: params
-                path: /amountMinor
-            - 0
-          - $lte:
-            - $var:
-                name: params
-                path: /amountMinor
-            - 10000
-      message: CAPTURE_OUTSIDE_LOCAL_LIMIT
-  after:
-  - $appendChange:
-      op: replace
-      path: /captureNoticeCount
-      val:
-        $add:
-        - $document: /captureNoticeCount
-        - 1
-  - $appendChange:
-      op: replace
-      path: /lastCaptureNote
-      val:
-        $pointerGet:
-          object:
-            $var: trigger
-          path: /note
-          default: ''
-  - $failIf:
-      cond:
-        $eq:
-        - $pointerGet:
-            object:
-              $var: trigger
-            path: /abortAfter
-            default: false
-        - true
-      message: DELIBERATE_AFTER_FAILURE
-  - $appendEvent:
-      $merge:
-      - type: Commerce/Domain Event
-      - kind: Capture Request Recorded
-        clause:
-          $const: clauseKey
-        amountMinor:
-          $var:
-            name: params
-            path: /amountMinor
-```
-
-
-The [custom-service example](../examples/payment-family/02-custom-service.blue) shows the long form: an explicit PI template, a delivery document, a host acceptance state and partial capture requests. The [smart-property example](../examples/payment-family/06-smart-property.blue) shows preset source configuration. The former is the more useful source to study when you need exact control over lifecycle actions.
-
-### Requests and confirmations are different facts
-
-`requestCapture` admits a command and reserves the corresponding capacity. It does not move money. A separately admitted operator confirmation records the outcome. Pending and unknown operations remain reserved until reconciliation; they are not safe grounds for issuing another transfer.
-
-The supplied MyOS, ACME and manual methods are executable **protocols**. ACME is an illustrative bank. MyOS Customer Payment models the session/funding handshake. None of these examples supplies a live bank adapter or checkout website. External executors need durable command discovery, idempotent execution and reconciliation.
-
-If an authorization expires without capture, the appropriate operation is generally **void/release**. If captured money must be returned, it is **refund**. The compensation example tests the difficult case: an Order fails while capture is unresolved, then capture succeeds late; the PI must request a refund.
-
-## 5. Parties, channels and readers are separate
-
-A business Party answers “who is involved?” An admitted channel answers “who can supply this operation?” A reader key answers “who can obtain these timeline entries?” None automatically implies the other two.
-
-`Parties/Party` describes a business participant. `MyOS/MyOS Party` additionally carries `myosAccountId`. In authenticated bootstrap that account must match the resolved participant. The sample IDs and `External Channel` objects in local examples are fixtures, not identity proofs.
-
-`Participants/Participants Clause` contributes validated named participant channels. `AccessParticipants/Participants with Access Clause` additionally checks embedded provider access documents. The protected workflow must explicitly use `AccessParticipants/Require Participant Access` before its business steps. Installing the clause does not magically prepend a guard to every arbitrary handler.
-
-The access example demonstrates an initially usable agreement, revocation blocking a guarded operation, and restoration permitting it again. The test still retains enough reader access to fetch the revocation. Complete loss of transport access is a separate provider/import availability concern.
-
-A PI copies its selected party snapshot when created. Editing a parent's labels or roster does not silently grant a new person PI authority or access. The full proposed system of lead representatives, delegates, multiple alternative keys and party-managed membership is **not implemented by these two participant clauses**. Mandates is a separate package and is not implicitly installed by Payment.
-
-## 6. Clause reference
-
-The examples below are extracted from checked-in authoring sources or executable walkthrough inputs. Follow their source links for the complete context. Base types are shown through concrete specializations. Internal PI helper clauses are shown through the preset and requests that install or exercise them; application authors normally do not install a second copy themselves.
-
-
-| Clause | Reference |
-| --- | --- |
-| `Connections/Hello Clause` | [Examples and contract](#clause-01) |
-| `Commerce/Status Clause` | [Examples and contract](#clause-02) |
-| `State/State Machine Clause` | [Examples and contract](#clause-03) |
-| `Commerce/Counter Clause` | [Examples and contract](#clause-04) |
-| `Commerce/Text Clause` | [Examples and contract](#clause-05) |
-| `Commerce/Product Clause` | [Examples and contract](#clause-06) |
-| `Features/Delivery Instructions Clause` | [Examples and contract](#clause-07) |
-| `Activation/Activation Clause` | [Examples and contract](#clause-08) |
-| `AmendmentsV3/Amendments Clause` | [Examples and contract](#clause-09) |
-| `Termination/Termination Clause` | [Examples and contract](#clause-10) |
-| `Balance/Balance Clause` | [Examples and contract](#clause-11) |
-| `DocumentsV3/Document Factory Clause` | [Examples and contract](#clause-12) |
-| `Commerce/Document Factory Clause` | [Examples and contract](#clause-13) |
-| `Clauses/Document Factory Clause` | [Examples and contract](#clause-14) |
-| `Clauses/Collection Clause` | [Examples and contract](#clause-15) |
-| `Clauses/Listener Clause` | [Examples and contract](#clause-16) |
-| `Clauses/Composable Clause` | [Examples and contract](#clause-17) |
-| `Participants/Participants Clause` | [Examples and contract](#clause-18) |
-| `AccessParticipants/Participants with Access Clause` | [Examples and contract](#clause-19) |
-| `Payment/Payment Clause` | [Examples and contract](#clause-20) |
-| `Payment/Conditional Payment` | [Examples and contract](#clause-21) |
-| `PaymentInstruction/Payment Lifecycle Clause` | [Examples and contract](#clause-22) |
-| `PaymentInstruction/Conditional Policy` | [Examples and contract](#clause-23) |
-| `MyOS/MyOS Customer Payment` | [Examples and contract](#clause-24) |
-| `MyOS/MyOS Account to Account Payment` | [Examples and contract](#clause-25) |
-| `ACME/ACME Bank Payment` | [Examples and contract](#clause-26) |
-| `ManualPayments/Manual Bank Payment` | [Examples and contract](#clause-27) |
-| `MyOS/Customer Session Clause` | [Examples and contract](#clause-28) |
-| `MyOS/Payment Method Events` | [Examples and contract](#clause-29) |
-| `ACME/Bank Method Events` | [Examples and contract](#clause-30) |
-| `ManualPayments/Manual Transfer Policy` | [Examples and contract](#clause-31) |
-| `Referrals/Order Summary Clause` | [Examples and contract](#clause-32) |
-| `Referrals/Procurement Summary Clause` | [Examples and contract](#clause-33) |
-| `Referrals/Commission Clause` | [Examples and contract](#clause-34) |
-| `Schedule/Schedule Clause` | [Examples and contract](#clause-35) |
-| `Clauses/Clause` | [Examples and contract](#clause-36) |
-| `Connections/Connected Clause` | [Examples and contract](#clause-37) |
-| `Payment/Conditional Payment Base` | [Examples and contract](#clause-38) |
-
-
-<a id="clause-01"></a>
-
-
-### 6.1. `Connections/Hello Clause`
-
-A deliberately small business action: write a greeting to a bound text field and emit `Connections/Hello Said`. This is the best place to learn composition because the action itself has almost no domain complexity.
-
-**Configure it:** `bindings.text` names the destination. `bindings.say` contains named connections. Map `params.text` for a custom greeting; otherwise the default is `Hello World`. The action result exposes the message for an `after` hook.
-
-**Boundary:** A greeting is not inherently one-time or authorized for everyone. The chosen connection determines its channel, filters and repetition policy.
-
-[Package definition](../clause-connections/types/hello-clause.blue).
-
-
-**Declared or inherited actions:** `say`.
-
-
-#### A named operation
-
-Expose `greet` on the owner channel. No custom steps are needed.
-
-<!-- source:examples/clause-tutorial/05-first-clause.blue#/clauses/hello -->
-
-**Fragment** — [examples/clause-tutorial/05-first-clause.blue](../examples/clause-tutorial/05-first-clause.blue) · `/clauses/hello`
-
-```yaml
-type: Connections/Hello Clause
-bindings:
-  text: /message
-  say:
-    greet:
-      'on': workflow
-      channel: owner
-```
-
-
-#### Observe an embedded supplier or any Order
-
-The same `say` action reacts to an individual embedded document and a collection. The case checks that the archive collection does not leak into the `/orders` scope.
-
-<!-- source:examples/clause-tutorial/02-embedded.blue#/clauses/hello -->
-
-**Fragment** — [examples/clause-tutorial/02-embedded.blue](../examples/clause-tutorial/02-embedded.blue) · `/clauses/hello`
-
-```yaml
-type: Connections/Hello Clause
-bindings:
-  text: /message
-  say:
-    ready:
-      'on': initialized
-      params:
-        text: Connections ready
-    supplierReady:
-      'on': embedded
-      path: /supplier
-      event:
-        kind: Ready
-      params:
-        text:
-          $event: /event/text
-    anyOrderUnknown:
-      'on': collection
-      path: /orders
-      event:
-        kind: Order Unknown
-      params:
-        text:
-          $concat:
-          - $event: /sourcePath
-          - ': '
-          - $var:
-              name: trigger
-              path: /text
-    childFieldIsNotALocalChange:
-      'on': change
-      path: /supplier/status
-      params:
-        text: This must never run
-```
-
-
-#### Join a longer workflow
-
-A native workflow prepares a greeting event; the clause reacts and marks the host as processed. This keeps formatting and the reusable action separate.
-
-<!-- source:examples/clause-tutorial/04-native-steps.blue#/clauses/hello -->
-
-**Fragment** — [examples/clause-tutorial/04-native-steps.blue](../examples/clause-tutorial/04-native-steps.blue) · `/clauses/hello`
-
-```yaml
-type: Connections/Hello Clause
-bindings:
-  text: /message
-  say:
-    preparedGreeting:
-      'on': event
-      event:
-        kind: Greeting Prepared
-      params:
-        text:
-          $event: /text
-      after:
-      - $appendChange:
-          op: replace
-          path: /processed
-          val: true
-```
-
-
-<a id="clause-02"></a>
-
-
-### 6.2. `Commerce/Status Clause`
-
-Maintain a named business state with an allowed transition graph. This is useful for a simple lifecycle such as Draft → Published → Archived.
-
-**Configure it:** `parameters.subject` names the event subject and `parameters.transitions` lists allowed destinations. Bind `state`, then connect `transition` with `params.to` and optional `reason`.
-
-**Boundary:** This is the simpler status implementation. Prefer `State/State Machine Clause` when the explicit repeat/no-op outcome behavior is important. A status field by itself does not prevent unrelated operations; add the appropriate guards.
-
-[Package definition](../clause-commerce/types/status-clause.blue).
-
-
-**Declared or inherited actions:** `transition`.
-
-
-#### Publish an offer
-
-The `publish` connection chooses Published; the transition table controls whether that move is allowed.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/status -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/status`
-
-```yaml
-type: Commerce/Status Clause
-parameters:
-  subject: Offer
-  transitions:
-    Draft:
-    - Published
-    Published:
-    - Archived
-bindings:
-  state: /status
-  transition:
-    publish:
-      'on': workflow
-      channel: owner
-      params:
-        to: Published
-    archive:
-      'on': workflow
-      channel: owner
-      params:
-        to: Archived
-```
-
-
-#### Retire an offer and notify another feature
-
-The Schedule clause observes `Offer Archived`. One clause owns the lifecycle; another reacts to its result.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/archiveNotice -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/archiveNotice`
-
-```yaml
-type: Schedule/Schedule Clause
-parameters:
-  key: archive-review
-bindings:
-  fire:
-    afterArchive:
-      'on': event
-      event:
-        type: Commerce/Domain Event
-        kind: Offer Archived
-```
-
-
-<a id="clause-03"></a>
-
-
-### 6.3. `State/State Machine Clause`
-
-Represent one independently changing aspect of the business with explicit outcomes. Use several instances for separate concerns instead of overloading one enormous status field.
-
-**Configure it:** Bind `state`; configure `subject` and `transitions`; connect `transition`. The implementation uses `outcome-v1`, so repeating a completed transition can be a no-op without repeating follow-up effects.
-
-**Boundary:** An allowed transition is not proof of a real-world event. Choose the actor channel and evidence required before accepting it.
-
-[Package definition](../clause-state-machine/types/clause.blue).
-
-
-**Declared or inherited actions:** `transition`.
-
-
-#### A milestone alongside an offer lifecycle
-
-The milestone can become Accepted while the separate offer status remains Published. The case repeats approval and checks there are no new events.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/milestone -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/milestone`
-
-```yaml
-type: State/State Machine Clause
-parameters:
-  subject: Milestone
-  transitions:
-    Open:
-    - Accepted
-    - Rejected
-bindings:
-  state: /milestone
-  transition:
-    approveMilestone:
-      'on': workflow
-      channel: owner
-      params:
-        to: Accepted
-```
-
-
-#### Delivery evidence in its own document
-
-A carrier reports Delivered or Failed. Payment observes this independently identified source.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/delivery/clauses/progress -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/delivery/clauses/progress`
-
-```yaml
-type: State/State Machine Clause
-parameters:
-  subject: Delivery
-  transitions:
-    Open:
-    - Delivered
-    - Failed
-    Delivered:
-    - Failed
-bindings:
-  state: /status
-  transition:
-    deliver:
-      'on': workflow
-      channel: carrier
-      params:
-        to: Delivered
-    failDelivery:
-      'on': workflow
-      channel: carrier
-      params:
-        to: Failed
-        reason:
-          $var:
-            name: trigger
-            path: /reason
-```
-
-
-#### Customer acceptance
-
-Customer acceptance and physical delivery are separate state machines and separate payment prerequisites.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/clauses/acceptance -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/clauses/acceptance`
-
-```yaml
-type: State/State Machine Clause
-parameters:
-  subject: Acceptance
-  transitions:
-    Pending:
-    - Accepted
-    - Declined
-bindings:
-  state: /acceptance
-  transition:
-    acceptDelivery:
-      'on': workflow
-      channel: customer
-      params:
-        to: Accepted
-    declineDelivery:
-      'on': workflow
-      channel: customer
-      params:
-        to: Declined
-```
-
-
-<a id="clause-04"></a>
-
-
-### 6.4. `Commerce/Counter Clause`
-
-Adjust a bounded integer through a reusable action. Inventory and usage counts share the arithmetic while keeping distinct state and limits.
-
-**Configure it:** Bind `count`; set `minimum` and `maximum`; connect `adjust` with a mapped `delta`. The default delta is one. The operation checks integer arithmetic and bounds.
-
-**Boundary:** It is not a financial ledger and it does not deduplicate business commands by an external request ID. Use Balance or Payment for those responsibilities.
-
-[Package definition](../clause-commerce/types/counter-clause.blue).
-
-
-**Declared or inherited actions:** `adjust`.
-
-
-#### Consume available stock
-
-The case reduces stock from five to three, then rejects a subtraction that would make it negative.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/stock -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/stock`
-
-```yaml
-type: Commerce/Counter Clause
-parameters:
-  minimum: 0
-  maximum: 10
-bindings:
-  count: /stock
-  adjust:
-    stockAdjust:
-      'on': workflow
-      channel: owner
-      params:
-        delta:
-          $var:
-            name: trigger
-            path: /delta
-```
-
-
-#### Count completed visits
-
-A second instance uses a different state pointer and a larger bound. Its updates do not affect stock.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/visits -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/visits`
-
-```yaml
-type: Commerce/Counter Clause
-parameters:
-  minimum: 0
-  maximum: 100
-bindings:
-  count: /visits
-  adjust:
-    visitsAdjust:
-      'on': workflow
-      channel: owner
-      params:
-        delta:
-          $var:
-            name: trigger
-            path: /delta
-```
-
-
-<a id="clause-05"></a>
-
-
-### 6.5. `Commerce/Text Clause`
-
-Change a text field while checking the value the caller expected to replace. This gives a compact stale-edit guard for ordinary editable text.
-
-**Configure it:** Bind `text`; connect `amend`; map `expected` and the new `text`. Both validation and the mutation stay in the reusable action.
-
-**Boundary:** This is optimistic text replacement, not multi-party approval. Use Amendments for changes that require agreement from several participants.
-
-[Package definition](../clause-commerce/types/text-clause.blue).
-
-
-**Declared or inherited actions:** `amend`.
-
-
-#### Edit payment wording
-
-The first edit replaces Original terms; repeating an edit with that old expected value is rejected.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/terms -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/terms`
-
-```yaml
-type: Commerce/Text Clause
-bindings:
-  text: /terms
-  amend:
-    termsAmend:
-      'on': workflow
-      channel: owner
-      params:
-        expected:
-          $var:
-            name: trigger
-            path: /expected
-        text:
-          $var:
-            name: trigger
-            path: /text
-```
-
-
-#### Edit a service-desk introduction
-
-The same behavior writes a different field, independently of contractual terms.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/copy -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/copy`
-
-```yaml
-type: Commerce/Text Clause
-bindings:
-  text: /message
-  amend:
-    copyAmend:
-      'on': workflow
-      channel: owner
-      params:
-        expected:
-          $var:
-            name: trigger
-            path: /expected
-        text:
-          $var:
-            name: trigger
-            path: /text
-```
-
-
-<a id="clause-06"></a>
-
-
-### 6.6. `Commerce/Product Clause`
-
-Calculate a small product/line-item quote from integer unit price, quantity and currency. Keep exact minor-unit amounts in the document.
-
-**Configure it:** Bind `product`; configure the currency; connect `quote` and map `unitPriceMinor` and `quantity`. The current action bounds price and quantity and computes `totalMinor`.
-
-**Boundary:** The action replaces the bound quote object. It does not preserve arbitrary extra product metadata such as a name; keep descriptive data outside that object or bind an appropriate quote field. Taxes, discounts and multi-line cart arithmetic are not implied.
-
-[Package definition](../clause-commerce/types/product-clause.blue).
-
-
-**Declared or inherited actions:** `quote`.
-
-
-#### Quote two service units
-
-Two units at 5000 minor units produce 10000. The case also rejects a negative unit price.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/serviceQuote -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/serviceQuote`
-
-```yaml
-type: Commerce/Product Clause
-parameters:
-  currency: EUR
-bindings:
-  product: /product
-  quote:
-    serviceQuote:
-      'on': workflow
-      channel: owner
-      params:
-        unitPriceMinor:
-          $var:
-            name: trigger
-            path: /price
-        quantity:
-          $var:
-            name: trigger
-            path: /quantity
-```
-
-
-#### Quote materials separately
-
-Three units at 750 produce 2250 in a separate quote object.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/materialsQuote -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/materialsQuote`
-
-```yaml
-type: Commerce/Product Clause
-parameters:
-  currency: EUR
-bindings:
-  product: /materials
-  quote:
-    materialsQuote:
-      'on': workflow
-      channel: owner
-      params:
-        unitPriceMinor:
-          $var:
-            name: trigger
-            path: /price
-        quantity:
-          $var:
-            name: trigger
-            path: /quantity
-```
-
-
-<a id="clause-07"></a>
-
-
-### 6.7. `Features/Delivery Instructions Clause`
-
-Expose an editable business feature whose availability depends on lifecycle state. The feature is meaningful to users: instructions can change while the work is still editable.
-
-**Configure it:** Bind `text` and `lifecycle`; list `editableStates`; connect `amend` with `params.text`. Repeated identical updates use explicit outcome semantics.
-
-**Boundary:** Changing instructions does not alter the separate delivery state. This clause is an example of grouping policy and mutation into a business feature rather than presenting users with low-level update primitives.
-
-[Package definition](../clause-features/types/clause.blue).
-
-
-**Declared or inherited actions:** `amend`.
-
-
-#### Edit only before publication
-
-The case changes Front door to Side door in Draft, then rejects another edit after publication.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/instructions -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/instructions`
-
-```yaml
-type: Features/Delivery Instructions Clause
-parameters:
-  editableStates:
-  - Draft
-bindings:
-  text: /instructions
-  lifecycle: /status
-  amend:
-    changeInstructions:
-      'on': workflow
-      channel: owner
-      params:
-        text:
-          $var:
-            name: trigger
-            path: /text
-```
-
-
-#### Edit while delivery is Open
-
-The same feature binds to a nested delivery document state in the custom service Order.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/clauses/instructions -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/clauses/instructions`
-
-```yaml
-type: Features/Delivery Instructions Clause
-parameters:
-  editableStates:
-  - Open
-bindings:
-  text: /instructions
-  lifecycle: /delivery/status
-  amend:
-    changeInstructions:
-      'on': workflow
-      channel: customer
-      params:
-        text:
-          $var:
-            name: trigger
-            path: /text
-```
-
-
-<a id="clause-08"></a>
-
-
-### 6.8. `Activation/Activation Clause`
-
-Collect required approvals for an exact terms revision. It produces a shared activation state that other features can inspect before admitting business work.
-
-**Configure it:** `parameters.required` lists approving channels and `parameters.revision` identifies the revision to approve. `bindings.state` defaults to `/activation`. Connect `approve` to the allowed participant workflows and map the requested revision.
-
-**Boundary:** Activation does not automatically guard every operation. Factory and business connections must use it in their own admission checks. An approval of an old revision must not activate new terms.
-
-[Package definition](../clause-activation/types/clause.blue).
-
-
-**Declared or inherited actions:** `initialize`, `approve`.
-
-
-#### Accept consulting terms
-
-Customer and seller approve the consulting agreement. The case exercises stale revisions and the resulting activation state.
-
-<!-- source:examples/clause-tutorial/11-consulting-terms.blue#/clauses/activation -->
-
-**Fragment** — [examples/clause-tutorial/11-consulting-terms.blue](../examples/clause-tutorial/11-consulting-terms.blue) · `/clauses/activation`
-
-```yaml
-type: Activation/Activation Clause
-parameters:
-  required:
-  - customer
-  - seller
-  revision: 1
-bindings:
-  approve:
-    approve_customer:
-      'on': workflow
-      channel: customer
-      params:
-        revision:
-          $var:
-            name: trigger
-            path: /revision
-    approve_seller:
-      'on': workflow
-      channel: seller
-      params:
-        revision:
-          $var:
-            name: trigger
-            path: /revision
-```
-
-
-#### Activate a referral partnership
-
-Seller and referrer approve the outer commercial relationship; procurement has its own activation instance for different parties.
-
-<!-- source:examples/payment-family/20-partnership.blue#/clauses/activation -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/clauses/activation`
-
-```yaml
-type: Activation/Activation Clause
-parameters:
-  required:
-  - seller
-  - referrer
-  revision: 1
-bindings:
-  approve:
-    approve_seller:
-      'on': workflow
-      channel: seller
-      params:
-        revision:
-          $var:
-            name: trigger
-            path: /revision
-    approve_referrer:
-      'on': workflow
-      channel: referrer
-      params:
-        revision:
-          $var:
-            name: trigger
-            path: /revision
-```
-
-
-<a id="clause-09"></a>
-
-
-### 6.9. `AmendmentsV3/Amendments Clause`
-
-Propose governed changes to allowlisted terms and collect the required approvals before applying them. This is the higher-level alternative to directly replacing text.
-
-**Configure it:** The clause has `initialize`, `propose` and `approve` actions. `parameters.paths` allowlists editable paths and `parameters.approvers` lists approving channels. The state and editability bindings default to `/amendments` and `/termsEditable`. A proposal maps `proposalId`, `expectedRevision`, `path` and `replacement`.
-
-**Boundary:** This particular clause governs its declared business terms. It is not unrestricted permission to rewrite contracts, participants or arbitrary executable code. Do not infer broad governance from the name.
-
-[Package definition](../clause-amendments/types/clause.blue).
-
-
-**Declared or inherited actions:** `initialize`, `propose`, `approve`.
-
-
-#### Change a booking subject to mutual approval
-
-The booking walkthrough proposes a change and requires both approvers; stale requests are rejected.
-
-<!-- source:examples/payment-family/05-booking-amendments.blue#/clauses/amendments -->
-
-**Fragment** — [examples/payment-family/05-booking-amendments.blue](../examples/payment-family/05-booking-amendments.blue) · `/clauses/amendments`
-
-```yaml
-type: AmendmentsV3/Amendments Clause
-parameters:
-  approvers:
-  - customer
-  - seller
-  paths:
-  - /terms
-bindings:
-  propose:
-    proposeChange:
-      'on': workflow
-      channel: seller
-      params:
-        proposalId:
-          $var:
-            name: trigger
-            path: /proposalId
-        expectedRevision:
-          $var:
-            name: trigger
-            path: /expectedRevision
-        path: /terms
-        replacement:
-          $var:
-            name: trigger
-            path: /replacement
-  approve:
-    approveChangeCustomer:
-      'on': workflow
-      channel: customer
-      params:
-        proposalId:
-          $var:
-            name: trigger
-            path: /proposalId
-    approveChangeSeller:
-      'on': workflow
-      channel: seller
-      params:
-        proposalId:
-          $var:
-            name: trigger
-            path: /proposalId
-```
-
-
-#### Expand consulting scope
-
-A separate agreement changes its scope from one service to two. The first approval leaves terms untouched; the final required approval applies them.
-
-<!-- source:examples/clause-tutorial/11-consulting-terms.blue#/clauses/amendments -->
-
-**Fragment** — [examples/clause-tutorial/11-consulting-terms.blue](../examples/clause-tutorial/11-consulting-terms.blue) · `/clauses/amendments`
-
-```yaml
-type: AmendmentsV3/Amendments Clause
-parameters:
-  approvers:
-  - customer
-  - seller
-  paths:
-  - /terms
-bindings:
-  propose:
-    proposeChange:
-      'on': workflow
-      channel: seller
-      params:
-        proposalId:
-          $var:
-            name: trigger
-            path: /proposalId
-        expectedRevision:
-          $var:
-            name: trigger
-            path: /expectedRevision
-        path: /terms
-        replacement:
-          $var:
-            name: trigger
-            path: /replacement
-  approve:
-    approveChangeCustomer:
-      'on': workflow
-      channel: customer
-      params:
-        proposalId:
-          $var:
-            name: trigger
-            path: /proposalId
-    approveChangeSeller:
-      'on': workflow
-      channel: seller
-      params:
-        proposalId:
-          $var:
-            name: trigger
-            path: /proposalId
-```
-
-
-<a id="clause-10"></a>
-
-
-### 6.10. `Termination/Termination Clause`
-
-Model orderly wind-down separately from immediate disappearance. Stop new business while allowing existing obligations to finish.
-
-**Configure it:** `request` moves Active to WindingDown. `finish` requires WindingDown and a true readiness binding before reaching Terminated. Bind `state` and `ready`, and connect the actions to appropriate actors.
-
-**Boundary:** The state is a policy input. All admission paths that must stop during wind-down need an explicit check. Termination must not erase debt, outstanding captures or refunds.
-
-[Package definition](../clause-termination/types/clause.blue).
-
-
-**Declared or inherited actions:** `request`, `finish`.
-
-
-#### Finish a booking after obligations are clear
-
-The readiness condition prevents premature final termination.
-
-<!-- source:examples/payment-family/05-booking-amendments.blue#/clauses/termination -->
-
-**Fragment** — [examples/payment-family/05-booking-amendments.blue](../examples/payment-family/05-booking-amendments.blue) · `/clauses/termination`
-
-```yaml
-type: Termination/Termination Clause
-bindings:
-  request:
-    cancel:
-      'on': workflow
-      channel: customer
-  finish:
-    close:
-      'on': workflow
-      channel: seller
-```
-
-
-#### Stop creating Orders while procurement settles
-
-The partnership case enters wind-down and then rejects a new Order; the existing graph remains available.
-
-<!-- source:examples/payment-family/20-partnership.blue#/procurementTemplate/clauses/termination -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/procurementTemplate/clauses/termination`
-
-```yaml
-type: Termination/Termination Clause
-bindings:
-  request:
-    windDown:
-      'on': workflow
-      channel: customer
-  finish:
-    close:
-      'on': workflow
-      channel: seller
-```
-
-
-<a id="clause-11"></a>
-
-
-### 6.11. `Balance/Balance Clause`
-
-Track attributed obligations, reservations and settled payments without pretending to hold external money. Targets can be corrected without rewriting confirmed history.
-
-**Configure it:** Bind the balance state. `setTarget` names the business contribution; `reserve` names a payout reservation and amount; `settle` consumes that reservation into paid. Repeated matching commands have explicit outcomes.
-
-**Boundary:** A downward correction can leave paid greater than accrued. That is a real business condition to resolve, not a reason to delete the historical payout. This clause is not a bank-account balance or an automatic debt-recovery engine.
-
-[Package definition](../clause-balance/types/clause.blue).
-
-
-**Declared or inherited actions:** `initialize`, `setTarget`, `reserve`, `settle`.
-
-
-#### Reserve and settle part of an obligation
-
-The standalone ledger sets a target of 1001, reserves 800 and rejects another reservation that would exceed the remainder.
-
-<!-- source:examples/payment-family/10-ledger.blue#/clauses/balance -->
-
-**Fragment** — [examples/payment-family/10-ledger.blue](../examples/payment-family/10-ledger.blue) · `/clauses/balance`
-
-```yaml
-type: Balance/Balance Clause
-parameters:
-  currency: EUR
-bindings:
-  setTarget:
-    setCommission:
-      'on': workflow
-      channel: seller
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /key
-        amountMinor:
-          $var:
-            name: trigger
-            path: /amountMinor
-  reserve:
-    reserve:
-      'on': workflow
-      channel: seller
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /key
-        amountMinor:
-          $var:
-            name: trigger
-            path: /amountMinor
-  settle:
-    settle:
-      'on': workflow
-      channel: guarantor
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /key
-```
-
-
-#### Correct commission after a customer refund
-
-The partnership links commission targets to the ledger and settles a separate payout. Later correction preserves the already paid amount.
-
-<!-- source:examples/payment-family/20-partnership.blue#/clauses/balance -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/clauses/balance`
-
-```yaml
-type: Balance/Balance Clause
-parameters:
-  currency: EUR
-bindings:
-  setTarget:
-    commissionChanged:
-      'on': event
-      event:
-        type: Commerce/Domain Event
-        kind: Commission Target Changed
-      params:
-        key: office-catering
-        amountMinor:
-          $document: /commissionTarget
-  reserve:
-    reservePayout:
-      'on': workflow
-      channel: seller
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /requestId
-        amountMinor:
-          $var:
-            name: trigger
-            path: /amountMinor
-      before:
-      - $failIf:
-          cond:
-            $and:
-            - $exists:
-                $document: /payout
-            - $ne:
-              - $document: /settlementKey
-              - $var:
-                  name: trigger
-                  path: /requestId
-          message: THIS_DEMO_HAS_ONE_PAYOUT_CLAUSE
-      after:
-      - $appendChange:
-          op: replace
-          path: /payoutAmount
-          val:
-            $var:
-              name: params
-              path: /amountMinor
-      - $appendChange:
-          op: replace
-          path: /settlementKey
-          val:
-            $var:
-              name: params
-              path: /key
-  settle:
-    payoutConfirmed:
-      'on': event
-      event:
-        type: Payment/Payment Event Received
-        clause: payout
-        kind: Payment Outcome
-        event:
-          action: capture
-          outcome: succeeded
-      when:
-        $eq:
-        - $document: /payout/payment/completed
-        - $document: /payoutAmount
-      params:
-        key:
-          $document: /settlementKey
-```
-
-
-<a id="clause-12"></a>
-
-
-### 6.12. `DocumentsV3/Document Factory Clause`
-
-Create independent child documents with a stable business key and a recorded creation intent. This is the richest current factory and the default choice for new commercial compositions.
-
-**Configure it:** Bind `template` and `collection`; allowlist business fields; explicitly inherit channels and pass `sourcePaths`. `identityChildren` identifies nested documents whose instance identity must belong to the new child. Repeated creation must match the recorded intent.
-
-**Boundary:** A template must be uninitialized. Copying an already running child is not a new instance. Shared references, per-instance children and inherited participant channels must be chosen deliberately.
-
-[Package definition](../clause-documents/types/factory.blue).
-
-
-**Declared or inherited actions:** `start`.
-
-
-#### Two separately payable design milestones
-
-Each created milestone has its own payment. Repeating one creation does not produce an extra PI.
-
-<!-- source:examples/clause-tutorial/13-design-milestones.blue#/clauses/periods -->
-
-**Fragment** — [examples/clause-tutorial/13-design-milestones.blue](../examples/clause-tutorial/13-design-milestones.blue) · `/clauses/periods`
-
-```yaml
-type: DocumentsV3/Document Factory Clause
-parameters:
-  allowedFields: []
-  inheritChannels:
-  - customer
-  - seller
-  - guarantor
-bindings:
-  template: /periodTemplate
-  collection: /periods
-  start:
-    openPeriod:
-      'on': workflow
-      channel: seller
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /period
-        fields: {}
-```
-
-
-#### A procurement agreement creates Orders
-
-The factory supplies identity to Orders and their delivery sources, while copying the approved participant channels.
-
-<!-- source:examples/payment-family/20-partnership.blue#/procurementTemplate/clauses/orders -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/procurementTemplate/clauses/orders`
-
-```yaml
-type: DocumentsV3/Document Factory Clause
-parameters:
-  allowedFields: []
-  inheritChannels:
-  - customer
-  - seller
-  - carrier
-  - guarantor
-  identityChildren:
-  - /delivery
-bindings:
-  template: /orderTemplate
-  collection: /orders
-  start:
-    placeOrder:
-      'on': workflow
-      channel: customer
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /orderId
-        fields: {}
-      before:
-      - $failIf:
-          cond:
-            $ne:
-            - $document: /activation/active
-            - true
-          message: PROCUREMENT_NOT_ACTIVE
-      - $failIf:
-          cond:
-            $ne:
-            - $document: /sources/referral/activation/active
-            - true
-          message: REFERRAL_NOT_ACTIVE
-      - $failIf:
-          cond:
-            $ne:
-            - $document: /lifecycle
-            - Active
-          message: PROCUREMENT_WINDING_DOWN
-```
-
-
-#### An outer agreement creates procurement
-
-The same mechanism operates a level higher and passes the explicitly shared relationship source.
-
-<!-- source:examples/payment-family/20-partnership.blue#/clauses/procurement -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/clauses/procurement`
-
-```yaml
-type: DocumentsV3/Document Factory Clause
-parameters:
-  allowedFields: []
-  inheritChannels:
-  - customer
-  - seller
-  - carrier
-  - guarantor
-  sourcePaths:
-    referral: ''
-bindings:
-  template: /procurementTemplate
-  collection: /procurements
-  start:
-    startProcurement:
-      'on': workflow
-      channel: seller
-      params:
-        key: office
-        fields: {}
-      before:
-      - $failIf:
-          cond:
-            $ne:
-            - $document: /activation/active
-            - true
-          message: REFERRAL_NOT_ACTIVE
-```
-
-
-<a id="clause-13"></a>
-
-
-### 6.13. `Commerce/Document Factory Clause`
-
-A smaller connected-action factory: copy an uninitialized template, apply allowlisted top-level fields, inherit explicit participant channels and embed the result.
-
-**Configure it:** `start` accepts `key` and `fields`. Bind `template` and `collection`. `allowedFields` contains top-level field names, not JSON Pointer paths. Inherited channels must be explicitly compatible.
-
-**Boundary:** Duplicate keys are rejected rather than treated as the richer idempotent creation-intent protocol. Prefer DocumentsV3 for payment graphs and durable retries. Keep this type documented for existing users.
-
-[Package definition](../clause-commerce/types/document-factory-clause.blue).
-
-
-**Declared or inherited actions:** `start`.
-
-
-#### Create an operational job
-
-The request supplies key a and message Send launch email; the job is a new embedded document.
-
-<!-- source:examples/clause-tutorial/10-connected-factories.blue#/clauses/jobs -->
-
-**Fragment** — [examples/clause-tutorial/10-connected-factories.blue](../examples/clause-tutorial/10-connected-factories.blue) · `/clauses/jobs`
-
-```yaml
-type: Commerce/Document Factory Clause
-parameters:
-  allowedFields:
-  - message
-  inheritChannels:
-  - owner
-bindings:
-  template: /jobTemplate
-  collection: /jobs
-  start:
-    newJob:
-      'on': workflow
-      channel: owner
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /key
-        fields:
-          message:
-            $var:
-              name: trigger
-              path: /message
-```
-
-
-#### Create a support case
-
-A second factory uses a separate collection and template. The case then invokes the created child's greeting operation.
-
-<!-- source:examples/clause-tutorial/10-connected-factories.blue#/clauses/cases -->
-
-**Fragment** — [examples/clause-tutorial/10-connected-factories.blue](../examples/clause-tutorial/10-connected-factories.blue) · `/clauses/cases`
-
-```yaml
-type: Commerce/Document Factory Clause
-parameters:
-  allowedFields:
-  - message
-  inheritChannels:
-  - owner
-bindings:
-  template: /caseTemplate
-  collection: /cases
-  start:
-    newCase:
-      'on': workflow
-      channel: owner
-      params:
-        key:
-          $var:
-            name: trigger
-            path: /key
-        fields:
-          message:
-            $var:
-              name: trigger
-              path: /message
-```
-
-
-<a id="clause-14"></a>
-
-
-### 6.14. `Clauses/Document Factory Clause`
-
-The original root-hook factory used by clause-enabled documents. It contributes an operation that starts a named child from a bound template.
-
-**Configure it:** Configure `operation`, `namePrefix` and `keyField`; bind `actor`, `template` and collection `context`. Additional argument mappings can constrain supported values. The child receives an instance key and start timestamp.
-
-**Boundary:** This is a different API from the connected factories. Duplicate/invalid business keys produce its documented business rejection behavior. Do not substitute its configuration into DocumentsV3 unchanged.
-
-[Package definition](../blue-clauses/types/document-factory-clause.blue).
-
-
-#### Start a work item
-
-A request creates a Task under `/tasks`. A listener observes greetings from that collection.
-
-<!-- source:examples/clause-tutorial/07-work-items.blue#/clauses/tasks -->
-
-**Fragment** — [examples/clause-tutorial/07-work-items.blue](../examples/clause-tutorial/07-work-items.blue) · `/clauses/tasks`
-
-```yaml
-type: Clauses/Document Factory Clause
-parameters:
-  operation: startTask
-  namePrefix: Task
-  keyField: itemId
-bindings:
-  actor: owner
-  template: /taskTemplate
-  context: /tasks
-```
-
-
-#### Start an appointment
-
-A separately configured operation writes to `/visits`, with its own listener and count.
-
-<!-- source:examples/clause-tutorial/07-work-items.blue#/clauses/visits -->
-
-**Fragment** — [examples/clause-tutorial/07-work-items.blue](../examples/clause-tutorial/07-work-items.blue) · `/clauses/visits`
-
-```yaml
-type: Clauses/Document Factory Clause
-parameters:
-  operation: startVisit
-  namePrefix: Visit
-  keyField: itemId
-bindings:
-  actor: owner
-  template: /visitTemplate
-  context: /visits
-```
-
-
-<a id="clause-15"></a>
-
-
-### 6.15. `Clauses/Collection Clause`
-
-Own an embedded collection and contribute an append operation plus observation counters. Useful for a controlled set of incoming child documents.
-
-**Configure it:** Specify the collection field, event family and operation; bind the actor. Submitted values are documents, not merely arbitrary array rows. The generated collection processing observes configured child events and changes.
-
-**Boundary:** This is not a query engine or a general schema validation policy for every submitted child. The host must still constrain what business documents it accepts.
-
-[Package definition](../blue-clauses/types/collection-clause.blue).
-
-
-#### Collect inspections
-
-The case appends an Inspection document and observes its update event.
-
-<!-- source:examples/clause-tutorial/09-collections.blue#/clauses/inspections -->
-
-**Fragment** — [examples/clause-tutorial/09-collections.blue](../examples/clause-tutorial/09-collections.blue) · `/clauses/inspections`
-
-```yaml
-type: Clauses/Collection Clause
-parameters:
-  field: inspections
-  family: Inspection
-  operation: addInspection
-bindings:
-  actor: owner
-```
-
-
-#### Collect receipts independently
-
-A Receipt family and a separate field keep the second collection's observations independent.
-
-<!-- source:examples/clause-tutorial/09-collections.blue#/clauses/receipts -->
-
-**Fragment** — [examples/clause-tutorial/09-collections.blue](../examples/clause-tutorial/09-collections.blue) · `/clauses/receipts`
-
-```yaml
-type: Clauses/Collection Clause
-parameters:
-  field: receipts
-  family: Receipt
-  operation: addReceipt
-bindings:
-  actor: owner
-```
-
-
-<a id="clause-16"></a>
-
-
-### 6.16. `Clauses/Listener Clause`
-
-Attach native workflow steps to selected embedded sources and optionally claim state for the listener. This remains useful for composition that predates the short connected-action interface.
-
-**Configure it:** `parameters.sources` describes source channels, `states` declares owned state and `steps` contains native Blue steps. Bind `context` to the embedded document or collection being observed. Use the supported steps form rather than mixing it with legacy `do`.
-
-**Boundary:** The listener is responsible for its declared context and event selection. It is not an account-wide event bus. Prefer a typed domain action with an `embedded` or `collection` connection when you already have that action.
-
-[Package definition](../blue-clauses/types/listener-clause.blue).
-
-
-#### Count greetings from work items
-
-A listener increments only `/tasksGreetings` when a child in `/tasks` emits Hello Said.
-
-<!-- source:examples/clause-tutorial/07-work-items.blue#/clauses/tasksWatch -->
-
-**Fragment** — [examples/clause-tutorial/07-work-items.blue](../examples/clause-tutorial/07-work-items.blue) · `/clauses/tasksWatch`
-
-```yaml
-type: Clauses/Listener Clause
-parameters:
-  sources:
-  - name: greeting
-    type: Contracts/Embedded Node Channel
-    event:
-      type: Connections/Hello Said
-  states:
-    count:
-      path: /tasksGreetings
-      kind: integer
-      initial: 0
-  steps:
-  - type: Contracts/Compute
-    do:
-    - $appendChange:
-        op: replace
-        path: /tasksGreetings
-        val:
-          $add:
-          - $document: /tasksGreetings
-          - 1
-bindings:
-  context: /tasks
-```
-
-
-#### Count greetings from appointments
-
-The same native steps target a separate state claim and collection. The walkthrough checks the counters separately.
-
-<!-- source:examples/clause-tutorial/07-work-items.blue#/clauses/visitsWatch -->
-
-**Fragment** — [examples/clause-tutorial/07-work-items.blue](../examples/clause-tutorial/07-work-items.blue) · `/clauses/visitsWatch`
-
-```yaml
-type: Clauses/Listener Clause
-parameters:
-  sources:
-  - name: greeting
-    type: Contracts/Embedded Node Channel
-    event:
-      type: Connections/Hello Said
-  states:
-    count:
-      path: /visitsGreetings
-      kind: integer
-      initial: 0
-  steps:
-  - type: Contracts/Compute
-    do:
-    - $appendChange:
-        op: replace
-        path: /visitsGreetings
-        val:
-          $add:
-          - $document: /visitsGreetings
-          - 1
-bindings:
-  context: /visits
-```
-
-
-<a id="clause-17"></a>
-
-
-### 6.17. `Clauses/Composable Clause`
-
-Package document-specific channels, handlers, embedding and state claims into one named feature without creating a new published domain type immediately.
-
-**Configure it:** `parameters.contracts` maps named contributions with a `kind` and native `contract`. `states` declares state and initial values; `reads` can declare dependencies. The host validates contribution ownership and compatibility.
-
-**Boundary:** This is an advanced building block. A page of low-level handlers is not automatically a clear business agreement. Once the pattern repeats, move it into a dedicated package with a smaller domain API.
-
-[Package definition](../blue-clauses/types/composable-clause.blue).
-
-
-#### Conversation feature
-
-One clause owns conversation text and contributes an operation plus a meaningful update event.
-
-<!-- source:examples/clause-tutorial/08-contributions.blue#/clauses/conversation -->
-
-**Fragment** — [examples/clause-tutorial/08-contributions.blue](../examples/clause-tutorial/08-contributions.blue) · `/clauses/conversation`
-
-```yaml
-type: Clauses/Composable Clause
-parameters:
-  states:
-    text:
-      path: /conversation
-      kind: text
-      initial: ''
-  contracts:
-    recordConversation:
-      kind: handler
-      contract:
-        type: Contracts/Sequential Workflow Operation
-        channel: owner
-        steps:
-        - type: Contracts/Compute
-          do:
-          - $appendChange:
-              op: replace
-              path: /conversation
-              val:
-                $binding: call/request/text
-          - $appendEvent:
-              kind: Conversation Updated
-              feature: recordConversation
-bindings: {}
-```
-
-
-#### Support notes feature
-
-A second feature owns another field and operation, proving they compose without sharing accidental state.
-
-<!-- source:examples/clause-tutorial/08-contributions.blue#/clauses/support -->
-
-**Fragment** — [examples/clause-tutorial/08-contributions.blue](../examples/clause-tutorial/08-contributions.blue) · `/clauses/support`
-
-```yaml
-type: Clauses/Composable Clause
-parameters:
-  states:
-    text:
-      path: /support
-      kind: text
-      initial: ''
-  contracts:
-    recordSupport:
-      kind: handler
-      contract:
-        type: Contracts/Sequential Workflow Operation
-        channel: owner
-        steps:
-        - type: Contracts/Compute
-          do:
-          - $appendChange:
-              op: replace
-              path: /support
-              val:
-                $binding: call/request/text
-          - $appendEvent:
-              kind: Conversation Updated
-              feature: recordSupport
-bindings: {}
-```
-
-
-#### A guarded business action
-
-A native access guard is the first step of an operation. The access test supplies real provider evidence.
-
-<!-- source:examples/clause-tutorial/15-access.template.blue#/clauses/action -->
-
-**Fragment** — [examples/clause-tutorial/15-access.template.blue](../examples/clause-tutorial/15-access.template.blue) · `/clauses/action`
-
-```yaml
-type: Clauses/Composable Clause
-parameters:
-  contracts:
-    bump:
-      kind: handler
-      contract:
-        type: Contracts/Sequential Workflow Operation
-        channel: alice
-        steps:
-        - type: AccessParticipants/Require Participant Access
-          constants:
-            clauseKey: participants
-        - type: Contracts/Compute
-          do:
-          - $appendChange:
-              op: replace
-              path: /count
-              val:
-                $add:
-                - $document: /count
-                - 1
-  states: {}
-  reads: []
-```
-
-
-<a id="clause-18"></a>
-
-
-### 6.18. `Participants/Participants Clause`
-
-Declare named participants and contribute their admitted channels to the host document. It validates the supported channel shapes and duplicate/conflicting configuration.
-
-**Configure it:** Each entry in `parameters.participants` supplies a `name` and `channel`. Current examples use local External Channels; authenticated bootstrap supplies real Timeline Channels.
-
-**Boundary:** The clause does not implement the full proposed Party/representative/mandate governance model, and it does not grant timeline read access. A descriptive participant name is not authentication.
-
-[Package definition](../clause-participants/types/participants-clause.blue).
-
-
-#### The account owner submits business input
-
-The owner channel is used by the conversation and support operations.
-
-<!-- source:examples/clause-tutorial/08-contributions.blue#/clauses/parties -->
-
-**Fragment** — [examples/clause-tutorial/08-contributions.blue](../examples/clause-tutorial/08-contributions.blue) · `/clauses/parties`
-
-```yaml
-type: Participants/Participants Clause
-parameters:
-  participants:
-    owner:
-      name: Account owner
-      channel:
-        type: Contracts/External Channel
-        event:
-          source: owner
-    reviewer:
-      name: Reviewer
-      channel:
-        type: Contracts/External Channel
-        event:
-          source: reviewer
-bindings: {}
-```
-
-
-#### A distinct reviewer channel
-
-The reviewer is a separate admitted input source. Merely declaring it does not authorize owner-only operations.
-
-<!-- source:examples/clause-tutorial/08-contributions.blue#/clauses/parties/parameters/participants/reviewer -->
-
-**Fragment** — [examples/clause-tutorial/08-contributions.blue](../examples/clause-tutorial/08-contributions.blue) · `/clauses/parties/parameters/participants/reviewer`
-
-```yaml
-name: Reviewer
-channel:
-  type: Contracts/External Channel
-  event:
-    source: reviewer
-```
-
-
-<a id="clause-19"></a>
-
-
-### 6.19. `AccessParticipants/Participants with Access Clause`
-
-Combine participant channel admission with current, embedded Timeline Access evidence. It tracks whether all configured required reader keys can obtain the relevant participant timelines.
-
-**Configure it:** Configure participants with a Timeline Channel and optional `readerKey`; list the embedded `accessPaths`; bind the status object. The provider identity, allowed timeline and required keys must match. Use Require Participant Access in protected workflows.
-
-**Boundary:** This is a concrete current-key check, not the future one-of-many-keys party policy. Transport unavailability and a missing grant both matter, but the native tutorial specifically exercises a visible revocation and restoration.
-
-[Package definition](../clause-participants-access/types/clause.blue).
-
-
-#### Admit an agreement with confirmed access
-
-The native fixture replaces empty placeholders with two real signed access documents and participant channels. The empty template alone is intentionally not runnable.
-
-<!-- source:examples/clause-tutorial/15-access.template.blue#/clauses/participants -->
-
-**Fragment** — [examples/clause-tutorial/15-access.template.blue](../examples/clause-tutorial/15-access.template.blue) · `/clauses/participants`
-
-```yaml
-type: AccessParticipants/Participants with Access Clause
-parameters:
-  participants: {}
-  accessPaths:
-  - /timelineAccess/alice
-  - /timelineAccess/bob
-bindings:
-  state: /accessStatus
-```
-
-
-#### Block and resume a protected operation
-
-The case first increments count, revokes Bob's key and observes rejection, then restores the grant and successfully increments again.
-
-<!-- source:examples/clause-tutorial/15-access.template.blue#/clauses/action/parameters/contracts/bump -->
-
-**Fragment** — [examples/clause-tutorial/15-access.template.blue](../examples/clause-tutorial/15-access.template.blue) · `/clauses/action/parameters/contracts/bump`
-
-```yaml
-kind: handler
-contract:
-  type: Contracts/Sequential Workflow Operation
-  channel: alice
-  steps:
-  - type: AccessParticipants/Require Participant Access
-    constants:
-      clauseKey: participants
-  - type: Contracts/Compute
-    do:
-    - $appendChange:
-        op: replace
-        path: /count
-        val:
-          $add:
-          - $document: /count
-          - 1
-```
-
-
-<a id="clause-20"></a>
-
-
-### 6.20. `Payment/Payment Clause`
-
-The general bridge between a business host and an explicit Payment Instruction template. It creates one PI, embeds it and relays its typed events with the host clause context.
-
-**Configure it:** Bind `template` and `instruction`; connect `initPayment`. `hostSource` gives the PI an identified reference back to the host; `sourcePaths` supplies other sources. `observe` provides event relay. Use the explicit template when the standard preset is too restrictive.
-
-**Boundary:** Financial commands belong to the PI lifecycle. Moving arbitrary host code into PI would change its document context; this clause instead uses explicit template and source configuration.
-
-[Package definition](../clause-payment/types/payment-clause.blue).
-
-
-**Declared or inherited actions:** `initPayment`, `observe`.
-
-
-#### Start a custom service payment
-
-A seller operation starts the PI. It observes both the Order and the independent delivery source.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/clauses/payment`
-
-```yaml
-type: Payment/Payment Clause
-parameters:
-  hostSource: order
-  sourcePaths:
-    delivery: /delivery
-  amountPath: /amountMinor
-bindings:
-  template: /paymentTemplate
-  instruction: /payment
-  initPayment:
-    startPayment:
-      'on': workflow
-      channel: seller
-```
-
-
-#### React correctly when a capture finishes late
-
-The same bridge works with an auto-capture policy. The compensation walkthrough verifies that a late success after failure is followed by a refund request.
-
-<!-- source:examples/payment-family/03-compensation.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/03-compensation.blue](../examples/payment-family/03-compensation.blue) · `/clauses/payment`
-
-```yaml
-type: Payment/Payment Clause
-parameters:
-  hostSource: order
-  sourcePaths:
-    delivery: /delivery
-  amountPath: /amountMinor
-bindings:
-  template: /paymentTemplate
-  instruction: /payment
-  initPayment:
-    startPayment:
-      'on': workflow
-      channel: seller
-```
-
-
-#### Add local request hooks
-
-The custom-hooks scenario extends the explicit PI rather than adding a second conflicting payment engine to the host.
-
-<!-- source:examples/payment-family/11-custom-hooks.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/11-custom-hooks.blue](../examples/payment-family/11-custom-hooks.blue) · `/clauses/payment`
-
-```yaml
-type: Payment/Payment Clause
-parameters:
-  hostSource: order
-  sourcePaths:
-    delivery: /delivery
-  amountPath: /amountMinor
-bindings:
-  template: /paymentTemplate
-  instruction: /payment
-  initPayment:
-    startPayment:
-      'on': workflow
-      channel: seller
-```
-
-
-<a id="clause-21"></a>
-
-
-### 6.21. `Payment/Conditional Payment`
-
-A compact, provider-neutral payment preset for common “pay when these conditions hold” processes. It builds the PI lifecycle and conditional policy for you.
-
-**Configure it:** The product or explicit amount supplies payment terms. `requireAll` names independent prerequisites; each can expose an operation or observe configured evidence. `releaseAfter` controls the waiting window. Sources and host inclusion are explicit.
-
-**Boundary:** Several requireAll entries are conjunctions, not alternative trigger routes. All named requirements must hold. The preset still needs an external operator to accept, initiate and confirm financial execution.
-
-[Package definition](../clause-payment/types/conditional-payment.blue).
-
-
-**Declared or inherited actions:** `start`, `observe`.
-
-
-#### An English lesson confirmed by its customer
-
-The condition operation lives in the PI, and its after hook emits Satisfaction Audit. Repeating satisfaction does not repeat the accepted action.
-
-<!-- source:examples/clause-tutorial/12-english-lesson.blue#/clauses/payment -->
-
-**Fragment** — [examples/clause-tutorial/12-english-lesson.blue](../examples/clause-tutorial/12-english-lesson.blue) · `/clauses/payment`
-
-```yaml
-type: Payment/Conditional Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-```
-
-
-#### A separate payment for each design milestone
-
-The same preset sits inside a generated child template; each milestone obtains independent conditions and financial state.
-
-<!-- source:examples/clause-tutorial/13-design-milestones.blue#/periodTemplate/clauses/payment -->
-
-**Fragment** — [examples/clause-tutorial/13-design-milestones.blue](../examples/clause-tutorial/13-design-milestones.blue) · `/periodTemplate/clauses/payment`
-
-```yaml
-type: Payment/Conditional Payment
-parameters:
-  requireAll:
-    acceptPeriod:
-      'on': workflow
-      channel: customer
-```
-
-
-#### Observe a shared property source
-
-The payment explicitly includes evidence and reads its state, rather than assuming every parent field is visible in the PI.
-
-<!-- source:examples/payment-family/06-smart-property.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/06-smart-property.blue](../examples/payment-family/06-smart-property.blue) · `/clauses/payment`
-
-```yaml
-type: Payment/Conditional Payment
-parameters:
-  autoStart: false
-  sources:
-    property: /property
-  requireAll:
-    checkIn:
-      observe:
-        source: property
-        path: /status
-        equals: Delivered
-    customerAcceptance:
-      'on': workflow
-      channel: customer
-  releaseAfter:
-    days: 2
-bindings:
-  start:
-    startPayment:
-      'on': workflow
-      channel: seller
-```
-
-
-<a id="clause-22"></a>
-
-
-### 6.22. `PaymentInstruction/Payment Lifecycle Clause`
-
-Own the financial state machine in an explicit PI: acceptance, initialization, authorization/reservation, capture, refund, release and outcome reconciliation. This is where mandatory financial checks belong.
-
-**Configure it:** Configure currency, amount and limit, payer/payee/guarantor channels, allowed payees, recipient approval and any capture gate. Map the needed actions to channels. Commands carry stable request IDs and amounts; confirmations carry the corresponding ID and outcome.
-
-**Boundary:** Exposing a custom capture workflow does not bypass the capture gate or available balance. Recipient assignment, transaction details, final amounts and locks use explicit request/guarantor-decision exchanges. See [the complete protocol](payment-protocol.md) and its executable scenarios.
-
-[Package definition](../payment-instruction/types/payment-lifecycle-clause.blue).
-
-
-**Declared or inherited actions:** `initialize`, `approveRecipient`, `requestSecure`, `requestCapture`, `requestRefund`, `requestVoid`, `acceptPaymentInstruction`, `rejectPaymentInstruction`, `recordTransactionInitiated`, `requestSecureFunds`, `requestCompletePayment`, `requestCancelBeforeCompletion`, `requestReverseAfterCompletion`, `secureFunds`, `declineSecureFunds`, `failSecureFunds`, `recordFundsSecuringUnknown`, `completePayment`, `declineCompletePayment`, `failCompletePayment`, `recordPaymentCompletionUnknown`, `cancelBeforeCompletion`, `declineCancelBeforeCompletion`, `failCancelBeforeCompletion`, `recordPaymentCancellationUnknown`, `reverseAfterCompletion`, `declineReverseAfterCompletion`, `failReverseAfterCompletion`, `recordPaymentReversalUnknown`, `requestPayeeAssignment`, `confirmPayeeAssignment`, `rejectPayeeAssignment`, `requestTransactionDetailsUpdate`, `confirmTransactionDetailsUpdated`, `rejectTransactionDetailsUpdate`, `failTransactionDetailsUpdate`, `requestFinalAmountResolution`, `resolveFinalAmount`, `rejectFinalAmountResolution`, `requestPaymentCompletionLock`, `lockPaymentCompletion`, `failPaymentCompletionLockChange`, `requestPaymentCompletionUnlock`, `unlockPaymentCompletion`, `requestPaymentReversalLock`, `lockPaymentReversal`, `failPaymentReversalLockChange`, `requestPaymentReversalUnlock`, `unlockPaymentReversal`, `requestTransactionDetailsUpdateLock`, `lockTransactionDetailsUpdate`, `failTransactionDetailsUpdateLockChange`, `requestTransactionDetailsUpdateUnlock`, `unlockTransactionDetailsUpdate`, `recordTransactionInitiationFailed`.
-
-
-#### A customer requests a partial capture
-
-The request maps both requestId and amountMinor. The surrounding lifecycle parameters still enforce policy.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/paymentTemplate/clauses/payment/bindings/requestCapture -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/paymentTemplate/clauses/payment/bindings/requestCapture`
-
-```yaml
-capture:
-  'on': workflow
-  channel: customer
-  params:
-    requestId:
-      $var:
-        name: trigger
-        path: /requestId
-    amountMinor:
-      $var:
-        name: trigger
-        path: /amountMinor
-```
-
-
-#### The recipient requests a refund
-
-Refund authority and amount checks belong to the instruction, not a parent-side money mutation.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/paymentTemplate/clauses/payment/bindings/requestRefund -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/paymentTemplate/clauses/payment/bindings/requestRefund`
-
-```yaml
-refund:
-  'on': workflow
-  channel: seller
-  params:
-    requestId:
-      $var:
-        name: trigger
-        path: /requestId
-    amountMinor:
-      $var:
-        name: trigger
-        path: /amountMinor
-```
-
-
-#### Confirm an external outcome
-
-The operator reports a result for the exact request. The walkthrough includes unknown and duplicate handling, rather than treating submission as success.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/paymentTemplate/clauses/payment/bindings/completePayment -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/paymentTemplate/clauses/payment/bindings/completePayment`
-
-```yaml
-completePayment:
-  'on': workflow
-  channel: guarantor
-  params:
-    $object:
-      $var: trigger
-```
-
-
-<a id="clause-23"></a>
-
-
-### 6.23. `PaymentInstruction/Conditional Policy`
-
-Track service prerequisites and choose the next financial request. The policy separates “may collect?” from the ledger that records requests and confirmations.
-
-**Configure it:** `record` updates a named fact; `fail` records service failure; `advance` reacts to lifecycle events; `retry` handles a permitted retry. It uses the configured required facts, capture gate and waiting window.
-
-**Boundary:** Pre-existing state requires an initial observation. Listening only for future events would miss evidence that became true before PI creation. A retry must identify an eligible definitive failure; unknown results require reconciliation.
-
-[Package definition](../payment-instruction/types/conditional-policy.blue).
-
-
-**Declared or inherited actions:** `initialize`, `record`, `fail`, `advance`, `retry`.
-
-
-#### Observe evidence at initialization and later
-
-Paired initialized/embedded connections catch both already-delivered and subsequently delivered evidence.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/paymentTemplate/clauses/decision/bindings/record -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/paymentTemplate/clauses/decision/bindings/record`
-
-```yaml
-deliveredInitial:
-  'on': initialized
-  once: true
-  params:
-    fact: delivered
-    confirmed:
-      $eq:
-      - $document: /sources/delivery/status
-      - Delivered
-deliveredChanged:
-  'on': embedded
-  path: /sources/delivery
-  params:
-    fact: delivered
-    confirmed:
-      $eq:
-      - $document: /sources/delivery/status
-      - Delivered
-acceptedInitial:
-  'on': initialized
-  once: true
-  params:
-    fact: accepted
-    confirmed:
-      $eq:
-      - $document: /sources/order/acceptance
-      - Accepted
-acceptedChanged:
-  'on': embedded
-  path: /sources/order
-  params:
-    fact: accepted
-    confirmed:
-      $eq:
-      - $document: /sources/order/acceptance
-      - Accepted
-```
-
-
-#### Fail only on the intended business reason
-
-The event pattern selects Order Failed with reason abc. An unrelated reason must not trigger compensation.
-
-<!-- source:examples/payment-family/03-compensation.blue#/paymentTemplate/clauses/decision/bindings/fail -->
-
-**Fragment** — [examples/payment-family/03-compensation.blue](../examples/payment-family/03-compensation.blue) · `/paymentTemplate/clauses/decision/bindings/fail`
-
-```yaml
-failedOrder:
-  'on': embedded
-  path: /sources/order
-  event:
-    type: Commerce/Domain Event
-    kind: Order Failed
-    reason: abc
-```
-
-
-#### A controlled retry operation
-
-The retry-entitlements walkthrough tests that definitive failed work permits one new attempt and unresolved work does not.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/paymentTemplate/clauses/decision/bindings/retry -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/paymentTemplate/clauses/decision/bindings/retry`
-
-```yaml
-retryPayment:
-  'on': workflow
-  channel: guarantor
-  params:
-    requestId:
-      $var:
-        name: trigger
-        path: /requestId
-```
-
-
-<a id="clause-24"></a>
-
-
-### 6.24. `MyOS/MyOS Customer Payment`
-
-A customer-facing payment protocol with a session/funding handshake before financial initiation. The intended recipient is a declared MyOS party/account.
-
-**Configure it:** Supply `recipient` as a supported party locator or account ID, plus the normal amount, currency and conditions. The preset installs the common PI lifecycle, policy, customer session helper and MyOS-specific event vocabulary.
-
-**Boundary:** It does not itself render a payment page or run a live provider. `confirmFunding` is an operator assertion that the funding interaction is ready, not confirmation of captured money.
-
-[Package definition](../myos/types/customer-payment.blue).
-
-
-**Declared or inherited actions:** `start`, `observe`.
-
-
-#### Recipient located by account ID
-
-The example requires session provisioning and matching funding confirmation before initiation.
-
-<!-- source:examples/payment-family/15-myos-customer.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/15-myos-customer.blue](../examples/payment-family/15-myos-customer.blue) · `/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Customer Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-  recipient: bob
-```
-
-
-#### Recipient supplied as a Party
-
-The locator resolves to the canonical declared party. Arbitrary replacement metadata in an input locator does not redefine that party.
-
-<!-- source:examples/payment-family/17-myos-party.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/17-myos-party.blue](../examples/payment-family/17-myos-party.blue) · `/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Customer Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-  recipient:
-    type: MyOS/MyOS Party
-    partyId: bob
-    displayName: Bob
-    myosAccountId: bob
-```
-
-
-#### Customer payments inside generated Orders
-
-The larger partnership reuses this protocol in each Order.
-
-<!-- source:examples/payment-family/20-partnership.blue#/procurementTemplate/orderTemplate/clauses/payment -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/procurementTemplate/orderTemplate/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Customer Payment
-parameters:
-  recipient: bob
-  amountPath: /amountMinor
-  currency: EUR
-  autoStart: false
-  includeOrder: true
-  sources:
-    delivery: /delivery
-  requireAll:
-    delivered:
-      observe:
-        source: delivery
-        path: /status
-        equals: Delivered
-    accepted:
-      observe:
-        source: order
-        path: /acceptance
-        equals: Accepted
-  failWhen:
-    orderFailed:
-      'on': embedded
-      path: /sources/order
-      event:
-        type: Commerce/Domain Event
-        kind: Order Failed
-        reason: abc
-bindings:
-  start:
-    startPayment:
-      'on': workflow
-      channel: seller
-```
-
-
-<a id="clause-25"></a>
-
-
-### 6.25. `MyOS/MyOS Account to Account Payment`
-
-A payment between two declared MyOS accounts without the customer-session phase. It is suitable for a payout, commission or payment between participating businesses.
-
-**Configure it:** Resolve both `payer` and `recipient` to declared parties/channels. Either supported party objects or direct account IDs may be used. Conditions and financial confirmations remain explicit.
-
-**Boundary:** The accounts must be distinct and unambiguous. A real executor must enforce account authorization and balances; the document protocol does not own a bank ledger.
-
-[Package definition](../myos/types/account-payment.blue).
-
-
-**Declared or inherited actions:** `start`, `observe`.
-
-
-#### A direct account transfer
-
-The example mixes locator forms and waits for customer satisfaction before capture.
-
-<!-- source:examples/payment-family/16-myos-account.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/16-myos-account.blue](../examples/payment-family/16-myos-account.blue) · `/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Account to Account Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-  recipient:
-    type: MyOS/MyOS Party
-    partyId: bob
-    displayName: Bob
-    myosAccountId: bob
-  payer: alice
-```
-
-
-#### A separate commission payout
-
-The payout is a different PI from the customer's payment; its confirmed outcome settles the commission obligation.
-
-<!-- source:examples/payment-family/20-partnership.blue#/clauses/payout -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/clauses/payout`
-
-```yaml
-type: MyOS/MyOS Account to Account Payment
-parameters:
-  payer:
-    type: MyOS/MyOS Party
-    partyId: bob
-    displayName: Bob
-    myosAccountId: bob
-  recipient: celine
-  amountPath: /payoutAmount
-  currency: EUR
-  autoStart: false
-  recipientApprovalRequired: true
-  requireAll:
-    payoutAuthorized:
-      'on': workflow
-      channel: seller
-bindings:
-  instruction: /payout
-  start:
-    createPayout:
-      'on': event
-      event:
-        type: Commerce/Domain Event
-        kind: Settlement Reserved
-```
-
-
-#### Frozen party snapshot
-
-Changing a parent party label afterward does not rewrite the already created PI.
-
-<!-- source:examples/payment-family/22-frozen-parties.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/22-frozen-parties.blue](../examples/payment-family/22-frozen-parties.blue) · `/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Account to Account Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-  recipient:
-    type: MyOS/MyOS Party
-    partyId: bob
-    displayName: Bob
-    myosAccountId: bob
-  payer: alice
-```
-
-
-<a id="clause-26"></a>
-
-
-### 6.26. `ACME/ACME Bank Payment`
-
-An illustrative bank-confirmed method in the same payment family. It changes method-specific setup and outgoing event vocabulary while reusing the common lifecycle.
-
-**Configure it:** Use the normal amount, currency and conditional-payment configuration. The nominated guarantor/bank channel accepts, initiates and confirms outcomes. The PI includes `ACME/Bank Method Events`.
-
-**Boundary:** ACME is an abstract example provider, not a live bank integration or a claim about any bank's payment guarantees.
-
-[Package definition](../acme-bank/types/payment.blue).
-
-
-**Declared or inherited actions:** `start`, `observe`.
-
-
-#### A bank-confirmed service payment
-
-A customer condition unlocks capture after bank authorization confirmation.
-
-<!-- source:examples/payment-family/18-acme-bank.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/18-acme-bank.blue](../examples/payment-family/18-acme-bank.blue) · `/clauses/payment`
-
-```yaml
-type: ACME/ACME Bank Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-```
-
-
-#### A bank-confirmed project milestone
-
-A different amount and `approveMilestone` operation reuse the same payment process.
-
-<!-- source:examples/clause-tutorial/17-acme-milestone.blue#/clauses/payment -->
-
-**Fragment** — [examples/clause-tutorial/17-acme-milestone.blue](../examples/clause-tutorial/17-acme-milestone.blue) · `/clauses/payment`
-
-```yaml
-type: ACME/ACME Bank Payment
-parameters:
-  requireAll:
-    approveMilestone:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-```
-
-
-<a id="clause-27"></a>
-
-
-### 6.27. `ManualPayments/Manual Bank Payment`
-
-A simpler transfer process based on participant reports: the payer reports sending money, and the recipient confirms receipt. It intentionally does not manufacture card-style authorization.
-
-**Configure it:** Configure amount and currency, and optionally the payer/recipient channel names. The host starts and observes a Manual Payment Instruction whose Manual Transfer Policy owns the process.
-
-**Boundary:** These are accountable participant assertions, not independent bank proof. The current profile supports a full refund process; partial manual refunds and disputes are outside this preset.
-
-[Package definition](../manual-payments/types/payment.blue).
-
-
-**Declared or inherited actions:** `start`, `observe`.
-
-
-#### A small invoice
-
-The 2500-minor-unit invoice is paid only after recipient confirmation.
-
-<!-- source:examples/payment-family/19-manual-bank.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/19-manual-bank.blue](../examples/payment-family/19-manual-bank.blue) · `/clauses/payment`
-
-```yaml
-type: ManualPayments/Manual Bank Payment
-parameters:
-  amountMinor: 2500
-  currency: EUR
-```
-
-
-#### A consulting invoice
-
-The same protocol handles 5000 minor units and runs the refund confirmation path.
-
-<!-- source:examples/clause-tutorial/16-manual-consulting.blue#/clauses/payment -->
-
-**Fragment** — [examples/clause-tutorial/16-manual-consulting.blue](../examples/clause-tutorial/16-manual-consulting.blue) · `/clauses/payment`
-
-```yaml
-type: ManualPayments/Manual Bank Payment
-parameters:
-  amountMinor: 5000
-  currency: EUR
-```
-
-
-<a id="clause-28"></a>
-
-
-### 6.28. `MyOS/Customer Session Clause`
-
-An internal PI feature that records the operator-provided customer session and its funding readiness. It gives MyOS Customer Payment its method-specific initialization sequence.
-
-**Configure it:** `initialize` is automatic. `provideSession` and `confirmFunding` are mapped to the operator by the preset. Confirmation must refer to the supplied session ID.
-
-**Boundary:** Application authors normally use MyOS Customer Payment rather than installing this helper manually. A session reference is not proof that money was captured.
-
-[Package definition](../myos/types/customer-session-clause.blue).
-
-
-**Declared or inherited actions:** `initialize`, `provideSession`, `confirmFunding`.
-
-
-#### Provision a session
-
-The operator provides the stable session reference for the customer flow.
-
-<!-- source:examples/payment-family/15-myos-customer.case.yaml#/steps/4 -->
-
-**Walkthrough input** — [examples/payment-family/15-myos-customer.case.yaml](../examples/payment-family/15-myos-customer.case.yaml) · `/steps/4`
-
-```yaml
-target: /payment
-channel: guarantor
-operation: provideSession
-request:
-  sessionId: test-session
-events:
-- kind: Customer Payment Session Ready
-  event:
-    sessionId: test-session
-```
-
-
-#### Confirm readiness of the same session
-
-The case checks a mismatched session is rejected and matching readiness permits the next stage.
-
-<!-- source:examples/payment-family/15-myos-customer.case.yaml#/steps/6 -->
-
-**Walkthrough input** — [examples/payment-family/15-myos-customer.case.yaml](../examples/payment-family/15-myos-customer.case.yaml) · `/steps/6`
-
-```yaml
-target: /payment
-channel: guarantor
-operation: confirmFunding
-request:
-  sessionId: test-session
-events:
-- kind: Customer Funding Confirmed
-  event:
-    sessionId: test-session
-```
-
-
-<a id="clause-29"></a>
-
-
-### 6.29. `MyOS/Payment Method Events`
-
-An internal adapter-facing vocabulary layer. It announces a MyOS payment instruction/session requirement and converts lifecycle requests into MyOS execution-request events.
-
-**Configure it:** `announce` runs at initialization; `request` reacts to the common payment-request event. Method configuration distinguishes customer payments from account payments.
-
-**Boundary:** It emits requests; it is not an executor. A consumer should correlate the instruction and request ID and must not execute every replayed event as a new payment.
-
-[Package definition](../myos/types/method-events.blue).
-
-
-**Declared or inherited actions:** `announce`, `request`.
-
-
-#### Customer-session setup
-
-The customer preset installs the helper and requests the session stage.
-
-<!-- source:examples/payment-family/15-myos-customer.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/15-myos-customer.blue](../examples/payment-family/15-myos-customer.blue) · `/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Customer Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-  recipient: bob
-```
-
-
-#### Account-payment setup
-
-The account preset announces an account instruction without a customer session, then emits execution requests when its lifecycle advances.
-
-<!-- source:examples/payment-family/16-myos-account.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/16-myos-account.blue](../examples/payment-family/16-myos-account.blue) · `/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Account to Account Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-  recipient:
-    type: MyOS/MyOS Party
-    partyId: bob
-    displayName: Bob
-    myosAccountId: bob
-  payer: alice
-```
-
-
-<a id="clause-30"></a>
-
-
-### 6.30. `ACME/Bank Method Events`
-
-The corresponding internal vocabulary layer for the illustrative bank method. It keeps provider-specific outgoing requests out of the generic financial state machine.
-
-**Configure it:** `announce` publishes bank instruction creation; `request` relays eligible lifecycle requests in the bank event form. The ACME preset installs it.
-
-**Boundary:** No HTTP call occurs while these steps replay. The external bank adapter and its reconciliation store are a separate responsibility.
-
-[Package definition](../acme-bank/types/events.blue).
-
-
-**Declared or inherited actions:** `announce`, `request`.
-
-
-#### Announce a service instruction
-
-Starting this preset installs bank-specific event behavior.
-
-<!-- source:examples/payment-family/18-acme-bank.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/18-acme-bank.blue](../examples/payment-family/18-acme-bank.blue) · `/clauses/payment`
-
-```yaml
-type: ACME/ACME Bank Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-```
-
-
-#### Request execution for a milestone
-
-The milestone walkthrough accepts and initiates the instruction, then confirms authorization and capture separately.
-
-<!-- source:examples/clause-tutorial/17-acme-milestone.blue#/clauses/payment -->
-
-**Fragment** — [examples/clause-tutorial/17-acme-milestone.blue](../examples/clause-tutorial/17-acme-milestone.blue) · `/clauses/payment`
-
-```yaml
-type: ACME/ACME Bank Payment
-parameters:
-  requireAll:
-    approveMilestone:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-```
-
-
-<a id="clause-31"></a>
-
-
-### 6.31. `ManualPayments/Manual Transfer Policy`
-
-The process inside a Manual Payment Instruction: accept, reportTransfer, confirmReceipt, requestRefund and confirmRefund. It distinguishes a claimed transfer from acknowledged receipt.
-
-**Configure it:** Transfer and refund reports use stable references. The preset supplies payer and recipient authority. Repeating a matching report is harmless; conflicting replacement is rejected.
-
-**Boundary:** An automatic recipient-side bank reconciliation feature would be a different adapter/profile. This policy records what the admitted participants assert.
-
-[Package definition](../manual-payments/types/policy.blue).
-
-
-**Declared or inherited actions:** `initialize`, `accept`, `reportTransfer`, `confirmReceipt`, `requestRefund`, `confirmRefund`.
-
-
-#### Report sending a payment
-
-The payer report begins the receipt-confirmation path; it is not yet Paid.
-
-<!-- source:examples/payment-family/19-manual-bank.case.yaml#/steps/2 -->
-
-**Walkthrough input** — [examples/payment-family/19-manual-bank.case.yaml](../examples/payment-family/19-manual-bank.case.yaml) · `/steps/2`
-
-```yaml
-target: /payment
-operation: reportTransfer
-channel: customer
-request:
-  reference: invoice-001
-```
-
-
-#### Confirm receiving it
-
-The recipient confirms the matching transfer and the PI becomes paid.
-
-<!-- source:examples/payment-family/19-manual-bank.case.yaml#/steps/5 -->
-
-**Walkthrough input** — [examples/payment-family/19-manual-bank.case.yaml](../examples/payment-family/19-manual-bank.case.yaml) · `/steps/5`
-
-```yaml
-target: /payment
-operation: confirmReceipt
-channel: seller
-expect:
-  /payment/manual/captured: 2500
-  /payment/manual/status: Paid
-```
-
-
-#### Confirm receiving a refund
-
-The original payer acknowledges the refund, closing that separate process.
-
-<!-- source:examples/payment-family/19-manual-bank.case.yaml#/steps/8 -->
-
-**Walkthrough input** — [examples/payment-family/19-manual-bank.case.yaml](../examples/payment-family/19-manual-bank.case.yaml) · `/steps/8`
-
-```yaml
-target: /payment
-operation: confirmRefund
-channel: customer
-expect:
-  /payment/manual/refunded: 2500
-  /payment/manual/status: Refunded
-restore: true
-```
-
-
-<a id="clause-32"></a>
-
-
-### 6.32. `Referrals/Order Summary Clause`
-
-Project the business result of an Order from confirmed financial amounts, delivery and acceptance. Other agreements can observe a compact, meaningful result.
-
-**Configure it:** `update` reads the current fixed Order schema and emits meaningful changes. Connect it to relayed payment events, acceptance changes and delivery-source updates.
-
-**Boundary:** This is currently a schema-specific projection, not a generic expression-based reporting clause. Partial capture alone does not satisfy complete payment.
-
-[Package definition](../clause-referrals/types/order-summary.blue).
-
-
-**Declared or inherited actions:** `update`.
-
-
-#### Summarize an individually authored service Order
-
-A payment result or delivery/acceptance change refreshes the Order summary.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/clauses/summary -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/clauses/summary`
-
-```yaml
-type: Referrals/Order Summary Clause
-bindings:
-  update:
-    paymentChanged:
-      'on': event
-      event:
-        type: Payment/Payment Event Received
-    acceptanceChanged:
-      'on': event
-      event:
-        type: Commerce/Domain Event
-        kind: Acceptance Accepted
-    deliveryChanged:
-      'on': embedded
-      path: /delivery
-```
-
-
-#### Summarize each generated Order
-
-The same projection becomes a reusable child feature of procurement.
-
-<!-- source:examples/payment-family/20-partnership.blue#/procurementTemplate/orderTemplate/clauses/summary -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/procurementTemplate/orderTemplate/clauses/summary`
-
-```yaml
-type: Referrals/Order Summary Clause
-bindings:
-  update:
-    paymentChanged:
-      'on': event
-      event:
-        type: Payment/Payment Event Received
-    acceptanceChanged:
-      'on': event
-      event:
-        type: Commerce/Domain Event
-        kind: Acceptance Accepted
-    deliveryChanged:
-      'on': embedded
-      path: /delivery
-```
-
-
-<a id="clause-33"></a>
-
-
-### 6.33. `Referrals/Procurement Summary Clause`
-
-Aggregate the current Order collection into procurement-level results such as net collected amount and Order count. It makes child results usable by an outer agreement.
-
-**Configure it:** `update` operates on the current procurement schema, including `/orders`, `/netCollected` and `/orderCount`. Connect it to relevant collection changes/events.
-
-**Boundary:** It is schema-specific. The older smart-property example uses this type only as a disabled embedding convenience (`when: false`); that is not a recommended aggregation pattern and is not counted as a functional example here.
-
-[Package definition](../clause-referrals/types/procurement-summary.blue).
-
-
-**Declared or inherited actions:** `update`.
-
-
-#### Aggregate a newly created procurement graph
-
-The two generated Orders contribute to a shared procurement summary.
-
-<!-- source:examples/payment-family/20-partnership.blue#/procurementTemplate/clauses/summary -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/procurementTemplate/clauses/summary`
-
-```yaml
-type: Referrals/Procurement Summary Clause
-bindings:
-  update:
-    orderChanged:
-      'on': collection
-      path: /orders
-    referralChanged:
-      'on': embedded
-      path: /sources/referral
-```
-
-
-#### Recompute after a refund
-
-The final compensation confirmation reduces net collection; the outer commission subsequently returns to zero.
-
-<!-- source:examples/payment-family/20-partnership.case.yaml#/steps/26 -->
-
-**Walkthrough input** — [examples/payment-family/20-partnership.case.yaml](../examples/payment-family/20-partnership.case.yaml) · `/steps/26`
-
-```yaml
-operation: reverseAfterCompletion
-channel: guarantor
-target: /procurements/office/orders/lunch-001/payment
-request:
-  requestId: compensate-10000-0-0
-expect:
-  /commissionTarget: 0
-  /balance/accrued: 0
-  /balance/paid: 1000
-  /procurements/office/orders/lunch-001/financial/net: 0
-```
-
-
-<a id="clause-34"></a>
-
-
-### 6.34. `Referrals/Commission Clause`
-
-Calculate an earned commission target from the configured rate and confirmed net results of referenced agreements. It keeps accrual separate from actual payout.
-
-**Configure it:** Bind `agreements` and `rate`; connect `update`. The current projection follows the provided procurement/Order schema and exact basis-point arithmetic, then emits Commission Target Changed.
-
-**Boundary:** The clause does not itself pay anyone. Connect the target to Balance and use a separate PI for payout. A customer refund after payout can create an overpaid obligation requiring further business handling.
-
-[Package definition](../clause-referrals/types/commission.blue).
-
-
-**Declared or inherited actions:** `update`.
-
-
-#### Earn commission from confirmed results
-
-The partnership's current net amount drives the commission target and its balance contribution.
-
-<!-- source:examples/payment-family/20-partnership.blue#/clauses/commission -->
-
-**Fragment** — [examples/payment-family/20-partnership.blue](../examples/payment-family/20-partnership.blue) · `/clauses/commission`
-
-```yaml
-type: Referrals/Commission Clause
-bindings:
-  agreements: /procurements
-  rate: /terms/commissionBps
-  update:
-    procurementChanged:
-      'on': collection
-      path: /procurements
-```
-
-
-#### Correct earned commission without erasing a payout
-
-After the refund, accrued returns to zero while the already confirmed paid amount remains 1000.
-
-<!-- source:examples/payment-family/20-partnership.case.yaml#/steps/26 -->
-
-**Walkthrough input** — [examples/payment-family/20-partnership.case.yaml](../examples/payment-family/20-partnership.case.yaml) · `/steps/26`
-
-```yaml
-operation: reverseAfterCompletion
-channel: guarantor
-target: /procurements/office/orders/lunch-001/payment
-request:
-  requestId: compensate-10000-0-0
-expect:
-  /commissionTarget: 0
-  /balance/accrued: 0
-  /balance/paid: 1000
-  /procurements/office/orders/lunch-001/financial/net: 0
-```
-
-
-<a id="clause-35"></a>
-
-
-### 6.35. `Schedule/Schedule Clause`
-
-Emit a named schedule event through the shared connection mechanism. This is a domain-facing scheduled notification/action marker, while the timer connection supplies timing.
-
-**Configure it:** Connect `fire`, configure the schedule key and bind or map the supported values shown in the examples. The resulting event identifies the schedule so other clauses can react.
-
-**Boundary:** The clause is not a general cron/calendar library. Triggering `fire` by an operation or event is also valid; use an actual timer connection when elapsed time is the requirement.
-
-[Package definition](../clause-schedule/types/clause.blue).
-
-
-**Declared or inherited actions:** `fire`.
-
-
-#### An explicitly requested reminder
-
-The owner asks for an offer follow-up; the test checks the emitted schedule key.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/reminder -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/reminder`
-
-```yaml
-type: Schedule/Schedule Clause
-parameters:
-  key: offer-follow-up
-bindings:
-  fire:
-    sendReminder:
-      'on': workflow
-      channel: owner
-```
-
-
-#### A follow-up caused by archiving
-
-Offer Archived invokes the same action family without adding another user workflow.
-
-<!-- source:examples/clause-tutorial/06-service-desk.blue#/clauses/archiveNotice -->
-
-**Fragment** — [examples/clause-tutorial/06-service-desk.blue](../examples/clause-tutorial/06-service-desk.blue) · `/clauses/archiveNotice`
-
-```yaml
-type: Schedule/Schedule Clause
-parameters:
-  key: archive-review
-bindings:
-  fire:
-    afterArchive:
-      'on': event
-      event:
-        type: Commerce/Domain Event
-        kind: Offer Archived
-```
-
-
-<a id="clause-36"></a>
-
-
-### 6.36. `Clauses/Clause`
-
-The foundational contract for a clause contribution. It lets a clause-enabled host validate configuration, validate transitions and plan contributed contracts/state.
-
-**Configure it:** Package authors implement the supported hook ABI and contribution plan. Ordinary document authors normally select a concrete clause rather than instantiating this base.
-
-**Boundary:** It is not a useful empty business feature on its own. Its examples below are concrete implementations of that interface, not two magical configurations of an abstract base.
-
-[Package definition](../blue-clauses/types/clause.blue).
-
-
-#### A channel-contributing implementation
-
-Participants implements the base contract to add validated participant channels.
-
-<!-- source:examples/clause-tutorial/08-contributions.blue#/clauses/parties -->
-
-**Fragment** — [examples/clause-tutorial/08-contributions.blue](../examples/clause-tutorial/08-contributions.blue) · `/clauses/parties`
-
-```yaml
-type: Participants/Participants Clause
-parameters:
-  participants:
-    owner:
-      name: Account owner
-      channel:
-        type: Contracts/External Channel
-        event:
-          source: owner
-    reviewer:
-      name: Reviewer
-      channel:
-        type: Contracts/External Channel
-        event:
-          source: reviewer
-bindings: {}
-```
-
-
-#### A workflow/state-contributing implementation
-
-Composable implements it to install a cohesive local feature.
-
-<!-- source:examples/clause-tutorial/08-contributions.blue#/clauses/conversation -->
-
-**Fragment** — [examples/clause-tutorial/08-contributions.blue](../examples/clause-tutorial/08-contributions.blue) · `/clauses/conversation`
-
-```yaml
-type: Clauses/Composable Clause
-parameters:
-  states:
-    text:
-      path: /conversation
-      kind: text
-      initial: ''
-  contracts:
-    recordConversation:
-      kind: handler
-      contract:
-        type: Contracts/Sequential Workflow Operation
-        channel: owner
-        steps:
-        - type: Contracts/Compute
-          do:
-          - $appendChange:
-              op: replace
-              path: /conversation
-              val:
-                $binding: call/request/text
-          - $appendEvent:
-              kind: Conversation Updated
-              feature: recordConversation
-bindings: {}
-```
-
-
-<a id="clause-37"></a>
-
-
-### 6.37. `Connections/Connected Clause`
-
-The reusable action/connection base. It adapts actions and named connections into ordinary Blue contracts while preserving state ownership and validation.
-
-**Configure it:** Package authors define actions, their defaults, optional automatic connections, binding types and action definitions. Instance authors supply parameters, bindings and named triggers.
-
-**Boundary:** This is an authoring/runtime interface, not a replacement for domain design. The usefulness of an API still depends on whether its actions express coherent business responsibilities.
-
-[Package definition](../clause-connections/types/connected-clause.blue).
-
-
-#### A minimal specialization
-
-Hello reduces a step collection to one reusable say action.
-
-<!-- source:examples/clause-tutorial/05-first-clause.blue#/clauses/hello -->
-
-**Fragment** — [examples/clause-tutorial/05-first-clause.blue](../examples/clause-tutorial/05-first-clause.blue) · `/clauses/hello`
-
-```yaml
-type: Connections/Hello Clause
-bindings:
-  text: /message
-  say:
-    greet:
-      'on': workflow
-      channel: owner
-```
-
-
-#### A financial specialization
-
-The PI lifecycle uses the same connection model while preserving stronger financial invariants.
-
-<!-- source:examples/payment-family/02-custom-service.blue#/paymentTemplate/clauses/payment/bindings/requestCapture -->
-
-**Fragment** — [examples/payment-family/02-custom-service.blue](../examples/payment-family/02-custom-service.blue) · `/paymentTemplate/clauses/payment/bindings/requestCapture`
-
-```yaml
-capture:
-  'on': workflow
-  channel: customer
-  params:
-    requestId:
-      $var:
-        name: trigger
-        path: /requestId
-    amountMinor:
-      $var:
-        name: trigger
-        path: /amountMinor
-```
-
-
-<a id="clause-38"></a>
-
-
-### 6.38. `Payment/Conditional Payment Base`
-
-The common implementation layer shared by provider-neutral and method-specific conditional-payment presets. It centralizes source inclusion, PI creation and observation.
-
-**Configure it:** A method-specific setup definition supplies the concrete PI configuration. The common start/observe behavior is inherited; ordinary authors choose a concrete payment type.
-
-**Boundary:** Do not replace an inherited BEX function body by assuming inheritance is JavaScript overriding. Fixed Blue content has its own merge constraints; the implementation deliberately separates method setup from common behavior.
-
-[Package definition](../clause-payment/types/conditional-base.blue).
-
-
-**Declared or inherited actions:** `start`, `observe`.
-
-
-#### Provider-neutral method
-
-The lesson uses Conditional Payment with no provider-specific account locator.
-
-<!-- source:examples/clause-tutorial/12-english-lesson.blue#/clauses/payment -->
-
-**Fragment** — [examples/clause-tutorial/12-english-lesson.blue](../examples/clause-tutorial/12-english-lesson.blue) · `/clauses/payment`
-
-```yaml
-type: Payment/Conditional Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-```
-
-
-#### A MyOS account method
-
-The account preset adds locator normalization and a distinct method protocol without duplicating the common host/PI boundary.
-
-<!-- source:examples/payment-family/16-myos-account.blue#/clauses/payment -->
-
-**Fragment** — [examples/payment-family/16-myos-account.blue](../examples/payment-family/16-myos-account.blue) · `/clauses/payment`
-
-```yaml
-type: MyOS/MyOS Account to Account Payment
-parameters:
-  requireAll:
-    confirmSatisfaction:
-      'on': workflow
-      channel: customer
-      after:
-      - $appendEvent:
-          kind: Satisfaction Audit
-  recipient:
-    type: MyOS/MyOS Party
-    partyId: bob
-    displayName: Bob
-    myosAccountId: bob
-  payer: alice
-```
-
-## 7. Complete applications to study and run
-
-These examples are ordinary authored Blue documents. The adjacent `.case.yaml` files are step-by-step executable walkthroughs, not hidden application implementations. Read a document and its case side by side.
-
-### Application A: a service desk with several independent features
-
-[Complete document](../examples/clause-tutorial/06-service-desk.blue) · [Walkthrough](../examples/clause-tutorial/06-service-desk.case.yaml)
-
-This document combines two quotes, stock, visit counting, editable wording, delivery instructions, a lifecycle, a milestone and follow-up events. Its separate state pointers are intentional: `/status` describes publication while `/milestone` describes approval; `/product` and `/materials` contain different quotes.
-
-Run the case in order. It calculates two totals, rejects a negative quote and an overdrawn stock adjustment, rejects a stale text edit, freezes instructions after publication, deduplicates repeated milestone approval and emits an archive follow-up. The value of the approach is visible here: these features share an input model and a document, without being welded into one giant feature-specific workflow.
-
-### Application B: an English lesson with conditional payment
-
-[Complete document](../examples/clause-tutorial/12-english-lesson.blue) · [Walkthrough](../examples/clause-tutorial/12-english-lesson.case.yaml)
-
-The lesson costs 4000 EUR minor units. The customer invokes `confirmSatisfaction` on the **Payment Instruction member**, not the lesson root. The operator independently accepts and initiates the PI, confirms authorization, then confirms capture. The host can observe PI events through the Payment clause.
-
-The same payment configuration can be put in another service document. There is no special Checkout/Payment abstraction. The business host determines what is being purchased; the payment family determines its payment protocol and conditions.
-
-### Application C: a design agreement with independently payable milestones
-
-[Complete document](../examples/clause-tutorial/13-design-milestones.blue) · [Walkthrough](../examples/clause-tutorial/13-design-milestones.case.yaml)
-
-<!-- source:examples/clause-tutorial/13-design-milestones.blue# -->
-
-**Complete document** — [examples/clause-tutorial/13-design-milestones.blue](../examples/clause-tutorial/13-design-milestones.blue)
-
-```yaml
-name: Design agreement with independently accepted milestones
-type: Agreements/Agreement with Clauses
-periods: {}
-periodTemplate:
-  name: One design milestone
-  type: Orders/Order with Clauses
-  product:
-    name: Design milestone
-    currency: EUR
-    unitPriceMinor: 6000
-    quantity: 1
-  clauses:
-    payment:
-      type: Payment/Conditional Payment
-      parameters:
-        requireAll:
-          acceptPeriod:
-            'on': workflow
-            channel: customer
-  contracts:
-    customer:
-      type: Contracts/External Channel
-      event:
-        source: customer
-    seller:
-      type: Contracts/External Channel
-      event:
-        source: seller
-    guarantor:
-      type: Contracts/External Channel
-      event:
-        source: guarantor
-clauses:
-  periods:
-    type: DocumentsV3/Document Factory Clause
-    parameters:
-      allowedFields: []
-      inheritChannels:
-      - customer
-      - seller
-      - guarantor
-    bindings:
-      template: /periodTemplate
-      collection: /periods
-      start:
-        openPeriod:
-          'on': workflow
-          channel: seller
-          params:
-            key:
-              $var:
-                name: trigger
-                path: /period
-            fields: {}
-contracts:
-  customer:
-    type: Contracts/External Channel
-    event:
-      source: customer
-  seller:
-    type: Contracts/External Channel
-    event:
-      source: seller
-  guarantor:
-    type: Contracts/External Channel
-    event:
-      source: guarantor
-```
-
-
-The factory starts the `wireframes` and `prototype` children. Each costs 6000 minor units and contains its own conditional payment. Repeating the same creation request does not create a third milestone or a second PI for the first milestone. Approving one child's payment does not approve the other.
-
-This is the practical reason for independent child documents: a shared reusable template does not imply shared execution state or shared financial consent. Identity, channels and evidence sources must be deliberately inherited or separated.
-
-### Application D: consulting terms with acceptance, amendments and wind-down
-
-[Complete document](../examples/clause-tutorial/11-consulting-terms.blue) · [Walkthrough](../examples/clause-tutorial/11-consulting-terms.case.yaml)
-
-Activation, amendments and termination are separate business responsibilities. The consulting example shows why that separation helps. A proposal to review two services does not immediately overwrite the accepted one-service scope. The required approvals first refer to the exact proposal/revision. Only their completion applies the change.
-
-Wind-down is another transition, with its own readiness check. It should stop new admissions while allowing existing commitments to resolve. The walkthrough includes rejected operations; a successful demonstration is not limited to a happy path.
-
-### Application E: referral agreement → procurement → Orders → payments → commission payout
-
-[Complete document](../examples/payment-family/20-partnership.blue) · [Walkthrough](../examples/payment-family/20-partnership.case.yaml)
-
-```mermaid
-flowchart TD
-    R[Referral agreement] --> P[Procurement agreement]
-    P --> O1[Order one]
-    P --> O2[Order two]
-    O1 --> D1[Delivery evidence one]
-    O1 --> PI1[Customer Payment Instruction one]
-    O2 --> D2[Delivery evidence two]
-    O2 --> PI2[Customer Payment Instruction two]
-    R --> PAY[Commission Payment Instruction]
-```
-
-This graph has nine documents at the tested point. The diagram shows containment/decomposition; the authored source also declares the necessary evidence relationships. It is not a claim that all processing is a simple one-way tree.
-
-1. Seller and referrer accept the outer agreement.
-2. A factory starts procurement; its customer and seller approve its own terms.
-3. The customer starts two Orders. Each gets independent delivery evidence and a customer-payment PI.
-4. Delivery and acceptance satisfy an Order's payment conditions. Operator confirmations establish the actual financial results.
-5. Order and procurement summaries carry confirmed net results upward. Commission computes a target and Balance records the obligation.
-6. A separate account-to-account PI pays the referrer. Confirming that payment settles the reservation.
-7. One Order later fails. Its PI refunds the customer; the commission target falls. The already paid commission remains visible rather than being erased.
-8. Procurement enters wind-down and rejects another Order.
-
-There is no mandate package hidden in this application. The participants invoke the configured operations directly. A future mandate-based user experience could build on the same boundaries, but it would need its own explicit authorization design.
-
-### Application F: a manually confirmed invoice
-
-This is a deliberately different payment process, not a card-style process with renamed events.
-
-<!-- source:examples/clause-tutorial/16-manual-consulting.blue# -->
-
-**Complete document** — [examples/clause-tutorial/16-manual-consulting.blue](../examples/clause-tutorial/16-manual-consulting.blue)
-
-```yaml
-name: Manual consulting invoice
-type: Agreements/Agreement with Clauses
-clauses:
-  payment:
-    type: ManualPayments/Manual Bank Payment
-    parameters:
-      amountMinor: 5000
-      currency: EUR
-contracts:
-  customer:
-    type: Contracts/External Channel
-    event:
-      source: customer
-  seller:
-    type: Contracts/External Channel
-    event:
-      source: seller
-```
-
-
-[Walkthrough](../examples/clause-tutorial/16-manual-consulting.case.yaml): the recipient accepts, the payer reports a transfer reference, and the recipient confirms receipt. A conflicting transfer reference fails. A refund is then requested by the recipient and acknowledged by the original payer. The document makes the assertions and their authors visible.
-
-## 8. How to build your own clause
-
-Start by naming a stable business responsibility. “Delivery instructions” is a good feature boundary; “change string at pointer” is a useful primitive but usually poor agreement prose. Keep low-level operations available for extension without making them the vocabulary every agreement author must learn.
-
-For a connected clause, define:
-
-1. The state it owns or the pointers it requires.
-2. Fixed configuration and action arguments separately.
-3. Mandatory validation inside the action, so a different connection cannot bypass it.
-4. An explicit action result and meaningful domain events.
-5. Whether repetition is intentional, a duplicate, a conflict or a retry.
-6. The default/automatic connections that are truly required by its semantics.
-
-Here is the actual small Hello type definition:
-
-<!-- source:clause-connections/types/hello-clause.blue# -->
-
-**Complete document** — [clause-connections/types/hello-clause.blue](../clause-connections/types/hello-clause.blue)
+The following block is the complete authored definition of `Connections/Hello Clause`. It inherits the connection compiler from `Connections/Connected Clause`; it is not a replacement implementation of that engine.
 
 ```yaml
 name: Hello Clause
@@ -3841,114 +70,4305 @@ actions:
               path: /text
 ```
 
+There are three important pieces. `bindingTypes.text` requires a valid property pointer. `say.defaults` supplies the default action input. The `do` steps validate the input, update the bound text property, and emit a typed event carrying the clause and connection names.
 
-This is native Blue/BEX package code. Its runtime behavior is not implemented by generating arbitrary JavaScript. A package build resolves and packages identified documents. The generic connected-clause machinery installs corresponding Blue contracts from the declared connections.
+The configuration validator rejects unsupported connection kinds, malformed property paths, and conflicting contributions. At execution time the common connection wrapper checks Activation for ordinary business actions, evaluates the mapping, runs `before`, runs the reusable action, and runs `after`. A validation failure prevents the update and event from being committed. A connection marked `once` is consumed according to the action outcome contract, not merely because an unrelated event was seen.
 
-For something like a CRM integration, use the same separation as Payment: an action records/emits a request, an admitted external actor reports the result, and a response listener belonging to that integration normalizes the result into state and events. Other clauses listen to those domain events. Do not scatter protocol parsing across every unrelated business clause. If the interaction has its own lifecycle and visibility boundary, give it an independent document; if it is a tiny local effect, an ordinary clause may be sufficient. **No CRM clause is claimed to ship in the current catalogue.**
+For example, `before` can reject an unapproved greeting; `params.text` can take text from the incoming request; and `after` can append an audit entry. All three happen in the same document step. This is demonstrated by `00-hello`, including a rejected request and a replay check.
 
-### A practical selection guide
+The complete connection engine is in [connected-clause.blue](../clause-connections/types/connected-clause.blue). It contributes contracts through the clause plan rather than letting every clause overwrite a shared `contracts` dictionary.
 
-| Need | Start here |
-| --- | --- |
-| A reusable action with several possible triggers | `Connections/Connected Clause` specialization. |
-| A small local feature without a reusable package yet | `Clauses/Composable Clause` or ordinary native workflow steps. |
-| Independent state transitions | `State/State Machine Clause`. |
-| Controlled text edit | `Commerce/Text Clause`; use Amendments for mutual consent. |
-| A new child graph with retry-safe creation intent | `DocumentsV3/Document Factory Clause`. |
-| One ordinary conditional payment | `Payment/Conditional Payment` or a concrete method preset. |
-| A highly customized PI | `Payment/Payment Clause` plus explicit PI lifecycle/policy clauses. |
-| Net obligations and payout reservations | `Balance/Balance Clause`. |
-| Known-time or event-relative action | A connected `timer`; optionally a Schedule domain event. |
-| Participants with required read visibility | `AccessParticipants/Participants with Access Clause` plus guarded operations and real access documents. |
+## 3. The connection vocabulary
 
-### Avoid these mistakes
+| Connection | What starts the action | Typical use |
+|---|---|---|
+| `on: workflow`, `party: customer` | An authenticated operation request | Accept delivery, request a refund |
+| `on: event`, `event: {...}` | A matching event in this document | Update status after payment confirmation |
+| `on: change`, `path: /status` | A document update at the selected property | React to a material state change |
+| `on: embedded`, `path: /shipment` | A matching event from one embedded document | Observe delivery confirmation |
+| `on: collection`, `path: /orders` | A matching event from a member of an embedded collection | Reconcile order outcomes |
+| `on: timer`, `timestamp: ...` | A durable absolute deadline | A fixed contractual deadline |
+| `on: timer`, `afterEvent: ...`, `delayMs: ...` | A durable deadline anchored to a matching signal | Seven days after delivery |
+| `on: initialized` | Initialization of this document | Initialize a feature or an agreed child |
+| `on: channel` | An existing native channel selected by an advanced integration | Integrate with a pre-existing native document |
 
-- Do not equate “can read a timeline” with “can invoke this operation.”
-- Do not equate a payment request or session callback with confirmed money movement.
-- Do not treat `once` as a replacement for financial request IDs.
-- Do not rely on a future event when the condition may already be true at initialization.
-- Do not silently create a cycle by copying the complete parent into the child. Use explicit identified source references.
-- Do not let a custom connection bypass an invariant that belongs in the reusable action.
-- Do not mix the three factory configuration formats. They are distinct APIs; DocumentsV3 is the recommended starting point for new complex graphs.
-- Do not change existing package identities in place. New behavior needs a new identified package selection and a compatibility decision.
+Public examples use the first eight forms and do not declare raw channels or contracts. The last form is an escape hatch for integration authors, not a requirement for ordinary document authors.
 
-## 9. Run and inspect the examples locally
+A binding contains an action name and a dictionary of named connections. Several connections may invoke the same reusable action. Each connection has its own trigger, parameter mapping, validation steps, completion steps and repetition policy.
 
-The package repository is the source of truth. The matching Core branch carries imported, integrity-checked package archives and mirrored tutorial fixtures so its tests are reproducible. No source package is published by these commands.
-
-Use JDK 21 and the matching Core source. From Core:
-
-```sh
-./runtime/gradlew -p runtime :blue-core-service:test \
-  --tests blue.core.ClauseTutorialTest \
-  --tests blue.core.PaymentFamilySuiteTest \
-  --tests blue.core.PaymentFamilyNativeTest \
-  --no-daemon
+```yaml
+bindings:
+  say:
+    customerGreeting:
+      on: workflow
+      party: customer
+      params:
+        text: {$var: {name: trigger, path: /text}}
+      before:
+        - $failIf:
+            cond: {$ne: [{$var: {name: trigger, path: /approved}}, true]}
+            message: APPROVAL_REQUIRED
+      after:
+        - $appendChange:
+            op: add
+            path: /audit/-
+            val: Greeting accepted
 ```
 
-The tutorial test runs the `.case.yaml` scenarios plus native signed-provider timer and access checks. The payment suite covers the existing payment and partnership walkthroughs; native payment tests additionally exercise deadline release and a restarted test executor.
+`trigger` is the selected request or event payload. `params` is the evaluated action input. Constants such as `bindings`, `parameters`, `clauseKey` and `connectionKey` belong to the compiled clause context. Whole-object request mappings are evaluated at execution time; they are not merged as literal BEX syntax into an action's defaults.
 
-To run one authoring case directly against the sibling package repository:
+Use event patterns to express the intended signal precisely. For example, an Order Failed event with `reason: abc` is different from any Order Failed event. A collection listener observes all members of its configured collection, while an embedded listener observes only one path. A collection and a listener for one direct child may coexist: the assembly step combines their embedding declarations without registering the same child twice. Removing a contribution does not discard another clause's ownership of that dependency.
 
-```sh
-./runtime/gradlew -p runtime :blue-core-service:paymentFamilyExamples \
-  -PbluePackagesDir=/absolute/path/to/blue-packages \
-  -PpaymentCases=examples/clause-tutorial/12-english-lesson.case.yaml \
-  --no-daemon
+Timers use the native Time protocol and completeness rules. `policy: first` retains the first matching anchor; `policy: latest` replaces the pending anchor with a later match. `once: true` prevents repeated completed firings. `cancelOn` specifies a signal that cancels the pending timer. `delayMs` is milliseconds; the native absolute timestamp is microseconds. There is no reliance on JavaScript `setTimeout` for contractual deadlines.
+
+Do not use an initialization trigger for work that requires acceptance by all parties. Initialization happens before those parties have approved. Prefer an explicit workflow or a later business event after Activation.
+
+## 4. Activation: parties, representatives, keys and acceptance
+
+Activation is the single public feature for membership, read access and acceptance. Agreement, Order, generic Document and Payment Instruction hosts all use the same clause.
+
+A **party** is a role in this document, not a login session. It can represent a person or a business. Its **lead representative** manages that party. It may have any number of named **additional representatives**, subject to the host's resource limits. Each representative has its own authenticated timeline. A representative is not silently the lead and is not automatically authorized to use every lead-only workflow.
+
+`Parties/Party` is the provider-neutral identity shape. `MyOS/MyOS Party` adds `myosAccountId`. A business descriptor is descriptive information; it is not proof of company registration or signing authority. MyOS resolves account IDs and email addresses against real accounts. When both are supplied, they must identify the same account.
+
+```yaml
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: MyOS/MyOS Party
+          myosAccountId: CUSTOMER_ACCOUNT_ID
+          displayName: Alice
+        supplier:
+          type: MyOS/MyOS Party
+          myosAccountId: SUPPLIER_ACCOUNT_ID
+          displayName: Example Services
+          representatives:
+            support:
+              type: MyOS/MyOS Representative
+              myosAccountId: SUPPORT_ACCOUNT_ID
+      readers:
+        auditor:
+          myosAccountId: AUDITOR_ACCOUNT_ID
+      required: [customer, supplier]
+      allowNewParties: false
 ```
 
-Run the repository-wide validation from Core with:
+The host resolves these identities before creating timelines. It chooses an owned reader key for each required reader group, grants access to the relevant timelines, embeds the provider's confirmed Timeline Access documents, installs the authenticated transports, and registers the same initial document for the participating accounts. The public source contains no channels.
 
-```sh
-bash scripts/check.sh
+A group may provide several alternative reader keys. At least one acceptable key for **each required reader group** must be authorized by each relevant access document. This means “one of Alice's keys and one of Bob's keys,” not “any key from Alice or Bob.” Merely reading one timeline does not subscribe an account to unrelated timelines and does not give it an operation role.
+
+The read-only auditor receives the state and input visibility required for independent execution. The auditor is not added as a workflow actor. A party whose key is missing cannot be treated as functional merely because another party can still read the data.
+
+The browser operation form defaults to requiring the displayed document version. Leave this enabled for approvals. If the document changes before the input is processed, review the new version before submitting again.
+
+Acceptance is explicit: each required lead calls `approve_<party>` against the exact reviewed document version and current Activation revision. Activation separates `functional` (required access is present) from `active` (functional and required approvals are present). Ordinary clause actions require active membership and current access. Observation and protocol recovery paths are treated separately so the application can still record authoritative outcomes and recover its state.
+
+The lead can replace its own party definition through `updateParty_<party>`, using `replacement`, not the Blue reserved field `value`. A complete replacement includes the prepared authenticated representative transports and reader keys. Each replacement timeline must already be covered by an embedded access document, and the required keys must already be granted. This operation does not itself create new timelines or add new access-proof documents. Updating someone else's party is rejected. Adding a new party requires `allowNewParties`. A roster change resets acceptance for a new revision. Preparing a new representative's timeline and grants is a host operation; adding a name in YAML alone does not create access. The current launcher prepares the initial roster. A post-start account-picker flow that prepares new representatives is not implemented yet; the lower-level replacement operation requires already prepared transports and grants. Do not treat this as a completed self-service membership editor.
+
+When a child is created, its selected parties and readers are a snapshot. Payment Instructions freeze that roster. Changes in an agreement do not silently expand the PI's membership or reader set. A new PI or an explicitly designed migration is required when its frozen membership must change.
+
+## 5. Payment is one family; the instruction owns the protocol
+
+A Payment clause represents one payment obligation. Its `start` action creates and embeds one Payment Instruction. Repeating the same creation intent is idempotent; a conflicting payment at the same destination is rejected.
+
+The generic `Payment/Payment Clause` uses the provider-neutral protocol. `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment` and `ManualPayments/Manual Bank Payment` specialize how that payment is initialized and confirmed. They share the same request-connection model.
+
+**The Payment clause does not expose guarantor confirmations.** `requestCapture` requests capture. `completePayment` is an authoritative operation on the PI, available to its guarantor. An agreement cannot prove that money moved by emitting its own success event.
+
+`PaymentInstruction/Payment Instruction` owns the payment state, correlated request ledger and named response operations. `PaymentInstruction/Payment Instruction with Clauses` extends it and adds the ordinary clause host. Clause support does not replace the standard protocol.
+
+### The actual Payment clause source
+
+The public Payment type selects a setup implementation. Its shared base creates the child, declares the embedded dependency and echoes typed events. The list of child actions contains requests, not the guarantor's result operations.
+
+```yaml
+name: Payment Clause
+type: Payment/Payment Base
+actionDefinition:
+  type: Payment/Standard Payment Setup
+description: One payment. Named request bindings execute in its Payment Instruction; an explicit agreement
+  source creates a cycle. Only the Payment Instruction exposes guarantor operations.
 ```
 
-Do not run concurrent Gradle invocations in the same worktree. The special native access and timer examples need their Java fixtures; their placeholder inputs are not standalone signed credentials or real-time schedules.
+Its complete shared base:
 
-### Execution budgets
+```yaml
+name: Payment Base
+type: Connections/Connected Clause
+description: Create and observe a standard PI. Capture connections execute inside PI; inputs and placement
+  remain explicit.
+bindingTypes:
+  instruction: pointer
+  amount: pointer
+defaultBindings:
+  instruction: /payment
+  amount: /product/totalMinor
+embeds:
+- instruction
+readParametersFromDocument: true
+actions:
+  start:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: build
+    resultContract: outcome-v1
+  observe:
+    automatic:
+      'on': embedded
+      pathBinding: instruction
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Events/Event
+        then:
+        - $return: {}
+    - $appendEvent:
+        $merge:
+        - type: Payment/Payment Event Received
+        - kind:
+            $var:
+              name: trigger
+              path: /kind
+          clause:
+            $const: clauseKey
+          instructionPath:
+            $const:
+              name: bindings
+              path: /instruction
+          event:
+            $objectSet:
+              object: {}
+              key: blueId
+              val:
+                $nodeBlueId:
+                  $event: /event
+    observation: true
+childActions:
+- approveRecipient
+- requestCapture
+- requestRefund
+- requestVoid
+- requestPayeeAssignment
+- requestTransactionDetailsUpdate
+- requestFinalAmountResolution
+- requestPaymentCompletionLock
+- requestPaymentCompletionUnlock
+- requestPaymentReversalLock
+- requestPaymentReversalUnlock
+- requestTransactionDetailsUpdateLock
+- requestTransactionDetailsUpdateUnlock
+- requestAuthorize
+```
 
-The selected Contracts profile uses a default and maximum **10,000,000 gas units per complete attempt**, with supported stricter local limits sharing the same meter. Gas measures specified logical work, not wall-clock time or database latency. A cache may make execution faster without reducing the semantic gas charge. Keep individual atomic steps and document expansion bounded; composing clauses does not remove the need for workload limits.
+The setup implementation is [Payment Setup](../clause-payment/types/conditional-setup.blue). It validates roles and terms, selects the party snapshot, separates local and agreement-sourced connections, and assembles the child before publishing it. It uses BEX throughout. It never edits a running child's type to turn it into another payment method.
 
-### What the evidence means
+Here is the complete host declaration that adds clauses to the standard PI:
 
-For case-driven scenarios, the runner checks expected state and declared events, verifies rollback on rejected attempts, and repeats each input from the same prior snapshot to compare **gas, receipt and resulting snapshot**. Selected steps additionally import a snapshot into a fresh processor and repeat the operation.
+```yaml
+name: Payment Instruction with Clauses
+type: PaymentInstruction/Payment Instruction
+clauses: {}
+contracts:
+  __clausesAccepted:
+    event:
+      type: Clauses/Amendment Accepted
+    type: Contracts/Triggered Event Channel
+  __clausesBegin:
+    channel: __clausesRequests
+    steps:
+    - type: Clauses/Begin Amendment Step
+    - type: Clauses/Prepare Amendment Step
+    type: Contracts/Sequential Workflow
+  __clausesChangeListener:
+    channel: __clausesChanges
+    steps:
+    - type: Clauses/Begin Amendment Step
+    - type: Clauses/Prepare Amendment Step
+    type: Contracts/Sequential Workflow
+  __clausesChanges:
+    event:
+      type: Clauses/Clause Change Requested
+    type: Contracts/Triggered Event Channel
+  __clausesInit:
+    channel: __clausesLife
+    steps:
+    - type: Clauses/Initialize Clauses Step
+    - type: Clauses/Prepare Amendment Step
+    type: Contracts/Sequential Workflow
+  __clausesInitialized:
+    event:
+      type: Clauses/Clauses Initialized
+    type: Contracts/Triggered Event Channel
+  __clausesLife:
+    event:
+      type: Contracts/Document Processing Initiated
+    type: Contracts/Lifecycle Event Channel
+  __clausesRequests:
+    event:
+      type: Clauses/Amendment Requested
+    type: Contracts/Triggered Event Channel
+  __clausesRun:
+    event:
+      type: Clauses/Run Amendment
+    type: Contracts/Triggered Event Channel
+  __paymentAfterClauses:
+    type: Contracts/Sequential Workflow
+    channel: __clausesInitialized
+    order: -1000
+    steps:
+    - type: PaymentInstruction/Initialize Payment Step
+```
 
-The native timer test verifies signed completeness and scheduler behavior. The native access test verifies grant/revoke/restore behavior. These integration checks do not claim a separate exact-gas replay assertion for every provider operation.
+### Requests, responses and the event hierarchy
 
-Detailed output goes to ignored Core `reports/clause-tutorial/` and `reports/payment-family/`. Each run should name the tested Core and package revisions. A report is local evidence, not an AWS performance result. This handbook does not claim Python parity, real bank execution, multi-host capacity or production availability from these Java checks.
+Every concrete payment request inherits `PaymentInstruction/Payment Request`, which inherits `Events/Request`, which inherits `Events/Event`. Concrete payment responses inherit `PaymentInstruction/Payment Response` → `Events/Response` → `Events/Event`. Shipping follows the same pattern with its own domain request and response bases.
 
-The [coverage index](../examples/clause-tutorial/coverage.json) connects every reference entry to exact source fragments. Run `python3 tools/check_clause_tutorial.py` in the package repository to detect missing catalogue entries, stale snippets and broken source references. That is a documentation check, not a replacement for executing the Java cases.
+For example, a capture request is represented by the protocol's `PaymentInstruction/Complete Payment Requested`. The public clause action is named `requestCapture`; the guarantor answers through `completePayment`, producing `PaymentInstruction/Payment Completed`. The protocol also distinguishes rejection, failure and an unknown result. An unknown external outcome must be reconciled; it is not safe to issue a second independent charge merely because a timeout occurred.
 
-## 10. Where the current approach stands
+The request ID correlates the entire attempt. Repeating the same request does not reserve the amount twice. Reusing an ID for a conflicting amount is rejected. Capture and refund reservations protect against concurrent requests exceeding the available authorized or refundable amount. The ledger advances only on the corresponding authoritative response.
 
-These are engineering judgments, not scores derived from a benchmark or certification. They rate the current implemented scope, including its limitations.
+```mermaid
+flowchart LR
+  A[Agreement or Order: Payment clause] -->|embeds| PI[Payment Instruction with Clauses]
+  U[Customer workflow or agreed signal] -->|requestCapture / requestRefund| PI
+  PI -->|typed request with requestId| G[Guarantor adapter]
+  G -->|authenticated response operation| PI
+  PI -->|Payment Event Received| A
+```
 
-| Category | Score / 10 | Assessment |
-| --- | ---: | --- |
-| Core composition model | 8.5 | Actions, connections, state ownership and independent documents form a coherent foundation. The examples combine small features and a substantial commercial graph. |
-| Simple authoring | 8 | Hello, conditional payment and manual payment are compact. Repeated participant/channel setup still adds ceremony. |
-| Advanced authoring | 7 | Explicit PI templates offer control, but repeated configuration and several overlapping APIs make complex documents harder to read. |
-| Payment protocol design | 8 | Requests, confirmations, reservations, compensation and retries are separated. Actual payment adapters and broader operational qualification remain outside these packages. |
-| Modularity and reuse | 8.5 | The same action connections and payment family work across services, milestones, Orders and payouts. Some referral projections remain tied to one schema. |
-| Deterministic execution evidence | 8 | Exact Java replay checks are meaningful and have exposed real defects. More adversarial graphs, sustained runs and independent implementation parity would increase confidence. |
-| Access and party model | 6.5 | Explicit channel authority and Timeline Access checks exist. Full representative/delegate governance, alternative-key policy and general observer onboarding remain unfinished. |
-| Documentation and examples | 9 | This handbook ties source, configuration, business explanation and executable walkthroughs together. The rating depends on keeping those checks in the maintenance workflow. |
-| Tooling and discovery | 6.5 | Source and replay evidence are inspectable, but authors still need better completion, validation diagnostics, generated forms and a visual composition debugger. |
-| Readiness for a live payment product | 5.5 | A useful tested protocol foundation, not yet a fully operated payment service with live rails, reconciliation operations and production qualification. |
-| **Overall as a foundation for continued development** | **8** | **Useful now for building and validating executable business processes; worth continuing with focused simplification.** |
+The arrow to the adapter is a protocol request, not a synchronous network call inside BEX. The adapter performs external work and submits the correlated result. The document can therefore distinguish requested, pending, failed, unknown and confirmed outcomes.
 
-### The next improvements that would earn higher scores
+### Where the request logic runs
 
-First, make the authoring surface smaller: promote one factory for new work, prefer one state-machine API, generate forms/completion from declared action schemas and make required bindings obvious. Preserve old identities for compatibility instead of quietly changing old documents.
+By default, request connections execute **inside the PI**. A customer workflow belongs there if it only needs the PI's state and the supplied request. The Payment clause observes the PI and emits `Payment/Payment Event Received` with the clause name, instruction path, original event reference and event kind. Other agreement clauses listen to that observation.
 
-Second, make complex payment templates easier to inspect without hiding their boundaries. A preview should show exactly which operations land in PI, which sources it embeds, which participants can act and which keys must read each timeline. Convenience should reveal the resulting graph, not guess authority or create cycles invisibly.
+```yaml
+payment:
+  type: Payment/Payment Clause
+  parameters:
+    amountMinor: 10000
+    currency: EUR
+  bindings:
+    instruction: /payment
+    start:
+      startPayment: {on: workflow, party: customer}
+    requestCapture:
+      confirmSatisfaction:
+        on: workflow
+        party: customer
+        params: {requestId: capture-1, amountMinor: 10000}
+        before:
+          - $failIf:
+              cond: {$ne: [{$var: {name: trigger, path: /satisfied}}, true]}
+              message: SATISFACTION_REQUIRED
+        after:
+          - $appendEvent:
+              $merge:
+                - type: Events/Event
+                - {kind: Customer Satisfaction, satisfied: true}
+```
 
-Third, generalize schema-specific projections only after the current business cases are well understood. A reusable commission clause should explicitly state its input contract rather than depending on incidental nested field names.
+`confirmSatisfaction` is a PI workflow. The customer supplies `satisfied: true`. The action requests capture; it does not confirm capture. Its completion event is visible to the agreement through the Payment clause's observation. The agreement can update a satisfaction indicator without pretending that payment is complete.
 
-Finally, qualify one real executor end to end: durable request discovery, idempotent external execution, unknown-result reconciliation, restart behavior, operator visibility and recovery. Keep the business package provider-neutral where that abstraction is real; let method packages own genuine differences in payment process.
+When the condition comes from the agreement, add `in: agreement` to the connection. The PI embeds the agreement under `/sources/order` and observes it. The agreement already embeds the PI, so this is a deliberate cycle. The guarantor must therefore have visibility of the agreement's input domain. The selected Activation roster and access rules make this requirement explicit.
 
-The strongest reason to continue is concrete: the same identified, replayable document machinery can express a greeting, a service commitment and a multi-document commercial relationship. The next stage should make that power easier to author and operate, while keeping its state, authority and evidence boundaries explicit.
+```yaml
+requestCapture:
+  acceptedDelivery:
+    in: agreement
+    on: event
+    event: {type: Events/Event, kind: Delivery Accepted}
+    params: {requestId: delivery-capture, amountMinor: 10000}
+```
 
-## Payment protocol update
+A local embedded path is similarly resolved through the agreement. A smart-home or Shipping event can request capture, and a collection of Orders can produce signals used by a parent payment policy. No mandatory third “proof document” is inserted between the agreement and the PI. Use an independent source document only when it already represents an actual subsystem or business fact.
 
-The current package set now contains the full explicit request/response catalogue and named guarantor operations. See [Payment Instruction protocol](payment-protocol.md) for every message, the operation mapping, control exchanges and migration notes. The old generic `confirm` examples have been replaced; assertions cover exact Blue event identities and their host echoes.
+### Common payment options
+
+`amountMinor` and `currency` define the amount and denomination. Alternatively bind `amount` to a document property, such as `/product/totalMinor`; the creation action snapshots it. `payer`, `payee` and `guarantor` select party roles. `recipientApprovalRequired` adds recipient approval. `parties` and `readers` select the roster copied from Activation; an empty party selection reuses the current roster. `instructionClauses` allows additional explicit PI features.
+
+Request actions include authorization, capture, refund, void/cancellation, recipient approval, payee assignment, transaction details updates, final amount resolution, and completion/reversal/details lock or unlock requests. They use the same `params`, `before`, `after` and trigger vocabulary. A requested lock does not become effective until the guarantor confirms it.
+
+MyOS payment methods accept selected MyOS parties or matching account IDs. An ID must resolve to a declared party; it does not bypass Activation. A customer payment can request a payment session and record funding through its PI's provider operations. An account-to-account payment selects the payer and recipient accounts. These package examples define and test the protocol; connecting actual financial services remains an adapter responsibility.
+
+Manual bank payment uses the recipient as the confirming authority. The payer can report a transfer, but that report does not mark the payment complete. ACME Bank illustrates a separate bank guarantor without coupling the family to a named commercial provider.
+
+## 6. Other selected families
+
+### Feature
+
+Group custom steps under one business heading. Feature is appropriate for a smart-house check-in, a CRM conversation request, a delivery acceptance, or an agreement-specific calculation. Give the feature request and response events when it integrates with an external service. Put response listeners with the feature that owns the integration and exposes its state; let other clauses consume its meaningful events.
+
+Feature is not permission to skip protocol authority. A response from a bank or carrier still needs an authenticated actor and correlated operation. Use a separate instruction document when the subsystem has its own parties, state and lifecycle.
+
+### Product
+
+Maintain a validated product quote: item name, quantity, unit price, currency and computed total. A lesson, a rental item, or a service order can all use it. Payment can bind to the resulting total and snapshot it when the PI starts. Changing the later quote does not retrospectively rewrite an already accepted PI.
+
+### Status
+
+One reusable state machine serves order progress, milestone acceptance, delivery state and other independent aspects. Declare allowed transitions and bind a property. Multiple Status clauses can govern different properties. Accepting the design milestone does not accept the delivery milestone; a paid order does not automatically become delivered.
+
+### Documents
+
+Create a named child from an agreed template, copy selected Activation parties/readers, and embed it in a collection. Repeating a creation key with the same intent is idempotent. Conflicting intent for the same key is rejected. Explicitly permitted fields may customize the template; the requester cannot replace arbitrary child code.
+
+Use Documents for reseller orders, membership periods and bundles. Each child may itself contain Product, Payment and Shipping. Dependencies remain real embedded documents and must satisfy native completeness rules.
+
+### Ledger
+
+Maintain accrued obligations, reservations and confirmed settlements. An absolute target for a source replaces its earlier target. For example, a commission correction from 1,000 to 750 minor units subtracts 250; replaying the 750 target does not add it again. A reservation prevents promising the same obligation to two payouts. Confirming a settlement consumes the reserved amount and increments paid value.
+
+Ledger does not move money. Bind settlement confirmation to an authoritative payout response. A reseller commission and the customer's purchase are separate obligations and normally separate PIs.
+
+### Amendments
+
+Propose an exact replacement at an allowed path and require the configured parties to approve the same proposal. The expected revision rejects stale edits. A proposal outside the permitted paths or approval for another proposal is rejected. Use this for booking changes or negotiated service terms. It does not silently alter frozen payment terms.
+
+### Termination
+
+Represent winding down separately from completed termination. A request can stop new business while outstanding work, disputes or payments finish. The final transition checks the bound completion condition. Bind new-work actions to the lifecycle policy as well; merely displaying “WindingDown” is not a substitute for enforcing it.
+
+### Schedule
+
+Expose a meaningful scheduled event using the same durable timer connections. Use it for renewal reminders, a reporting deadline or an inactivity signal. Cancellation, first/latest anchoring, and actual financial consequences remain explicit. A timer should not invent a bank confirmation.
+
+### Shipping
+
+Shipping has a separate standard instruction, an instruction with clauses, a request feature and a parent Shipping clause. It models shipment booking, cancellation and address changes as requests, then records carrier acceptance/rejection and delivery outcomes through carrier operations. Each request is correlated; conflicting duplicate IDs and contradictory decisions are rejected.
+
+An address-change request does not change the confirmed destination. The carrier's confirmation does. Once dispatched, a cancellation or address change cannot be treated as a pre-dispatch action. The parent order observes the instruction's outcomes and can connect them to payment conditions.
+
+### Representation
+
+A listed representative may be assigned a workflow directly using its qualified role, for example `buyer__assistant`. Broader authority to act for the lead is a separate concept. The Representation clause prepares a fixed-target, fixed-operation native Operation Mandate. The holder must approve the mandate. The example verifies preparation and owner approval; the hosted provider append API does not yet accept delegated-authority selectors. Direct representative workflows work through their own timelines. The native `blue-mandates` package remains the authority for delegated execution and revocation; the wrapper does not reimplement it.
+
+Do not infer authority from possession of a reader key. Reading, direct operation permission and delegated authority are three separate capabilities.
+
+## 7. Composition rules and operational boundaries
+
+Business clauses contribute plans. Plans declare owned state, contracts, embedded dependencies and read requirements. The host validates those plans before applying them. Conflicting owners and invalid dependencies fail instead of silently overwriting each other.
+
+A cycle is allowed when the native runtime can execute its atomic component within the resource budget. It is not free. A wide or deeply cyclic graph may be expensive. Use a cycle because the PI needs agreement facts, not because every workflow must run in the agreement. A PI-local workflow avoids that dependency entirely.
+
+Every example here is provider-neutral unless its type says otherwise. Test guarantor and carrier operations simulate authoritative responses. Production adapters need durable request delivery, idempotent external calls, reconciliation of unknown outcomes, and authenticated response submission. Deterministic document execution does not make a network payment exactly once by itself.
+
+## 8. Running and auditing the examples
+
+Each source below lives in `examples/apps/` beside a `.case.yaml` scenario, a `.native.yaml` scenario for native mandate authority, or a `.time.yaml` signed-time walkthrough. Scenarios specify the actor, target document, operation, request, expected state and rejected cases. The Java runner executes those sources and compares replay gas, receipt and snapshot identities. Selected cases also export/import a snapshot before replay.
+
+The local Contracts runner uses explicit test transports. It tests business semantics and deterministic replay. The authenticated bootstrap integration separately verifies account lookup, reader-key grants, provider access documents and account routing. Timers require the native Time service; changing an operating-system clock or injecting a look-alike event is not an equivalent test.
+
+The example launcher displays complete source and a step-by-step operation list. Starting it creates a real document, installs the exact verified declarative package closure in the participating workspaces, and redirects to that document. Sign-up retains the selected example. A user chooses the accounts for each role before starting. Using separate accounts is necessary to exercise genuine inter-account permissions; one account in several roles is only a convenient local walkthrough.
+
+| Family | Public types | Purpose |
+|---|---|---|
+| Hello World | `Connections/Hello Clause` | Bind a greeting action to workflows and document signals. |
+| Feature | `Features/Feature Clause` | Group native actions into a named business feature. |
+| Activation | `Activation/Activation Clause` | Parties, representatives, reader access and acceptance. |
+| Representation | `Representation/Representation Clause` | Explicit owner-approved operation delegation; not implied by a representative listing. |
+| Amendments | `Amendments/Amendments Clause` | Propose and approve changes to editable terms. |
+| Termination | `Termination/Termination Clause` | Request closure and finish after outstanding obligations permit it. |
+| Status | `State/Status Clause` | Validate named state transitions. |
+| Product | `Commerce/Product Clause` | Maintain a validated product quote. |
+| Documents | `Documents/Documents Clause` | Start named child documents and reuse party snapshots. |
+| Payment | `Payment/Payment Clause`, `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment`, `ManualPayments/Manual Bank Payment` | Create one payment instruction with request connections; provider-specific variants share one family. |
+| Ledger | `Ledger/Ledger Clause` | Accrual targets, reservations and confirmed settlement accounting. |
+| Schedule | `Schedule/Schedule Clause` | Emit scheduled business signals using signed time completeness. |
+| Shipping | `Shipping/Shipping Clause` | Create a shipping instruction and relay correlated carrier requests and responses. |
+
+## 9. Complete application documents
+
+Applications 01–10 adapt the scenarios from the supplied `myos-examples.zip`. That archive identifies its blueprints as a design interchange format, not executable Blue. The table below states the scope of each executable adaptation; it is not a claim that every proposed feature in the archive is complete. Document 00 introduces Hello, and documents 11–29 isolate additional behaviors and payment methods.
+
+| Archive scenario | Executable adaptation | Scope |
+|---|---|---|
+| Order and payment | 01 | Delivery, customer satisfaction in the PI, authorization and confirmed capture; the order observes the PI event. |
+| Reseller and ledger | 02 | Commission from confirmed net collection, corrections after refunds and settlement of the resulting obligation. |
+| Milestone payments | 03 | Separate acceptance and payment for design and delivery, with explicit agreement observation. |
+| Bundle order | 04 | Independent child orders and payments; activity on an unrelated role does not satisfy another order. |
+| Smart home | 05 | Matching check-in requests capture; bounded temperature requests and separate provider confirmation. |
+| Membership | 06 | Trial attendance, explicit membership opt-in, independent paid periods and termination. |
+| Booking amendment | 07 | Exact two-party amendment approval; an existing PI retains its original amount. |
+| Participants and agents | 08 | Predeclared representative actions and lead-only actions. Post-start representative provisioning is still a separate integration task. |
+| Evidence and mandate | 09 | Delivered-evidence validation and native fixed-scope mandate creation/approval. The archive's broader multi-evidence refund budget/freeze design and hosted delegated invocation are not implemented here. |
+| Net settlement | 10 | Material statement revisions and settlement against the selected statement, with confirmed payment accounting. |
+
+### 00-hello
+
+Source: [`00-hello.blue`](../examples/apps/00-hello.blue).
+
+```yaml
+name: Hello with consent and validation
+type: Agreements/Agreement with Clauses
+message: ''
+audit: ''
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        sayHello:
+          'on': workflow
+          party: owner
+          params:
+            text:
+              $var:
+                name: trigger
+                path: /text
+          before:
+          - $failIf:
+              cond:
+                $not:
+                  $var:
+                    name: trigger
+                    path: /approved
+              message: APPROVAL_REQUIRED
+          after:
+          - $appendChange:
+              op: replace
+              path: /audit
+              val:
+                $resultValue: /message
+```
+
+Walkthrough: [`00-hello.case.yaml`](../examples/apps/00-hello.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | owner | Main | approve_owner | `{"revision":1}` | Processed |
+| 2 | owner | Main | sayHello | `{"text":"Hello Alice","approved":true}` | Processed; `{"/message":"Hello Alice","/audit":"Hello Alice"}` |
+| 3 | owner | Main | sayHello | `{"text":"Rejected","approved":false}` | Rejected; no state change; `{"/message":"Hello Alice"}` |
+
+### 01-order-payment
+
+Source: [`01-order-payment.blue`](../examples/apps/01-order-payment.blue).
+
+```yaml
+name: An English lesson paid when the customer is satisfied
+type: Orders/Order with Clauses
+product:
+  name: One English lesson
+  quantity: 1
+  unitPriceMinor: 10000
+  currency: EUR
+satisfied: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+      instructionClauses:
+        delivery:
+          type: Features/Feature Clause
+          parameters:
+            actions:
+              report:
+                do:
+                - $appendChange:
+                    op: add
+                    path: /deliveryReported
+                    val: true
+                - $appendEvent:
+                    $merge:
+                    - type: Events/Event
+                    - kind: Delivery Reported
+          bindings:
+            report:
+              reportDelivery:
+                'on': workflow
+                party: seller
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        confirmSatisfaction:
+          'on': workflow
+          party: customer
+          params:
+            requestId: capture-1
+            amountMinor: 10000
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /deliveryReported
+                - true
+              message: DELIVERY_REPORT_REQUIRED
+          - $failIf:
+              cond:
+                $ne:
+                - $var:
+                    name: trigger
+                    path: /satisfied
+                - true
+              message: SATISFACTION_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Customer Satisfaction
+                satisfied: true
+      requestRefund:
+        refund:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+  satisfaction:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        remember:
+          do:
+          - $appendChange:
+              op: replace
+              path: /satisfied
+              val: true
+    bindings:
+      remember:
+        satisfied:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            kind: Customer Satisfaction
+```
+
+Walkthrough: [`01-order-payment.case.yaml`](../examples/apps/01-order-payment.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
+| 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
+| 6 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 7 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 8 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 9 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Rejected; no state change |
+| 10 | seller | /payment | reportDelivery | `{}` | Processed |
+| 11 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
+| 12 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
+| 13 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 14 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
+| 15 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+
+### 02-reseller-ledger
+
+Source: [`02-reseller-ledger.blue`](../examples/apps/02-reseller-ledger.blue).
+
+```yaml
+name: Reseller commission from net confirmed order payments
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+        partner:
+          type: Parties/Party
+          displayName: Partner
+      required:
+      - customer
+      - seller
+      - guarantor
+      - partner
+  orders:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties: []
+    bindings:
+      template: /orderTemplate
+      collection: /orders
+      start:
+        newOrder:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+  commission:
+    type: Ledger/Ledger Clause
+    bindings:
+      state: /commission
+      setTarget:
+        confirmed:
+          'on': collection
+          path: /orders
+          event:
+            type: Payment/Payment Event Received
+            event:
+              type: PaymentInstruction/Payment Completed
+          before: []
+          params:
+            key:
+              $sliceAfter:
+              - $event: /sourcePath
+              - /orders/
+            amountMinor:
+              $call:
+                function: roundBps
+                args:
+                  basis:
+                    $subtract:
+                    - $document:
+                        $concat:
+                        - $event: /sourcePath
+                        - /payment/payment/completed
+                    - $document:
+                        $concat:
+                        - $event: /sourcePath
+                        - /payment/payment/reversed
+                  bps: 1000
+        reversed:
+          'on': collection
+          path: /orders
+          event:
+            type: Payment/Payment Event Received
+            event:
+              type: PaymentInstruction/Payment Reversed After Completion
+          before: []
+          params:
+            key:
+              $sliceAfter:
+              - $event: /sourcePath
+              - /orders/
+            amountMinor:
+              $call:
+                function: roundBps
+                args:
+                  basis:
+                    $subtract:
+                    - $document:
+                        $concat:
+                        - $event: /sourcePath
+                        - /payment/payment/completed
+                    - $document:
+                        $concat:
+                        - $event: /sourcePath
+                        - /payment/payment/reversed
+                  bps: 1000
+      reserve:
+        opened:
+          'on': event
+          event:
+            type: Events/Event
+            kind: Commission Payout Opened
+          params:
+            key: payout-1
+            amountMinor:
+              $document: /commission/accrued
+      settle:
+        paid:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            clause: payout
+            event:
+              type: PaymentInstruction/Payment Completed
+          when:
+            $eq:
+            - $document: /payout/payment/completed
+            - $document: /payout/paymentTerms/amountMinor
+          params:
+            key: payout-1
+  payout:
+    type: Payment/Payment Clause
+    parameters:
+      payer: seller
+      payee: partner
+      guarantor: guarantor
+      currency: EUR
+    bindings:
+      amount: /commission/accrued
+      instruction: /payout
+      start:
+        startPayout:
+          'on': workflow
+          party: seller
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Commission Payout Opened
+      requestAuthorize:
+        authorizePayout:
+          'on': workflow
+          party: seller
+          params:
+            requestId: payout-auth
+            amountMinor: 750
+      requestCapture:
+        capturePayout:
+          'on': workflow
+          party: seller
+          params:
+            requestId: payout-capture
+            amountMinor: 750
+orders: {}
+orderTemplate:
+  name: Service order
+  type: Orders/Order with Clauses
+  product:
+    name: One English lesson
+    quantity: 1
+    unitPriceMinor: 10000
+    currency: EUR
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        amountMinor: 10000
+        currency: EUR
+      bindings:
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: customer
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          confirmSatisfaction:
+            'on': workflow
+            party: customer
+            params:
+              requestId: capture-1
+              amountMinor: 10000
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /satisfied
+                  - true
+                message: SATISFACTION_REQUIRED
+            after:
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Delivery Accepted
+        requestRefund:
+          refund:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+```
+
+Walkthrough: [`02-reseller-ledger.case.yaml`](../examples/apps/02-reseller-ledger.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | partner | Main | approve_partner | `{"revision":1}` | Processed |
+| 5 | customer | Main | newOrder | `{"key":"lesson"}` | Processed |
+| 6 | customer | /orders/lesson | startPayment | `{}` | Processed |
+| 7 | guarantor | /orders/lesson/payment | acceptPaymentInstruction | `{}` | Processed |
+| 8 | guarantor | /orders/lesson/payment | recordTransactionInitiated | `{"transactionId":"orders-lesson-payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 9 | customer | /orders/lesson/payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 10 | guarantor | /orders/lesson/payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 11 | customer | /orders/lesson/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
+| 12 | guarantor | /orders/lesson/payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/commission/accrued":1000}` |
+| 13 | seller | /orders/lesson/payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
+| 14 | guarantor | /orders/lesson/payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/commission/accrued":750}` |
+| 15 | seller | Main | startPayout | `{}` | Processed; `{"/commission/reserved":750}` |
+| 16 | guarantor | /payout | acceptPaymentInstruction | `{}` | Processed |
+| 17 | guarantor | /payout | recordTransactionInitiated | `{"transactionId":"commission-payout","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 18 | seller | /payout | authorizePayout | `{}` | Processed |
+| 19 | guarantor | /payout | secureFunds | `{"requestId":"payout-auth","amountSecured":750}` | Processed |
+| 20 | seller | /payout | capturePayout | `{}` | Processed |
+| 21 | guarantor | /payout | completePayment | `{"requestId":"payout-capture","amountCompleted":750}` | Processed; `{"/commission/paid":750,"/commission/reserved":0}` |
+
+### 03-milestone-payments
+
+Source: [`03-milestone-payments.blue`](../examples/apps/03-milestone-payments.blue).
+
+```yaml
+name: Independent design and delivery milestones
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  design:
+    type: State/Status Clause
+    parameters:
+      subject: Design
+      transitions:
+        pending:
+        - accepted
+        accepted: []
+    bindings:
+      state: /design
+      transition:
+        acceptDesign:
+          'on': workflow
+          party: customer
+          params:
+            to: accepted
+  designPayment:
+    type: Payment/Payment Clause
+    parameters:
+      amountMinor: 30000
+      currency: EUR
+    bindings:
+      instruction: /designPayment
+      start:
+        startDesignpayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        accepted:
+          in: agreement
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Design accepted
+          params:
+            requestId: design-capture
+            amountMinor: 30000
+  delivery:
+    type: State/Status Clause
+    parameters:
+      subject: Delivery
+      transitions:
+        pending:
+        - accepted
+        accepted: []
+    bindings:
+      state: /delivery
+      transition:
+        acceptDelivery:
+          'on': workflow
+          party: customer
+          params:
+            to: accepted
+  deliveryPayment:
+    type: Payment/Payment Clause
+    parameters:
+      amountMinor: 70000
+      currency: EUR
+    bindings:
+      instruction: /deliveryPayment
+      start:
+        startDeliverypayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        accepted:
+          in: agreement
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Delivery accepted
+          params:
+            requestId: delivery-capture
+            amountMinor: 70000
+design: pending
+delivery: pending
+```
+
+Walkthrough: [`03-milestone-payments.case.yaml`](../examples/apps/03-milestone-payments.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | startDesignpayment | `{}` | Processed |
+| 5 | guarantor | /designPayment | acceptPaymentInstruction | `{}` | Processed |
+| 6 | guarantor | /designPayment | recordTransactionInitiated | `{"transactionId":"designPayment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 7 | customer | /designPayment | authorize | `{"requestId":"auth-1","amountMinor":30000}` | Processed |
+| 8 | guarantor | /designPayment | secureFunds | `{"requestId":"auth-1","amountSecured":30000}` | Processed |
+| 9 | customer | Main | startDeliverypayment | `{}` | Processed |
+| 10 | guarantor | /deliveryPayment | acceptPaymentInstruction | `{}` | Processed |
+| 11 | guarantor | /deliveryPayment | recordTransactionInitiated | `{"transactionId":"deliveryPayment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 12 | customer | /deliveryPayment | authorize | `{"requestId":"auth-1","amountMinor":70000}` | Processed |
+| 13 | guarantor | /deliveryPayment | secureFunds | `{"requestId":"auth-1","amountSecured":70000}` | Processed |
+| 14 | customer | Main | acceptDesign | `{}` | Processed; `{"/designPayment/payment/reserved/capture":30000,"/deliveryPayment/payment/reserved/capture":0}` |
+| 15 | guarantor | /designPayment | completePayment | `{"requestId":"design-capture","amountCompleted":30000}` | Processed |
+| 16 | customer | Main | acceptDelivery | `{}` | Processed; `{"/deliveryPayment/payment/reserved/capture":70000}` |
+
+### 04-bundle-order
+
+Source: [`04-bundle-order.blue`](../examples/apps/04-bundle-order.blue).
+
+```yaml
+name: Weekend bundle with independent hotel and restaurant orders
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+        hotel:
+          type: Parties/Party
+          displayName: Hotel
+        restaurant:
+          type: Parties/Party
+          displayName: Restaurant
+      required:
+      - customer
+      - hotel
+      - restaurant
+      - guarantor
+  hotel:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties:
+      - customer
+      - hotel
+      - guarantor
+    bindings:
+      template: /hotelTemplate
+      collection: /orders
+      start:
+        bookHotel:
+          'on': workflow
+          party: customer
+          params:
+            key: hotel
+  restaurant:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties:
+      - customer
+      - restaurant
+      - guarantor
+    bindings:
+      template: /restaurantTemplate
+      collection: /orders
+      start:
+        bookRestaurant:
+          'on': workflow
+          party: customer
+          params:
+            key: dinner
+orders: {}
+hotelTemplate:
+  name: Hotel weekend
+  type: Orders/Order with Clauses
+  product:
+    name: Hotel weekend
+    quantity: 1
+    unitPriceMinor: 30000
+    currency: EUR
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        amountMinor: 30000
+        currency: EUR
+        payee: hotel
+      bindings:
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: customer
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          confirmSatisfaction:
+            'on': workflow
+            party: customer
+            params:
+              requestId: capture-1
+              amountMinor: 30000
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /satisfied
+                  - true
+                message: SATISFACTION_REQUIRED
+            after:
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Delivery Accepted
+        requestRefund:
+          refund:
+            'on': workflow
+            party: hotel
+            params:
+              $object:
+                $var: trigger
+restaurantTemplate:
+  name: Dinner reservation
+  type: Orders/Order with Clauses
+  product:
+    name: Dinner reservation
+    quantity: 1
+    unitPriceMinor: 8000
+    currency: EUR
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        amountMinor: 8000
+        currency: EUR
+        payee: restaurant
+      bindings:
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: customer
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          confirmSatisfaction:
+            'on': workflow
+            party: customer
+            params:
+              requestId: capture-1
+              amountMinor: 8000
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /satisfied
+                  - true
+                message: SATISFACTION_REQUIRED
+            after:
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Delivery Accepted
+        requestRefund:
+          refund:
+            'on': workflow
+            party: restaurant
+            params:
+              $object:
+                $var: trigger
+```
+
+Walkthrough: [`04-bundle-order.case.yaml`](../examples/apps/04-bundle-order.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | hotel | Main | approve_hotel | `{"revision":1}` | Processed |
+| 3 | restaurant | Main | approve_restaurant | `{"revision":1}` | Processed |
+| 4 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 5 | customer | Main | bookHotel | `{}` | Processed |
+| 6 | customer | Main | bookRestaurant | `{}` | Processed |
+| 7 | customer | /orders/hotel | startPayment | `{}` | Processed |
+| 8 | guarantor | /orders/hotel/payment | acceptPaymentInstruction | `{}` | Processed |
+| 9 | guarantor | /orders/hotel/payment | recordTransactionInitiated | `{"transactionId":"hotel","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 10 | customer | /orders/hotel/payment | authorize | `{"requestId":"auth-1","amountMinor":30000}` | Processed |
+| 11 | guarantor | /orders/hotel/payment | secureFunds | `{"requestId":"auth-1","amountSecured":30000}` | Processed |
+| 12 | customer | /orders/hotel/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
+| 13 | guarantor | /orders/hotel/payment | completePayment | `{"requestId":"capture-1","amountCompleted":30000}` | Processed |
+| 14 | customer | /orders/dinner | startPayment | `{}` | Processed |
+| 15 | guarantor | /orders/dinner/payment | acceptPaymentInstruction | `{}` | Processed |
+| 16 | guarantor | /orders/dinner/payment | recordTransactionInitiated | `{"transactionId":"dinner","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 17 | customer | /orders/dinner/payment | authorize | `{"requestId":"auth-1","amountMinor":8000}` | Processed |
+| 18 | guarantor | /orders/dinner/payment | secureFunds | `{"requestId":"auth-1","amountSecured":8000}` | Processed |
+| 19 | customer | /orders/dinner/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
+| 20 | guarantor | /orders/dinner/payment | completePayment | `{"requestId":"capture-1","amountCompleted":8000}` | Processed |
+| 21 | hotel | /orders/dinner/payment | refund | `{"requestId":"not-yours","amountMinor":100}` | Processed; `{"/orders/dinner/payment/payment/reversed":0}` |
+
+### 05-smart-home
+
+Source: [`05-smart-home.blue`](../examples/apps/05-smart-home.blue).
+
+```yaml
+name: Rental capture after a matching smart-home check-in
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+          representatives:
+            assistant:
+              type: Parties/Representative
+              displayName: Guest assistant
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  houses:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /houseTemplate
+      collection: /houses
+      start:
+        openHouse:
+          'on': workflow
+          party: customer
+          params:
+            key: rental
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        checkIn:
+          in: agreement
+          'on': embedded
+          path: /houses/rental
+          event:
+            type: Events/Event
+            kind: Check In Confirmed
+            reservation: rental-7
+          params:
+            requestId: check-in
+            amountMinor: 10000
+houses: {}
+houseTemplate:
+  name: Smart home
+  type: Agreements/Agreement with Clauses
+  reservation: rental-7
+  checkedIn: false
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    access:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          checkIn:
+            do:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /reservation
+                  - $document: /reservation
+                message: RESERVATION_MISMATCH
+            - $appendChange:
+                op: add
+                path: /checkedIn
+                val: true
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Check In Confirmed
+                  reservation:
+                    $document: /reservation
+      bindings:
+        checkIn:
+          checkIn:
+            'on': workflow
+            party: seller
+    temperature:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          request:
+            do:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document: /checkedIn
+                  - true
+                message: ACTIVE_STAY_REQUIRED
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /temperatureC
+                        kind: integer
+                    - $gte:
+                      - $var:
+                          name: trigger
+                          path: /temperatureC
+                      - 18
+                    - $lte:
+                      - $var:
+                          name: trigger
+                          path: /temperatureC
+                      - 23
+                message: TEMPERATURE_OUTSIDE_AGREED_RANGE
+            - $failIf:
+                cond:
+                  $eq:
+                  - $document: /temperatureRequest/status
+                  - Pending
+                message: TEMPERATURE_REQUEST_PENDING
+            - $appendChange:
+                op: add
+                path: /temperatureRequest
+                val:
+                  requestId:
+                    $var:
+                      name: trigger
+                      path: /requestId
+                  temperatureC:
+                    $var:
+                      name: trigger
+                      path: /temperatureC
+                  status: Pending
+            - $appendChange:
+                op: add
+                path: /requestedC
+                val:
+                  $var:
+                    name: trigger
+                    path: /temperatureC
+            - $appendEvent:
+                $merge:
+                - type: Events/Request
+                - kind: Temperature Change Requested
+                  requestId:
+                    $var:
+                      name: trigger
+                      path: /requestId
+                  temperatureC:
+                    $var:
+                      name: trigger
+                      path: /temperatureC
+          confirm:
+            do:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /requestId
+                  - $document: /temperatureRequest/requestId
+                message: TEMPERATURE_REQUEST_MISMATCH
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document: /temperatureRequest/status
+                  - Pending
+                message: TEMPERATURE_REQUEST_NOT_PENDING
+            - $appendChange:
+                op: add
+                path: /reportedC
+                val:
+                  $document: /temperatureRequest/temperatureC
+            - $appendChange:
+                op: add
+                path: /temperatureRequest/status
+                val: Confirmed
+            - $appendEvent:
+                $merge:
+                - type: Events/Response
+                - kind: Temperature Change Confirmed
+                  requestId:
+                    $var:
+                      name: trigger
+                      path: /requestId
+                  temperatureC:
+                    $document: /reportedC
+      bindings:
+        request:
+          requestTemperature:
+            'on': workflow
+            party: customer__assistant
+        confirm:
+          confirmTemperature:
+            'on': workflow
+            party: seller
+  reportedC: 20
+  requestedC: 20
+  temperatureRequest: {}
+```
+
+Walkthrough: [`05-smart-home.case.yaml`](../examples/apps/05-smart-home.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | openHouse | `{}` | Processed |
+| 5 | customer | Main | startPayment | `{}` | Processed |
+| 6 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
+| 7 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 8 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 9 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 10 | seller | /houses/rental | checkIn | `{"reservation":"wrong"}` | Rejected; no state change |
+| 11 | seller | /houses/rental | checkIn | `{"reservation":"rental-7"}` | Processed; `{"/payment/payment/reserved/capture":10000}` |
+| 12 | guarantor | /payment | completePayment | `{"requestId":"check-in","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 13 | customer__assistant | /houses/rental | requestTemperature | `{"requestId":"too-hot","temperatureC":35}` | Rejected; no state change |
+| 14 | customer__assistant | /houses/rental | requestTemperature | `{"requestId":"comfortable","temperatureC":22}` | Processed; `{"/houses/rental/requestedC":22,"/houses/rental/reportedC":20}` |
+| 15 | seller | /houses/rental | confirmTemperature | `{"requestId":"unrelated"}` | Rejected; no state change |
+| 16 | seller | /houses/rental | confirmTemperature | `{"requestId":"comfortable"}` | Processed; `{"/houses/rental/reportedC":22,"/houses/rental/temperatureRequest/status":"Confirmed"}` |
+
+### 06-membership
+
+Source: [`06-membership.blue`](../examples/apps/06-membership.blue).
+
+```yaml
+name: A free trial, explicit membership and separate period payments
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  periods:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /periodTemplate
+      collection: /periods
+      start:
+        renew:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /membership
+                - Joined
+              message: MEMBERSHIP_OPT_IN_REQUIRED
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /lifecycle
+                - Active
+              message: MEMBERSHIP_CLOSED
+  termination:
+    type: Termination/Termination Clause
+    bindings:
+      request:
+        requestTermination:
+          'on': workflow
+          party: customer
+      finish:
+        finishTermination:
+          'on': workflow
+          party: customer
+  membership:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        attend:
+          do:
+          - $appendChange:
+              op: add
+              path: /trial
+              val: Attended
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Trial Attended
+        join:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /trial
+                - Attended
+              message: TRIAL_ATTENDANCE_REQUIRED
+          - $appendChange:
+              op: add
+              path: /membership
+              val: Joined
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Membership Joined
+    bindings:
+      attend:
+        recordTrialAttendance:
+          'on': workflow
+          party: seller
+      join:
+        joinMembership:
+          'on': workflow
+          party: customer
+periods: {}
+periodTemplate:
+  name: Service order
+  type: Orders/Order with Clauses
+  product:
+    name: One English lesson
+    quantity: 1
+    unitPriceMinor: 10000
+    currency: EUR
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        amountMinor: 10000
+        currency: EUR
+      bindings:
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: customer
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          confirmSatisfaction:
+            'on': workflow
+            party: customer
+            params:
+              requestId: capture-1
+              amountMinor: 10000
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /satisfied
+                  - true
+                message: SATISFACTION_REQUIRED
+            after:
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Delivery Accepted
+        requestRefund:
+          refund:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+lifecycle: Active
+canTerminate: true
+trial: Offered
+membership: NotJoined
+```
+
+Walkthrough: [`06-membership.case.yaml`](../examples/apps/06-membership.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | renew | `{"key":"2027-01"}` | Rejected; no state change |
+| 5 | seller | Main | recordTrialAttendance | `{}` | Processed; `{"/trial":"Attended","/periods":{}}` |
+| 6 | customer | Main | joinMembership | `{}` | Processed; `{"/membership":"Joined"}` |
+| 7 | customer | Main | renew | `{"key":"2027-01"}` | Processed |
+| 8 | customer | /periods/2027-01 | startPayment | `{}` | Processed |
+| 9 | guarantor | /periods/2027-01/payment | acceptPaymentInstruction | `{}` | Processed |
+| 10 | guarantor | /periods/2027-01/payment | recordTransactionInitiated | `{"transactionId":"period-1","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 11 | customer | /periods/2027-01/payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 12 | guarantor | /periods/2027-01/payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 13 | customer | /periods/2027-01/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
+| 14 | guarantor | /periods/2027-01/payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/periods/2027-01/payment/payment/completed":10000}` |
+| 15 | customer | Main | renew | `{"key":"2027-02"}` | Processed |
+| 16 | customer | /periods/2027-02 | startPayment | `{}` | Processed; `{"/periods/2027-01/payment/payment/completed":10000,"/periods/2027-02/payment/payment/completed":0}` |
+| 17 | customer | Main | requestTermination | `{}` | Processed |
+| 18 | customer | Main | finishTermination | `{}` | Processed; `{"/lifecycle":"Terminated"}` |
+| 19 | customer | Main | renew | `{"key":"2027-03"}` | Rejected; no state change |
+
+### 07-booking-amendment
+
+Source: [`07-booking-amendment.blue`](../examples/apps/07-booking-amendment.blue).
+
+```yaml
+name: Booking changes require agreement and preserve the existing payment
+type: Agreements/Agreement with Clauses
+termsEditable: true
+booking:
+  room: A
+  priceMinor: 40000
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        guest:
+          type: Parties/Party
+          displayName: Guest
+        host:
+          type: Parties/Party
+          displayName: Host
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - guest
+      - host
+      - guarantor
+  amendments:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers:
+      - guest
+      - host
+      paths:
+      - /booking
+    bindings:
+      propose:
+        proposeBooking:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+      approve:
+        guestApprove:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+        hostApprove:
+          'on': workflow
+          party: host
+          params:
+            $object:
+              $var: trigger
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      payer: guest
+      payee: host
+      guarantor: guarantor
+      currency: EUR
+    bindings:
+      amount: /booking/priceMinor
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: guest
+```
+
+Walkthrough: [`07-booking-amendment.case.yaml`](../examples/apps/07-booking-amendment.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | guest | Main | approve_guest | `{"revision":1}` | Processed |
+| 2 | host | Main | approve_host | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | guest | Main | startPayment | `{}` | Processed; `{"/payment/paymentTerms/amountMinor":40000}` |
+| 5 | guest | Main | proposeBooking | `{"proposalId":"p1","expectedRevision":1,"path":"/booking","replacement":{"room":"B","priceMinor":45000}}` | Processed |
+| 6 | guest | Main | guestApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"A"}` |
+| 7 | host | Main | hostApprove | `{"proposalId":"wrong"}` | Rejected; no state change |
+| 8 | host | Main | hostApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"B","/amendments/revision":2,"/payment/paymentTerms/amountMinor":40000}` |
+
+### 08-participants-agents
+
+Source: [`08-participants-agents.blue`](../examples/apps/08-participants-agents.blue).
+
+```yaml
+name: Party representatives have explicitly assigned actions
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        buyer:
+          type: Parties/Party
+          displayName: Buyer
+          representatives:
+            assistant:
+              type: Parties/Representative
+              displayName: Purchasing assistant
+        seller:
+          type: Parties/Party
+          displayName: Seller
+      required:
+      - buyer
+      - seller
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        agentGreeting:
+          'on': workflow
+          party: buyer__assistant
+          params:
+            text: From the purchasing assistant
+        leadGreeting:
+          'on': workflow
+          party: buyer
+          params:
+            text: From the buyer
+message: ''
+```
+
+Walkthrough: [`08-participants-agents.case.yaml`](../examples/apps/08-participants-agents.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | buyer | Main | approve_buyer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | buyer__assistant | Main | agentGreeting | `{}` | Processed; `{"/message":"From the purchasing assistant"}` |
+| 4 | buyer__assistant | Main | leadGreeting | `{}` | Rejected; no state change; `{"/message":"From the purchasing assistant"}` |
+| 5 | buyer | Main | leadGreeting | `{}` | Processed; `{"/message":"From the buyer"}` |
+
+### 09-evidence-mandate
+
+Source: [`09-evidence-mandate.blue`](../examples/apps/09-evidence-mandate.blue).
+
+```yaml
+name: Evidence-gated purchasing with an explicit operation mandate
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        buyer:
+          type: Parties/Party
+          displayName: Buyer
+          representatives:
+            agent:
+              type: Parties/Representative
+              displayName: Purchasing agent
+        supplier:
+          type: Parties/Party
+          displayName: Supplier
+      required:
+      - buyer
+      - supplier
+  evidence:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /evidenceTemplate
+      collection: /evidence
+      start:
+        startEvidence:
+          'on': workflow
+          party: buyer
+          params:
+            key: shipment
+  acceptance:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        accept:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /evidence/shipment/status
+                - delivered
+              message: DELIVERY_EVIDENCE_REQUIRED
+          - $appendChange:
+              op: add
+              path: /accepted
+              val: true
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Evidence Accepted
+    bindings:
+      accept:
+        acceptEvidence:
+          'on': workflow
+          party: buyer
+  delegation:
+    type: Representation/Representation Clause
+    parameters:
+      owner: buyer
+      delegate: buyer__agent
+      target: ''
+      operations:
+      - acceptEvidence
+    bindings:
+      mandate: /mandate
+      grant:
+        prepareMandate:
+          'on': workflow
+          party: buyer
+evidence: {}
+evidenceTemplate:
+  name: Delivery evidence
+  type: Agreements/Agreement with Clauses
+  status: pending
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    status:
+      type: State/Status Clause
+      parameters:
+        subject: Delivery
+        transitions:
+          pending:
+          - delivered
+          - failed
+          delivered: []
+          failed: []
+      bindings:
+        state: /status
+        transition:
+          deliver:
+            'on': workflow
+            party: supplier
+            params:
+              to: delivered
+accepted: false
+```
+
+Walkthrough: [`09-evidence-mandate.native.yaml`](../examples/apps/09-evidence-mandate.native.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | buyer | Main | approve_buyer | `{"revision":1}` | Processed |
+| 2 | supplier | Main | approve_supplier | `{"revision":1}` | Processed |
+| 3 | buyer | Main | startEvidence | `{}` | Processed |
+| 4 | buyer | Main | acceptEvidence | `{}` | Rejected; no state change |
+| 5 | supplier | /evidence/shipment | deliver | `{}` | Processed |
+| 6 | buyer | Main | prepareMandate | `{}` | Processed; `{"/mandate/status":"Pending"}` |
+| 7 | buyer | /mandate | approveMandate | `{}` | Processed; `{"/mandate/status":"Active"}` |
+| 8 | buyer | Main | acceptEvidence | `{}` | Processed; `{"/accepted":true}` |
+
+### 10-net-settlement
+
+Source: [`10-net-settlement.blue`](../examples/apps/10-net-settlement.blue).
+
+```yaml
+name: Two approved settlement statements and a separate net payment
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Hotel
+        seller:
+          type: Parties/Party
+          displayName: Restaurant
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  ledger:
+    type: Ledger/Ledger Clause
+    bindings:
+      setTarget:
+        agreed:
+          'on': event
+          event:
+            type: Events/Event
+            kind: Net Settlement Approved
+          params:
+            key: net-1
+            amountMinor:
+              $document: /net/amountMinor
+      reserve:
+        opened:
+          'on': event
+          event:
+            type: Events/Event
+            kind: Net Payment Opened
+          params:
+            key: net-1
+            amountMinor:
+              $document: /net/amountMinor
+      settle:
+        confirmed:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            event:
+              type: PaymentInstruction/Payment Completed
+          params:
+            key: net-1
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      currency: EUR
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+          before:
+          - $failIf:
+              cond:
+                $not:
+                  $and:
+                  - $and:
+                    - $eq:
+                      - $document: /net/hotelId
+                      - $nodeBlueId:
+                          $document: /statements/hotel/statement
+                    - $eq:
+                      - $document: /net/restaurantId
+                      - $nodeBlueId:
+                          $document: /statements/restaurant/statement
+                  - $eq:
+                    - $document: /net/approvals/customer
+                    - true
+                  - $eq:
+                    - $document: /net/approvals/seller
+                    - true
+              message: APPROVED_CURRENT_STATEMENTS_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Net Payment Opened
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        settle:
+          'on': workflow
+          party: customer
+          params:
+            requestId: net-1
+            amountMinor: 3000
+      amount: /net/amountMinor
+  hotel:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /hotelTemplate
+      collection: /statements
+      start:
+        publishHotel:
+          'on': workflow
+          party: customer
+          params:
+            key: hotel
+  restaurant:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /restaurantTemplate
+      collection: /statements
+      start:
+        publishRestaurant:
+          'on': workflow
+          party: seller
+          params:
+            key: restaurant
+  agreement:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        propose:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /statements/hotel/statement/scope
+                - $document: /statements/restaurant/statement/scope
+              message: SETTLEMENT_SCOPE_MISMATCH
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /statements/hotel/statement/currency
+                - $document: /statements/restaurant/statement/currency
+              message: CURRENCY_MISMATCH
+          - $let:
+              name: amount
+              expr:
+                $subtract:
+                - $document: /statements/hotel/statement/amountMinor
+                - $document: /statements/restaurant/statement/amountMinor
+          - $failIf:
+              cond:
+                $lte:
+                - $var: amount
+                - 0
+              message: POSITIVE_NET_REQUIRED
+          - $appendChange:
+              op: add
+              path: /net
+              val:
+                hotelId:
+                  $nodeBlueId:
+                    $document: /statements/hotel/statement
+                restaurantId:
+                  $nodeBlueId:
+                    $document: /statements/restaurant/statement
+                scope:
+                  $document: /statements/hotel/statement/scope
+                amountMinor:
+                  $var: amount
+                approvals: {}
+        approve:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $binding: call/requireExactDocumentVersion
+                - true
+              message: EXACT_REVIEW_REQUIRED
+          - $failIf:
+              cond:
+                $not:
+                  $and:
+                  - $eq:
+                    - $document: /net/hotelId
+                    - $nodeBlueId:
+                        $document: /statements/hotel/statement
+                  - $eq:
+                    - $document: /net/restaurantId
+                    - $nodeBlueId:
+                        $document: /statements/restaurant/statement
+              message: SETTLEMENT_SOURCE_CHANGED
+          - $let:
+              name: approvals
+              expr:
+                $objectSet:
+                  object:
+                    $document: /net/approvals
+                  key:
+                    $var:
+                      name: params
+                      path: /role
+                  val: true
+          - $appendChange:
+              op: add
+              path: /net/approvals
+              val:
+                $var: approvals
+          - $if:
+              cond:
+                $and:
+                - $eq:
+                  - $var:
+                      name: approvals
+                      path: /customer
+                  - true
+                - $eq:
+                  - $var:
+                      name: approvals
+                      path: /seller
+                  - true
+              then:
+              - $appendEvent:
+                  $merge:
+                  - type: Events/Event
+                  - kind: Net Settlement Approved
+    bindings:
+      propose:
+        proposeNet:
+          'on': workflow
+          party: customer
+      approve:
+        customerApproveNet:
+          'on': workflow
+          party: customer
+          params:
+            role: customer
+        sellerApproveNet:
+          'on': workflow
+          party: seller
+          params:
+            role: seller
+statements: {}
+net: {}
+hotelTemplate:
+  name: Hotel settlement statement
+  type: Agreements/Agreement with Clauses
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    statement:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          revise:
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /amountMinor
+                        kind: integer
+                    - $gte:
+                      - $var:
+                          name: trigger
+                          path: /amountMinor
+                      - 0
+                message: NONNEGATIVE_AMOUNT_REQUIRED
+            - $appendChange:
+                op: add
+                path: /statement/amountMinor
+                val:
+                  $var:
+                    name: trigger
+                    path: /amountMinor
+      bindings:
+        revise:
+          reviseStatement:
+            'on': workflow
+            party: customer
+  statement:
+    scope: 2026-10
+    currency: EUR
+    amountMinor: 12000
+restaurantTemplate:
+  name: Restaurant settlement statement
+  type: Agreements/Agreement with Clauses
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    statement:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          revise:
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /amountMinor
+                        kind: integer
+                    - $gte:
+                      - $var:
+                          name: trigger
+                          path: /amountMinor
+                      - 0
+                message: NONNEGATIVE_AMOUNT_REQUIRED
+            - $appendChange:
+                op: add
+                path: /statement/amountMinor
+                val:
+                  $var:
+                    name: trigger
+                    path: /amountMinor
+      bindings:
+        revise:
+          reviseStatement:
+            'on': workflow
+            party: seller
+  statement:
+    scope: 2026-10
+    currency: EUR
+    amountMinor: 8000
+```
+
+Walkthrough: [`10-net-settlement.case.yaml`](../examples/apps/10-net-settlement.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | publishHotel | `{}` | Processed |
+| 5 | seller | Main | publishRestaurant | `{}` | Processed |
+| 6 | customer | Main | proposeNet | `{}` | Processed |
+| 7 | customer | Main | customerApproveNet | `{}` | Processed |
+| 8 | seller | /statements/restaurant | reviseStatement | `{"amountMinor":9000}` | Processed |
+| 9 | seller | Main | sellerApproveNet | `{}` | Rejected; no state change |
+| 10 | customer | Main | startPayment | `{}` | Rejected; no state change |
+| 11 | customer | Main | proposeNet | `{}` | Processed |
+| 12 | customer | Main | customerApproveNet | `{}` | Processed |
+| 13 | seller | Main | sellerApproveNet | `{}` | Processed; `{"/balance/accrued":3000}` |
+| 14 | customer | Main | startPayment | `{}` | Processed |
+| 15 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
+| 16 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 17 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":3000}` | Processed |
+| 18 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":3000}` | Processed |
+| 19 | customer | /payment | settle | `{}` | Processed |
+| 20 | guarantor | /payment | completePayment | `{"requestId":"net-1","amountCompleted":3000}` | Processed; `{"/balance/paid":3000,"/balance/reserved":0}` |
+
+### 11-hello-events
+
+Source: [`11-hello-events.blue`](../examples/apps/11-hello-events.blue).
+
+```yaml
+name: Hello when an Order fails
+type: Agreements/Agreement with Clauses
+message: ''
+signals: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  signal:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        report:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Order Failed
+                reason:
+                  $var:
+                    name: trigger
+                    path: /reason
+    bindings:
+      report:
+        reportFailure:
+          'on': workflow
+          party: owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        failed:
+          'on': event
+          event:
+            type: Events/Event
+            kind: Order Failed
+            reason: abc
+          once: true
+          params:
+            text: The order needs attention
+```
+
+Walkthrough: [`11-hello-events.case.yaml`](../examples/apps/11-hello-events.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | owner | Main | approve_owner | `{"revision":1}` | Processed |
+| 2 | owner | Main | reportFailure | `{"reason":"other"}` | Processed; `{"/message":""}` |
+| 3 | owner | Main | reportFailure | `{"reason":"abc"}` | Processed; `{"/message":"The order needs attention"}` |
+
+### 12-hello-change
+
+Source: [`12-hello-change.blue`](../examples/apps/12-hello-change.blue).
+
+```yaml
+name: Hello when a document property changes
+type: Agreements/Agreement with Clauses
+message: ''
+status: draft
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  edit:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setStatus:
+          do:
+          - $appendChange:
+              op: replace
+              path: /status
+              val:
+                $var:
+                  name: trigger
+                  path: /status
+    bindings:
+      setStatus:
+        setStatus:
+          'on': workflow
+          party: owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        onDelivery:
+          'on': change
+          path: /status
+          when:
+            $eq:
+            - $event: /after
+            - delivered
+          params:
+            text: Delivery confirmed
+```
+
+Walkthrough: [`12-hello-change.case.yaml`](../examples/apps/12-hello-change.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | owner | Main | approve_owner | `{"revision":1}` | Processed |
+| 2 | owner | Main | setStatus | `{"status":"pending"}` | Processed; `{"/message":""}` |
+| 3 | owner | Main | setStatus | `{"status":"delivered"}` | Processed; `{"/message":"Delivery confirmed"}` |
+
+### 13-hello-embedded
+
+Source: [`13-hello-embedded.blue`](../examples/apps/13-hello-embedded.blue).
+
+```yaml
+name: Greetings propagated from one child
+type: Agreements/Agreement with Clauses
+message: ''
+children: {}
+childTemplate:
+  name: Child greeting
+  type: Orders/Order with Clauses
+  message: ''
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    hello:
+      type: Connections/Hello Clause
+      bindings:
+        text: /message
+        say:
+          greet:
+            'on': workflow
+            party: owner
+            params:
+              text:
+                $var:
+                  name: trigger
+                  path: /text
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  children:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties: []
+    bindings:
+      template: /childTemplate
+      collection: /children
+      start:
+        newChild:
+          'on': workflow
+          party: owner
+          params:
+            $object:
+              $var: trigger
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        fromChild:
+          'on': embedded
+          path: /children/a
+          event:
+            type: Connections/Hello Said
+          params:
+            text:
+              $concat:
+              - 'Received: '
+              - $var:
+                  name: trigger
+                  path: /text
+```
+
+Walkthrough: [`13-hello-embedded.case.yaml`](../examples/apps/13-hello-embedded.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | owner | Main | approve_owner | `{"revision":1}` | Processed |
+| 2 | owner | Main | newChild | `{"key":"a"}` | Processed |
+| 3 | owner | /children/a | greet | `{"text":"A"}` | Processed; `{"/message":"Received: A"}` |
+| 4 | owner | Main | newChild | `{"key":"b"}` | Processed |
+| 5 | owner | /children/b | greet | `{"text":"B"}` | Processed; `{"/message":"Received: A"}` |
+
+### 14-hello-collection
+
+Source: [`14-hello-collection.blue`](../examples/apps/14-hello-collection.blue).
+
+```yaml
+name: Greetings propagated from a collection
+type: Agreements/Agreement with Clauses
+message: ''
+children: {}
+childTemplate:
+  name: Child greeting
+  type: Orders/Order with Clauses
+  message: ''
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    hello:
+      type: Connections/Hello Clause
+      bindings:
+        text: /message
+        say:
+          greet:
+            'on': workflow
+            party: owner
+            params:
+              text:
+                $var:
+                  name: trigger
+                  path: /text
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  children:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties: []
+    bindings:
+      template: /childTemplate
+      collection: /children
+      start:
+        newChild:
+          'on': workflow
+          party: owner
+          params:
+            $object:
+              $var: trigger
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        fromChild:
+          'on': collection
+          path: /children
+          event:
+            type: Connections/Hello Said
+          params:
+            text:
+              $concat:
+              - 'Received: '
+              - $var:
+                  name: trigger
+                  path: /text
+```
+
+Walkthrough: [`14-hello-collection.case.yaml`](../examples/apps/14-hello-collection.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | owner | Main | approve_owner | `{"revision":1}` | Processed |
+| 2 | owner | Main | newChild | `{"key":"a"}` | Processed |
+| 3 | owner | /children/a | greet | `{"text":"A"}` | Processed; `{"/message":"Received: A"}` |
+| 4 | owner | Main | newChild | `{"key":"b"}` | Processed |
+| 5 | owner | /children/b | greet | `{"text":"B"}` | Processed; `{"/message":"Received: B"}` |
+
+### 15-product
+
+Source: [`15-product.blue`](../examples/apps/15-product.blue).
+
+```yaml
+name: A validated product quote
+type: Orders/Order with Clauses
+product: {}
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        buyer:
+          type: Parties/Party
+          displayName: Buyer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+      required:
+      - buyer
+      - seller
+  product:
+    type: Commerce/Product Clause
+    parameters:
+      currency: EUR
+    bindings:
+      product: /product
+      quote:
+        quote:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+```
+
+Walkthrough: [`15-product.case.yaml`](../examples/apps/15-product.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | buyer | Main | approve_buyer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | seller | Main | quote | `{"quantity":3,"unitPriceMinor":2500}` | Processed; `{"/product/totalMinor":7500}` |
+| 4 | seller | Main | quote | `{"quantity":0,"unitPriceMinor":2500}` | Rejected; no state change; `{"/product/totalMinor":7500}` |
+
+### 16-ledger
+
+Source: [`16-ledger.blue`](../examples/apps/16-ledger.blue).
+
+```yaml
+name: Commission corrections and settlement
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        partner:
+          type: Parties/Party
+          displayName: Partner
+      required:
+      - seller
+      - partner
+  ledger:
+    type: Ledger/Ledger Clause
+    bindings:
+      setTarget:
+        setTarget:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+      reserve:
+        reserve:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+      settle:
+        settle:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+```
+
+Walkthrough: [`16-ledger.case.yaml`](../examples/apps/16-ledger.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 2 | partner | Main | approve_partner | `{"revision":1}` | Processed |
+| 3 | seller | Main | setTarget | `{"key":"orderA","amountMinor":1000}` | Processed; `{"/balance/accrued":1000}` |
+| 4 | seller | Main | setTarget | `{"key":"orderA","amountMinor":750}` | Processed; `{"/balance/accrued":750}` |
+| 5 | seller | Main | reserve | `{"key":"payout1","amountMinor":500}` | Processed; `{"/balance/reserved":500}` |
+| 6 | seller | Main | settle | `{"key":"payout1","outcome":"succeeded"}` | Processed; `{"/balance/paid":500,"/balance/reserved":0}` |
+| 7 | seller | Main | reserve | `{"key":"tooMuch","amountMinor":300}` | Rejected; no state change |
+
+### 17-termination
+
+Source: [`17-termination.blue`](../examples/apps/17-termination.blue).
+
+```yaml
+name: Termination waits for outstanding work
+type: Agreements/Agreement with Clauses
+lifecycle: Active
+canTerminate: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  termination:
+    type: Termination/Termination Clause
+    bindings:
+      request:
+        requestTermination:
+          'on': workflow
+          party: owner
+      finish:
+        finishTermination:
+          'on': workflow
+          party: owner
+  work:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        complete:
+          do:
+          - $appendChange:
+              op: replace
+              path: /canTerminate
+              val: true
+    bindings:
+      complete:
+        completeWork:
+          'on': workflow
+          party: owner
+```
+
+Walkthrough: [`17-termination.case.yaml`](../examples/apps/17-termination.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | owner | Main | approve_owner | `{"revision":1}` | Processed |
+| 2 | owner | Main | requestTermination | `{}` | Processed; `{"/lifecycle":"WindingDown"}` |
+| 3 | owner | Main | finishTermination | `{}` | Rejected; no state change |
+| 4 | owner | Main | completeWork | `{}` | Processed |
+| 5 | owner | Main | finishTermination | `{}` | Processed; `{"/lifecycle":"Terminated"}` |
+
+### 18-amendments
+
+Source: [`18-amendments.blue`](../examples/apps/18-amendments.blue).
+
+```yaml
+name: Two-party approval of a booking amendment
+type: Agreements/Agreement with Clauses
+termsEditable: true
+booking:
+  room: A
+  priceMinor: 40000
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        guest:
+          type: Parties/Party
+          displayName: Guest
+        host:
+          type: Parties/Party
+          displayName: Host
+      required:
+      - guest
+      - host
+  amendments:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers:
+      - guest
+      - host
+      paths:
+      - /booking
+    bindings:
+      propose:
+        proposeBooking:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+      approve:
+        guestApprove:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+        hostApprove:
+          'on': workflow
+          party: host
+          params:
+            $object:
+              $var: trigger
+```
+
+Walkthrough: [`18-amendments.case.yaml`](../examples/apps/18-amendments.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | guest | Main | approve_guest | `{"revision":1}` | Processed |
+| 2 | host | Main | approve_host | `{"revision":1}` | Processed |
+| 3 | guest | Main | proposeBooking | `{"proposalId":"p1","expectedRevision":1,"path":"/booking","replacement":{"room":"B","priceMinor":45000}}` | Processed |
+| 4 | guest | Main | guestApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"A"}` |
+| 5 | host | Main | hostApprove | `{"proposalId":"wrong"}` | Rejected; no state change |
+| 6 | host | Main | hostApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"B","/amendments/revision":2}` |
+
+### 19-instruction-with-clauses
+
+Source: [`19-instruction-with-clauses.blue`](../examples/apps/19-instruction-with-clauses.blue).
+
+```yaml
+name: Payment Instruction with a customer greeting
+type: PaymentInstruction/Payment Instruction with Clauses
+paymentTerms:
+  amountMinor: 10000
+  limitMinor: 10000
+  currency: EUR
+  payerChannel: customer
+  payeeChannel: seller
+  guarantorChannel: guarantor
+  allowedPayees:
+  - seller
+  recipientApprovalRequired: false
+message: ''
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        greet:
+          'on': workflow
+          party: customer
+```
+
+Walkthrough: [`19-instruction-with-clauses.case.yaml`](../examples/apps/19-instruction-with-clauses.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | guarantor | Main | acceptPaymentInstruction | `{}` | Processed; `{"/payment/accepted":true}` |
+| 5 | customer | Main | greet | `{}` | Processed; `{"/message":"Hello World"}` |
+| 6 | customer | Main | updateParty_customer | `{"party":"customer","replacement":{"displayName":"Replacement"}}` | Rejected; no state change |
+
+### 20-status-branch
+
+Source: [`20-status-branch.blue`](../examples/apps/20-status-branch.blue).
+
+```yaml
+name: A repair job with two possible outcomes
+type: Agreements/Agreement with Clauses
+status: reported
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        technician:
+          type: Parties/Party
+          displayName: Technician
+      required:
+      - customer
+      - technician
+  status:
+    type: State/Status Clause
+    parameters:
+      subject: Repair
+      transitions:
+        reported:
+        - examining
+        - cancelled
+        examining:
+        - repaired
+        - unrepairable
+        repaired: []
+        unrepairable: []
+        cancelled: []
+    bindings:
+      state: /status
+      transition:
+        advanceRepair:
+          'on': workflow
+          party: technician
+          params:
+            to:
+              $var:
+                name: trigger
+                path: /to
+            reason:
+              $var:
+                name: trigger
+                path: /reason
+```
+
+Walkthrough: [`20-status-branch.case.yaml`](../examples/apps/20-status-branch.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | technician | Main | approve_technician | `{"revision":1}` | Processed |
+| 3 | technician | Main | advanceRepair | `{"to":"examining","reason":"Received"}` | Processed; `{"/status":"examining"}` |
+| 4 | technician | Main | advanceRepair | `{"to":"unrepairable","reason":"Part unavailable"}` | Processed; `{"/status":"unrepairable"}` |
+| 5 | technician | Main | advanceRepair | `{"to":"repaired","reason":"Not allowed"}` | Rejected; no state change; `{"/status":"unrepairable"}` |
+
+### 21-myos-customer
+
+Source: [`21-myos-customer.blue`](../examples/apps/21-myos-customer.blue).
+
+```yaml
+name: MyOS Customer Payment for a lesson
+type: Orders/Order with Clauses
+product:
+  name: One English lesson
+  quantity: 1
+  unitPriceMinor: 10000
+  currency: EUR
+satisfied: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: MyOS/MyOS Party
+          displayName: Customer
+          myosAccountId: test-customer
+        seller:
+          type: MyOS/MyOS Party
+          displayName: Seller
+          myosAccountId: test-seller
+        guarantor:
+          type: MyOS/MyOS Party
+          displayName: Guarantor
+          myosAccountId: test-guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  payment:
+    type: MyOS/MyOS Customer Payment
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+      recipient: seller
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        confirmSatisfaction:
+          'on': workflow
+          party: customer
+          params:
+            requestId: capture-1
+            amountMinor: 10000
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $var:
+                    name: trigger
+                    path: /satisfied
+                - true
+              message: SATISFACTION_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Customer Satisfaction
+                satisfied: true
+      requestRefund:
+        refund:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+  satisfaction:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        remember:
+          do:
+          - $appendChange:
+              op: replace
+              path: /satisfied
+              val: true
+    bindings:
+      remember:
+        satisfied:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            kind: Customer Satisfaction
+```
+
+Walkthrough: [`21-myos-customer.case.yaml`](../examples/apps/21-myos-customer.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
+| 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
+| 6 | guarantor | /payment | provideSession | `{"sessionId":"test-session"}` | Processed |
+| 7 | guarantor | /payment | confirmFunding | `{"sessionId":"test-session"}` | Processed |
+| 8 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 9 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 10 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 11 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
+| 12 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
+| 13 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 14 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
+| 15 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+
+### 22-myos-account
+
+Source: [`22-myos-account.blue`](../examples/apps/22-myos-account.blue).
+
+```yaml
+name: MyOS Account to Account Payment for a lesson
+type: Orders/Order with Clauses
+product:
+  name: One English lesson
+  quantity: 1
+  unitPriceMinor: 10000
+  currency: EUR
+satisfied: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: MyOS/MyOS Party
+          displayName: Customer
+          myosAccountId: test-customer
+        seller:
+          type: MyOS/MyOS Party
+          displayName: Seller
+          myosAccountId: test-seller
+        guarantor:
+          type: MyOS/MyOS Party
+          displayName: Guarantor
+          myosAccountId: test-guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  payment:
+    type: MyOS/MyOS Account to Account Payment
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+      recipient: seller
+      payer: customer
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        confirmSatisfaction:
+          'on': workflow
+          party: customer
+          params:
+            requestId: capture-1
+            amountMinor: 10000
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $var:
+                    name: trigger
+                    path: /satisfied
+                - true
+              message: SATISFACTION_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Customer Satisfaction
+                satisfied: true
+      requestRefund:
+        refund:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+  satisfaction:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        remember:
+          do:
+          - $appendChange:
+              op: replace
+              path: /satisfied
+              val: true
+    bindings:
+      remember:
+        satisfied:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            kind: Customer Satisfaction
+```
+
+Walkthrough: [`22-myos-account.case.yaml`](../examples/apps/22-myos-account.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
+| 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
+| 6 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 7 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 8 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 9 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
+| 10 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
+| 11 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 12 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
+| 13 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+
+### 23-manual-bank
+
+Source: [`23-manual-bank.blue`](../examples/apps/23-manual-bank.blue).
+
+```yaml
+name: Manual Bank Payment for a lesson
+type: Orders/Order with Clauses
+product:
+  name: One English lesson
+  quantity: 1
+  unitPriceMinor: 10000
+  currency: EUR
+satisfied: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+      required:
+      - customer
+      - seller
+  payment:
+    type: ManualPayments/Manual Bank Payment
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        confirmSatisfaction:
+          'on': workflow
+          party: customer
+          params:
+            requestId: capture-1
+            amountMinor: 10000
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $var:
+                    name: trigger
+                    path: /satisfied
+                - true
+              message: SATISFACTION_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Customer Satisfaction
+                satisfied: true
+      requestRefund:
+        refund:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+  satisfaction:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        remember:
+          do:
+          - $appendChange:
+              op: replace
+              path: /satisfied
+              val: true
+    bindings:
+      remember:
+        satisfied:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            kind: Customer Satisfaction
+```
+
+Walkthrough: [`23-manual-bank.case.yaml`](../examples/apps/23-manual-bank.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
+| 4 | seller | /payment | acceptPaymentInstruction | `{}` | Processed |
+| 5 | seller | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 6 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 7 | seller | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 8 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
+| 9 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
+| 10 | seller | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 11 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
+| 12 | seller | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+
+### 24-acme-bank
+
+Source: [`24-acme-bank.blue`](../examples/apps/24-acme-bank.blue).
+
+```yaml
+name: ACME Bank Payment for a lesson
+type: Orders/Order with Clauses
+product:
+  name: One English lesson
+  quantity: 1
+  unitPriceMinor: 10000
+  currency: EUR
+satisfied: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  payment:
+    type: ACME/ACME Bank Payment
+    parameters:
+      amountMinor: 10000
+      currency: EUR
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        confirmSatisfaction:
+          'on': workflow
+          party: customer
+          params:
+            requestId: capture-1
+            amountMinor: 10000
+          before:
+          - $failIf:
+              cond:
+                $ne:
+                - $var:
+                    name: trigger
+                    path: /satisfied
+                - true
+              message: SATISFACTION_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Customer Satisfaction
+                satisfied: true
+      requestRefund:
+        refund:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+  satisfaction:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        remember:
+          do:
+          - $appendChange:
+              op: replace
+              path: /satisfied
+              val: true
+    bindings:
+      remember:
+        satisfied:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            kind: Customer Satisfaction
+```
+
+Walkthrough: [`24-acme-bank.case.yaml`](../examples/apps/24-acme-bank.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
+| 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
+| 6 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 7 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
+| 8 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 9 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
+| 10 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
+| 11 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 12 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
+| 13 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+
+### 25-shipping
+
+Source: [`25-shipping.blue`](../examples/apps/25-shipping.blue).
+
+```yaml
+name: A physical order with carrier-confirmed shipping
+type: Orders/Order with Clauses
+destination: 22 Blue Street
+shippingTemplate:
+  name: Parcel delivery
+  type: Shipping/Shipping Instruction with Clauses
+  destination: 22 Blue Street
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    requests:
+      type: Shipping/Shipping Request Actions
+      bindings:
+        requestShipment:
+          bookShipment:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestCancellation:
+          cancelShipment:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestAddressChange:
+          changeAddress:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+delivered: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        carrier:
+          type: Parties/Party
+          displayName: Carrier
+      required:
+      - seller
+      - customer
+      - carrier
+  shipping:
+    type: Shipping/Shipping Clause
+    bindings:
+      template: /shippingTemplate
+      instruction: /shipment
+      start:
+        startShipping:
+          'on': workflow
+          party: seller
+  delivery:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        confirm:
+          do:
+          - $appendChange:
+              op: replace
+              path: /delivered
+              val: true
+    bindings:
+      confirm:
+        delivered:
+          'on': embedded
+          path: /shipment
+          event:
+            type: Shipping/Shipment Delivered
+```
+
+Walkthrough: [`25-shipping.case.yaml`](../examples/apps/25-shipping.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 2 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 3 | carrier | Main | approve_carrier | `{"revision":1}` | Processed |
+| 4 | seller | Main | startShipping | `{}` | Processed |
+| 5 | seller | /shipment | bookShipment | `{"requestId":"ship-1"}` | Processed |
+| 6 | carrier | /shipment | confirmShipment | `{"requestId":"ship-1","trackingId":"TEST123"}` | Processed; `{"/shipment/shipment/status":"accepted"}` |
+| 7 | carrier | /shipment | confirmDelivery | `{"requestId":"ship-1"}` | Rejected; no state change |
+| 8 | seller | /shipment | changeAddress | `{"requestId":"address-1","address":"24 Blue Street"}` | Processed |
+| 9 | carrier | /shipment | confirmAddressChange | `{"requestId":"address-1"}` | Processed; `{"/shipment/destination":"24 Blue Street"}` |
+| 10 | carrier | /shipment | rejectAddressChange | `{"requestId":"address-1"}` | Rejected; no state change |
+| 11 | carrier | /shipment | recordDispatched | `{"requestId":"ship-1"}` | Processed; `{"/shipment/shipment/status":"dispatched"}` |
+| 12 | carrier | /shipment | confirmDelivery | `{"requestId":"ship-1"}` | Processed; `{"/delivered":true,"/shipment/shipment/status":"delivered"}` |
+
+### 26-timers
+
+Source: [`26-timers.blue`](../examples/apps/26-timers.blue).
+
+```yaml
+name: One reminder from the first report and a resettable latest reminder
+type: Agreements/Agreement with Clauses
+message: ''
+log: []
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  report:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        report:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Delivery Reported
+                text:
+                  $var:
+                    name: trigger
+                    path: /text
+        cancel:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Cancel Reminder
+        remind:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Reminder Requested
+    bindings:
+      report:
+        report:
+          'on': workflow
+          party: owner
+      cancel:
+        cancel:
+          'on': workflow
+          party: owner
+      remind:
+        remind:
+          'on': workflow
+          party: owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        first:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Delivery Reported
+          delayMs: 2000
+          policy: first
+          once: true
+          cancelOn:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Cancel Reminder
+          params:
+            text:
+              $concat:
+              - 'first: '
+              - $var:
+                  name: trigger
+                  path: /text
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: first
+        latest:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Delivery Reported
+          delayMs: 2000
+          policy: latest
+          once: true
+          cancelOn:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Cancel Reminder
+          params:
+            text:
+              $concat:
+              - 'latest: '
+              - $var:
+                  name: trigger
+                  path: /text
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: latest
+        cancellable:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Reminder Requested
+          delayMs: 2000
+          policy: latest
+          cancelOn:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Cancel Reminder
+          params:
+            text: Should be cancelled
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: cancelled-timer-fired
+  schedule:
+    type: Schedule/Schedule Clause
+    parameters:
+      key: follow-up
+    bindings:
+      fire:
+        followUp:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Delivery Reported
+          delayMs: 4000
+          policy: first
+          once: true
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: schedule
+```
+
+Signed-time walkthrough:
+
+```yaml
+document: 26-timers.blue
+nativeTime: true
+steps:
+- operation: approve_owner
+  channel: owner
+  request:
+    revision: 1
+- operation: report
+  channel: owner
+  request:
+    text: A
+- operation: report
+  channel: owner
+  request:
+    text: B
+- clock: First fires two seconds after A; latest fires two seconds after B; follow-up
+    fires four seconds after A.
+- operation: remind
+  channel: owner
+  request: {}
+- operation: cancel
+  channel: owner
+  request: {}
+```
+
+### 27-payment-protocol
+
+Source: [`27-payment-protocol.blue`](../examples/apps/27-payment-protocol.blue).
+
+```yaml
+name: Payment protocol requests, outcomes and reconciliation
+type: PaymentInstruction/Payment Instruction with Clauses
+instanceKey: protocol-demo
+paymentTerms:
+  currency: EUR
+  amountMinor: 10000
+  limitMinor: 12000
+  payerChannel: customer
+  payeeChannel: seller
+  guarantorChannel: guarantor
+  allowedPayees:
+  - seller
+  - seller2
+  recipientApprovalRequired: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        seller2:
+          type: Parties/Party
+          displayName: Seller2
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - seller2
+      - guarantor
+  requests:
+    type: PaymentInstruction/Payment Request Actions
+    bindings:
+      requestAuthorize:
+        requestSecureFunds:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestCapture:
+        requestCompletePayment:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestRefund:
+        requestReverseAfterCompletion:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestVoid:
+        requestCancelBeforeCompletion:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPayeeAssignment:
+        requestPayeeAssignment:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdate:
+        requestTransactionDetailsUpdate:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestFinalAmountResolution:
+        requestFinalAmountResolution:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentCompletionLock:
+        requestPaymentCompletionLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentCompletionUnlock:
+        requestPaymentCompletionUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentReversalLock:
+        requestPaymentReversalLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentReversalUnlock:
+        requestPaymentReversalUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdateLock:
+        requestTransactionDetailsUpdateLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdateUnlock:
+        requestTransactionDetailsUpdateUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      approveRecipient:
+        approveRecipient:
+          'on': workflow
+          party: seller
+```
+
+Walkthrough: [`27-payment-protocol.case.yaml`](../examples/apps/27-payment-protocol.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | seller2 | Main | approve_seller2 | `{"revision":1}` | Processed |
+| 4 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 5 | guarantor | Main | acceptPaymentInstruction | `{}` | Processed |
+| 6 | guarantor | Main | recordTransactionInitiated | `{"transactionId":"protocol-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"provider-1"}` | Processed |
+| 7 | customer | Main | requestSecureFunds | `{"requestId":"secure-declined","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
+| 8 | guarantor | Main | completePayment | `{"requestId":"secure-declined"}` | Rejected; no state change |
+| 9 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"secure-declined","transactionDetails":{}}` | Rejected; no state change |
+| 10 | guarantor | Main | declineSecureFunds | `{"requestId":"secure-declined","reason":"Provider declined"}` | Processed |
+| 11 | guarantor | Main | declineSecureFunds | `{"requestId":"secure-declined","reason":"Provider declined"}` | Processed |
+| 12 | customer | Main | requestSecureFunds | `{"requestId":"secure-failed","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
+| 13 | guarantor | Main | failSecureFunds | `{"requestId":"secure-failed","reason":"Provider failed"}` | Processed |
+| 14 | guarantor | Main | failSecureFunds | `{"requestId":"secure-failed","reason":"Provider failed"}` | Processed |
+| 15 | customer | Main | requestSecureFunds | `{"requestId":"secure-unknown","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
+| 16 | guarantor | Main | recordFundsSecuringUnknown | `{"requestId":"secure-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/secure":10000}` |
+| 17 | guarantor | Main | recordFundsSecuringUnknown | `{"requestId":"secure-unknown","reason":"Provider unknown"}` | Processed |
+| 18 | guarantor | Main | secureFunds | `{"requestId":"secure-unknown","amountSecured":999}` | Rejected; no state change; `{"/payment/reserved/secure":10000}` |
+| 19 | guarantor | Main | secureFunds | `{"requestId":"secure-unknown"}` | Processed |
+| 20 | guarantor | Main | secureFunds | `{"requestId":"secure-unknown"}` | Processed |
+| 21 | guarantor | Main | recordFundsSecuringUnknown | `{"requestId":"secure-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+| 22 | customer | Main | requestCompletePayment | `{"requestId":"capture-declined","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
+| 23 | guarantor | Main | declineCompletePayment | `{"requestId":"capture-declined","reason":"Provider declined"}` | Processed |
+| 24 | guarantor | Main | declineCompletePayment | `{"requestId":"capture-declined","reason":"Provider declined"}` | Processed |
+| 25 | customer | Main | requestCompletePayment | `{"requestId":"capture-failed","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
+| 26 | guarantor | Main | failCompletePayment | `{"requestId":"capture-failed","reason":"Provider failed"}` | Processed |
+| 27 | guarantor | Main | failCompletePayment | `{"requestId":"capture-failed","reason":"Provider failed"}` | Processed |
+| 28 | customer | Main | requestCompletePayment | `{"requestId":"capture-unknown","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
+| 29 | guarantor | Main | recordPaymentCompletionUnknown | `{"requestId":"capture-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/capture":4000}` |
+| 30 | guarantor | Main | recordPaymentCompletionUnknown | `{"requestId":"capture-unknown","reason":"Provider unknown"}` | Processed |
+| 31 | guarantor | Main | completePayment | `{"requestId":"capture-unknown"}` | Processed |
+| 32 | guarantor | Main | completePayment | `{"requestId":"capture-unknown"}` | Processed |
+| 33 | guarantor | Main | recordPaymentCompletionUnknown | `{"requestId":"capture-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+| 34 | customer | Main | requestReverseAfterCompletion | `{"requestId":"refund-declined","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
+| 35 | guarantor | Main | declineReverseAfterCompletion | `{"requestId":"refund-declined","reason":"Provider declined"}` | Processed |
+| 36 | guarantor | Main | declineReverseAfterCompletion | `{"requestId":"refund-declined","reason":"Provider declined"}` | Processed |
+| 37 | customer | Main | requestReverseAfterCompletion | `{"requestId":"refund-failed","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
+| 38 | guarantor | Main | failReverseAfterCompletion | `{"requestId":"refund-failed","reason":"Provider failed"}` | Processed |
+| 39 | guarantor | Main | failReverseAfterCompletion | `{"requestId":"refund-failed","reason":"Provider failed"}` | Processed |
+| 40 | customer | Main | requestReverseAfterCompletion | `{"requestId":"refund-unknown","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
+| 41 | guarantor | Main | recordPaymentReversalUnknown | `{"requestId":"refund-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/refund":1000}` |
+| 42 | guarantor | Main | recordPaymentReversalUnknown | `{"requestId":"refund-unknown","reason":"Provider unknown"}` | Processed |
+| 43 | guarantor | Main | reverseAfterCompletion | `{"requestId":"refund-unknown"}` | Processed |
+| 44 | guarantor | Main | reverseAfterCompletion | `{"requestId":"refund-unknown"}` | Processed |
+| 45 | guarantor | Main | recordPaymentReversalUnknown | `{"requestId":"refund-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+| 46 | customer | Main | requestCancelBeforeCompletion | `{"requestId":"void-declined","reason":"Protocol walkthrough"}` | Processed |
+| 47 | guarantor | Main | declineCancelBeforeCompletion | `{"requestId":"void-declined","reason":"Provider declined"}` | Processed |
+| 48 | guarantor | Main | declineCancelBeforeCompletion | `{"requestId":"void-declined","reason":"Provider declined"}` | Processed |
+| 49 | customer | Main | requestCancelBeforeCompletion | `{"requestId":"void-failed","reason":"Protocol walkthrough"}` | Processed |
+| 50 | guarantor | Main | failCancelBeforeCompletion | `{"requestId":"void-failed","reason":"Provider failed"}` | Processed |
+| 51 | guarantor | Main | failCancelBeforeCompletion | `{"requestId":"void-failed","reason":"Provider failed"}` | Processed |
+| 52 | customer | Main | requestCancelBeforeCompletion | `{"requestId":"void-unknown","reason":"Protocol walkthrough"}` | Processed |
+| 53 | guarantor | Main | recordPaymentCancellationUnknown | `{"requestId":"void-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/void":6000}` |
+| 54 | guarantor | Main | recordPaymentCancellationUnknown | `{"requestId":"void-unknown","reason":"Provider unknown"}` | Processed |
+| 55 | guarantor | Main | cancelBeforeCompletion | `{"requestId":"void-unknown"}` | Processed |
+| 56 | guarantor | Main | cancelBeforeCompletion | `{"requestId":"void-unknown"}` | Processed |
+| 57 | guarantor | Main | recordPaymentCancellationUnknown | `{"requestId":"void-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+
+### 28-payment-controls
+
+Source: [`28-payment-controls.blue`](../examples/apps/28-payment-controls.blue).
+
+```yaml
+name: Payment protocol requests, outcomes and reconciliation
+type: PaymentInstruction/Payment Instruction with Clauses
+instanceKey: protocol-demo
+paymentTerms:
+  currency: EUR
+  amountMinor: 10000
+  limitMinor: 12000
+  payerChannel: customer
+  payeeChannel: seller
+  guarantorChannel: guarantor
+  allowedPayees:
+  - seller
+  - seller2
+  recipientApprovalRequired: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        seller2:
+          type: Parties/Party
+          displayName: Seller2
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - seller2
+      - guarantor
+  requests:
+    type: PaymentInstruction/Payment Request Actions
+    bindings:
+      requestAuthorize:
+        requestSecureFunds:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestCapture:
+        requestCompletePayment:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestRefund:
+        requestReverseAfterCompletion:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestVoid:
+        requestCancelBeforeCompletion:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPayeeAssignment:
+        requestPayeeAssignment:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdate:
+        requestTransactionDetailsUpdate:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestFinalAmountResolution:
+        requestFinalAmountResolution:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentCompletionLock:
+        requestPaymentCompletionLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentCompletionUnlock:
+        requestPaymentCompletionUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentReversalLock:
+        requestPaymentReversalLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentReversalUnlock:
+        requestPaymentReversalUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdateLock:
+        requestTransactionDetailsUpdateLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdateUnlock:
+        requestTransactionDetailsUpdateUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      approveRecipient:
+        approveRecipient:
+          'on': workflow
+          party: seller
+```
+
+Walkthrough: [`28-payment-controls.case.yaml`](../examples/apps/28-payment-controls.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | seller2 | Main | approve_seller2 | `{"revision":1}` | Processed |
+| 4 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 5 | guarantor | Main | acceptPaymentInstruction | `{}` | Processed |
+| 6 | customer | Main | requestPayeeAssignment | `{"requestId":"payee-declined","payeeRef":"seller2"}` | Processed; `{"/payment/payeeChannel":"seller"}` |
+| 7 | guarantor | Main | rejectPayeeAssignment | `{"requestId":"payee-declined","reason":"Provider declined"}` | Processed |
+| 8 | guarantor | Main | rejectPayeeAssignment | `{"requestId":"payee-declined","reason":"Provider declined"}` | Processed |
+| 9 | guarantor | Main | confirmPayeeAssignment | `{"requestId":"payee-declined"}` | Rejected; no state change |
+| 10 | customer | Main | requestPayeeAssignment | `{"requestId":"payee-succeeded","payeeRef":"seller2"}` | Processed; `{"/payment/payeeChannel":"seller"}` |
+| 11 | guarantor | Main | confirmPayeeAssignment | `{"requestId":"payee-succeeded"}` | Processed |
+| 12 | guarantor | Main | confirmPayeeAssignment | `{"requestId":"payee-succeeded"}` | Processed; `{"/payment/payeeChannel":"seller2"}` |
+| 13 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"details-declined","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
+| 14 | guarantor | Main | rejectTransactionDetailsUpdate | `{"requestId":"details-declined","reason":"Provider declined"}` | Processed |
+| 15 | guarantor | Main | rejectTransactionDetailsUpdate | `{"requestId":"details-declined","reason":"Provider declined"}` | Processed |
+| 16 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-declined"}` | Rejected; no state change |
+| 17 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"details-failed","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
+| 18 | guarantor | Main | failTransactionDetailsUpdate | `{"requestId":"details-failed","reason":"Provider failed"}` | Processed |
+| 19 | guarantor | Main | failTransactionDetailsUpdate | `{"requestId":"details-failed","reason":"Provider failed"}` | Processed |
+| 20 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-failed"}` | Rejected; no state change |
+| 21 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"details-succeeded","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
+| 22 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-succeeded"}` | Processed |
+| 23 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-succeeded"}` | Processed; `{"/payment/details/merchantReference":"shop-1"}` |
+| 24 | customer | Main | requestFinalAmountResolution | `{"requestId":"finalAmount-declined","finalAmount":9000,"reason":"Actual total"}` | Processed |
+| 25 | guarantor | Main | rejectFinalAmountResolution | `{"requestId":"finalAmount-declined","reason":"Provider declined"}` | Processed |
+| 26 | guarantor | Main | rejectFinalAmountResolution | `{"requestId":"finalAmount-declined","reason":"Provider declined"}` | Processed |
+| 27 | guarantor | Main | resolveFinalAmount | `{"requestId":"finalAmount-declined"}` | Rejected; no state change |
+| 28 | customer | Main | requestFinalAmountResolution | `{"requestId":"finalAmount-succeeded","finalAmount":9000,"reason":"Actual total"}` | Processed |
+| 29 | guarantor | Main | resolveFinalAmount | `{"requestId":"finalAmount-succeeded"}` | Processed |
+| 30 | guarantor | Main | resolveFinalAmount | `{"requestId":"finalAmount-succeeded"}` | Processed; `{"/payment/targetMinor":9000}` |
+| 31 | customer | Main | requestPaymentCompletionLock | `{"requestId":"completionLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/capture":false}` |
+| 32 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/capture":false}` |
+| 33 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionLock-failed","reason":"Operator failed"}` | Processed |
+| 34 | customer | Main | requestPaymentCompletionLock | `{"requestId":"completionLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/capture":false}` |
+| 35 | guarantor | Main | lockPaymentCompletion | `{"requestId":"completionLock-ok"}` | Processed; `{"/payment/locks/capture":true}` |
+| 36 | guarantor | Main | lockPaymentCompletion | `{"requestId":"completionLock-ok"}` | Processed |
+| 37 | customer | Main | requestPaymentCompletionUnlock | `{"requestId":"completionUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/capture":true}` |
+| 38 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/capture":true}` |
+| 39 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionUnlock-failed","reason":"Operator failed"}` | Processed |
+| 40 | customer | Main | requestPaymentCompletionUnlock | `{"requestId":"completionUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/capture":true}` |
+| 41 | guarantor | Main | unlockPaymentCompletion | `{"requestId":"completionUnlock-ok"}` | Processed; `{"/payment/locks/capture":false}` |
+| 42 | guarantor | Main | unlockPaymentCompletion | `{"requestId":"completionUnlock-ok"}` | Processed |
+| 43 | customer | Main | requestPaymentReversalLock | `{"requestId":"reversalLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/refund":false}` |
+| 44 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/refund":false}` |
+| 45 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalLock-failed","reason":"Operator failed"}` | Processed |
+| 46 | customer | Main | requestPaymentReversalLock | `{"requestId":"reversalLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/refund":false}` |
+| 47 | guarantor | Main | lockPaymentReversal | `{"requestId":"reversalLock-ok"}` | Processed; `{"/payment/locks/refund":true}` |
+| 48 | guarantor | Main | lockPaymentReversal | `{"requestId":"reversalLock-ok"}` | Processed |
+| 49 | customer | Main | requestPaymentReversalUnlock | `{"requestId":"reversalUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/refund":true}` |
+| 50 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/refund":true}` |
+| 51 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalUnlock-failed","reason":"Operator failed"}` | Processed |
+| 52 | customer | Main | requestPaymentReversalUnlock | `{"requestId":"reversalUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/refund":true}` |
+| 53 | guarantor | Main | unlockPaymentReversal | `{"requestId":"reversalUnlock-ok"}` | Processed; `{"/payment/locks/refund":false}` |
+| 54 | guarantor | Main | unlockPaymentReversal | `{"requestId":"reversalUnlock-ok"}` | Processed |
+| 55 | customer | Main | requestTransactionDetailsUpdateLock | `{"requestId":"detailsUpdateLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/details":false}` |
+| 56 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/details":false}` |
+| 57 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateLock-failed","reason":"Operator failed"}` | Processed |
+| 58 | customer | Main | requestTransactionDetailsUpdateLock | `{"requestId":"detailsUpdateLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/details":false}` |
+| 59 | guarantor | Main | lockTransactionDetailsUpdate | `{"requestId":"detailsUpdateLock-ok"}` | Processed; `{"/payment/locks/details":true}` |
+| 60 | guarantor | Main | lockTransactionDetailsUpdate | `{"requestId":"detailsUpdateLock-ok"}` | Processed |
+| 61 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"while-locked","transactionDetails":{"merchantReference":"bad"}}` | Processed |
+| 62 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"while-locked"}` | Rejected; no state change; `{"/payment/details/merchantReference":"shop-1"}` |
+| 63 | customer | Main | requestTransactionDetailsUpdateUnlock | `{"requestId":"detailsUpdateUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/details":true}` |
+| 64 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/details":true}` |
+| 65 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateUnlock-failed","reason":"Operator failed"}` | Processed |
+| 66 | customer | Main | requestTransactionDetailsUpdateUnlock | `{"requestId":"detailsUpdateUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/details":true}` |
+| 67 | guarantor | Main | unlockTransactionDetailsUpdate | `{"requestId":"detailsUpdateUnlock-ok"}` | Processed; `{"/payment/locks/details":false}` |
+| 68 | guarantor | Main | unlockTransactionDetailsUpdate | `{"requestId":"detailsUpdateUnlock-ok"}` | Processed |
+| 69 | guarantor | Main | recordTransactionInitiationFailed | `{"requestId":"attempt-1","reason":"Provider unavailable"}` | Processed |
+| 70 | guarantor | Main | recordTransactionInitiationFailed | `{"requestId":"attempt-1","reason":"Provider unavailable"}` | Processed |
+| 71 | guarantor | Main | recordTransactionInitiated | `{"transactionId":"eventual-transaction"}` | Processed |
+
+### 29-payment-rejection
+
+Source: [`29-payment-rejection.blue`](../examples/apps/29-payment-rejection.blue).
+
+```yaml
+name: Payment protocol requests, outcomes and reconciliation
+type: PaymentInstruction/Payment Instruction with Clauses
+instanceKey: protocol-demo
+paymentTerms:
+  currency: EUR
+  amountMinor: 10000
+  limitMinor: 12000
+  payerChannel: customer
+  payeeChannel: seller
+  guarantorChannel: guarantor
+  allowedPayees:
+  - seller
+  - seller2
+  recipientApprovalRequired: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        seller2:
+          type: Parties/Party
+          displayName: Seller2
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - seller2
+      - guarantor
+  requests:
+    type: PaymentInstruction/Payment Request Actions
+    bindings:
+      requestAuthorize:
+        requestSecureFunds:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestCapture:
+        requestCompletePayment:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestRefund:
+        requestReverseAfterCompletion:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestVoid:
+        requestCancelBeforeCompletion:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPayeeAssignment:
+        requestPayeeAssignment:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdate:
+        requestTransactionDetailsUpdate:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestFinalAmountResolution:
+        requestFinalAmountResolution:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentCompletionLock:
+        requestPaymentCompletionLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentCompletionUnlock:
+        requestPaymentCompletionUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentReversalLock:
+        requestPaymentReversalLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestPaymentReversalUnlock:
+        requestPaymentReversalUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdateLock:
+        requestTransactionDetailsUpdateLock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      requestTransactionDetailsUpdateUnlock:
+        requestTransactionDetailsUpdateUnlock:
+          'on': workflow
+          params:
+            $object:
+              $var: trigger
+          party: customer
+      approveRecipient:
+        approveRecipient:
+          'on': workflow
+          party: seller
+```
+
+Walkthrough: [`29-payment-rejection.case.yaml`](../examples/apps/29-payment-rejection.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
+| 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 3 | seller2 | Main | approve_seller2 | `{"revision":1}` | Processed |
+| 4 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 5 | guarantor | Main | rejectPaymentInstruction | `{"reason":"Unsupported instruction"}` | Processed; `{"/payment/rejected":true}` |
+| 6 | guarantor | Main | acceptPaymentInstruction | `{}` | Rejected; no state change |
+| 7 | guarantor | Main | recordTransactionInitiated | `{"transactionId":"forbidden"}` | Rejected; no state change |
+
+## 10. Source of truth and compatibility
+
+Use the package identities from `PACKAGES.json`, not a similarly named package from an earlier preview. An authored name such as `Payment/Payment Clause` is resolved to an exact definition before execution. Existing deployed documents keep their historical exact packages. Replacing the current unpublished candidate does not migrate their state or revise previously accepted terms.
+
+The native Language, BEX, Contracts, Coordination, Time and Mandates protocols remain distinct from these declarative business packages. The default gas limit is 10,000,000. This limit protects one processing step; it is not a promise that every enormous graph will be fast or fit in memory.

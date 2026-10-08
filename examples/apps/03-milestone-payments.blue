@@ -1,0 +1,110 @@
+name: Independent design and delivery milestones
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Seller
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  design:
+    type: State/Status Clause
+    parameters:
+      subject: Design
+      transitions:
+        pending:
+        - accepted
+        accepted: []
+    bindings:
+      state: /design
+      transition:
+        acceptDesign:
+          'on': workflow
+          party: customer
+          params:
+            to: accepted
+  designPayment:
+    type: Payment/Payment Clause
+    parameters:
+      amountMinor: 30000
+      currency: EUR
+    bindings:
+      instruction: /designPayment
+      start:
+        startDesignpayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        accepted:
+          in: agreement
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Design accepted
+          params:
+            requestId: design-capture
+            amountMinor: 30000
+  delivery:
+    type: State/Status Clause
+    parameters:
+      subject: Delivery
+      transitions:
+        pending:
+        - accepted
+        accepted: []
+    bindings:
+      state: /delivery
+      transition:
+        acceptDelivery:
+          'on': workflow
+          party: customer
+          params:
+            to: accepted
+  deliveryPayment:
+    type: Payment/Payment Clause
+    parameters:
+      amountMinor: 70000
+      currency: EUR
+    bindings:
+      instruction: /deliveryPayment
+      start:
+        startDeliverypayment:
+          'on': workflow
+          party: customer
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        accepted:
+          in: agreement
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Delivery accepted
+          params:
+            requestId: delivery-capture
+            amountMinor: 70000
+design: pending
+delivery: pending

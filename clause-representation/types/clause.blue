@@ -1,0 +1,142 @@
+name: Representation Clause
+type: Connections/Connected Clause
+description: Prepare an owner-approved native mandate with fixed operations and a
+  fixed target. The owner must approve the created mandate before it grants authority.
+bindingTypes:
+  mandate: pointer
+defaultBindings:
+  mandate: /mandate
+embeds:
+- mandate
+actions:
+  grant:
+    resultContract: outcome-v1
+    do:
+    - $let:
+        name: owner
+        expr:
+          $const:
+            name: parameters
+            path: /owner
+    - $let:
+        name: delegate
+        expr:
+          $const:
+            name: parameters
+            path: /delegate
+    - $let:
+        name: target
+        expr:
+          $const:
+            name: parameters
+            path: /target
+    - $let:
+        name: destination
+        expr:
+          $const:
+            name: bindings
+            path: /mandate
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $var: owner
+        message: MANDATE_OWNER_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $concat:
+                - /contracts/
+                - $var: delegate
+        message: DECLARED_REPRESENTATIVE_REQUIRED
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: destination
+        then:
+        - $set:
+            name: actionResult
+            expr:
+              outcome: duplicate
+        - $return: {}
+    - $let:
+        name: scope
+        expr: {}
+    - $forEach:
+        item: operation
+        in:
+          $const:
+            name: parameters
+            path: /operations
+        do:
+        - $set:
+            name: scope
+            expr:
+              $objectSet:
+                object:
+                  $var: scope
+                key:
+                  $var: operation
+                val:
+                  target:
+                    initialDocument:
+                      $objectSet:
+                        object: {}
+                        key: blueId
+                        val:
+                          $nodeBlueId:
+                            $document:
+                              $concat:
+                              - $var: target
+                              - /contracts/initialized/document
+                    channel:
+                      $var: owner
+                    operation:
+                      $var: operation
+    - $let:
+        name: mandate
+        expr:
+          $objectSet:
+            object:
+              name: Operation delegation
+            key: type
+            val:
+              $get:
+                object:
+                  type: Mandates/Operation Mandate
+                key: type
+    - $set:
+        name: mandate
+        expr:
+          $merge:
+          - $var: mandate
+          - scope:
+              $merge:
+              - type: Mandates/Scope
+              - $var: scope
+            contracts:
+              authorityHolderChannel:
+                $document:
+                  $concat:
+                  - /contracts/
+                  - $var: owner
+              authorizedActorChannel:
+                $document:
+                  $concat:
+                  - /contracts/
+                  - $var: delegate
+    - $appendChange:
+        op: add
+        path:
+          $var: destination
+        val:
+          $var: mandate
+    - $set:
+        name: actionResult
+        expr:
+          outcome: acceptedNew
+          path:
+            $var: destination

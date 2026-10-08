@@ -1,0 +1,181 @@
+name: Weekend bundle with independent hotel and restaurant orders
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+        hotel:
+          type: Parties/Party
+          displayName: Hotel
+        restaurant:
+          type: Parties/Party
+          displayName: Restaurant
+      required:
+      - customer
+      - hotel
+      - restaurant
+      - guarantor
+  hotel:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties:
+      - customer
+      - hotel
+      - guarantor
+    bindings:
+      template: /hotelTemplate
+      collection: /orders
+      start:
+        bookHotel:
+          'on': workflow
+          party: customer
+          params:
+            key: hotel
+  restaurant:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties:
+      - customer
+      - restaurant
+      - guarantor
+    bindings:
+      template: /restaurantTemplate
+      collection: /orders
+      start:
+        bookRestaurant:
+          'on': workflow
+          party: customer
+          params:
+            key: dinner
+orders: {}
+hotelTemplate:
+  name: Hotel weekend
+  type: Orders/Order with Clauses
+  product:
+    name: Hotel weekend
+    quantity: 1
+    unitPriceMinor: 30000
+    currency: EUR
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        amountMinor: 30000
+        currency: EUR
+        payee: hotel
+      bindings:
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: customer
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          confirmSatisfaction:
+            'on': workflow
+            party: customer
+            params:
+              requestId: capture-1
+              amountMinor: 30000
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /satisfied
+                  - true
+                message: SATISFACTION_REQUIRED
+            after:
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Delivery Accepted
+        requestRefund:
+          refund:
+            'on': workflow
+            party: hotel
+            params:
+              $object:
+                $var: trigger
+restaurantTemplate:
+  name: Dinner reservation
+  type: Orders/Order with Clauses
+  product:
+    name: Dinner reservation
+    quantity: 1
+    unitPriceMinor: 8000
+    currency: EUR
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        amountMinor: 8000
+        currency: EUR
+        payee: restaurant
+      bindings:
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: customer
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          confirmSatisfaction:
+            'on': workflow
+            party: customer
+            params:
+              requestId: capture-1
+              amountMinor: 8000
+            before:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: trigger
+                      path: /satisfied
+                  - true
+                message: SATISFACTION_REQUIRED
+            after:
+            - $appendEvent:
+                $merge:
+                - type: Events/Event
+                - kind: Delivery Accepted
+        requestRefund:
+          refund:
+            'on': workflow
+            party: restaurant
+            params:
+              $object:
+                $var: trigger

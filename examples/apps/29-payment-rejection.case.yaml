@@ -1,0 +1,43 @@
+document: 29-payment-rejection.blue
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller2
+  channel: seller2
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: rejectPaymentInstruction
+  channel: guarantor
+  request:
+    reason: Unsupported instruction
+  events:
+  - kind: Instruction Rejected
+  expect:
+    /payment/rejected: true
+  eventTypes:
+  - PaymentInstruction/Payment Instruction Rejected
+  requireExactDocumentVersion: true
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  status: FAILED
+  requireExactDocumentVersion: true
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: forbidden
+  status: FAILED
+  requireExactDocumentVersion: true

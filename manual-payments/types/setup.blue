@@ -1,252 +1,52 @@
 name: Manual Payment Setup
-type: Contracts/Compute Definition
+type: Payment/Payment Setup
 functions:
   build:
-    args:
-      input: {}
+    args: {}
     do:
-    - $let:
-        name: destination
-        expr:
-          $const:
-            name: bindings
-            path: /instruction
-    - $let:
-        name: identityPath
-        expr:
-          $concat:
-          - /connectionState_
-          - $const: clauseKey
-          - /instructionIdentity
-    - $let:
-        name: identity
-        expr:
-          $choose:
-            cond:
-              $exists:
-                $document:
-                  $var: identityPath
-            then:
-              $document:
-                $var: identityPath
-            else:
-              $concat:
-              - $nodeBlueId:
-                  $document: ''
-              - ':'
-              - $const: clauseKey
-    - $if:
-        cond:
-          $exists:
-            $document:
-              $var: destination
-        then:
-        - $failIf:
-            cond:
-              $ne:
-              - $document:
-                  $concat:
-                  - $var: destination
-                  - /instanceKey
-              - $var: identity
-            message: PAYMENT_DESTINATION_CONFLICT
-        - $return:
-            outcome: duplicate
     - $let:
         name: p
         expr:
-          $merge:
-          - payer: customer
-            recipient: seller
-          - $object:
-              $document:
-                $concat:
-                - /clauses/
-                - $const: clauseKey
-                - /parameters
-    - $let:
-        name: amount
-        expr:
-          $pointerGet:
-            object:
-              $var: p
-            path: /amountMinor
-            default: 0
-    - $let:
-        name: currency
-        expr:
-          $pointerGet:
-            object:
-              $var: p
-            path: /currency
-            default: ''
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $var: amount
-                kind: integer
-            - $gt:
-              - $var: amount
-              - 0
-            - $isKind:
-                val:
-                  $var: currency
-                kind: text
-            - $ne:
-              - $var: currency
-              - ''
-        message: MANUAL_PAYMENT_TERMS
-    - $let:
-        name: payer
-        expr:
-          $var:
-            name: p
-            path: /payer
+          $document:
+            $concat:
+            - /clauses/
+            - $const: clauseKey
+            - /parameters
     - $let:
         name: recipient
         expr:
-          $var:
-            name: p
-            path: /recipient
-    - $let:
-        name: channels
-        expr: {}
-    - $forEach:
-        item: role
-        in:
-        - $var: payer
-        - $var: recipient
-        do:
-        - $failIf:
-            cond:
-              $not:
-                $exists:
-                  $document:
-                    $concat:
-                    - /contracts/
-                    - $var: role
-            message: MANUAL_PAYMENT_CHANNEL
-        - $set:
-            name: channels
-            expr:
-              $objectSet:
-                object:
-                  $var: channels
-                key:
-                  $var: role
-                val:
-                  $document:
-                    $concat:
-                    - /contracts/
-                    - $var: role
-    - $let:
-        name: child
-        expr:
-          $literal:
-            name: Manual Bank Payment Instruction
-            type: PaymentInstruction/Payment Instruction
-            clauses:
-              transfer:
-                type: ManualPayments/Manual Transfer Policy
-    - $let:
-        name: bindings
-        expr: {}
-    - $forEach:
-        key: operation
-        item: role
-        in:
-          accept:
-            $var: recipient
-          reportTransfer:
-            $var: payer
-          confirmReceipt:
-            $var: recipient
-          requestRefund:
-            $var: recipient
-          confirmRefund:
-            $var: payer
-        do:
-        - $set:
-            name: bindings
-            expr:
-              $objectSet:
-                object:
-                  $var: bindings
-                key:
-                  $var: operation
-                val:
-                  $objectSet:
-                    object: {}
-                    key:
-                      $var: operation
-                    val:
-                      $merge:
-                      - 'on': workflow
-                        channel:
-                          $var: role
-                      - $literal:
-                          params:
-                            reference:
-                              $var:
-                                name: trigger
-                                path: /reference
-    - $set:
-        name: child
-        expr:
-          $pointerSet:
+          $pointerGet:
             object:
-              $var: child
-            path: /clauses/transfer/parameters
-            val:
-              amountMinor:
-                $var: amount
-              currency:
-                $var: currency
-              payerChannel:
-                $var: payer
-              recipientChannel:
-                $var: recipient
-    - $set:
-        name: child
+              $var: p
+            path: /payee
+            default: seller
+    - $let:
+        name: result
         expr:
-          $pointerSet:
-            object:
-              $var: child
-            path: /clauses/transfer/bindings
-            val:
-              $var: bindings
-    - $set:
-        name: child
-        expr:
-          $merge:
-          - $var: child
-          - instanceKey:
-              $var: identity
-            contracts:
-              $var: channels
-            paymentDetails:
-              method: manual-bank-transfer
-              confirmation: recipient
-              amountMinor:
-                $var: amount
-              currency:
-                $var: currency
-    - $appendChange:
-        op: add
-        path:
-          $var: identityPath
-        val:
-          $var: identity
-    - $appendChange:
-        op: add
-        path:
-          $var: destination
-        val:
-          $var: child
+          $call:
+            function: buildInstruction
+            args:
+              configOverride:
+                guarantor:
+                  $var: recipient
+              details:
+                method: manual-bank-transfer
+                confirmation: recipient
+              methodClauses: {}
+              termsOverride: {}
+              instructionPatch:
+                rootType:
+                  $get:
+                    object:
+                      type: ManualPayments/Manual Payment Instruction
+                    key: type
+                contracts:
+                  reportTransfer:
+                    channel:
+                      $pointerGet:
+                        object:
+                          $var: p
+                        path: /payer
+                        default: customer
     - $return:
-        outcome: acceptedNew
-        path:
-          $var: destination
+        $var: result

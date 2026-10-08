@@ -1,0 +1,102 @@
+name: Evidence-gated purchasing with an explicit operation mandate
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        buyer:
+          type: Parties/Party
+          displayName: Buyer
+          representatives:
+            agent:
+              type: Parties/Representative
+              displayName: Purchasing agent
+        supplier:
+          type: Parties/Party
+          displayName: Supplier
+      required:
+      - buyer
+      - supplier
+  evidence:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /evidenceTemplate
+      collection: /evidence
+      start:
+        startEvidence:
+          'on': workflow
+          party: buyer
+          params:
+            key: shipment
+  acceptance:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        accept:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /evidence/shipment/status
+                - delivered
+              message: DELIVERY_EVIDENCE_REQUIRED
+          - $appendChange:
+              op: add
+              path: /accepted
+              val: true
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Evidence Accepted
+    bindings:
+      accept:
+        acceptEvidence:
+          'on': workflow
+          party: buyer
+  delegation:
+    type: Representation/Representation Clause
+    parameters:
+      owner: buyer
+      delegate: buyer__agent
+      target: ''
+      operations:
+      - acceptEvidence
+    bindings:
+      mandate: /mandate
+      grant:
+        prepareMandate:
+          'on': workflow
+          party: buyer
+evidence: {}
+evidenceTemplate:
+  name: Delivery evidence
+  type: Agreements/Agreement with Clauses
+  status: pending
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    status:
+      type: State/Status Clause
+      parameters:
+        subject: Delivery
+        transitions:
+          pending:
+          - delivered
+          - failed
+          delivered: []
+          failed: []
+      bindings:
+        state: /status
+        transition:
+          deliver:
+            'on': workflow
+            party: supplier
+            params:
+              to: delivered
+accepted: false

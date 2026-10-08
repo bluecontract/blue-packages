@@ -12,8 +12,8 @@ def check(root=ROOT):
     messages = {name for name, e in exports.items() if '/messages/' in e['path']}
     concrete = messages - {'Payment Request', 'Payment Response'}
     covered, invoked = set(), set()
-    for number in ('23', '24', '25'):
-        case = next((root / 'examples/payment-family').glob(number + '-*.case.yaml'))
+    for number in ('27', '28', '29'):
+        case = next((root / 'examples/apps').glob(number + '-*.case.yaml'))
         data = load(case)
         for row in [data.get('initial', {}), *data['steps']]:
             covered.update(t.split('/', 1)[1] for t in row.get('eventTypes', []))
@@ -22,10 +22,21 @@ def check(root=ROOT):
     assert concrete == covered, f'Missing or unknown message assertions: {concrete ^ covered}'
     metadata = json.loads((root / 'docs/payment-protocol-operations.json').read_text())
     assert set(metadata['guarantorOperations']) <= invoked, 'Untested guarantor operation'
-    actions = load(root / 'payment-instruction/types/payment-lifecycle-clause.blue')['actions']
-    assert set(metadata['guarantorOperations']) <= actions.keys(), 'Undeclared operation'
-    assert 'confirm' not in actions, 'Generic confirmation must not be the public operation'
-    print(f'PASS: {len(concrete)} concrete messages and {len(metadata["guarantorOperations"])} guarantor operations have executable scenario assertions')
+    operations = load(root / 'payment-instruction/types/payment-instruction.blue')['contracts']
+    assert set(metadata['guarantorOperations']) <= operations.keys(), 'Undeclared domain operation'
+    assert 'confirm' not in operations, 'Generic confirmation must not be the public operation'
+    requests = load(root / 'payment-instruction/types/payment-request-actions.blue')['actions']
+    payment = load(root / 'clause-payment/types/conditional-base.blue')
+    assert not set(metadata['guarantorOperations']) & (set(requests) | set(payment['actions']) | set(payment['childActions'])), 'Guarantor operation leaked into a clause'
+    assert load(root / 'payment-instruction/types/host-with-clauses.blue')['type'] == 'PaymentInstruction/Payment Instruction'
+    for domain, folder, prefix in [('Payment', 'payment-instruction', 'messages/'), ('Shipping', 'shipping-instruction', '')]:
+        manifest = load(root / folder / 'blue-package.yaml')
+        types = {e['name']: load(root / folder / e['path']) for e in manifest['exports']}
+        for kind in ['Request', 'Response']:
+            assert types[domain+' '+kind]['type'] == 'Events/'+kind
+    assert load(root / 'blue-events/types/request.blue')['type'] == 'Events/Event'
+    assert load(root / 'blue-events/types/response.blue')['type'] == 'Events/Event'
+    print(f'PASS: {len(concrete)} concrete messages and {len(metadata["guarantorOperations"])} guarantor operations have executable scenario assertions (static coverage check; run Java separately)')
 
 if __name__ == '__main__':
     check()

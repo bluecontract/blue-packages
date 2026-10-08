@@ -1,0 +1,49 @@
+name: Two-party approval of a booking amendment
+type: Agreements/Agreement with Clauses
+termsEditable: true
+booking:
+  room: A
+  priceMinor: 40000
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        guest:
+          type: Parties/Party
+          displayName: Guest
+        host:
+          type: Parties/Party
+          displayName: Host
+      required:
+      - guest
+      - host
+  amendments:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers:
+      - guest
+      - host
+      paths:
+      - /booking
+    bindings:
+      propose:
+        proposeBooking:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+      approve:
+        guestApprove:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+        hostApprove:
+          'on': workflow
+          party: host
+          params:
+            $object:
+              $var: trigger

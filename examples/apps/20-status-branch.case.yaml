@@ -1,0 +1,40 @@
+document: 20-status-branch.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_technician
+  channel: technician
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: advanceRepair
+  channel: technician
+  request:
+    to: examining
+    reason: Received
+  expect:
+    /status: examining
+  requireExactDocumentVersion: true
+- operation: advanceRepair
+  channel: technician
+  request:
+    to: unrepairable
+    reason: Part unavailable
+  expect:
+    /status: unrepairable
+  requireExactDocumentVersion: true
+- operation: advanceRepair
+  channel: technician
+  request:
+    to: repaired
+    reason: Not allowed
+  expect:
+    /status: unrepairable
+  status: FAILED
+  requireExactDocumentVersion: true

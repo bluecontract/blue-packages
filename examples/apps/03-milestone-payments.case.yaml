@@ -1,0 +1,104 @@
+document: 03-milestone-payments.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: startDesignpayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /designPayment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: designPayment
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /designPayment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 30000
+  requireExactDocumentVersion: true
+  target: /designPayment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 30000
+  requireExactDocumentVersion: true
+  target: /designPayment
+- operation: startDeliverypayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /deliveryPayment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: deliveryPayment
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /deliveryPayment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 70000
+  requireExactDocumentVersion: true
+  target: /deliveryPayment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 70000
+  requireExactDocumentVersion: true
+  target: /deliveryPayment
+- operation: acceptDesign
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /designPayment/payment/reserved/capture: 30000
+    /deliveryPayment/payment/reserved/capture: 0
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: design-capture
+    amountCompleted: 30000
+  requireExactDocumentVersion: true
+  target: /designPayment
+- operation: acceptDelivery
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /deliveryPayment/payment/reserved/capture: 70000

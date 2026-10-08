@@ -1,0 +1,32 @@
+document: 15-product.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_buyer
+  channel: buyer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: quote
+  channel: seller
+  request:
+    quantity: 3
+    unitPriceMinor: 2500
+  expect:
+    /product/totalMinor: 7500
+  requireExactDocumentVersion: true
+- operation: quote
+  channel: seller
+  request:
+    quantity: 0
+    unitPriceMinor: 2500
+  expect:
+    /product/totalMinor: 7500
+  status: FAILED
+  requireExactDocumentVersion: true

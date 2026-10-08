@@ -1,5 +1,5 @@
 name: Payment Setup
-type: Payment/Conditional Payment Setup
+type: Payment/Payment Setup
 functions:
   resolveParty:
     args:
@@ -11,6 +11,33 @@ functions:
           $var:
             name: input
             path: /candidate
+    - $if:
+        cond:
+          $and:
+          - $isKind:
+              val:
+                $var: candidate
+              kind: text
+          - $hasKey:
+              object:
+                $document: /activation/parties
+              key:
+                $var: candidate
+        then:
+        - $return:
+            channel:
+              $var: candidate
+            party:
+              $document:
+                $concat:
+                - /activation/parties/
+                - $var: candidate
+            myosAccountId:
+              $document:
+                $concat:
+                - /activation/parties/
+                - $var: candidate
+                - /myosAccountId
     - $let:
         name: account
         expr:
@@ -48,7 +75,7 @@ functions:
         item: party
         in:
           $object:
-            $document: /parties
+            $document: /activation/parties
         do:
         - $if:
             cond:
@@ -95,7 +122,7 @@ functions:
         party:
           $document:
             $concat:
-            - /parties/
+            - /activation/parties/
             - $var: role
         myosAccountId:
           $var: account
@@ -234,53 +261,35 @@ functions:
             name: methodTerms
             expr:
               initiationGate: /customerSession/funded
-        - $set:
-            name: methodClauses
-            expr:
-              $objectSet:
-                object:
-                  $var: methodClauses
-                key: customerSession
-                val:
-                  type: MyOS/Customer Session Clause
-                  parameters:
-                    operator:
-                      $var: operator
-                  bindings:
-                    provideSession:
-                      provideSession:
-                        'on': workflow
-                        channel:
-                          $var: operator
-                        params:
-                          $literal:
-                            sessionId:
-                              $var:
-                                name: trigger
-                                path: /sessionId
-                    confirmFunding:
-                      confirmFunding:
-                        'on': workflow
-                        channel:
-                          $var: operator
-                        params:
-                          $literal:
-                            sessionId:
-                              $var:
-                                name: trigger
-                                path: /sessionId
+    - $let:
+        name: result
+        expr:
+          $call:
+            function: buildInstruction
+            args:
+              configOverride:
+                $var: patch
+              details:
+                method:
+                  $var: method
+                parties:
+                  $var: snapshots
+              methodClauses:
+                $var: methodClauses
+              termsOverride:
+                $var: methodTerms
+              instructionPatch:
+                $choose:
+                  cond:
+                    $eq:
+                    - $var: method
+                    - myos-customer
+                  then:
+                    rootType:
+                      $get:
+                        object:
+                          type: MyOS/MyOS Customer Payment Instruction
+                        key: type
+                  else: {}
     - $return:
-        $call:
-          function: buildInstruction
-          args:
-            configOverride:
-              $var: patch
-            details:
-              method:
-                $var: method
-              parties:
-                $var: snapshots
-            methodClauses:
-              $var: methodClauses
-            termsOverride:
-              $var: methodTerms
+        $var: result

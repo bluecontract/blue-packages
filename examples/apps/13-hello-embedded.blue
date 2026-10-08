@@ -1,0 +1,69 @@
+name: Greetings propagated from one child
+type: Agreements/Agreement with Clauses
+message: ''
+children: {}
+childTemplate:
+  name: Child greeting
+  type: Orders/Order with Clauses
+  message: ''
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    hello:
+      type: Connections/Hello Clause
+      bindings:
+        text: /message
+        say:
+          greet:
+            'on': workflow
+            party: owner
+            params:
+              text:
+                $var:
+                  name: trigger
+                  path: /text
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  children:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      parties: []
+    bindings:
+      template: /childTemplate
+      collection: /children
+      start:
+        newChild:
+          'on': workflow
+          party: owner
+          params:
+            $object:
+              $var: trigger
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        fromChild:
+          'on': embedded
+          path: /children/a
+          event:
+            type: Connections/Hello Said
+          params:
+            text:
+              $concat:
+              - 'Received: '
+              - $var:
+                  name: trigger
+                  path: /text

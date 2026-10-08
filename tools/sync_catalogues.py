@@ -15,7 +15,7 @@ def views(root=ROOT):
         {key:r[key] for key in ('name','path','packageBlueId','archiveSha256')} for r in rows])
     business=[r for r in rows if r['directory'] in sources['packages'] and r['directory']!='blue-mandates']
     family=dict(format='blue-payment-family/1', status='unpublished-candidate', generatedFrom='PACKAGES.json',
-                packages=business, mounts={k:v for k,v in catalogue['mounts'].items() if k != 'Mandates'})
+                packages=business, mounts=catalogue['mounts'])
     return {'SHARED-PACKAGES.json':shared, 'PAYMENT-FAMILY-PACKAGES.json':family}
 
 def sync(root=ROOT, check=False):

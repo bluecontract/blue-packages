@@ -1,0 +1,154 @@
+name: One reminder from the first report and a resettable latest reminder
+type: Agreements/Agreement with Clauses
+message: ''
+log: []
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  report:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        report:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Delivery Reported
+                text:
+                  $var:
+                    name: trigger
+                    path: /text
+        cancel:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Cancel Reminder
+        remind:
+          do:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Reminder Requested
+    bindings:
+      report:
+        report:
+          'on': workflow
+          party: owner
+      cancel:
+        cancel:
+          'on': workflow
+          party: owner
+      remind:
+        remind:
+          'on': workflow
+          party: owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        first:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Delivery Reported
+          delayMs: 2000
+          policy: first
+          once: true
+          cancelOn:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Cancel Reminder
+          params:
+            text:
+              $concat:
+              - 'first: '
+              - $var:
+                  name: trigger
+                  path: /text
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: first
+        latest:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Delivery Reported
+          delayMs: 2000
+          policy: latest
+          once: true
+          cancelOn:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Cancel Reminder
+          params:
+            text:
+              $concat:
+              - 'latest: '
+              - $var:
+                  name: trigger
+                  path: /text
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: latest
+        cancellable:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Reminder Requested
+          delayMs: 2000
+          policy: latest
+          cancelOn:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Cancel Reminder
+          params:
+            text: Should be cancelled
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: cancelled-timer-fired
+  schedule:
+    type: Schedule/Schedule Clause
+    parameters:
+      key: follow-up
+    bindings:
+      fire:
+        followUp:
+          'on': timer
+          afterEvent:
+            'on': event
+            event:
+              type: Events/Event
+              kind: Delivery Reported
+          delayMs: 4000
+          policy: first
+          once: true
+          after:
+          - $appendChange:
+              op: add
+              path: /log/-
+              val: schedule

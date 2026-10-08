@@ -1,0 +1,96 @@
+document: 24-acme-bank.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: startPayment
+  channel: customer
+  request: {}
+  expect:
+    /payment/activation/active: true
+  requireExactDocumentVersion: true
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  target: /payment
+  requireExactDocumentVersion: true
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: lesson-transaction
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test-1
+  target: /payment
+  requireExactDocumentVersion: true
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 10000
+  target: /payment
+  requireExactDocumentVersion: true
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 10000
+  target: /payment
+  requireExactDocumentVersion: true
+- operation: confirmSatisfaction
+  channel: customer
+  request:
+    satisfied: false
+  target: /payment
+  status: FAILED
+  requireExactDocumentVersion: true
+- operation: confirmSatisfaction
+  channel: customer
+  request:
+    satisfied: true
+  expect:
+    /satisfied: true
+    /payment/payment/reserved/capture: 10000
+  target: /payment
+  requireExactDocumentVersion: true
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: capture-1
+    amountCompleted: 10000
+  expect:
+    /payment/payment/completed: 10000
+  target: /payment
+  restore: true
+  requireExactDocumentVersion: true
+- operation: refund
+  channel: seller
+  request:
+    requestId: refund-1
+    amountMinor: 2500
+  target: /payment
+  requireExactDocumentVersion: true
+- operation: reverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-1
+    amountReversed: 2500
+  expect:
+    /payment/payment/reversed: 2500
+  target: /payment
+  requireExactDocumentVersion: true

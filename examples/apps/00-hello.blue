@@ -1,0 +1,41 @@
+name: Hello with consent and validation
+type: Agreements/Agreement with Clauses
+message: ''
+audit: ''
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        sayHello:
+          'on': workflow
+          party: owner
+          params:
+            text:
+              $var:
+                name: trigger
+                path: /text
+          before:
+          - $failIf:
+              cond:
+                $not:
+                  $var:
+                    name: trigger
+                    path: /approved
+              message: APPROVAL_REQUIRED
+          after:
+          - $appendChange:
+              op: replace
+              path: /audit
+              val:
+                $resultValue: /message

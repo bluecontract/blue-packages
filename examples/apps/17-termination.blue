@@ -1,0 +1,40 @@
+name: Termination waits for outstanding work
+type: Agreements/Agreement with Clauses
+lifecycle: Active
+canTerminate: false
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  termination:
+    type: Termination/Termination Clause
+    bindings:
+      request:
+        requestTermination:
+          'on': workflow
+          party: owner
+      finish:
+        finishTermination:
+          'on': workflow
+          party: owner
+  work:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        complete:
+          do:
+          - $appendChange:
+              op: replace
+              path: /canTerminate
+              val: true
+    bindings:
+      complete:
+        completeWork:
+          'on': workflow
+          party: owner

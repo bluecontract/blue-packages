@@ -1,0 +1,86 @@
+document: 25-shipping.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_carrier
+  channel: carrier
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: startShipping
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+- operation: bookShipment
+  channel: seller
+  request:
+    requestId: ship-1
+  target: /shipment
+  requireExactDocumentVersion: true
+- operation: confirmShipment
+  channel: carrier
+  request:
+    requestId: ship-1
+    trackingId: TEST123
+  expect:
+    /shipment/shipment/status: accepted
+  target: /shipment
+  requireExactDocumentVersion: true
+- operation: confirmDelivery
+  channel: carrier
+  request:
+    requestId: ship-1
+  target: /shipment
+  status: FAILED
+  requireExactDocumentVersion: true
+- operation: changeAddress
+  channel: seller
+  request:
+    requestId: address-1
+    address: 24 Blue Street
+  target: /shipment
+  requireExactDocumentVersion: true
+- operation: confirmAddressChange
+  channel: carrier
+  request:
+    requestId: address-1
+  expect:
+    /shipment/destination: 24 Blue Street
+  target: /shipment
+  requireExactDocumentVersion: true
+- operation: rejectAddressChange
+  channel: carrier
+  request:
+    requestId: address-1
+  target: /shipment
+  status: FAILED
+  requireExactDocumentVersion: true
+- operation: recordDispatched
+  channel: carrier
+  request:
+    requestId: ship-1
+  expect:
+    /shipment/shipment/status: dispatched
+  target: /shipment
+  requireExactDocumentVersion: true
+- operation: confirmDelivery
+  channel: carrier
+  request:
+    requestId: ship-1
+  expect:
+    /delivered: true
+    /shipment/shipment/status: delivered
+  target: /shipment
+  restore: true
+  requireExactDocumentVersion: true

@@ -1,0 +1,206 @@
+name: Child Activation Functions
+type: Parties/Party Access Functions
+description: Snapshot explicitly reused parent parties into a child. This copies access evidence and never
+  gives a new party permission implicitly.
+functions:
+  activateChild:
+    args:
+      child: {}
+      roles: []
+      readerNames: []
+      frozen:
+        type: Boolean
+    do:
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document: /activation
+        then:
+        - $return:
+            $var: child
+    - $let:
+        name: selected
+        expr:
+          $choose:
+            cond:
+              $eq:
+              - $size:
+                  $var: roles
+              - 0
+            then:
+              $keys:
+                $document: /activation/parties
+            else:
+              $var: roles
+    - $let:
+        name: roster
+        expr: {}
+    - $let:
+        name: readers
+        expr: {}
+    - $forEach:
+        item: role
+        in:
+          $var: selected
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $document: /activation/parties
+                  key:
+                    $var: role
+            message: CHILD_PARTY_NOT_IN_PARENT
+        - $set:
+            name: roster
+            expr:
+              $objectSet:
+                object:
+                  $var: roster
+                key:
+                  $var: role
+                val:
+                  $get:
+                    object:
+                      $document: /activation/parties
+                    key:
+                      $var: role
+    - $forEach:
+        item: reader
+        in:
+          $var: readerNames
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $document: /activation/readers
+                  key:
+                    $var: reader
+            message: CHILD_READER_NOT_IN_PARENT
+        - $set:
+            name: readers
+            expr:
+              $objectSet:
+                object:
+                  $var: readers
+                key:
+                  $var: reader
+                val:
+                  $get:
+                    object:
+                      $document: /activation/readers
+                    key:
+                      $var: reader
+    - $let:
+        name: access
+        expr: {}
+    - $let:
+        name: paths
+        expr: []
+    - $forEach:
+        item: path
+        in:
+          $document: /activation/accessPaths
+        do:
+        - $let:
+            name: key
+            expr:
+              $concat:
+              - grant
+              - $text:
+                  $size:
+                    $var: paths
+        - $set:
+            name: access
+            expr:
+              $objectSet:
+                object:
+                  $var: access
+                key:
+                  $var: key
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: path
+        - $set:
+            name: paths
+            expr:
+              $listConcat:
+              - $var: paths
+              - - $concat:
+                  - /timelineAccess/
+                  - $var: key
+    - $let:
+        name: result
+        expr:
+          $merge:
+          - $var: child
+          - timelineAccess:
+              $var: access
+    - $let:
+        name: params
+        expr:
+          $pointerGet:
+            object:
+              $var: child
+            path: /clauses/activation/parameters
+            default: {}
+    - $set:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: result
+            path: /clauses/activation
+            val:
+              $merge:
+              - type: Activation/Activation Clause
+              - parameters:
+                  $merge:
+                  - $var: params
+                  - parties:
+                      $var: roster
+                    readers:
+                      $var: readers
+                    accessPaths:
+                      $var: paths
+                    required:
+                      $pointerGet:
+                        object:
+                          $var: params
+                        path: /required
+                        default: []
+                    frozen:
+                      $var: frozen
+    - $forEach:
+        item: transport
+        in:
+          $call:
+            function: transports
+            args:
+              roster:
+                $var: roster
+        do:
+        - $set:
+            name: result
+            expr:
+              $pointerSet:
+                object:
+                  $var: result
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: key
+                val:
+                  $var: transport
+        key: key
+    - $return:
+        $var: result

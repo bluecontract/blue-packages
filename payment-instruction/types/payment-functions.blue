@@ -46,9 +46,7 @@ functions:
               - workflow
             - $eq:
               - $binding: call/channel
-              - $const:
-                  name: parameters
-                  path: /guarantorChannel
+              - $document: /paymentTerms/guarantorChannel
         message: Guarantor workflow required
   emit:
     args:
@@ -186,9 +184,7 @@ functions:
           paymentId:
             $document: /instanceKey
           currency:
-            $const:
-              name: parameters
-              path: /currency
+            $document: /paymentTerms/currency
         - $choose:
             cond:
               $exists:
@@ -310,7 +306,7 @@ functions:
     - $let:
         name: terms
         expr:
-          $const: parameters
+          $document: /paymentTerms
     - $let:
         name: amount
         expr:
@@ -449,18 +445,12 @@ functions:
           $gt:
           - $size:
               $object:
-                $document:
-                  $const:
-                    name: bindings
-                    path: /state
+                $document: /payment
           - 0
         message: Initial financial state must be empty
     - $appendChange:
         op: replace
-        path:
-          $const:
-            name: bindings
-            path: /state
+        path: /payment
         val:
           accepted: false
           rejected: false
@@ -547,10 +537,7 @@ functions:
     - $let:
         name: s
         expr:
-          $document:
-            $const:
-              name: bindings
-              path: /state
+          $document: /payment
     - $failIf:
         cond:
           $and:
@@ -590,10 +577,7 @@ functions:
             changed: false
     - $appendChange:
         op: replace
-        path:
-          $const:
-            name: bindings
-            path: /state
+        path: /payment
         val:
           $merge:
           - $var: s
@@ -628,10 +612,7 @@ functions:
     do:
     - $let:
         name: path
-        expr:
-          $const:
-            name: bindings
-            path: /state
+        expr: /payment
     - $let:
         name: s
         expr:
@@ -692,10 +673,7 @@ functions:
             $var: transactionId
     - $let:
         name: path
-        expr:
-          $const:
-            name: bindings
-            path: /state
+        expr: /payment
     - $let:
         name: s
         expr:
@@ -738,9 +716,7 @@ functions:
                 $var: input
               path: /initiatedAmount
               default:
-                $const:
-                  name: parameters
-                  path: /amountMinor
+                $document: /paymentTerms/amountMinor
     - $failIf:
         cond:
           $not:
@@ -760,9 +736,7 @@ functions:
               - $var:
                   name: attachment
                   path: /initiatedAmount
-              - $const:
-                  name: parameters
-                  path: /limitMinor
+              - $document: /paymentTerms/limitMinor
         message: Invalid initiated amount
     - $if:
         cond:
@@ -795,7 +769,7 @@ functions:
         expr:
           $pointerGet:
             object:
-              $const: parameters
+              $document: /paymentTerms
             path: /initiationGate
             default: ''
     - $if:
@@ -843,10 +817,7 @@ functions:
     do:
     - $let:
         name: path
-        expr:
-          $const:
-            name: bindings
-            path: /state
+        expr: /payment
     - $let:
         name: s
         expr:
@@ -984,7 +955,7 @@ functions:
         expr:
           $pointerGet:
             object:
-              $const: parameters
+              $document: /paymentTerms
             path: /captureGate
             default: ''
     - $failIf:
@@ -1094,9 +1065,7 @@ functions:
                     path: /payeeChannel
                 - ''
               - $and:
-                - $const:
-                    name: parameters
-                    path: /recipientApprovalRequired
+                - $document: /paymentTerms/recipientApprovalRequired
                 - $not:
                     $var:
                       name: s
@@ -1266,10 +1235,7 @@ functions:
         function: guarantor
     - $let:
         name: path
-        expr:
-          $const:
-            name: bindings
-            path: /state
+        expr: /payment
     - $let:
         name: s
         expr:
@@ -1579,10 +1545,7 @@ functions:
         function: guarantor
     - $let:
         name: path
-        expr:
-          $const:
-            name: bindings
-            path: /state
+        expr: /payment
     - $let:
         name: s
         expr:
@@ -1671,9 +1634,7 @@ functions:
                         path: /reserved/capture
                 - $lte:
                   - $var: nextValue
-                  - $const:
-                      name: parameters
-                      path: /limitMinor
+                  - $document: /paymentTerms/limitMinor
             message: Final amount outside approved limits or pending capture
         - $failIf:
             cond:
@@ -1726,9 +1687,7 @@ functions:
                 $and:
                 - $includes:
                     list:
-                      $const:
-                        name: parameters
-                        path: /allowedPayees
+                      $document: /paymentTerms/allowedPayees
                     val:
                       $var: nextValue
                 - $exists:

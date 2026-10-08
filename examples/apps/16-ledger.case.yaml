@@ -1,0 +1,55 @@
+document: 16-ledger.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_partner
+  channel: partner
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: setTarget
+  channel: seller
+  request:
+    key: orderA
+    amountMinor: 1000
+  expect:
+    /balance/accrued: 1000
+  requireExactDocumentVersion: true
+- operation: setTarget
+  channel: seller
+  request:
+    key: orderA
+    amountMinor: 750
+  expect:
+    /balance/accrued: 750
+  requireExactDocumentVersion: true
+- operation: reserve
+  channel: seller
+  request:
+    key: payout1
+    amountMinor: 500
+  expect:
+    /balance/reserved: 500
+  requireExactDocumentVersion: true
+- operation: settle
+  channel: seller
+  request:
+    key: payout1
+    outcome: succeeded
+  expect:
+    /balance/paid: 500
+    /balance/reserved: 0
+  requireExactDocumentVersion: true
+- operation: reserve
+  channel: seller
+  request:
+    key: tooMuch
+    amountMinor: 300
+  status: FAILED
+  requireExactDocumentVersion: true

@@ -967,6 +967,71 @@ do:
                     $var: ownedEmbedding
                   key:
                     $var: field
+- $let:
+    name: effectivePaths
+    expr: []
+- $forEach:
+    item: fixedPath
+    in:
+      $var:
+        name: embedding
+        path: /paths
+    do:
+    - $let:
+        name: coveredByCollection
+        expr: false
+    - $forEach:
+        item: collectionPath
+        in:
+          $var:
+            name: embedding
+            path: /collectionPaths
+        do:
+        - $if:
+            cond:
+              $and:
+              - $startsWith:
+                - $var: fixedPath
+                - $concat:
+                  - $var: collectionPath
+                  - /
+              - $eq:
+                - $size:
+                    $split:
+                      text:
+                        $var: fixedPath
+                      separator: /
+                - $add:
+                  - $size:
+                      $split:
+                        text:
+                          $var: collectionPath
+                        separator: /
+                  - 1
+            then:
+            - $set:
+                name: coveredByCollection
+                expr: true
+    - $if:
+        cond:
+          $not:
+            $var: coveredByCollection
+        then:
+        - $set:
+            name: effectivePaths
+            expr:
+              $listConcat:
+              - $var: effectivePaths
+              - - $var: fixedPath
+- $let:
+    name: effectiveEmbedding
+    expr:
+      $objectSet:
+        object:
+          $var: embedding
+        key: paths
+        val:
+          $var: effectivePaths
 - $if:
     cond:
       $gt:
@@ -993,7 +1058,7 @@ do:
               contract:
                 $merge:
                 - type: Contracts/Process Embedded
-                - $var: embedding
+                - $var: effectiveEmbedding
     - $set:
         name: managed
         expr:

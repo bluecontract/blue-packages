@@ -1,28 +1,15 @@
 # Blue packages
 
-One current package set lives at the repository root. `PACKAGE-SOURCES.json`
-selects the source directories; `PACKAGES.json` pins the complete built set.
-There are no alternative source editions to choose between.
+One current package set lives at the repository root. `PACKAGE-SOURCES.json` selects source directories; `PACKAGES.json` pins the built archives. `PUBLIC-CLAUSES.json` is the public catalogue: 13 feature families, including one payment family with provider-specific variants.
 
-Start with the [complete clause tutorial](docs/clauses-tutorial.md): all 38 clause types,
-87 use-case references, complete applications, and executable Java walkthroughs.
-Then read [the payment-family guide](docs/payment-family.md),
-[the repository layout](docs/layout.md), and [consolidation notes](docs/consolidation.md).
+Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [executable examples](examples/apps). They use Activation and clauses throughout. Raw contracts are implementation details of reusable packages. The Payment clause exposes requests; guarantor operations belong to the Payment Instruction.
 
-The foundation is Language, BEX, Contracts (10,000,000 default gas), Coordination,
-Time and Mandates. **Mandates is its own package, `blue-mandates`.** Coordination
-owns authenticated timeline transport and access, not business delegation rules.
-
-Business packages cover clauses, agreements, orders, document collections,
-parties, access participants, state, activation, termination, amendments,
-balances, referrals, schedules and the payment family. Payment Instruction is
-provider-neutral; MyOS, ACME Bank and Manual Payments contain specific processes.
-Adapters remain test implementations, not live financial integrations.
+The foundations are Language, BEX, Contracts (10,000,000 default gas), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 
 ## Build and verify
 
 ```sh
-# JAVA_HOME must select Java 21; classpath must use the qualified Blue Java runtime.
+# Java 21 and a qualified Blue Java runtime classpath are required.
 BLUE_JAVA_CLASSPATH=... bash tools/build-payment-family.sh
 python3 tools/sync_catalogues.py
 python3 tools/release.py check
@@ -31,11 +18,8 @@ python3 tools/check_clause_tutorial.py
 python3 -m unittest discover -s tools -p 'test_release.py'
 ```
 
-The builder reads `.blue` definitions. It packages BEX programs and never
-implements their business rules in Java or JavaScript. `SHARED-PACKAGES.json`
-and `PAYMENT-FAMILY-PACKAGES.json` are generated views of `PACKAGES.json`, not
-independent selections. Do not edit their pins manually.
+The builder packages the BEX authored in `.blue` files. It does not generate business logic in JavaScript. Java execution and authenticated integration tests live in the companion Core checkout. The isolated runner uses `blue.core.ClauseAppsExamples`; full Core validation uses `bash scripts/check.sh`.
 
-These sources are unpublished candidates. Package consolidation is not a
-publication or production qualification. Native protocol support must be
-explicitly installed and tested by each runtime.
+To update an explicit Core checkout after validation, run `python3 tools/export_core_apps.py /path/to/core`. The export retains historical package archives required by existing documents and supplies exact package selections to the current examples.
+
+These are unpublished candidates, not a production certification or a live financial service. See the tutorial for execution boundaries and the distinction between protocol requests and confirmed external outcomes.

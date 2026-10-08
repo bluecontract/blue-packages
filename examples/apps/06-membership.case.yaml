@@ -1,0 +1,121 @@
+document: 06-membership.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: renew
+  channel: customer
+  request:
+    key: 2027-01
+  requireExactDocumentVersion: true
+  status: FAILED
+- operation: recordTrialAttendance
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /trial: Attended
+    /periods: {}
+- operation: joinMembership
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /membership: Joined
+- operation: renew
+  channel: customer
+  request:
+    key: 2027-01
+  requireExactDocumentVersion: true
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  target: /periods/2027-01
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /periods/2027-01/payment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: period-1
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /periods/2027-01/payment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 10000
+  requireExactDocumentVersion: true
+  target: /periods/2027-01/payment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 10000
+  requireExactDocumentVersion: true
+  target: /periods/2027-01/payment
+- operation: confirmSatisfaction
+  channel: customer
+  request:
+    satisfied: true
+  requireExactDocumentVersion: true
+  target: /periods/2027-01/payment
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: capture-1
+    amountCompleted: 10000
+  requireExactDocumentVersion: true
+  expect:
+    /periods/2027-01/payment/payment/completed: 10000
+  target: /periods/2027-01/payment
+- operation: renew
+  channel: customer
+  request:
+    key: 2027-02
+  requireExactDocumentVersion: true
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /periods/2027-01/payment/payment/completed: 10000
+    /periods/2027-02/payment/payment/completed: 0
+  target: /periods/2027-02
+- operation: requestTermination
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: finishTermination
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /lifecycle: Terminated
+- operation: renew
+  channel: customer
+  request:
+    key: 2027-03
+  status: FAILED
+  requireExactDocumentVersion: true

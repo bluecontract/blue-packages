@@ -1,0 +1,67 @@
+name: Booking changes require agreement and preserve the existing payment
+type: Agreements/Agreement with Clauses
+termsEditable: true
+booking:
+  room: A
+  priceMinor: 40000
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        guest:
+          type: Parties/Party
+          displayName: Guest
+        host:
+          type: Parties/Party
+          displayName: Host
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - guest
+      - host
+      - guarantor
+  amendments:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers:
+      - guest
+      - host
+      paths:
+      - /booking
+    bindings:
+      propose:
+        proposeBooking:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+      approve:
+        guestApprove:
+          'on': workflow
+          party: guest
+          params:
+            $object:
+              $var: trigger
+        hostApprove:
+          'on': workflow
+          party: host
+          params:
+            $object:
+              $var: trigger
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      payer: guest
+      payee: host
+      guarantor: guarantor
+      currency: EUR
+    bindings:
+      amount: /booking/priceMinor
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: guest

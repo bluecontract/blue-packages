@@ -1,65 +1,127 @@
 name: Activation Functions
-type: Contracts/Compute Definition
+type: Parties/Party Access Functions
 functions:
-  initialize:
+  computeState:
     args:
-      input: {}
-    do:
-    - $failIf:
-        cond:
-          $exists:
-            $document:
-              $const:
-                name: bindings
-                path: /state
-        message: STATE_ALREADY_EXISTS
-    - $appendChange:
-        op: add
-        path:
-          $const:
-            name: bindings
-            path: /state
-        val:
-          revision:
-            $const:
-              name: parameters
-              path: /revision
-          approved: {}
-          active: false
-    - $return:
-        outcome: acceptedNew
-  approve:
-    args:
-      input: {}
+      state: {}
     do:
     - $let:
         name: s
         expr:
-          $document:
-            $const:
-              name: bindings
-              path: /state
+          $var: state
     - $let:
-        name: role
+        name: functional
         expr:
-          $binding: call/channel
+          $call:
+            function: accessValid
+            args:
+              roster:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /parties
+                  default: {}
+              readers:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /readers
+                  default: {}
+              accessPaths:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /accessPaths
+                  default: []
+    - $let:
+        name: accepted
+        expr: true
+    - $forEach:
+        item: role
+        in:
+          $pointerGet:
+            object:
+              $var: s
+            path: /required
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path:
+                    $concat:
+                    - /approved/
+                    - $var: role
+                  default: false
+            then:
+            - $set:
+                name: accepted
+                expr: false
+    - $return:
+        $merge:
+        - $var: s
+        - functional:
+            $var: functional
+          active:
+            $and:
+            - $var: functional
+            - $var: accepted
+          reason:
+            $choose:
+              cond:
+                $var: functional
+              then:
+                $choose:
+                  cond:
+                    $var: accepted
+                  then: ''
+                  else: ACCEPTANCE_REQUIRED
+              else: PARTICIPANT_ACCESS_MISSING
+  refresh:
+    args: {}
+    do:
+    - $let:
+        name: s
+        expr:
+          $call:
+            function: computeState
+            args:
+              state:
+                $document: /activation
+    - $appendChange:
+        op: add
+        path: /activation
+        val:
+          $var: s
+    - $return: true
+  approve:
+    args:
+      input: {}
+    do:
     - $failIf:
         cond:
           $ne:
-          - $const: sourceMode
-          - workflow
-        message: APPROVAL_REQUIRES_PARTICIPANT
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: EXACT_REVIEW_REQUIRED
+    - $let:
+        name: s
+        expr:
+          $document: /activation
     - $failIf:
         cond:
           $not:
-            $includes:
-              list:
-                $const:
-                  name: parameters
-                  path: /required
-              val:
-                $var: role
-        message: NOT_AN_APPROVER
+            $hasKey:
+              object:
+                $var:
+                  name: s
+                  path: /parties
+              key:
+                $binding: call/channel
+        message: ONLY_PARTY_LEAD_CAN_ACCEPT
     - $failIf:
         cond:
           $ne:
@@ -72,78 +134,419 @@ functions:
                 $var: s
               path: /revision
         message: STALE_TERMS_REVISION
-    - $if:
+    - $failIf:
         cond:
-          $eq:
-          - $get:
+          $not:
+            $call:
+              function: accessValid
+              args:
+                roster:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /parties
+                    default: {}
+                readers:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /readers
+                    default: {}
+                accessPaths:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /accessPaths
+                    default: []
+        message: PARTICIPANT_ACCESS_MISSING
+    - $set:
+        name: s
+        expr:
+          $merge:
+          - $var: s
+          - approved:
+              $objectSet:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /approved
+                    default: {}
+                key:
+                  $binding: call/channel
+                val: true
+    - $appendChange:
+        op: add
+        path: /activation
+        val:
+          $call:
+            function: computeState
+            args:
+              state:
+                $var: s
+    - $appendEvent:
+        $merge:
+        - type: Activation/Terms Accepted
+        - party:
+            $binding: call/channel
+          revision:
+            $pointerGet:
+              object:
+                $var: s
+              path: /revision
+    - $return: true
+  updateParty:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: EXACT_REVIEW_REQUIRED
+    - $let:
+        name: s
+        expr:
+          $document: /activation
+    - $failIf:
+        cond:
+          $pointerGet:
+            object:
+              $var: s
+            path: /frozen
+            default: false
+        message: PARTIES_FROZEN
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var:
+                  name: s
+                  path: /parties
+              key:
+                $binding: call/channel
+        message: ONLY_PARTY_LEAD_CAN_MANAGE
+    - $let:
+        name: target
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /party
+            default:
+              $binding: call/channel
+    - $let:
+        name: adding
+        expr:
+          $not:
+            $hasKey:
               object:
                 $pointerGet:
                   object:
                     $var: s
-                  path: /approved
+                  path: /parties
+                  default: {}
               key:
-                $var: role
-          - true
-        then:
-        - $return:
-            outcome: duplicate
+                $var: target
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validPartyName
+              args:
+                candidate:
+                  $var: target
+        message: INVALID_PARTY_NAME
+    - $failIf:
+        cond:
+          $and:
+          - $var: adding
+          - $not:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /allowNewParties
+                default: false
+        message: NEW_PARTIES_DISABLED
+    - $failIf:
+        cond:
+          $and:
+          - $not:
+              $var: adding
+          - $ne:
+            - $var: target
+            - $binding: call/channel
+        message: CANNOT_MANAGE_ANOTHER_PARTY
     - $let:
-        name: approved
+        name: party
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /replacement
+            default: {}
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /lead/channel
+        message: PARTY_LEAD_CHANNEL_REQUIRED
+    - $forEach:
+        item: rep
+        in:
+          $pointerGet:
+            object:
+              $var: party
+            path: /representatives
+            default: {}
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: validPartyName
+                  args:
+                    candidate:
+                      $var: repId
+            message: INVALID_REPRESENTATIVE_NAME
+        key: repId
+    - $let:
+        name: roster
         expr:
           $objectSet:
             object:
               $pointerGet:
                 object:
                   $var: s
-                path: /approved
+                path: /parties
+                default: {}
             key:
-              $var: role
-            val: true
+              $var: target
+            val:
+              $var: party
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: accessValid
+              args:
+                roster:
+                  $var: roster
+                readers:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /readers
+                    default: {}
+                accessPaths:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /accessPaths
+                    default: []
+        message: PARTICIPANT_ACCESS_MISSING
     - $let:
-        name: active
-        expr: true
-    - $forEach:
-        item: required
-        in:
-          $const:
-            name: parameters
-            path: /required
-        do:
-        - $if:
-            cond:
-              $ne:
-              - $get:
+        name: previousContracts
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              roster:
+                $pointerGet:
                   object:
-                    $var: approved
-                  key:
-                    $var: required
-              - true
-            then:
-            - $set:
-                name: active
-                expr: false
-    - $appendChange:
-        op: replace
-        path:
-          $const:
-            name: bindings
-            path: /state
-        val:
+                    $var: s
+                  path: /parties
+                  default: {}
+              runtimeDefinition:
+                $document:
+                  $concat:
+                  - /contracts/updateParty_
+                  - $binding: call/channel
+                  - /steps/0/definition
+    - $let:
+        name: nextContracts
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              roster:
+                $var: roster
+              runtimeDefinition:
+                $document:
+                  $concat:
+                  - /contracts/updateParty_
+                  - $binding: call/channel
+                  - /steps/0/definition
+    - $forEach:
+        item: contribution
+        key: key
+        in:
+          $var: nextContracts
+        do:
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: key
+              - $not:
+                  $hasKey:
+                    object:
+                      $var: previousContracts
+                    key:
+                      $var: key
+            message: PARTY_CONTRACT_NAME_CONFLICT
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - /contracts/
+              - $var: key
+            val:
+              $var:
+                name: contribution
+                path: /contract
+    - $set:
+        name: s
+        expr:
           $merge:
           - $var: s
-          - approved:
-              $var: approved
-            active:
-              $var: active
+          - parties:
+              $var: roster
+            approved: {}
+            revision:
+              $add:
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /revision
+                  default: 1
+              - 1
+            required:
+              $choose:
+                cond:
+                  $var: adding
+                then:
+                  $listConcat:
+                  - $pointerGet:
+                      object:
+                        $var: s
+                      path: /required
+                      default: []
+                  - - $var: target
+                else:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /required
+                    default: []
+    - $appendChange:
+        op: add
+        path: /activation
+        val:
+          $call:
+            function: computeState
+            args:
+              state:
+                $var: s
     - $appendEvent:
         $merge:
-        - type: Commerce/Domain Event
-        - kind: Terms Accepted
-          clause:
-            $const: clauseKey
-          participant:
-            $var: role
-          active:
-            $var: active
+        - type: Activation/Party Changed
+        - party:
+            $var: target
+          revision:
+            $pointerGet:
+              object:
+                $var: s
+              path: /revision
+    - $return: true
+  rosterContracts:
+    args:
+      roster: {}
+      runtimeDefinition:
+        type: Contracts/Compute Definition
+    do:
+    - $let:
+        name: contributions
+        expr: {}
+    - $forEach:
+        item: channel
+        in:
+          $call:
+            function: transports
+            args:
+              roster:
+                $var: roster
+        do:
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $var: key
+                val:
+                  kind: channel
+                  contract:
+                    $var: channel
+        key: key
+    - $forEach:
+        item: party
+        in:
+          $var: roster
+        do:
+        - $forEach:
+            item: operation
+            in:
+            - approve
+            - updateParty
+            do:
+            - $set:
+                name: contributions
+                expr:
+                  $objectSet:
+                    object:
+                      $var: contributions
+                    key:
+                      $concat:
+                      - $var: operation
+                      - _
+                      - $var: role
+                    val:
+                      kind: handler
+                      contract:
+                        $merge:
+                        - type: Contracts/Sequential Workflow Operation
+                        - channel:
+                            $var: role
+                          steps:
+                          - $merge:
+                            - type: Contracts/Compute
+                            - definition:
+                                $var: runtimeDefinition
+                              constants:
+                                party:
+                                  $var: role
+                              do:
+                              - $pointerSet:
+                                  object:
+                                    $literal:
+                                      $call:
+                                        function: ''
+                                        args:
+                                          input:
+                                            $binding: call/request
+                                  path: /$call/function
+                                  val:
+                                    $var: operation
+        key: role
     - $return:
-        outcome: acceptedNew
+        $var: contributions

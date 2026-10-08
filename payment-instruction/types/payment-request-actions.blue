@@ -1,0 +1,465 @@
+name: Payment Request Actions
+type: Connections/Connected Clause
+description: Internal reusable request actions. Guarantor operations belong to Payment Instruction, never to
+  this action library.
+actionDefinition:
+  type: PaymentInstruction/Payment Protocol Functions
+actions:
+  approveRecipient:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: approveRecipient
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestCapture:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: request
+            args:
+              action: capture
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestRefund:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: request
+            args:
+              action: refund
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestVoid:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: request
+            args:
+              action: void
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestPayeeAssignment:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: payee
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestTransactionDetailsUpdate:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: details
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestFinalAmountResolution:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: finalAmount
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestPaymentCompletionLock:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: completionLock
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestPaymentCompletionUnlock:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: completionUnlock
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestPaymentReversalLock:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: reversalLock
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestPaymentReversalUnlock:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: reversalUnlock
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestTransactionDetailsUpdateLock:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: detailsUpdateLock
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestTransactionDetailsUpdateUnlock:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: requestControl
+            args:
+              action: detailsUpdateUnlock
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1
+  requestAuthorize:
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: request
+            args:
+              action: secure
+              input:
+                $var: params
+    - $set:
+        name: actionResult
+        expr:
+          $merge:
+          - $var: actionResult
+          - outcome:
+              $choose:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /created
+                    - true
+                  - $eq:
+                    - $var:
+                        name: actionResult
+                        path: /changed
+                    - true
+                then: acceptedNew
+                else: duplicate
+    resultContract: outcome-v1

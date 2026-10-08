@@ -1,0 +1,52 @@
+name: MyOS Customer Payment Instruction
+type: PaymentInstruction/Payment Instruction with Clauses
+description: Customer funding session operations belong to this instruction, alongside the standard guarantor
+  protocol.
+contracts:
+  provideSession:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Session Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: provideSession
+          args:
+            input:
+              $object:
+                $binding: call/request
+  confirmFunding:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Session Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: confirmFunding
+          args:
+            input:
+              $object:
+                $binding: call/request
+  __customerSessionInitialize:
+    type: Contracts/Sequential Workflow
+    channel: __clausesInitialized
+    order: -900
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Session Functions
+      constants:
+        sourceMode: initialized
+      do:
+      - $call:
+          function: initialize
+          args:
+            input: {}

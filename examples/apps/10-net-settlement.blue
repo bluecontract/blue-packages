@@ -1,0 +1,341 @@
+name: Two approved settlement statements and a separate net payment
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Hotel
+        seller:
+          type: Parties/Party
+          displayName: Restaurant
+        guarantor:
+          type: Parties/Party
+          displayName: Guarantor
+      required:
+      - customer
+      - seller
+      - guarantor
+  ledger:
+    type: Ledger/Ledger Clause
+    bindings:
+      setTarget:
+        agreed:
+          'on': event
+          event:
+            type: Events/Event
+            kind: Net Settlement Approved
+          params:
+            key: net-1
+            amountMinor:
+              $document: /net/amountMinor
+      reserve:
+        opened:
+          'on': event
+          event:
+            type: Events/Event
+            kind: Net Payment Opened
+          params:
+            key: net-1
+            amountMinor:
+              $document: /net/amountMinor
+      settle:
+        confirmed:
+          'on': event
+          event:
+            type: Payment/Payment Event Received
+            event:
+              type: PaymentInstruction/Payment Completed
+          params:
+            key: net-1
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      currency: EUR
+    bindings:
+      instruction: /payment
+      start:
+        startPayment:
+          'on': workflow
+          party: customer
+          before:
+          - $failIf:
+              cond:
+                $not:
+                  $and:
+                  - $and:
+                    - $eq:
+                      - $document: /net/hotelId
+                      - $nodeBlueId:
+                          $document: /statements/hotel/statement
+                    - $eq:
+                      - $document: /net/restaurantId
+                      - $nodeBlueId:
+                          $document: /statements/restaurant/statement
+                  - $eq:
+                    - $document: /net/approvals/customer
+                    - true
+                  - $eq:
+                    - $document: /net/approvals/seller
+                    - true
+              message: APPROVED_CURRENT_STATEMENTS_REQUIRED
+          after:
+          - $appendEvent:
+              $merge:
+              - type: Events/Event
+              - kind: Net Payment Opened
+      requestAuthorize:
+        authorize:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+      requestCapture:
+        settle:
+          'on': workflow
+          party: customer
+          params:
+            requestId: net-1
+            amountMinor: 3000
+      amount: /net/amountMinor
+  hotel:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /hotelTemplate
+      collection: /statements
+      start:
+        publishHotel:
+          'on': workflow
+          party: customer
+          params:
+            key: hotel
+  restaurant:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields: []
+    bindings:
+      template: /restaurantTemplate
+      collection: /statements
+      start:
+        publishRestaurant:
+          'on': workflow
+          party: seller
+          params:
+            key: restaurant
+  agreement:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        propose:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /statements/hotel/statement/scope
+                - $document: /statements/restaurant/statement/scope
+              message: SETTLEMENT_SCOPE_MISMATCH
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /statements/hotel/statement/currency
+                - $document: /statements/restaurant/statement/currency
+              message: CURRENCY_MISMATCH
+          - $let:
+              name: amount
+              expr:
+                $subtract:
+                - $document: /statements/hotel/statement/amountMinor
+                - $document: /statements/restaurant/statement/amountMinor
+          - $failIf:
+              cond:
+                $lte:
+                - $var: amount
+                - 0
+              message: POSITIVE_NET_REQUIRED
+          - $appendChange:
+              op: add
+              path: /net
+              val:
+                hotelId:
+                  $nodeBlueId:
+                    $document: /statements/hotel/statement
+                restaurantId:
+                  $nodeBlueId:
+                    $document: /statements/restaurant/statement
+                scope:
+                  $document: /statements/hotel/statement/scope
+                amountMinor:
+                  $var: amount
+                approvals: {}
+        approve:
+          do:
+          - $failIf:
+              cond:
+                $ne:
+                - $binding: call/requireExactDocumentVersion
+                - true
+              message: EXACT_REVIEW_REQUIRED
+          - $failIf:
+              cond:
+                $not:
+                  $and:
+                  - $eq:
+                    - $document: /net/hotelId
+                    - $nodeBlueId:
+                        $document: /statements/hotel/statement
+                  - $eq:
+                    - $document: /net/restaurantId
+                    - $nodeBlueId:
+                        $document: /statements/restaurant/statement
+              message: SETTLEMENT_SOURCE_CHANGED
+          - $let:
+              name: approvals
+              expr:
+                $objectSet:
+                  object:
+                    $document: /net/approvals
+                  key:
+                    $var:
+                      name: params
+                      path: /role
+                  val: true
+          - $appendChange:
+              op: add
+              path: /net/approvals
+              val:
+                $var: approvals
+          - $if:
+              cond:
+                $and:
+                - $eq:
+                  - $var:
+                      name: approvals
+                      path: /customer
+                  - true
+                - $eq:
+                  - $var:
+                      name: approvals
+                      path: /seller
+                  - true
+              then:
+              - $appendEvent:
+                  $merge:
+                  - type: Events/Event
+                  - kind: Net Settlement Approved
+    bindings:
+      propose:
+        proposeNet:
+          'on': workflow
+          party: customer
+      approve:
+        customerApproveNet:
+          'on': workflow
+          party: customer
+          params:
+            role: customer
+        sellerApproveNet:
+          'on': workflow
+          party: seller
+          params:
+            role: seller
+statements: {}
+net: {}
+hotelTemplate:
+  name: Hotel settlement statement
+  type: Agreements/Agreement with Clauses
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    statement:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          revise:
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /amountMinor
+                        kind: integer
+                    - $gte:
+                      - $var:
+                          name: trigger
+                          path: /amountMinor
+                      - 0
+                message: NONNEGATIVE_AMOUNT_REQUIRED
+            - $appendChange:
+                op: add
+                path: /statement/amountMinor
+                val:
+                  $var:
+                    name: trigger
+                    path: /amountMinor
+      bindings:
+        revise:
+          reviseStatement:
+            'on': workflow
+            party: customer
+  statement:
+    scope: 2026-10
+    currency: EUR
+    amountMinor: 12000
+restaurantTemplate:
+  name: Restaurant settlement statement
+  type: Agreements/Agreement with Clauses
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties: {}
+        required: []
+    statement:
+      type: Features/Feature Clause
+      parameters:
+        actions:
+          revise:
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /amountMinor
+                        kind: integer
+                    - $gte:
+                      - $var:
+                          name: trigger
+                          path: /amountMinor
+                      - 0
+                message: NONNEGATIVE_AMOUNT_REQUIRED
+            - $appendChange:
+                op: add
+                path: /statement/amountMinor
+                val:
+                  $var:
+                    name: trigger
+                    path: /amountMinor
+      bindings:
+        revise:
+          reviseStatement:
+            'on': workflow
+            party: seller
+  statement:
+    scope: 2026-10
+    currency: EUR
+    amountMinor: 8000

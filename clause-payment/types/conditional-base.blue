@@ -1,21 +1,18 @@
-name: Conditional Payment Base
+name: Payment Base
 type: Connections/Connected Clause
 description: Create and observe a standard PI. Capture connections execute inside PI; inputs and placement
   remain explicit.
 bindingTypes:
-  product: pointer
   instruction: pointer
+  amount: pointer
 defaultBindings:
-  product: /product
   instruction: /payment
+  amount: /product/totalMinor
 embeds:
 - instruction
 readParametersFromDocument: true
 actions:
   start:
-    automatic:
-      'on': initialized
-      once: true
     do:
     - $set:
         name: actionResult
@@ -35,7 +32,7 @@ actions:
               node:
                 $event: /event
               pattern:
-                type: PaymentInstruction/Payment Event
+                type: Events/Event
         then:
         - $return: {}
     - $appendEvent:
@@ -58,3 +55,19 @@ actions:
               val:
                 $nodeBlueId:
                   $event: /event
+    observation: true
+childActions:
+- approveRecipient
+- requestCapture
+- requestRefund
+- requestVoid
+- requestPayeeAssignment
+- requestTransactionDetailsUpdate
+- requestFinalAmountResolution
+- requestPaymentCompletionLock
+- requestPaymentCompletionUnlock
+- requestPaymentReversalLock
+- requestPaymentReversalUnlock
+- requestTransactionDetailsUpdateLock
+- requestTransactionDetailsUpdateUnlock
+- requestAuthorize

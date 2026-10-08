@@ -1,0 +1,46 @@
+name: Hello when a document property changes
+type: Agreements/Agreement with Clauses
+message: ''
+status: draft
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          displayName: Owner
+      required:
+      - owner
+  edit:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setStatus:
+          do:
+          - $appendChange:
+              op: replace
+              path: /status
+              val:
+                $var:
+                  name: trigger
+                  path: /status
+    bindings:
+      setStatus:
+        setStatus:
+          'on': workflow
+          party: owner
+  hello:
+    type: Connections/Hello Clause
+    bindings:
+      text: /message
+      say:
+        onDelivery:
+          'on': change
+          path: /status
+          when:
+            $eq:
+            - $event: /after
+            - delivered
+          params:
+            text: Delivery confirmed

@@ -1,0 +1,46 @@
+name: A repair job with two possible outcomes
+type: Agreements/Agreement with Clauses
+status: reported
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        technician:
+          type: Parties/Party
+          displayName: Technician
+      required:
+      - customer
+      - technician
+  status:
+    type: State/Status Clause
+    parameters:
+      subject: Repair
+      transitions:
+        reported:
+        - examining
+        - cancelled
+        examining:
+        - repaired
+        - unrepairable
+        repaired: []
+        unrepairable: []
+        cancelled: []
+    bindings:
+      state: /status
+      transition:
+        advanceRepair:
+          'on': workflow
+          party: technician
+          params:
+            to:
+              $var:
+                name: trigger
+                path: /to
+            reason:
+              $var:
+                name: trigger
+                path: /reason

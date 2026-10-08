@@ -1,0 +1,711 @@
+name: Shipping Functions
+type: Contracts/Compute Definition
+functions:
+  request:
+    args:
+      action:
+        type: Text
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - book
+              - cancel
+              - address
+              val:
+                $var: action
+        message: INVALID_SHIPPING_ACTION
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - address
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: input
+                        path: /address
+                        default: ''
+                    kind: text
+                - $ne:
+                  - $pointerGet:
+                      object:
+                        $var: input
+                      path: /address
+                      default: ''
+                  - ''
+            message: SHIPPING_ADDRESS_REQUIRED
+    - $let:
+        name: s
+        expr:
+          $document: /shipment
+    - $let:
+        name: id
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $failIf:
+        cond:
+          $or:
+          - $not:
+              $isKind:
+                val:
+                  $var: id
+                kind: text
+          - $eq:
+            - $var: id
+            - ''
+        message: SHIPPING_REQUEST_ID_REQUIRED
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /requests
+                default: {}
+            key:
+              $var: id
+    - $if:
+        cond:
+          $exists:
+            $var: previous
+        then:
+        - $failIf:
+            cond:
+              $or:
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: previous
+                    path: /input
+                - $var: input
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: previous
+                    path: /action
+                - $var: action
+            message: SHIPPING_REQUEST_ID_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $and:
+          - $eq:
+            - $var: action
+            - book
+          - $ne:
+            - $pointerGet:
+                object:
+                  $var: s
+                path: /status
+            - new
+        message: SHIPMENT_ALREADY_REQUESTED
+    - $failIf:
+        cond:
+          $and:
+          - $ne:
+            - $var: action
+            - book
+          - $not:
+              $includes:
+                list:
+                - requested
+                - accepted
+                val:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /status
+        message: SHIPMENT_NO_LONGER_EDITABLE
+    - $appendChange:
+        op: add
+        path: /shipment
+        val:
+          $merge:
+          - $var: s
+          - status:
+              $choose:
+                cond:
+                  $eq:
+                  - $var: action
+                  - book
+                then: requested
+                else:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /status
+            requests:
+              $objectSet:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /requests
+                    default: {}
+                key:
+                  $var: id
+                val:
+                  action:
+                    $var: action
+                  input:
+                    $var: input
+                  responses: {}
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - book
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Requested
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              details:
+                $var: input
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - cancel
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Cancellation Requested
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              details:
+                $var: input
+    - $if:
+        cond:
+          $eq:
+          - $var: action
+          - address
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipping Address Change Requested
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              details:
+                $var: input
+    - $return:
+        outcome: acceptedNew
+  respond:
+    args:
+      outcome:
+        type: Text
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - carrier
+        message: SHIPPING_CARRIER_REQUIRED
+    - $let:
+        name: s
+        expr:
+          $document: /shipment
+    - $let:
+        name: id
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $let:
+        name: request
+        expr:
+          $get:
+            object:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /requests
+                default: {}
+            key:
+              $var: id
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: request
+        message: UNKNOWN_SHIPPING_REQUEST
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $pointerGet:
+                object:
+                  $var: request
+                path: /responses
+                default: {}
+            key:
+              $var: outcome
+    - $if:
+        cond:
+          $exists:
+            $var: previous
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var: previous
+              - $var: input
+            message: SHIPPING_RESPONSE_CONFLICT
+        - $return: false
+    - $let:
+        name: action
+        expr:
+          $pointerGet:
+            object:
+              $var: request
+            path: /action
+    - $failIf:
+        cond:
+          $not:
+            $choose:
+              cond:
+                $includes:
+                  list:
+                  - cancelled
+                  - cancellationRejected
+                  val:
+                    $var: outcome
+              then:
+                $eq:
+                - $var: action
+                - cancel
+              else:
+                $choose:
+                  cond:
+                    $includes:
+                      list:
+                      - addressChanged
+                      - addressRejected
+                      val:
+                        $var: outcome
+                  then:
+                    $eq:
+                    - $var: action
+                    - address
+                  else:
+                    $eq:
+                    - $var: action
+                    - book
+        message: SHIPPING_RESPONSE_WRONG_REQUEST
+    - $let:
+        name: status
+        expr:
+          $pointerGet:
+            object:
+              $var: s
+            path: /status
+    - $failIf:
+        cond:
+          $and:
+          - $includes:
+              list:
+              - delivered
+              - cancelled
+              - rejected
+              - failed
+              val:
+                $var: status
+          - $not:
+              $eq:
+              - $var: outcome
+              - $var: status
+        message: SHIPMENT_TERMINAL
+    - $failIf:
+        cond:
+          $and:
+          - $eq:
+            - $var: outcome
+            - dispatched
+          - $ne:
+            - $var: status
+            - accepted
+        message: SHIPMENT_NOT_ACCEPTED
+    - $failIf:
+        cond:
+          $and:
+          - $eq:
+            - $var: outcome
+            - delivered
+          - $ne:
+            - $var: status
+            - dispatched
+        message: SHIPMENT_NOT_DISPATCHED
+    - $failIf:
+        cond:
+          $and:
+          - $includes:
+              list:
+              - accepted
+              - rejected
+              val:
+                $var: outcome
+          - $ne:
+            - $var: status
+            - requested
+        message: SHIPMENT_ALREADY_DECIDED
+    - $failIf:
+        cond:
+          $and:
+          - $includes:
+              list:
+              - cancelled
+              - cancellationRejected
+              - addressChanged
+              - addressRejected
+              val:
+                $var: outcome
+          - $gt:
+            - $size:
+                $pointerGet:
+                  object:
+                    $var: request
+                  path: /responses
+                  default: {}
+            - 0
+        message: SHIPPING_RESPONSE_CONFLICT
+    - $failIf:
+        cond:
+          $and:
+          - $includes:
+              list:
+              - cancelled
+              - addressChanged
+              val:
+                $var: outcome
+          - $not:
+              $includes:
+                list:
+                - requested
+                - accepted
+                val:
+                  $var: status
+        message: SHIPMENT_NO_LONGER_EDITABLE
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - addressChanged
+        then:
+        - $appendChange:
+            op: add
+            path: /destination
+            val:
+              $pointerGet:
+                object:
+                  $var: request
+                path: /input/address
+    - $appendChange:
+        op: add
+        path: /shipment
+        val:
+          $merge:
+          - $var: s
+          - status:
+              $choose:
+                cond:
+                  $includes:
+                    list:
+                    - addressChanged
+                    - addressRejected
+                    - cancellationRejected
+                    val:
+                      $var: outcome
+                then:
+                  $var: status
+                else:
+                  $var: outcome
+            trackingId:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /trackingId
+                default:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /trackingId
+                    default: ''
+            requests:
+              $objectSet:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /requests
+                    default: {}
+                key:
+                  $var: id
+                val:
+                  $merge:
+                  - $var: request
+                  - responses:
+                      $objectSet:
+                        object:
+                          $pointerGet:
+                            object:
+                              $var: request
+                            path: /responses
+                            default: {}
+                        key:
+                          $var: outcome
+                        val:
+                          $var: input
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - accepted
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Confirmed
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - rejected
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Rejected
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - dispatched
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Dispatched
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - delivered
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Delivered
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - failed
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Failed
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - cancelled
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Cancellation Confirmed
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - cancellationRejected
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipment Cancellation Rejected
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - addressChanged
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipping Address Change Confirmed
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - addressRejected
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Shipping/Shipping Address Change Rejected
+            - requestId:
+                $var: id
+              shipmentId:
+                $document: /instanceKey
+              trackingId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /trackingId
+                  default: ''
+              reason:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /reason
+                  default: ''
+    - $return: true

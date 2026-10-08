@@ -1,12 +1,12 @@
 # Payment Instruction: explicit requests and guarantor responses
 
-The `0.6.0-preview.4` payment family implements the public lifecycle as distinct Blue message types and named guarantor operations, following the supplied PayNote design. One Payment Instruction governs one transaction. It emits requests; an external guarantor executes or reconciles them and reports results through its admitted channel. Executing the Blue document itself never moves money or calls a banking API.
+The `0.7.0-preview.1` payment family implements the public lifecycle as distinct Blue message types and named guarantor operations, following the supplied PayNote design. One Payment Instruction governs one transaction. It emits requests; an external guarantor executes or reconciles them and reports results through its admitted channel. Executing the Blue document itself never moves money or calls a banking API.
 
 ## What changed
 
 Previously the public surface exposed `Payment Event` with `kind: Payment Requested` or `kind: Payment Outcome`, and the guarantor called `confirm` with an arbitrary outcome. New instructions expose `secureFunds`, `completePayment`, `declineCompletePayment`, `failCompletePayment`, `reverseAfterCompletion`, and the rest of the named operations below. Financial accounting remains shared BEX, but emitted messages have distinct exported Blue identities.
 
-The common ancestors are `PaymentInstruction/Payment Request` and `PaymentInstruction/Payment Response`, both deriving from `PaymentInstruction/Payment Event`. A host Payment clause therefore continues to echo all protocol messages, preserving the exact inner type. The `kind`, `action`, `amountMinor`, and `outcome` projections remain available to existing policy/listener code; they are no longer the only way to distinguish messages.
+The common ancestors are `PaymentInstruction/Payment Request` and `PaymentInstruction/Payment Response`, deriving from `Events/Request` and `Events/Response`, respectively, and then `Events/Event`. A host Payment clause therefore continues to echo all protocol messages, preserving the exact inner type. The `kind`, `action`, `amountMinor`, and `outcome` projections remain available to existing policy/listener code; they are no longer the only way to distinguish messages.
 
 ## Client migration at a glance
 
@@ -27,16 +27,16 @@ Keep the recorded `requestId`; do not generate a new ID when retrying delivery o
 
 ## A complete exchange
 
-A PI-local clause action can request completion after a customer operation or another bound trigger. `requestCapture` remains a convenient synonym for `requestCompletePayment`:
+A PI-local clause action can request completion after a customer operation or another bound trigger. `requestCapture` creates a `Complete Payment Requested` event:
 
 ```yaml
 requestCapture:
   acceptDelivery:
     on: workflow
-    channel: customer
+    party: customer
     params:
       requestId: {$var: {name: trigger, path: /requestId}}
-      amount: {$var: {name: trigger, path: /amount}}
+      amountMinor: {$var: {name: trigger, path: /amountMinor}}
 ```
 
 After policy and available-capacity checks, this creates a pending ledger entry, reserves the amount, and emits `PaymentInstruction/Complete Payment Requested` containing the request ID and amount. An external executor processes that request with the same idempotency identity. The guarantor then invokes:
@@ -60,7 +60,7 @@ These are connection/event-pattern fragments, not complete standalone documents.
 
 ## Guarantor operations
 
-Every operation below is channel-restricted in generated Payment instructions. A response must match the action of the recorded request. For example, `completePayment` cannot settle a `Secure Funds Requested` request ID.
+Every operation below is channel-restricted in the standard Payment Instruction domain. A response must match the action of the recorded request. For example, `completePayment` cannot settle a `Secure Funds Requested` request ID.
 
 | Operation | Meaning / result |
 | --- | --- |
@@ -204,22 +204,8 @@ The two base envelopes and all concrete messages are exported directly by `payme
 
 ## Composition and method packages
 
-`Payment/Payment Clause` still creates the PI and echoes its events. `Payment/Conditional Payment` and the MyOS/ACME methods install the named guarantor operations into the PI, not the outer agreement. PI-local workflows, explicit host cycles, and shared evidence retain their existing placement rules. A guarantor does not gain authority over the host merely because it can report a PI result.
+The standard Payment Instruction owns the guarantor operations. The Payment clause creates an instruction with clauses, configures its request connections, and echoes its typed events. An instruction-local request needs no host cycle; `in: agreement` deliberately adds one.
 
-The MyOS customer-session protocol remains in `myos`; manual payer-report/recipient-receipt confirmation remains in `manual-payments`; ACME execution notifications remain in `acme-bank`. They reuse the new core protocol where applicable. The manual direct-transfer profile does not pretend that a recipient confirmation is bank authorization.
+The current complete protocol scenarios are [financial exchanges](../examples/apps/27-payment-protocol.case.yaml), [control exchanges](../examples/apps/28-payment-controls.case.yaml) and [rejection](../examples/apps/29-payment-rejection.case.yaml). See the [complete clause tutorial](clauses-tutorial.md) for all public examples and method-specific payment types.
 
-## Complete runnable examples
-
-- [Explicit protocol document](../examples/payment-family/23-explicit-protocol.blue): a standalone PI, all named guarantor operations, participant request routes, and predeclared recipients.
-- [Financial outcomes](../examples/payment-family/23-explicit-protocol.case.yaml): success, decline, definitive failure, unresolved execution and reconciliation for all four financial actions; wrong-operation rejection; duplicate handling; replay/restore checks.
-- [Control exchanges](../examples/payment-family/24-control-protocol.case.yaml): recipient assignment, details, final amount, all locks/unlocks, failure, duplicate responses, blocked updates, initiation failure and recovery.
-- [Instruction rejection](../examples/payment-family/25-rejected-instruction.case.yaml): rejection cannot be followed by acceptance or attachment.
-- [Hosted control request](../examples/payment-family/26-hosted-control.case.yaml): a payer requests a completion lock through the standard generated PI; the host receives the typed request and confirmed result.
-- [Cancellation before securing funds](../examples/payment-family/27-zero-cancellation.case.yaml): a zero-value cancellation blocks competing charges, closes the instruction, and remains idempotent after completion.
-- [Customer-accepted payment](../examples/payment-family/01-simple-payment.blue) and [input sequence](../examples/payment-family/01-simple-payment.case.yaml): the simple authoring experience, including assertions that concrete PI response types survive host echo.
-
-## Compatibility and qualification
-
-This is a new unpublished preview, not an in-place rewrite of existing instruction identities. Core retains prior package archives; existing documents keep their exact package dependencies. Newly authored instructions use the new operations. Integrations calling `confirm`, `accept`, or `initiate` must migrate to the named operations before selecting the new package set. Existing short request-action names are preserved.
-
-The authored Blue/BEX files are the implementation. The package builder only packages those sources. No runtime JavaScript generator implements the protocol. Local tests exercise document behavior and a test guarantor; they do not certify any live payment provider or claim exactly-once external banking execution. This change does not deploy AWS or migrate existing documents.
+Existing documents keep their historical exact package identities. New package selection does not migrate them. External financial execution still requires an idempotent, authenticated adapter and unknown-outcome reconciliation.

@@ -1,0 +1,46 @@
+document: 18-amendments.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_guest
+  channel: guest
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_host
+  channel: host
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: proposeBooking
+  channel: guest
+  request:
+    proposalId: p1
+    expectedRevision: 1
+    path: /booking
+    replacement:
+      room: B
+      priceMinor: 45000
+  requireExactDocumentVersion: true
+- operation: guestApprove
+  channel: guest
+  request:
+    proposalId: p1
+  expect:
+    /booking/room: A
+  requireExactDocumentVersion: true
+- operation: hostApprove
+  channel: host
+  request:
+    proposalId: wrong
+  status: FAILED
+  requireExactDocumentVersion: true
+- operation: hostApprove
+  channel: host
+  request:
+    proposalId: p1
+  expect:
+    /booking/room: B
+    /amendments/revision: 2
+  requireExactDocumentVersion: true

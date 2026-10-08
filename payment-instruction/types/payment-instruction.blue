@@ -1,3 +1,1798 @@
 name: Payment Instruction
-type: PaymentInstruction/Payment Instruction with Clauses
-description: One transaction; lifecycle behavior is explicitly supplied by a Payment Lifecycle Clause.
+description: One payment with typed requests and authorized guarantor responses. The domain owns its financial
+  ledger and outcome operations; clauses are opt-in.
+payment: {}
+paymentTerms: {}
+contracts:
+  __paymentLife:
+    type: Contracts/Lifecycle Event Channel
+    event:
+      type: Contracts/Document Processing Initiated
+  __paymentInitialize:
+    type: Contracts/Sequential Workflow
+    channel: __paymentLife
+    order: -1000
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $if:
+          cond:
+            $not:
+              $exists:
+                $document: /clauses
+          then:
+          - $appendEvent:
+              type: PaymentInstruction/Initialize Payment
+  __paymentInitializeRequested:
+    type: Contracts/Triggered Event Channel
+    event:
+      type: PaymentInstruction/Initialize Payment
+  __paymentInitializeLedger:
+    type: Contracts/Sequential Workflow
+    channel: __paymentInitializeRequested
+    order: -1000
+    steps:
+    - type: PaymentInstruction/Initialize Payment Step
+  acceptPaymentInstruction:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: accept
+              args:
+                approved: true
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  rejectPaymentInstruction:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: accept
+              args:
+                approved: false
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  recordTransactionInitiated:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: initiate
+              args:
+                transactionId:
+                  $var:
+                    name: params
+                    path: /transactionId
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  recordTransactionInitiationFailed:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordInitiationFailure
+              args:
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  secureFunds:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: secure
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  declineSecureFunds:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: secure
+                outcome: declined
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failSecureFunds:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: secure
+                outcome: failed
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  recordFundsSecuringUnknown:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: secure
+                outcome: unknown
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  completePayment:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: capture
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  declineCompletePayment:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: capture
+                outcome: declined
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failCompletePayment:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: capture
+                outcome: failed
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  recordPaymentCompletionUnknown:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: capture
+                outcome: unknown
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  cancelBeforeCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: void
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  declineCancelBeforeCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: void
+                outcome: declined
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failCancelBeforeCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: void
+                outcome: failed
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  recordPaymentCancellationUnknown:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: void
+                outcome: unknown
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  reverseAfterCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: refund
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  declineReverseAfterCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: refund
+                outcome: declined
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failReverseAfterCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: refund
+                outcome: failed
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  recordPaymentReversalUnknown:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: recordOutcome
+              args:
+                action: refund
+                outcome: unknown
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  confirmPayeeAssignment:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: payee
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  rejectPayeeAssignment:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: payee
+                outcome: declined
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  confirmTransactionDetailsUpdated:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: details
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  rejectTransactionDetailsUpdate:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: details
+                outcome: declined
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failTransactionDetailsUpdate:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: details
+                outcome: failed
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  resolveFinalAmount:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: finalAmount
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  rejectFinalAmountResolution:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: finalAmount
+                outcome: declined
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  lockPaymentCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: completionLock
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failPaymentCompletionLockChange:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: failPaymentCompletionLockChangeResponse
+              args:
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  unlockPaymentCompletion:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: completionUnlock
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  lockPaymentReversal:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: reversalLock
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failPaymentReversalLockChange:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: failPaymentReversalLockChangeResponse
+              args:
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  unlockPaymentReversal:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: reversalUnlock
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  lockTransactionDetailsUpdate:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: detailsUpdateLock
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  failTransactionDetailsUpdateLockChange:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: failTransactionDetailsUpdateLockChangeResponse
+              args:
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+  unlockTransactionDetailsUpdate:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: PaymentInstruction/Payment Protocol Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $let:
+          name: actionResult
+          expr: {}
+      - $let:
+          name: params
+          expr:
+            $object:
+              $binding: call/request
+      - $set:
+          name: actionResult
+          expr:
+            $call:
+              function: decideControl
+              args:
+                action: detailsUpdateUnlock
+                outcome: succeeded
+                input:
+                  $var: params
+      - $set:
+          name: actionResult
+          expr:
+            $merge:
+            - $var: actionResult
+            - outcome:
+                $choose:
+                  cond:
+                    $or:
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /created
+                      - true
+                    - $eq:
+                      - $var:
+                          name: actionResult
+                          path: /changed
+                      - true
+                  then: acceptedNew
+                  else: duplicate
+partyRosterFrozen: true

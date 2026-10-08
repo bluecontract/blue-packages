@@ -1,7 +1,7 @@
 name: Connected Clause
 type: Clauses/Clause
-description: Named connections lower to native Contracts channels and BEX workflows. Actions are declared by the
-  exact clause type.
+description: Named connections lower to native Contracts channels and BEX workflows. Actions are declared by
+  the exact clause type.
 hookAbi: document-context-1
 hookDefinition:
   type: Contracts/Compute Definition
@@ -277,6 +277,22 @@ hookDefinition:
               - /clauseRuntime/work/candidate/
               - $const: clauseKey
               - /type/actions
+      - $if:
+          cond:
+            $eq:
+            - $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+                - /type/configurableActions
+            - true
+          then:
+          - $set:
+              name: actions
+              expr:
+                $var:
+                  name: clause
+                  path: /parameters/actions
       - $failIf:
           cond:
             $not:
@@ -296,6 +312,15 @@ hookDefinition:
                 - $const: clauseKey
                 - /type/bindingTypes
       - $let:
+          name: childActions
+          expr:
+            $list:
+              $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+                - /type/childActions
+      - $let:
           name: propertyBindings
           expr: {}
       - $forEach:
@@ -306,12 +331,19 @@ hookDefinition:
           do:
           - $if:
               cond:
-                $not:
-                  $hasKey:
-                    object:
-                      $var: actions
-                    key:
-                      $var: bindingName
+                $and:
+                - $not:
+                    $hasKey:
+                      object:
+                        $var: actions
+                      key:
+                        $var: bindingName
+                - $not:
+                    $includes:
+                      list:
+                        $var: childActions
+                      val:
+                        $var: bindingName
               then:
               - $failIf:
                   cond:
@@ -594,6 +626,7 @@ hookDefinition:
                         - channel
                         - event
                         - request
+                        - party
                         event:
                         - event
                         embedded:
@@ -752,9 +785,14 @@ hookDefinition:
                   - $set:
                       name: channel
                       expr:
-                        $var:
-                          name: c
-                          path: /channel
+                        $pointerGet:
+                          object:
+                            $var: c
+                          path: /party
+                          default:
+                            $var:
+                              name: c
+                              path: /channel
                   - $failIf:
                       cond:
                         $not:
@@ -835,9 +873,14 @@ hookDefinition:
                           - $set:
                               name: channel
                               expr:
-                                $var:
-                                  name: c
-                                  path: /channel
+                                $pointerGet:
+                                  object:
+                                    $var: c
+                                  path: /party
+                                  default:
+                                    $var:
+                                      name: c
+                                      path: /channel
                           - $if:
                               cond:
                                 $exists:
@@ -886,9 +929,13 @@ hookDefinition:
                           - true
                         then: {}
                         else:
-                          $var:
-                            name: clause
-                            path: /parameters
+                          $pointerSet:
+                            object:
+                              $var:
+                                name: clause
+                                path: /parameters
+                            path: /actions
+                            op: remove
                     bindings:
                       $var: propertyBindings
                     statePath:
@@ -979,17 +1026,20 @@ hookDefinition:
                                 expr: {}
                           path: /$let/expr
                           val:
-                            $merge:
-                            - $pointerGet:
-                                object:
-                                  $var: action
-                                path: /defaults
-                                default: {}
-                            - $pointerGet:
-                                object:
-                                  $var: c
-                                path: /params
-                                default: {}
+                            $objectSet:
+                              object: {}
+                              key: $merge
+                              val:
+                              - $pointerGet:
+                                  object:
+                                    $var: action
+                                  path: /defaults
+                                  default: {}
+                              - $pointerGet:
+                                  object:
+                                    $var: c
+                                  path: /params
+                                  default: {}
                     - - $pointerSet:
                           object:
                             $literal:
@@ -1112,7 +1162,30 @@ hookDefinition:
                     - channel:
                         $var: channel
                       steps:
-                      - $var: compute
+                        $choose:
+                          cond:
+                            $or:
+                            - $eq:
+                              - $var: mode
+                              - initialized
+                            - $eq:
+                              - $pointerGet:
+                                  object:
+                                    $var: action
+                                  path: /observation
+                                  default: false
+                              - true
+                          then:
+                          - $var: compute
+                          else:
+                          - $merge:
+                            - type: Parties/Require Active Parties
+                            - constants:
+                                workflow:
+                                  $eq:
+                                  - $var: mode
+                                  - workflow
+                          - $var: compute
               - $let:
                   name: handlerKey
                   expr:

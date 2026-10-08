@@ -1,0 +1,141 @@
+document: 02-reseller-ledger.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_partner
+  channel: partner
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: newOrder
+  channel: customer
+  request:
+    key: lesson
+  requireExactDocumentVersion: true
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  target: /orders/lesson
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: orders-lesson-payment
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 10000
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 10000
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+- operation: confirmSatisfaction
+  channel: customer
+  request:
+    satisfied: true
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: capture-1
+    amountCompleted: 10000
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+  expect:
+    /commission/accrued: 1000
+- operation: refund
+  channel: seller
+  request:
+    requestId: refund-1
+    amountMinor: 2500
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+- operation: reverseAfterCompletion
+  channel: guarantor
+  request:
+    requestId: refund-1
+    amountReversed: 2500
+  requireExactDocumentVersion: true
+  target: /orders/lesson/payment
+  expect:
+    /commission/accrued: 750
+- operation: startPayout
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /commission/reserved: 750
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /payout
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: commission-payout
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /payout
+- operation: authorizePayout
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+  target: /payout
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: payout-auth
+    amountSecured: 750
+  requireExactDocumentVersion: true
+  target: /payout
+- operation: capturePayout
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+  target: /payout
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: payout-capture
+    amountCompleted: 750
+  requireExactDocumentVersion: true
+  target: /payout
+  expect:
+    /commission/paid: 750
+    /commission/reserved: 0

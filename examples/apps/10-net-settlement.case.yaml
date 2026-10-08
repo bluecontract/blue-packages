@@ -1,0 +1,113 @@
+document: 10-net-settlement.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_customer
+  channel: customer
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_guarantor
+  channel: guarantor
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: publishHotel
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: publishRestaurant
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+- operation: proposeNet
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: customerApproveNet
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: reviseStatement
+  channel: seller
+  request:
+    amountMinor: 9000
+  requireExactDocumentVersion: true
+  target: /statements/restaurant
+- operation: sellerApproveNet
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+  status: FAILED
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  status: FAILED
+- operation: proposeNet
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: customerApproveNet
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: sellerApproveNet
+  channel: seller
+  request: {}
+  requireExactDocumentVersion: true
+  expect:
+    /balance/accrued: 3000
+- operation: startPayment
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+- operation: acceptPaymentInstruction
+  channel: guarantor
+  request: {}
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: recordTransactionInitiated
+  channel: guarantor
+  request:
+    transactionId: payment
+    railType: test
+    attachmentPoint: instruction
+    providerReference: test
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: authorize
+  channel: customer
+  request:
+    requestId: auth-1
+    amountMinor: 3000
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: secureFunds
+  channel: guarantor
+  request:
+    requestId: auth-1
+    amountSecured: 3000
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: settle
+  channel: customer
+  request: {}
+  requireExactDocumentVersion: true
+  target: /payment
+- operation: completePayment
+  channel: guarantor
+  request:
+    requestId: net-1
+    amountCompleted: 3000
+  requireExactDocumentVersion: true
+  target: /payment
+  expect:
+    /balance/paid: 3000
+    /balance/reserved: 0

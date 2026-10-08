@@ -1,60 +1,6 @@
 name: Manual Bank Payment
-type: Connections/Connected Clause
-bindingTypes:
-  instruction: pointer
-defaultBindings:
-  instruction: /payment
-embeds:
-- instruction
+type: Payment/Payment Base
+description: The recipient confirms bank-transfer outcomes using the standard PI protocol. A reported transfer
+  is a request, not proof that money arrived.
 actionDefinition:
   type: ManualPayments/Manual Payment Setup
-actions:
-  start:
-    resultContract: outcome-v1
-    do:
-    - $set:
-        name: actionResult
-        expr:
-          $call:
-            function: build
-            args:
-              input:
-                $var: params
-    automatic:
-      'on': initialized
-      once: true
-  observe:
-    automatic:
-      'on': embedded
-      pathBinding: instruction
-    do:
-    - $if:
-        cond:
-          $not:
-            $is:
-              node:
-                $event: /event
-              pattern:
-                type: PaymentInstruction/Payment Event
-        then:
-        - $return: {}
-    - $appendEvent:
-        $merge:
-        - type: Payment/Payment Event Received
-        - kind:
-            $var:
-              name: trigger
-              path: /kind
-          clause:
-            $const: clauseKey
-          instructionPath:
-            $const:
-              name: bindings
-              path: /instruction
-          event:
-            $objectSet:
-              object: {}
-              key: blueId
-              val:
-                $nodeBlueId:
-                  $event: /event
