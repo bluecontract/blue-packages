@@ -46,8 +46,8 @@ def main():
     from blue_packages.reader import read_package
     selected=PackageStore(ROOT)
     assert {r['name']:r for r in inventory['packages']} == selected._entries, 'Consumer/shared selection differs'
-    from blue_coordination.engine.mandate_package import supported_definition
-    assert json.loads((ROOT/'editions/gas-10m/blue-mandates/docs/native-support.json').read_text()) == supported_definition(True), 'Native approval differs'
+    # This reader checks data integrity only. Current native approval is qualified
+    # independently by the Java runtime's CanonicalPackagesTest.
     checked=[]
     for row in selections(ROOT):
         package=read_package(ROOT/row['path'])

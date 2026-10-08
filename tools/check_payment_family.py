@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the candidate separately from the default release collection; no publication."""
+"""Check the current business subset and its exact dependency graph; no publication."""
 import json
 from pathlib import Path
 from release import check_archive
@@ -8,9 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def check(root=ROOT):
     selection = json.loads((root / 'PAYMENT-FAMILY-PACKAGES.json').read_text())
-    source = json.loads((root / 'PAYMENT-FAMILY-SOURCES.json').read_text())
+    source = json.loads((root / 'PACKAGE-SOURCES.json').read_text())
     assert selection['status'] == source['status'] == 'unpublished-candidate'
-    assert [row['directory'] for row in selection['packages']] == source['packages']
+    assert [row['directory'] for row in selection['packages']] == [p for p in source['packages'] if p != 'blue-mandates']
     assert len({r['namespace'] for r in selection['packages']}) == len(selection['packages'])
     for row in selection['packages']:
         checked, _ = check_archive(root, dict(row, selection='payment-family-candidate'))

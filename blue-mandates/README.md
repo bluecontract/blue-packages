@@ -1,20 +1,20 @@
 # Blue Mandates
 
-Owner-approved operation delegation, implemented as Blue definitions and ordinary
-Contracts/BEX workflows with explicitly selected native Coordination support.
+Owner-approved operation delegation is a separate package. Its lifecycle and
+scope transitions are ordinary Contracts/BEX workflows. A runtime must explicitly
+support its native authority protocol before those claims grant any permission.
 
-Read [installation and runnable checks](docs/installation.md), the [guide](docs/guide.md)
-and [normative protocol](spec/mandates.md). Definitions are in `types/`; the exact
-published data archive is `dist/package.bluepkg`. Dependencies are pinned sibling
-packages, not copied implementations. Native code lives in blue-python.
+`Mandate` has an authority holder and an authorized actor. `Operation Mandate`
+adds a scope of permitted target operations; `Qualification Mandate` adds
+correlated evidence requests. A holder must approve the exact document version.
+The approved program and designated lifecycle writers are protected by the host.
 
-Use `Runtime.mandates().coordination()` to select the full supported dependency set:
-Language, BEX, Contracts, Coordination and Mandates. Mounting data alone grants no
-execution authority. A holder must approve the exact program; the delegate remains
-the actual actor. The historical complete scope must contain one whole matching grant.
+Mandates owns its Event, Message, Request, Response and Authority base types.
+Coordination supplies authenticated actors, signed timelines and channels.
+Agreement and Payment packages do not implicitly enable delegation.
 
-The Workbench lesson demonstrates A owning increment/decrement and B receiving an
-increment grant plus a decrement grant controlled by an independently processed flag
-embedded in the Mandate. `Qualification Mandate` also provides typed evidence requests
-and correlated provider responses. No external connector or Java implementation is
-included. This is a Python integration preview.
+The current package is an unpublished Core Java integration candidate. Current
+Python native support is not claimed. See `spec/mandates.md` for the normative
+rules and `../docs/consolidation.md` for compatibility and validation scope.
+Build from `types/*.blue` using `../tools/build-payment-family.sh Mandates`;
+then regenerate consumer catalogues using `../tools/sync_catalogues.py`.

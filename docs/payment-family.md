@@ -1,6 +1,6 @@
 # Payment family and connected commercial documents
 
-This is an **unpublished candidate**, version `0.5.0-preview.1`. Its package sources live in this repository. Core consumes exact compiled distributions; it does not maintain a second authoritative copy of these definitions. No release tag or external publication is created by the build.
+This is an **unpublished candidate**, version `0.5.0-preview.2`. Its package sources live in this repository. Core consumes exact compiled distributions; it does not maintain a second authoritative copy of these definitions. No release tag or external publication is created by the build.
 
 ## Package boundaries
 
@@ -18,7 +18,7 @@ This is an **unpublished candidate**, version `0.5.0-preview.1`. Its package sou
 | `clause-commerce`, `clause-features`, `clause-balance`, `clause-referrals`, `clause-schedule`, `blue-money` | Corresponding manifest namespaces | Product and business features, attributed obligations, financial projections, time actions and exact money arithmetic. |
 | `clause-participants`, `clause-participants-access` | `Participants`, `AccessParticipants` | Existing admitted-channel validation and explicit Timeline Access guards, rebuilt against this clause edition. |
 
-`PAYMENT-FAMILY-SOURCES.json` is the build order. `PAYMENT-FAMILY-PACKAGES.json` records exact identities, archives and the qualified native dependency selection. `blue-agreements-connected` provides the clause-enabled Agreement host without replacing the older `blue-agreements` publication. Old editions and existing documents keep their identities.
+`PAYMENT-FAMILY-SOURCES.json` is the build order. `PAYMENT-FAMILY-PACKAGES.json` records exact identities, archives and the qualified native dependency selection. `blue-agreements` provides the clause-enabled Agreement host without replacing the older `blue-agreements` publication. Old editions and existing documents keep their identities.
 
 ## One payment, one PI
 

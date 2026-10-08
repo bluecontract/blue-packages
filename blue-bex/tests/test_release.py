@@ -96,13 +96,21 @@ def test_explicit_empty_source_url_does_not_inherit_git_remote(monkeypatch):
     assert inferred == {'revision': 'fixed-revision', 'repository': 'https://github.com/example/local-checkout'}
 
 
-def test_preserved_hundred_thousand_edition():
-    prior=ROOT.parent/'editions/gas-100k'/ROOT.name
-    release=json.loads((prior/'release.json').read_text())
-    raw=(prior/'dist/package.bluepkg').read_bytes()
-    assert 'sha256:'+hashlib.sha256(raw).hexdigest()==release['archiveSha256']
-    assert b'100000' in (prior/'SPECIFICATION.md').read_bytes()
-    assert release['packageBlueId']!=json.loads((ROOT/'release.json').read_text())['packageBlueId']
+def prior_publication():
+    fixtures=ROOT.parent/'verification/fixtures'
+    pin=json.loads((fixtures/(ROOT.name+'-100k.json')).read_text())
+    data=(fixtures/(ROOT.name+'-100k.bluepkg')).read_bytes()
+    assert 'sha256:'+hashlib.sha256(data).hexdigest()==pin['archiveSha256']
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        manifest=json.loads(archive.read('package.json'))
+        assert manifest['packageBlueId']==pin['packageBlueId']
+        return archive.read('spec/'+('bex' if ROOT.name=='blue-bex' else 'contracts')+'.md').decode(),pin
+
+
+def test_preserved_hundred_thousand_publication():
+    text,pin=prior_publication()
+    assert '100000' in text
+    assert pin['packageBlueId']!=json.loads((ROOT/'release.json').read_text())['packageBlueId']
 
 
 def test_new_default_and_maximum():
@@ -111,8 +119,8 @@ def test_new_default_and_maximum():
     if ROOT.name=='blue-contracts':
         manifest=json.loads((ROOT/'reference/GAS_MANIFEST.json').read_text())
         assert manifest['sharedMaximum']==10_000_000
-        prior=ROOT.parent/'editions/gas-100k/blue-contracts/SPECIFICATION.md'
-        blocks=re.findall(r'```json\n(.*?)\n```',prior.read_text(),re.S)
+        prior,_=prior_publication()
+        blocks=re.findall(r'```json\n(.*?)\n```',prior,re.S)
         old=next(json.loads(b) for b in blocks if '"sharedMaximum"' in b)
         assert manifest['weights']==old['weights']
         assert 'integer(gas_limit, 0, 10000000)' in text

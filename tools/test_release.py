@@ -38,6 +38,26 @@ class ReleaseTests(unittest.TestCase):
         return dict(name='example', path='example/dist/package.bluepkg',
                     archiveSha256=release.digest(data), packageBlueId='example-id', selection='shared')
 
+    def test_current_catalogue_and_generated_views_are_consistent(self):
+        rows = release.selections(release.ROOT)
+        self.assertEqual(30, len(rows))
+        self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))
+        self.assertFalse((release.ROOT / 'editions').exists())
+        self.assertEqual({row['directory'] for row in rows},
+                         {row['path'].split('/')[0] for row in rows})
+
+    def test_historical_gas_fixtures_keep_exact_publications(self):
+        for name in ('blue-bex', 'blue-contracts'):
+            folder=release.ROOT / 'verification/fixtures'
+            pin=json.loads((folder / (name + '-100k.json')).read_text())
+            data=(folder / (name + '-100k.bluepkg')).read_bytes()
+            self.assertEqual(pin['archiveSha256'], release.digest(data))
+            with zipfile.ZipFile(io.BytesIO(data)) as archive:
+                manifest=json.loads(archive.read('package.json'))
+                self.assertEqual(pin['packageBlueId'], manifest['packageBlueId'])
+            current=json.loads((release.ROOT / name / 'dist/package.json').read_text())
+            self.assertNotEqual(current['packageBlueId'], pin['packageBlueId'])
+
     def test_rejects_changed_archive_and_unpacked_content(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -87,7 +107,7 @@ class ReleaseTests(unittest.TestCase):
         row, data = release.check_archive(root, self.fixture(root))
         edition_data = b'Exact root-clause edition bytes'
         edition = dict(row, version='0.2.0-preview.1', selection='root-clause-edition',
-                       path='editions/root-clauses/example/dist/package.bluepkg',
+                       path='fixtures/second/example.bluepkg',
                        packageBlueId='edition-id', archiveSha256=release.digest(edition_data))
         return {'packages': [row, edition]}, {row['path']: data, edition['path']: edition_data}
 

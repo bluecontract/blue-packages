@@ -3,7 +3,7 @@ import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.*;
 
-/** Generic data-package publisher. Business logic is authored in the package .blue files. */
+/** Generic source-package publisher. Business logic is authored in the package .blue files. */
 public final class BuildPaymentFamily {
   static final Map<Path,BluePackage> CACHE=new HashMap<>();
   static BluePackage open(Path path) throws Exception {
@@ -35,11 +35,17 @@ public final class BuildPaymentFamily {
   }
   public static void main(String[] args) throws Exception {
     Path root=Path.of(args[0]).toAbsolutePath().normalize();
-    var selection=map(read(root.resolve("PAYMENT-FAMILY-SOURCES.json")));
+    var selection=map(read(root.resolve("PACKAGE-SOURCES.json")));
     if (!"unpublished-candidate".equals(selection.get("status")))
       throw new IllegalArgumentException("This publisher only rebuilds unpublished candidates");
     Set<String> only = args.length > 1 ? Set.of(args[1].split(",")) : Set.of();
     var rows=new ArrayList<Object>();var mounted=new TreeMap<String,Object>();
+    for(Object item:list(selection.get("foundations"))) {
+      Path archive=root.resolve(item.toString()).resolve("dist/package.bluepkg");var pkg=open(archive);
+      String ns=map(read(archive.getParent().getParent().resolve("blue-package.yaml"))).get("namespace").toString();
+      rows.add(Map.of("directory",item.toString(),"namespace",ns,"name",pkg.name(),"version",pkg.version(),"packageBlueId",pkg.blueId(),"path",root.relativize(archive).toString(),"archiveSha256",sha(archive)));
+      mounted.put(ns,Map.of("path",root.relativize(archive).toString(),"blueId",pkg.blueId(),"archiveSha256",sha(archive)));
+    }
     for(Object item:list(selection.get("packages"))) {
       Path source=root.resolve(item.toString());var cfg=map(read(source.resolve("blue-package.yaml")));
       if (!Boolean.TRUE.equals(cfg.get("previewOnly")))
@@ -68,15 +74,24 @@ public final class BuildPaymentFamily {
         mounted.put(entry.getKey(),Map.of("path",root.relativize(path).toString(),"blueId",pkg.blueId(),"archiveSha256",sha(path)));
       }
       for(Object need:list(cfg.get("executionRequires"))) builder.executionRequires(need.toString());
+      if(cfg.containsKey("protocol")) {
+        var protocol=map(cfg.get("protocol"));String path=protocol.get("rules").toString();String rules=Files.readString(source.resolve(path));
+        if(!sha(source.resolve(path)).equals(map(read(source.resolve("spec/frozen.json"))).get(path))) throw new IllegalArgumentException("Frozen rules differ: "+source);
+        var requirements=new TreeMap<String,String>();map(protocol.get("requires")).forEach((k,v)->requirements.put(k,v.toString()));
+        builder.protocol(new ProtocolDefinition(protocol.get("name").toString(),protocol.get("status").toString(),new ProtocolDefinition.Asset(path,rules,sha(source.resolve(path))),null,null,requirements));
+      }
       var definitions=new LinkedHashMap<String,Object>();
       for(Object e:list(cfg.get("exports"))) {var export=map(e);definitions.put(export.get("name").toString(),read(source.resolve(export.get("path").toString())));}
       var ordered=new LinkedHashSet<String>();for(String name:definitions.keySet()) order(name,ns+"/",definitions,ordered,new HashSet<>());
-      for(String name:ordered) builder.exportJson(name,WireData.write(definitions.get(name)));
+      for(String name:ordered) {
+        if(cfg.containsKey("protocol") && !map(definitions.get(name)).containsKey("specification")) throw new IllegalArgumentException("Native source needs explicit rules reference: "+name);
+        builder.exportJson(name,WireData.write(definitions.get(name)));
+      }
       builder.documentation("README.md",Files.readString(source.resolve("README.md")));
       Path staging=Files.createTempDirectory(root.resolve("build"),"payment-candidate-");
       Path prepared=staging.resolve("dist");var pkg=builder.write(prepared);
       BluePackage.archive(prepared,prepared.resolve("package.bluepkg"),PackageSelection.pinned(pkg.blueId()));
-      // These explicitly unpublished distributions may be rebuilt; published editions are untouched.
+      // These explicitly unpublished distributions may be rebuilt; published archives are untouched.
       Path dist=source.resolve("dist"),backup=staging.resolve("previous");
       if(Files.exists(dist)) Files.move(dist,backup);
       try { Files.move(prepared,dist); }
@@ -89,6 +104,6 @@ public final class BuildPaymentFamily {
       rows.add(row); mounted.put(ns,Map.of("path",root.relativize(archive).toString(),"blueId",pkg.blueId(),"archiveSha256",sha(archive)));
       System.out.println(ns+" "+pkg.blueId());
     }
-    Files.writeString(root.resolve("PAYMENT-FAMILY-PACKAGES.json"),WireData.write(Map.of("format","blue-payment-family/1","status","unpublished-candidate","packages",rows,"mounts",mounted))+"\n");
+    Files.writeString(root.resolve("PACKAGES.json"),WireData.write(Map.of("format","blue-package-catalog/2","status","unpublished-candidate","packages",rows,"mounts",mounted))+"\n");
   }
 }

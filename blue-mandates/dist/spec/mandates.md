@@ -2,7 +2,7 @@
 
 Protocol name: `owner-approved-operation-authority/1`  
 Package namespace: `Mandates`  
-Release status: Python integration preview, 29 September 2026
+Release status: Core Java integration preview, 8 October 2026
 
 ## 1. Scope and layer boundary
 
@@ -80,7 +80,7 @@ current scope is not current authority.
 Blue pattern) and `function`. Each supplied condition applies; an omitted optional
 condition adds no restriction. Explicit empty patterns are permitted as wildcards.
 
-`Mandate Authority` extends `Coordination/Authority` and refers to the original
+`Mandate Authority` extends `Mandates/Authority` and refers to the original
 pre-initialization Mandate through `mandate`. Its inherited `actor` is the represented
 holder. The Timeline Entry's actor remains the actual submitting agent.
 
@@ -206,13 +206,13 @@ The package emits these concrete event types:
 
 | Type | Kind | Meaning |
 |---|---|---|
-| Mandate Initialized | Coordination/Event | Genuine local initialization to Pending, no delegation yet |
-| Mandate Approved | Coordination/Event | Owner's exact-program approval was processed |
-| Mandate Termination Requested | Coordination/Event | Internal request to the base lifecycle |
-| Mandate Terminated | Coordination/Event | Permanent end, with time and reason |
-| Scope Changed | Coordination/Event | Scope identity after an observed authority-scope update |
-| Evidence Requested | Coordination/Request | Addressed, fixed evidence job opened by the approved program |
-| Evidence Responded | Coordination/Response | Exact-request-correlated provider outcome accepted by its operation |
+| Mandate Initialized | Mandates/Event | Genuine local initialization to Pending, no delegation yet |
+| Mandate Approved | Mandates/Event | Owner's exact-program approval was processed |
+| Mandate Termination Requested | Mandates/Event | Internal request to the base lifecycle |
+| Mandate Terminated | Mandates/Event | Permanent end, with time and reason |
+| Scope Changed | Mandates/Event | Scope identity after an observed authority-scope update |
+| Evidence Requested | Mandates/Request | Addressed, fixed evidence job opened by the approved program |
+| Evidence Responded | Mandates/Response | Exact-request-correlated provider outcome accepted by its operation |
 
 Scope notifications are ordinary workflow events. An Active scope update is observed
 through a Document Update Channel; termination explicitly reports its cleared scope
@@ -496,3 +496,11 @@ resource admission separately. Physical inability must not become a fabricated
 semantic denial or permission to skip an unresolved input.
 
 This edition selects the exact 10M gas prerequisites. Previously published content retains its original semantics.
+
+## Package ownership
+
+Mandates defines its own Event, Message, Request, Response and Authority base types.
+Coordination provides authenticated actors, signed timelines and timeline channels;
+it does not own application messages or delegation policy. This revision retains
+the owner-approved protected program and exact-review rules above. Historical
+Mandates identities remain separate immutable protocols for replay.

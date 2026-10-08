@@ -35,34 +35,23 @@ def local(root, name):
 
 
 def selections(root):
-    rows = json.loads((root / 'SHARED-PACKAGES.json').read_text())['packages']
-    rows = [dict(row, selection='shared') for row in rows]
-    preview = json.loads((root / 'blue-time/docs/integration-selection.json').read_text())
-    require(preview['approvedNativeSupport'] is False, 'Review the Time preview selection explicitly')
-    requirements = preview['requiredPackages']
-    if isinstance(requirements, dict):
-        time = dict(name='blue-time', packageBlueId=preview['packageBlueId'],
-                    archiveSha256=preview['archiveSha256'])
-    else:
-        time = next(row for row in requirements if row['name'] == 'blue-time')
-    require(not any(row['name'] == 'blue-time' for row in rows), 'Time selection needs explicit review')
-    rows.append(dict(time, path='blue-time/dist/package.bluepkg', selection='preview'))
-    edition = json.loads((root / 'ROOT-CLAUSE-PACKAGES.json').read_text())
-    require(edition['nativeRuntimeModified'] is False, 'Business edition cannot register native support')
-    rows.extend(dict(row, selection=edition['edition']) for row in edition['packages'])
-    timeline = json.loads((root / 'TIMELINE-PACKAGES.json').read_text())
-    require(timeline['nativeRuntimeModified'] is False, 'Timeline data cannot register native support')
-    for row in timeline['packages']:
-        path = row.get('path', row['name'] + '/dist/package.bluepkg')
-        existing = next((entry for entry in rows if entry['path'] == path), None)
-        if existing is not None:
-            require(all(existing[key] == row[key] for key in ('packageBlueId', 'archiveSha256')),
-                    'Conflicting timeline selection: ' + path)
-        else:
-            rows.append(dict(row, path=path, selection='timeline-candidate'))
-    require(len({(r['selection'], r['name']) for r in rows}) == len(rows), 'Duplicate selected package name')
-    require(len({r['path'] for r in rows}) == len(rows), 'Duplicate archive path')
-    return sorted(rows, key=lambda row: row['name'])
+    catalogue = json.loads((root / 'PACKAGES.json').read_text())
+    source = json.loads((root / 'PACKAGE-SOURCES.json').read_text())
+    rows = catalogue['packages']
+    require([r['directory'] for r in rows] == source['foundations'] + source['packages'],
+            'Current catalogue differs from source inventory')
+    require(len({r['name'] for r in rows}) == len(rows), 'Duplicate current package name')
+    require(len({r['namespace'] for r in rows}) == len(rows), 'Duplicate current namespace')
+    for row in rows:
+        require(row['path'] == row['directory'] + '/dist/package.bluepkg'
+                and '/' not in row['directory'], 'Package must live at the root')
+        mount = catalogue['mounts'][row['namespace']]
+        require(mount == dict(path=row['path'], blueId=row['packageBlueId'], archiveSha256=row['archiveSha256']),
+                'Namespace mount differs from current package')
+    require(set(catalogue['mounts']) == {r['namespace'] for r in rows}, 'Undeclared namespace mount')
+    from sync_catalogues import sync
+    sync(root, check=True)
+    return [dict(row, selection='current') for row in rows]
 
 
 def check_archive(root, row):
@@ -112,6 +101,8 @@ def check(root=ROOT):
     rows, payloads = [], {}
     for selection in selections(root):
         row, data = check_archive(root, selection)
+        selected_ids = {r['packageBlueId'] for r in selections(root)}
+        require(set(row['imports'].values()) <= selected_ids, 'Dependency outside current catalogue: ' + row['name'])
         rows.append(row)
         payloads[row['path']] = data
     indexed = {row['path'].removesuffix('/dist/package.bluepkg'): row for row in rows}
@@ -208,7 +199,8 @@ def main():
     catalogue, payloads = check()
     result = dict(verified=True, packages=len(catalogue['packages']),
                   sourceFilesChecked=catalogue['sourceFilesChecked'],
-                  previewPackages=[r['name'] for r in catalogue['packages'] if r['selection'] == 'preview'])
+                  publicationStatus='unpublished-candidate',
+                  previewPackages=[r['name'] for r in catalogue['packages'] if 'preview' in r['version']])
     if args.command == 'bundle':
         result['bundle'] = bundle(args.output, catalogue, payloads)
     elif args.command == 'assets':

@@ -1,1 +1,344 @@
-{"approvedAt":{"type":"Integer"},"contracts":{"applyMandateTermination":{"channel":"terminationRequests","event":{"type":"Mandates/Mandate Termination Requested"},"steps":[{"do":[{"$appendChange":{"op":"replace","path":"/status","val":"Terminated"}},{"$appendChange":{"op":"add","path":"/terminatedAt","val":{"$binding":"timestamp"}}},{"$appendEvent":{"$objectSet":{"key":"reason","object":{"$objectSet":{"key":"timestampUs","object":{"$literal":{"reason":"uninitialized","timestampUs":0,"type":"Mandates/Mandate Terminated"}},"val":{"$binding":"timestamp"}}},"val":{"$event":"/reason"}}}}],"type":"contracts/Compute"},{"cause":"mandate-terminated","type":"contracts/Terminate Processing"}],"type":"contracts/Sequential Workflow"},"approveMandate":{"channel":"authorityHolderChannel","request":{},"steps":[{"do":[{"$failIf":{"cond":{"$not":{"$eq":[{"$document":"/status"},"Pending"]}},"message":"MANDATE_NOT_PENDING"}},{"$failIf":{"cond":{"$not":{"$eq":[{"$keys":{"$binding":"call/request"}},[]]}},"message":"EMPTY_REQUEST_REQUIRED"}},{"$failIf":{"cond":{"$not":{"$eq":[{"$binding":"call/requireExactDocumentVersion"},true]}},"message":"EXACT_REVIEW_REQUIRED"}},{"$appendChange":{"op":"replace","path":"/status","val":"Active"}},{"$appendChange":{"op":"add","path":"/approvedAt","val":{"$binding":"timestamp"}}},{"$appendEvent":{"$objectSet":{"key":"reviewedDocumentId","object":{"$objectSet":{"key":"timestampUs","object":{"$literal":{"reviewedDocumentId":"uninitialized","timestampUs":0,"type":"Mandates/Mandate Approved"}},"val":{"$binding":"timestamp"}}},"val":{"$nodeBlueId":{"$binding":"call/document"}}}}}],"type":"contracts/Compute"}],"type":"contracts/Sequential Workflow Operation"},"authorityHolderChannel":{"schema":{"required":true},"type":"coordination/Timeline Channel"},"authorizedActorChannel":{"schema":{"required":true},"type":"coordination/Timeline Channel"},"initializeMandate":{"channel":"lifecycle","event":{"type":"contracts/Document Processing Initiated"},"steps":[{"do":[{"$appendChange":{"op":"add","path":"/status","val":"Pending"}},{"$if":{"cond":{"$exists":{"$document":"/approvedAt"}},"then":[{"$appendChange":{"op":"remove","path":"/approvedAt"}}]}},{"$if":{"cond":{"$exists":{"$document":"/terminatedAt"}},"then":[{"$appendChange":{"op":"remove","path":"/terminatedAt"}}]}},{"$appendEvent":{"$literal":{"type":"Mandates/Mandate Initialized"}}}],"type":"contracts/Compute"}],"type":"contracts/Sequential Workflow"},"lifecycle":{"type":"contracts/Lifecycle Event Channel"},"mandateProtocol":{"type":"Mandates/Authority Protocol"},"terminateMandate":{"channel":"authorityHolderChannel","request":{"reason":{"schema":{"minLength":1,"required":true},"type":"Text"}},"steps":[{"do":[{"$failIf":{"cond":{"$not":{"$or":[{"$eq":[{"$document":"/status"},"Pending"]},{"$eq":[{"$document":"/status"},"Active"]}]}},"message":"MANDATE_ENDED"}},{"$failIf":{"cond":{"$not":{"$eq":[{"$keys":{"$binding":"call/request"}},["reason"]]}},"message":"ONLY_REASON_REQUIRED"}},{"$appendEvent":{"$objectSet":{"key":"reason","object":{"$literal":{"reason":"uninitialized","type":"Mandates/Mandate Termination Requested"}},"val":{"$binding":"call/request/reason"}}}}],"type":"contracts/Compute"}],"type":"contracts/Sequential Workflow Operation"},"terminationRequests":{"type":"contracts/Triggered Event Channel"}},"description":"Two-role owner-approved authority program. No mandatory guarantor. The base alone grants no target operation.","name":"Mandate","specification":{"blueId":"C8S7J4uBd7jrioK6VxtBrhNu3urGmgKVeH6gcdJhYGUC"},"status":{"type":"Mandates/Status"},"terminatedAt":{"type":"Integer"}}
+{
+  "approvedAt": {
+    "type": "Integer"
+  },
+  "contracts": {
+    "applyMandateTermination": {
+      "channel": "terminationRequests",
+      "event": {
+        "type": "Mandates/Mandate Termination Requested"
+      },
+      "steps": [
+        {
+          "do": [
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/status",
+                "val": "Terminated"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/terminatedAt",
+                "val": {
+                  "$binding": "timestamp"
+                }
+              }
+            },
+            {
+              "$appendEvent": {
+                "$objectSet": {
+                  "key": "reason",
+                  "object": {
+                    "$objectSet": {
+                      "key": "timestampUs",
+                      "object": {
+                        "$literal": {
+                          "reason": "uninitialized",
+                          "timestampUs": 0,
+                          "type": "Mandates/Mandate Terminated"
+                        }
+                      },
+                      "val": {
+                        "$binding": "timestamp"
+                      }
+                    }
+                  },
+                  "val": {
+                    "$event": "/reason"
+                  }
+                }
+              }
+            }
+          ],
+          "type": "Contracts/Compute"
+        },
+        {
+          "cause": "mandate-terminated",
+          "type": "Contracts/Terminate Processing"
+        }
+      ],
+      "type": "Contracts/Sequential Workflow"
+    },
+    "approveMandate": {
+      "channel": "authorityHolderChannel",
+      "request": {},
+      "steps": [
+        {
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$document": "/status"
+                      },
+                      "Pending"
+                    ]
+                  }
+                },
+                "message": "MANDATE_NOT_PENDING"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$keys": {
+                          "$binding": "call/request"
+                        }
+                      },
+                      []
+                    ]
+                  }
+                },
+                "message": "EMPTY_REQUEST_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$binding": "call/requireExactDocumentVersion"
+                      },
+                      true
+                    ]
+                  }
+                },
+                "message": "EXACT_REVIEW_REQUIRED"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/status",
+                "val": "Active"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/approvedAt",
+                "val": {
+                  "$binding": "timestamp"
+                }
+              }
+            },
+            {
+              "$appendEvent": {
+                "$objectSet": {
+                  "key": "reviewedDocumentId",
+                  "object": {
+                    "$objectSet": {
+                      "key": "timestampUs",
+                      "object": {
+                        "$literal": {
+                          "reviewedDocumentId": "uninitialized",
+                          "timestampUs": 0,
+                          "type": "Mandates/Mandate Approved"
+                        }
+                      },
+                      "val": {
+                        "$binding": "timestamp"
+                      }
+                    }
+                  },
+                  "val": {
+                    "$nodeBlueId": {
+                      "$binding": "call/document"
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "type": "Contracts/Compute"
+        }
+      ],
+      "type": "Contracts/Sequential Workflow Operation"
+    },
+    "authorityHolderChannel": {
+      "schema": {
+        "required": true
+      },
+      "type": "Coordination/Timeline Channel"
+    },
+    "authorizedActorChannel": {
+      "schema": {
+        "required": true
+      },
+      "type": "Coordination/Timeline Channel"
+    },
+    "initializeMandate": {
+      "channel": "lifecycle",
+      "event": {
+        "type": "Contracts/Document Processing Initiated"
+      },
+      "steps": [
+        {
+          "do": [
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/status",
+                "val": "Pending"
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$exists": {
+                    "$document": "/approvedAt"
+                  }
+                },
+                "then": [
+                  {
+                    "$appendChange": {
+                      "op": "remove",
+                      "path": "/approvedAt"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$exists": {
+                    "$document": "/terminatedAt"
+                  }
+                },
+                "then": [
+                  {
+                    "$appendChange": {
+                      "op": "remove",
+                      "path": "/terminatedAt"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$appendEvent": {
+                "$literal": {
+                  "type": "Mandates/Mandate Initialized"
+                }
+              }
+            }
+          ],
+          "type": "Contracts/Compute"
+        }
+      ],
+      "type": "Contracts/Sequential Workflow"
+    },
+    "lifecycle": {
+      "type": "Contracts/Lifecycle Event Channel"
+    },
+    "mandateProtocol": {
+      "type": "Mandates/Authority Protocol"
+    },
+    "terminateMandate": {
+      "channel": "authorityHolderChannel",
+      "request": {
+        "reason": {
+          "schema": {
+            "minLength": 1,
+            "required": true
+          },
+          "type": "Text"
+        }
+      },
+      "steps": [
+        {
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$or": [
+                      {
+                        "$eq": [
+                          {
+                            "$document": "/status"
+                          },
+                          "Pending"
+                        ]
+                      },
+                      {
+                        "$eq": [
+                          {
+                            "$document": "/status"
+                          },
+                          "Active"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "message": "MANDATE_ENDED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$keys": {
+                          "$binding": "call/request"
+                        }
+                      },
+                      [
+                        "reason"
+                      ]
+                    ]
+                  }
+                },
+                "message": "ONLY_REASON_REQUIRED"
+              }
+            },
+            {
+              "$appendEvent": {
+                "$objectSet": {
+                  "key": "reason",
+                  "object": {
+                    "$literal": {
+                      "reason": "uninitialized",
+                      "type": "Mandates/Mandate Termination Requested"
+                    }
+                  },
+                  "val": {
+                    "$binding": "call/request/reason"
+                  }
+                }
+              }
+            }
+          ],
+          "type": "Contracts/Compute"
+        }
+      ],
+      "type": "Contracts/Sequential Workflow Operation"
+    },
+    "terminationRequests": {
+      "type": "Contracts/Triggered Event Channel"
+    }
+  },
+  "description": "Two-role owner-approved authority program. No mandatory guarantor. The base alone grants no target operation.",
+  "name": "Mandate",
+  "status": {
+    "type": "Mandates/Status"
+  },
+  "terminatedAt": {
+    "type": "Integer"
+  },
+  "specification": {
+    "blueId": "7nTzS5jVoHeZC9xq9PWrvWAL3oxBcHGfPQjaf8A6FhhA"
+  }
+}

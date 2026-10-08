@@ -1,156 +1,38 @@
-# Blue Packages
+# Blue packages
 
-Current gas edition: [10M default and maximum](GAS-10M.md). Historical publications retain their original budgets.
+One current package set lives at the repository root. `PACKAGE-SOURCES.json`
+selects the source directories; `PACKAGES.json` pins the complete built set.
+There are no alternative source editions to choose between.
 
-Reusable Blue definitions, protocol specifications and executable business documents,
-shared by the Java and Python implementations of Blue.
+Start with [the payment and clauses guide](docs/payment-family.md),
+[the repository layout](docs/layout.md), and [consolidation notes](docs/consolidation.md).
 
-The new [payment family candidate](docs/payment-family.md) adds reusable Payment
-Instructions, connected clauses, MyOS parties and payments, and illustrative ACME
-Bank and manual-transfer methods. Its sources and exact build order are in
-`PAYMENT-FAMILY-SOURCES.json`. It is unpublished and separately qualified; it does
-not silently replace the default release collection or existing documents.
+The foundation is Language, BEX, Contracts (10,000,000 default gas), Coordination,
+Time and Mandates. **Mandates is its own package, `blue-mandates`.** Coordination
+owns authenticated timeline transport and access, not business delegation rules.
 
-A package gives content an exact identity and a set of named exports. It can describe
-a language, define a protocol, supply reusable types or contain an entire agreement.
-Packages are data: native protocol implementations live in the consuming runtime.
-Loading a package makes its definitions available; execution requires a runtime that
-explicitly supports its exact protocol dependencies.
+Business packages cover clauses, agreements, orders, document collections,
+parties, access participants, state, activation, termination, amendments,
+balances, referrals, schedules and the payment family. Payment Instruction is
+provider-neutral; MyOS, ACME Bank and Manual Payments contain specific processes.
+Adapters remain test implementations, not live financial integrations.
 
-## Timeline provider selection
-
-`blue-coordination` **0.2.0-rc.2** replaces the temporary package. Its provider has
-one required `endpoint` for public and private reads. See
-[the migration notes](docs/timeline-provider-migration.md) and
-[TIMELINE-PACKAGES.json](TIMELINE-PACKAGES.json) for the rebuilt consumer identities.
-Existing native runtime approvals remain attached to their original publications;
-this data-package migration does not silently migrate live MyOS documents.
-
-## Available packages
-
-There are **14 baseline package projects**, including three versions of the commerce
-function example. Historical immutable editions are retained separately. Follow the package links for sources, specifications and examples.
-
-| Package | Suggested import prefix | What it provides |
-| --- | --- | --- |
-| [Language](blue-language/) | `Language` | Immutable typed content graphs, BlueId calculation, references, specialization and schemas. Exports `Package` and `Protocol Specification`; primitive types belong to the Language registry. |
-| [BEX](blue-bex/) | `BEX` | The deterministic expression and program language used by workflows: values, functions, changesets, events and metered execution. This package defines a protocol and has no named type exports. |
-| [Contracts](blue-contracts/) | `Contracts` | Document processing: channels, operations, workflows, compute steps, document updates, event delivery and embedded documents. Contains 32 type exports and the processing specification. |
-| [Coordination](blue-coordination/) | `Coordination` | 53 definitions for timelines, signed reads, completeness, Timeline Access and timestamped document input. Provider storage and feeder scheduling belong to the host. |
-| [Agreements](blue-agreements/) | `Agreements` | The reusable `Agreement` and `Clause` model, progress notifications and typed agreement lifecycle events. Independent of any particular activation clause. |
-| [Mutual Activation](clause-mutual-activation/) | `MutualActivation` | Two-party negotiation, proposed edits, review rounds, approvals and decline. Emits typed events including `Activation Succeeded` and `Activation Declined`. |
-| [Immediate Termination](clause-immediate-termination/) | `ImmediateTermination` | Separates negotiable termination terms from the executable clause. Allows party A, party B or either party to terminate, with authenticated actions and typed evidence. |
-| [Reseller Agreement](agreement-reseller/) | `Reseller` | A concrete agreement combining commercial terms, mutual activation and optional immediate termination. Demonstrates the NEGOTIATING → ACTIVE → TERMINATED lifecycle. |
-| [Agreement Examples](blue-agreement-examples/) | `AgreementExamples` | A portfolio containing subagreements. Observes their lifecycle events and requests onboarding for selected activated agreements. |
-| [Mandates](blue-mandates/) | `Mandates` | Owner-approved conditional delegation of operations, including correlated evidence requests and responses. Requires explicitly supported native Coordination/Mandates behavior. |
-| [Time](blue-time/) | `Time` | Eight timer definitions for scheduling, firing, cancelling and replacing one-shot timers using explicit Unix timestamps in microseconds. **Conformance preview:** a data package and test fixture; native scheduling is not approved by this package. |
-| [Commerce Functions v1](functions/commerce-functions-v1/) | `CommerceFunctions` | `Totals`: an exact integer line-total calculation implemented as ordinary Contracts/BEX data. |
-| [Commerce Functions v1.1](functions/commerce-functions-v1_1/) | `CommerceFunctions` | Adds `Double` while preserving the original `Totals` export; demonstrates an additive package release. |
-| [Commerce Functions v2](functions/commerce-functions-v2/) | `CommerceFunctions` | Changes the total function's arguments to include a fee; demonstrates explicitly selecting a different release. |
-
-The foundation is Language → BEX → Contracts → Coordination. Agreements and the
-business clauses compose on top of it. Mandates and Time specify additional protocol
-requirements. Exact imports are recorded in each `blue-package.lock.json`; the table
-is an overview, not a substitute for those pins.
-
-## Current Agreement model
-
-The four top-level Agreement projects now use **root clauses, version 0.3.0-rc.2**.
-[ROOT-CLAUSE-PACKAGES.json](ROOT-CLAUSE-PACKAGES.json) pins their exact publications.
-Clauses install state and workflows into one managed root document. The installer
-supports atomic add/edit/remove amendments, revision checks, typed change events,
-whole workflow parameters and references to existing fields.
-
-Start with [the authoring guide](blue-agreements/docs/root-clauses.md) and
-[Java qualification results](docs/root-clause-amendments.md).
-
-The previous top-level embedded-clause projects are preserved in
-[editions/embedded-clauses](editions/embedded-clauses/). SHARED-PACKAGES.json keeps
-those legacy identities, so existing consumers can continue using that selection.
-The original root-clause preview remains in editions/root-clauses with its own
-SELECTION.json. Selecting the new release does not migrate an existing instance.
-
-## Identities, names and content
-
-An export is addressed by its BlueId. A readable name such as
-`MutualActivation/Mutual Activation Clause` is a local, case-sensitive alias for that
-identity. Mount each namespace explicitly; importing an agreement does not expose all
-its dependencies' names. Use capitalized prefixes in new documents, as shown above.
-Some immutable foundation releases retain older lowercase authoring aliases internally.
-
-The package BlueId identifies its semantic package content. The archive SHA-256
-checks the exact transported bytes. A changed release gets new identities and an
-explicit dependency selection; existing IDs are never rebound to new content.
-
-A package is a convenient way to group reusable definitions. It does not limit Blue
-to predefined types: applications can also store and resolve arbitrary content,
-including collapsed references, through their runtime's repository/provider API.
-
-## Using the packages
-
-For development, place the repositories beside one another:
-
-```text
-workspace/
-  blue-packages/
-  blue-java/
-  blue-language-python/
-```
-
-Both consumers can select this directory with `BLUE_PACKAGES_DIR`; Java also accepts
-`-PbluePackagesDir=/absolute/path/to/blue-packages`. Keep each consumer's exact package
-lock. Changing this repository's inventory does not automatically migrate a runtime,
-its stored state or its execution permissions.
-
-The current shared selection is in [SHARED-PACKAGES.json](SHARED-PACKAGES.json).
-Time has a [separate preview selection](blue-time/docs/integration-selection.json)
-and is not silently added to either runtime. Historical Java consumers also use the
-preserved `blue-mutual-activation` compatibility path. See
-[consumer selection and aliases](docs/using-packages.md) for these distinctions.
-
-## Checking and preparing a release
-
-Run these commands from this repository:
+## Build and verify
 
 ```sh
-# Fast archive, unpacked-file, inventory and dependency integrity checks; Python 3.10+.
+# JAVA_HOME must select Java 21; classpath must use the qualified Blue Java runtime.
+BLUE_JAVA_CLASSPATH=... bash tools/build-payment-family.sh
+python3 tools/sync_catalogues.py
 python3 tools/release.py check
-
-# Semantic package/definition checks; Python 3.13+ with Blue Python installed.
-PYTHONDONTWRITEBYTECODE=1 python tools/verify_packages.py
-
-# A deterministic data-only bundle of the 18 selected package archives.
-python3 tools/release.py bundle --output build/blue-packages.zip
-
-# Flat GitHub Release attachments: individual archives, ZIP, catalogue and checksums.
-python3 tools/release.py assets --output build/release
+python3 tools/check_payment_family.py
+python3 -m unittest discover -s tools -p 'test_release.py'
 ```
 
-The bundle includes a catalogue, checksums and distribution notes. It excludes
-runtime snapshots, tests, logs, unpacked duplicates and historical publications.
-Individual `dist/package.bluepkg` files remain the units to distribute and pin.
-The bundle is an artifact collection, not a replacement source checkout.
+The builder reads `.blue` definitions. It packages BEX programs and never
+implements their business rules in Java or JavaScript. `SHARED-PACKAGES.json`
+and `PAYMENT-FAMILY-PACKAGES.json` are generated views of `PACKAGES.json`, not
+independent selections. Do not edit their pins manually.
 
-The [GitHub Releases workflow](.github/workflows/packages-release.yml) checks and
-prepares these shared data artifacts on pull requests, `main` pushes and manual runs.
-Pushing a `blue-packages-*` tag publishes them as one collection for compatible
-Java, Python and other implementations. See [publishing](docs/publishing.md) for
-tagging, downloading and verification instructions.
-
-See [publishing](docs/publishing.md) for release checks and licensing status,
-[layout](docs/layout.md) for source ownership, and
-[the agreement walkthrough](docs/agreements.md) for typed events and composition.
-Recorded qualification belongs to its specific release and runtime; package integrity
-alone does not assert complete Java/Python behavioral parity or production readiness.
-
-## Repository maintenance
-
-Package folders contain authored content and their exact distributions. `docs/`
-contains current repository guidance; `tools/` contains build and release utilities;
-`verification/` retains reproducibility evidence and older publications. The root
-JSON files remain at stable paths because existing consumer tools read them.
-The [layout guide](docs/layout.md) explains their distinct purposes and the few
-compatibility paths. Generated caches and local build outputs are ignored.
-
-No repository-wide license has been declared. Existing provenance and third-party
-notices are retained; select appropriate licensing before public redistribution.
+These sources are unpublished candidates. Package consolidation is not a
+publication or production qualification. Native protocol support must be
+explicitly installed and tested by each runtime.
