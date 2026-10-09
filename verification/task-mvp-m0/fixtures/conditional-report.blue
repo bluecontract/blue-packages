@@ -1,0 +1,167 @@
+{
+  "name": "M0 conditional native report matcher",
+  "accepted": {},
+  "parameters": {
+    "reportRequest": {
+      "name": "Successful Task report",
+      "result": {
+        "type": "Integer",
+        "schema": {
+          "required": true
+        }
+      }
+    }
+  },
+  "contracts": {
+    "performer": {
+      "type": "Contracts/External Channel",
+      "event": {
+        "source": "performer"
+      }
+    },
+    "life": {
+      "type": "Contracts/Lifecycle Event Channel",
+      "event": {
+        "type": "Contracts/Document Processing Initiated"
+      }
+    },
+    "install": {
+      "type": "Contracts/Sequential Workflow",
+      "channel": "life",
+      "steps": [
+        {
+          "type": "Contracts/Compute",
+          "do": [
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/contracts/report",
+                "val": {
+                  "$pointerSet": {
+                    "object": {
+                      "$literal": {
+                        "type": "Contracts/Sequential Workflow Operation",
+                        "channel": "performer",
+                        "request": {
+                          "requestId": {
+                            "type": "Text",
+                            "schema": {
+                              "required": true,
+                              "minLength": 1
+                            }
+                          },
+                          "status": {
+                            "type": "Text",
+                            "schema": {
+                              "required": true,
+                              "enum": [
+                                "succeeded",
+                                "failed"
+                              ]
+                            }
+                          }
+                        },
+                        "steps": [
+                          {
+                            "type": "Contracts/Compute",
+                            "do": [
+                              {
+                                "$if": {
+                                  "cond": {
+                                    "$eq": [
+                                      {
+                                        "$binding": "call/request/status"
+                                      },
+                                      "succeeded"
+                                    ]
+                                  },
+                                  "then": [
+                                    {
+                                      "$failIf": {
+                                        "cond": {
+                                          "$not": {
+                                            "$is": {
+                                              "node": {
+                                                "$binding": "call/request"
+                                              },
+                                              "pattern": {}
+                                            }
+                                          }
+                                        },
+                                        "message": "SUCCESS_RESULT_MISMATCH"
+                                      }
+                                    }
+                                  ],
+                                  "else": [
+                                    {
+                                      "$failIf": {
+                                        "cond": {
+                                          "$not": {
+                                            "$is": {
+                                              "node": {
+                                                "$binding": "call/request"
+                                              },
+                                              "pattern": {
+                                                "error": {
+                                                  "type": "Text",
+                                                  "schema": {
+                                                    "required": true,
+                                                    "minLength": 1
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "message": "FAILURE_ERROR_REQUIRED"
+                                      }
+                                    },
+                                    {
+                                      "$failIf": {
+                                        "cond": {
+                                          "$exists": {
+                                            "$binding": "call/request/result"
+                                          }
+                                        },
+                                        "message": "FAILURE_RESULT_FORBIDDEN"
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              {
+                                "$appendChange": {
+                                  "op": "replace",
+                                  "path": "/accepted",
+                                  "val": {
+                                    "$binding": "call/request"
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    },
+                    "path": "/steps/0/do/0/$if/then/0/$failIf/cond/$not/$is/pattern",
+                    "val": {
+                      "$objectSet": {
+                        "object": {},
+                        "key": "blueId",
+                        "val": {
+                          "$nodeBlueId": {
+                            "$document": "/parameters/reportRequest"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

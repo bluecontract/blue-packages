@@ -1,0 +1,76 @@
+{
+  "name": "Work Functions",
+  "type": "Contracts/Compute Definition",
+  "functions": {
+    "request": {
+      "args": {},
+      "do": [
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$is": {
+                  "node": {
+                    "$document": "/clauses/work"
+                  },
+                  "pattern": {
+                    "type": "TaskM0/Work Clause"
+                  }
+                }
+              }
+            },
+            "message": "WORK_OWNER_REQUIRED"
+          }
+        },
+        {
+          "$let": {
+            "name": "next",
+            "expr": {
+              "$add": [
+                {
+                  "$document": "/work/count"
+                },
+                1
+              ]
+            }
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "replace",
+            "path": "/work/count",
+            "val": {
+              "$var": "next"
+            }
+          }
+        },
+        {
+          "$appendEvent": {
+            "$merge": [
+              {
+                "type": "TaskM0/Work Requested"
+              },
+              {
+                "requestId": {
+                  "$concat": [
+                    "request-",
+                    {
+                      "$text": {
+                        "$var": "next"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$return": {
+            "outcome": "acceptedNew"
+          }
+        }
+      ]
+    }
+  }
+}
