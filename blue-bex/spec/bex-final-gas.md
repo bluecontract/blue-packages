@@ -51,7 +51,7 @@ A package distributes this specification; it does not install a processor. The p
 
 This edition selects Blue Language package `8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4`, whose complete specification Text is `H7WiYQ6GiWypRdFyWRcv99dsvTv6WnJYnu9eLYPQmWnc`. Node construction, exact references, specialization, output admission and BlueIds have the meaning defined by that Language release.
 
-BEX is independent of Contracts. A host may supply Language-backed matching, node identity, finite reads and explicit intrinsics. Contracts is one such host and binds the supplied BEX context and ledger according to its own specification. BEX MUST NOT substitute ambient state or an unversioned implementation for these declared interfaces.
+BEX is independent of Contracts. A host may supply Language-backed matching, node identity, finite reads and explicit intrinsics. Contracts is one such host and binds the supplied BEX context and meter according to its own specification. BEX MUST NOT substitute ambient state or an unversioned implementation for these declared interfaces.
 
 Package imports supply exact content. Authoring prefixes are local bindings and do not leak through transitive imports. An imported definition retains its exact references. Mounting another package cannot change the selected interpreter or replace an existing type reference. Within this edition's interpreted package graph, the selected Language release MUST agree throughout; cross-Language conversion and mixed-rule cyclic sets are not defined. One selected Language governs a complete cyclic identity set and its owning proof.
 
@@ -67,7 +67,7 @@ The executable algorithm appendix contains the complete evaluator and host-value
 <a id="section-4"></a>
 ## 4. Machine and invocation
 
-An invocation has a compiled program; an explicit context; a gas ledger; lexical function frames; an ordered changeset; and an ordered event list. Context supplies the selected document snapshot, event, current contract, previous step results, named bindings, and executing scope. Optional adapters provide finite document reads, Blue specialization checks, and exact-type intrinsics.
+An invocation has a compiled program; an explicit context; a gas meter; lexical function frames; an ordered changeset; and an ordered event list. Context supplies the selected document snapshot, event, current contract, previous step results, named bindings, and executing scope. Optional adapters provide finite document reads, Blue specialization checks, and exact-type intrinsics.
 
 No process-global variable is a program binding. No Python expression is evaluated from program text. The interpreter recognizes data forms, not Python, JavaScript, or embedded shell commands. An installed intrinsic is trusted host code and is outside that sandbox boundary.
 
@@ -123,7 +123,7 @@ The context's matcher implements `$is` using Blue semantic admission and special
 `$nodeBlueId: EXPR` evaluates EXPR once and returns a Text containing the ordinary
 Language BlueId. Charge `nodeIdentityRequested = 5` after evaluating the operand
 and before calling the host's Language identity boundary. The boundary shares
-the invocation ledger and cannot use a separate unmetered hash implementation.
+the invocation meter and cannot use a separate unmetered hash implementation.
 
 An admitted exact host collection retains its selected exact identity, including
 owning-set member identity, without expanding its descendants. A newly computed
@@ -165,7 +165,7 @@ Iteration gas is charged for each admitted visited item. Short-circuiting stops 
 
 `let` declares function-frame slots. Parallel declarations evaluate their initializers against the old frame; an explicit declaration order enables ordered dependency between initializers. `set` updates an existing declared slot. Conditional declaration visibility is checked statically.
 
-Function calls use isolated frames, exact declared argument-name sets, and supplied Blue argument-pattern checks. Functions share the invocation's effect accumulators and gas ledger but do not implicitly capture another function's locals. Recursion is rejected during compilation. Business-process cycles therefore arise from Contracts event work, not recursive BEX function calls.
+Function calls use isolated frames, exact declared argument-name sets, and supplied Blue argument-pattern checks. Functions share the invocation's effect accumulators and gas meter but do not implicitly capture another function's locals. Recursion is rejected during compilation. Business-process cycles therefore arise from Contracts event work, not recursive BEX function calls.
 
 Explicit return exits the current function/body. Without an explicit result, the interpreter returns the accumulated changeset and events. A called function's return does not terminate its caller. Failure exits the invocation and does not authorize partial publication.
 
@@ -246,9 +246,9 @@ Collection equality keeps its ordered short-circuit comparisons. A host can prov
 <a id="section-22"></a>
 ## 22. Shared host metering
 
-When invoked by Contracts, BEX uses the same bounded meter: **10,000,000 maximum/default** for the complete Contracts attempt, with supported stricter local limits. No BEX frame, intrinsic, compiled-program cache or lower standalone-Gas setting can detach from or reset the parent ledger. Standalone BEX API budget configuration remains a separate API contract; it cannot enlarge the standard Contracts allowance.
+When invoked by Contracts, BEX uses the same bounded meter: **10,000,000 maximum/default** for the complete Contracts attempt, with supported stricter local limits. No BEX frame, intrinsic, compiled-program cache or lower standalone-Gas setting can detach from or reset the parent meter. Standalone BEX API budget configuration remains a separate API contract; it cannot enlarge the standard Contracts allowance.
 
-Work charges apply independently of physical resource controls. Conversion, Integer arithmetic, collections, strings and output sizing use the exact counters, quantities and charge positions defined here. Implementations MUST NOT substitute after-the-fact bit-length caps or wall-clock timeouts for the specified ledger. Any changed tariff requires a separately identified specification and conformance vectors. Preserve ordinary validation failure order and short-circuit behavior; no charges execute in an unselected branch.
+Work charges apply independently of physical resource controls. Conversion, Integer arithmetic, collections, strings and output sizing use the exact counters, quantities and charge positions defined here. Implementations MUST NOT substitute after-the-fact bit-length caps or wall-clock timeouts for the specified meter. Any changed tariff requires a separately identified specification and conformance vectors. Preserve ordinary validation failure order and short-circuit behavior; no charges execute in an unselected branch.
 
 Compiler structure checks remain semantically complete, including unused branches and forbidden recursive functions. Compilation still consumes no BEX semantic gas under this schedule; any inability to finish compilation is a prerequisite/host failure, not a fabricated failed debit. This rule neither exempts the containing Contracts work from its existing charges nor makes first-time authoring free in physical resources.
 
@@ -256,7 +256,7 @@ Compiler structure checks remain semantically complete, including unused branche
 ## 23. Resource-proportional work accounting
 
 Contracts continues to supply one shared meter with a maximum of 10000000. BEX
-compilation and host prerequisite acquisition are outside that invocation ledger.
+compilation and host prerequisite acquisition are outside that invocation meter.
 A host interruption is incomplete execution, never a BEX semantic rejection.
 
 Three additional BEX counters have unit weight 1: `integerWork`, `textWork`, and
@@ -290,7 +290,7 @@ Integer decimal conversion is precharged as above. No whole recursive output
 walk precedes a single future debit. Exact host transfer uses its canonical accounting form defined below,
 independent of inline/reference materialization; it does not expand untouched bodies. A rejected debit is never admitted;
 the first failed debit and its complete arbitrary-precision quantity are retained.
-Diagnostic size is not saturated. The complete admitted prefix and rejected charge are observable results of this schedule.
+Diagnostic size is not saturated. The admitted gas total and first rejected charge are observable results of this schedule; accepted-charge history is not retained.
 
 
 <a id="section-24"></a>
@@ -310,7 +310,7 @@ allocating/enumerating its key inventory; debit `valueMember` n*r and `textWork`
 b*(r+1) before sorting or comparing the keys. Sort ascending by Unicode code
 points. These prepaid deterministic envelope quantities cover key enumeration,
 ordering and key comparisons, not the implementation's actual sort comparison
-count. Zero-quantity calls remain ordered trace entries. Existing per-pair,
+count. Zero-quantity calls preserve charge ordering and failure checks without creating trace entries. Existing per-pair,
 Integer-limb and Text-block comparisons then apply to selected children only.
 No descendant value is materialized to sort keys. Lazy host metadata/access
 retains its host charges; BEX does not synthesize another host read charge.
@@ -327,8 +327,8 @@ own charges, once per lookup. Native runtime wrapper objects need not themselves
 be admissible Blue scalar documents; the Language output boundary is unchanged.
 
 Both corrections use the existing weight-1 counters and invoking owner, shared
-ledger and local-before-shared cap precedence. Rejection preserves the admitted
-prefix and exact first unaffordable charge. Host interruption is incomplete work,
+meter and local-before-shared cap precedence. Rejection preserves the admitted
+gas total and exact first unaffordable charge. Host interruption is incomplete work,
 not an invented completed rejection. A 10000000 allowance is not a time/RAM bound.
 
 
@@ -353,7 +353,7 @@ where `r=ceil(log2(n))`, or zero for an empty object. Use Unicode code-point key
 order. For each sorted key, debit `textWork=ceil(keyCodePoints/64)` before computing
 and yielding its UTF-16 length. Only after these key fragments have been paid
 request each child, in that same order. Do not materialize descendants to size
-the parent. Zero quantities keep the BEX meter's existing trace convention.
+the parent. Zero quantities follow the scalar metering rules and create no accepted-charge history.
 
 Undefined/null contribute no scalar fragment. For an Integer, debit
 `integerWork=max(1,ceil(bitLength(abs(value))/32))^2` before decimal conversion.
@@ -362,7 +362,7 @@ Render other supported scalar values by the existing rule; debit
 `max(1,renderedUTF16Length)`. The caller admits each yielded effect quantity
 before requesting the next fragment. Thus key-order blocks are code-point based,
 while effect size remains UTF-16 based. Ownership and shared/local cap precedence
-come from the calling ledger. Rejection stops this walk at that exact debit;
+come from the calling meter. Rejection stops this walk at that exact debit;
 no subsequent lookup, conversion or encoding is permitted.
 
 A supported host value exposes `accounting_view()`, a finite metering form.
