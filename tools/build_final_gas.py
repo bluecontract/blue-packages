@@ -51,7 +51,7 @@ def build(package, check=False):
         if all_packages:
             inventory = json.loads((ROOT/'PACKAGE-SOURCES.json').read_text())
             names = [name for name in inventory['foundations'] + inventory['packages']
-                     if name not in ('blue-language', 'blue-bex')]
+                     if name != 'blue-language']
         for name in names:
             subprocess.run([java, '-Xmx1500m', '-cp', str(classes)+os.pathsep+classpath,
                             'BuildFinalGas', str(selected), name], check=True, stdout=subprocess.DEVNULL)

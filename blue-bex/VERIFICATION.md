@@ -1,3 +1,11 @@
+# Current final-gas edition
+
+See `QUALIFICATION.md` and `migration.json` for the current result format and
+exact publication identities. The dated report below covers the original
+trace-bearing edition and does not describe final-gas results.
+
+---
+
 # Verification — 26 September 2026
 
 ## Verdict
