@@ -22,7 +22,7 @@ additional narrowing stay in this one discoverable definition; its name label
 does not create result type ancestry. `reportFailure` has its own package-owned
 matcher requiring requestId, failed status and nonempty Text error. Its three
 business fields exclude result and extras. Both performer operations call one
-contributed `taskReportFunctions` Compute Definition for bounded report size,
+contributed `taskReportFunctions` Compute Definition for
 slot/finality validation, retention and accepted-event emission. Native validation
 remains mandatory. Launch functions require the exact supplied Work clause type
 and matching ledger owner; arbitrary Work subtypes are outside this preview.
@@ -37,16 +37,13 @@ canonical design revision ccf1e0ff09c6e66fdf8954bd9d2c2f1ef00311ce. Event, deleg
 Order and report-relative timer products remain later stages. Qualification uses isolated tests against the exact exported definitions.
 Selecting this archive does not deploy Core or change an owned live runtime.
 
-The 32 KiB bound is applied to the full canonical report envelope by a versioned
-native measurement intrinsic; the comparison and failure decision remain Blue.
-The draft descriptor is included as exact content. Explicit native runtime
-selection is required. The capability implementation has been independently
-reviewed and committed in Core. Core exposes explicit registration execution
-selection for new documents in eligible existing accounts, with local API/SDK
-qualification. This package still requires separate Core catalogue adoption, release approval
-and coordinated live qualification; it does not migrate historical documents.
-Current/historical default bindings and the owned application journal are unchanged.
-Native workflow tests cover exact success/failure boundaries, finality, replay,
+Report acceptance has no package-level byte-size cap. Both successful and failed
+reports are validated against their native matcher, request identity and finality.
+Host execution still follows the selected native runtime's resource accounting.
+The prior 0.1.0-preview.1 publication is retained under `releases/` with its exact
+bytes; this new publication does not rewrite existing documents or reports.
+
+Native workflow tests cover successful and failed reports above the former 32 KiB boundary, finality, replay,
 manual/out-of-order reports, and native termination. Bootstrap and complete case
 tests also use distinct native accounts with genuine participant Timeline
 Channels, including cold reopen of the same SQLite journals and retained keys.

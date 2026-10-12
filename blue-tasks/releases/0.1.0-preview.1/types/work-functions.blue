@@ -1,0 +1,290 @@
+{
+  "name": "Task Work Functions",
+  "type": "Contracts/Compute Definition",
+  "functions": {
+    "request": {
+      "args": {
+        "params": {}
+      },
+      "do": [
+        {
+          "$let": {
+            "name": "policy",
+            "expr": {
+              "$document": {
+                "$pointerJoin": [
+                  "clauses",
+                  {
+                    "$const": "clauseKey"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$ne": [
+                {
+                  "$nodeBlueId": {
+                    "$document": {
+                      "$pointerJoin": [
+                        "clauses",
+                        {
+                          "$const": "clauseKey"
+                        },
+                        "type",
+                        "type"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$nodeBlueId": {
+                    "$get": {
+                      "object": {
+                        "$literal": {
+                          "type": "Tasks/Task Launch Policy"
+                        }
+                      },
+                      "key": "type"
+                    }
+                  }
+                }
+              ]
+            },
+            "message": "TASK_LAUNCH_POLICY_REQUIRED"
+          }
+        },
+        {
+          "$let": {
+            "name": "workKey",
+            "expr": {
+              "$var": {
+                "name": "policy",
+                "path": "/parameters/workClause"
+              }
+            }
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$is": {
+                  "node": {
+                    "$var": "workKey"
+                  },
+                  "pattern": {
+                    "type": "Text",
+                    "schema": {
+                      "minLength": 1
+                    }
+                  }
+                }
+              }
+            },
+            "message": "TASK_WORK_BINDING_REQUIRED"
+          }
+        },
+        {
+          "$let": {
+            "name": "work",
+            "expr": {
+              "$document": {
+                "$pointerJoin": [
+                  "clauses",
+                  {
+                    "$var": "workKey"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$ne": [
+                {
+                  "$nodeBlueId": {
+                    "$document": {
+                      "$pointerJoin": [
+                        "clauses",
+                        {
+                          "$var": "workKey"
+                        },
+                        "type"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "$nodeBlueId": {
+                    "$get": {
+                      "object": {
+                        "$literal": {
+                          "type": "Tasks/Task Work Clause"
+                        }
+                      },
+                      "key": "type"
+                    }
+                  }
+                }
+              ]
+            },
+            "message": "TASK_WORK_OWNER_REQUIRED"
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$ne": [
+                {
+                  "$document": "/taskWork/ownerClause"
+                },
+                {
+                  "$var": "workKey"
+                }
+              ]
+            },
+            "message": "TASK_WORK_OWNER_MISMATCH"
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$includes": {
+                  "list": [
+                    "initialized",
+                    "workflow"
+                  ],
+                  "val": {
+                    "$const": "sourceMode"
+                  }
+                }
+              }
+            },
+            "message": "TASK_LAUNCH_MODE_NOT_SUPPORTED"
+          }
+        },
+        {
+          "$let": {
+            "name": "number",
+            "expr": {
+              "$document": "/taskWork/nextRequestNumber"
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "requestId",
+            "expr": {
+              "$concat": [
+                "request-",
+                {
+                  "$text": {
+                    "$var": "number"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "request",
+            "expr": {
+              "$merge": [
+                {
+                  "$literal": {
+                    "type": "Tasks/Task Work Requested"
+                  }
+                },
+                {
+                  "requestId": {
+                    "$var": "requestId"
+                  },
+                  "instructions": {
+                    "$document": "/instructions"
+                  },
+                  "input": {
+                    "$var": {
+                      "name": "params",
+                      "path": "/input"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "requestIdentity",
+            "expr": {
+              "$nodeBlueId": {
+                "$var": "request"
+              }
+            }
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "replace",
+            "path": "/taskWork/nextRequestNumber",
+            "val": {
+              "$add": [
+                {
+                  "$var": "number"
+                },
+                1
+              ]
+            }
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": {
+              "$pointerJoin": [
+                "taskWork",
+                "requests",
+                {
+                  "$var": "requestId"
+                }
+              ]
+            },
+            "val": {
+              "request": {
+                "$objectSet": {
+                  "object": {},
+                  "key": "blueId",
+                  "val": {
+                    "$var": "requestIdentity"
+                  }
+                }
+              },
+              "disposition": "pending"
+            }
+          }
+        },
+        {
+          "$appendEvent": {
+            "$var": "request"
+          }
+        },
+        {
+          "$return": {
+            "outcome": "acceptedNew",
+            "requestId": {
+              "$var": "requestId"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

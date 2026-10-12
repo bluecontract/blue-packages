@@ -14,7 +14,7 @@ if not (core / "runtime/blue-core-service/build.gradle").is_file():
 target = core / "runtime/blue-core-service/src/test/resources/task-mvp-m1"
 checksums = {}
 for path in sorted(source.rglob("*")):
-    if path.is_file() and "dist" not in path.relative_to(source).parts:
+    if path.is_file() and not {"dist", "releases"}.intersection(path.relative_to(source).parts):
         relative = path.relative_to(source)
         destination = target / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
