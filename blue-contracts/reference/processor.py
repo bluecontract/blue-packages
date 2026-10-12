@@ -199,7 +199,7 @@ class Run(CompletionMachine):
         # An immutable cause token, NOT an external ordering relation.
         return self.event_id
     def fail_result(self,status,diagnostic):
-        return Outcome(status,self.input.copy(),self.input.identity,self.invocation,event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),gas=self.meter.used,gas_trace=deepcopy(self.meter.trace),rejected=deepcopy(self.meter.rejected),diagnostic=diagnostic)
+        return Outcome(status,self.input.copy(),self.input.identity,self.invocation,event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),gas=self.meter.used,rejected=deepcopy(self.meter.rejected),diagnostic=diagnostic)
     def attempt(self):
         from .chunks import Attempt
         attempt=Attempt(self)
@@ -243,7 +243,7 @@ class Run(CompletionMachine):
         for event in self.events:
             if event['document']==self.state.root:
                 self.meter.owner=self.state.root;self.meter.contracts('rootEventRecorded');self.public.append(deepcopy(event))
-        result=Outcome('APPLIED',self.state,self.input.identity,self.invocation,public_events=deepcopy(self.public),event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),changes=deepcopy(self.changes),checkpoints=deepcopy(self.writes),gas=self.meter.used,gas_trace=deepcopy(self.meter.trace),completions=deepcopy(self.turns),rounds=deepcopy(self.rounds),units=deepcopy(self.units))
+        result=Outcome('APPLIED',self.state,self.input.identity,self.invocation,public_events=deepcopy(self.public),event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),changes=deepcopy(self.changes),checkpoints=deepcopy(self.writes),gas=self.meter.used,completions=deepcopy(self.turns),rounds=deepcopy(self.rounds),units=deepcopy(self.units))
         self.blue.retain([d.body for _,d in sorted(self.state.documents.items())]);self.engine.archive.add(self.state)
         self.engine._completion_store.remember(self.input,result,self.event_id,self.timestamp)
         return result

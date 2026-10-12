@@ -84,6 +84,9 @@ def export(core):
             if ns=='Coordination':destination=core/'runtime/blue-coordination-core/src/main/resources/provider-v1/coordination.bluepkg'
             if ns=='Time':destination=core/'runtime/blue-coordination-core/src/main/resources/canonical/time.bluepkg'
             if ns=='Mandates':destination=core/'runtime/blue-coordination-core/src/main/resources/canonical/mandates.bluepkg'
+            if json.loads((ROOT/'PACKAGE-SOURCES.json').read_text()).get('runtimeProfile')=='core-java-final-gas':
+                if ns=='Contracts':destination=core/'runtime/blue-contracts-core/src/main/resources/runtime/final-gas/blue-contracts/dist/package.bluepkg'
+                if ns in {'Coordination','Time','Mandates'}:destination=core/'runtime/blue-coordination-core/src/main/resources/final-gas'/(ns.lower()+'.bluepkg')
         else:
             destination=out/(row['name']+'@'+row['version']+'.bluepkg')
         if not destination.exists():raise ValueError('Missing Core dependency: '+str(destination))

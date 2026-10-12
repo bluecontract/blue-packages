@@ -17,7 +17,7 @@ def verify_authoring_overrides(directory, package):
     if not folder.exists():return
     expected={
         'blue-bex': {'reference/gas.py','reference/runtime.py'},
-        'blue-contracts': {'reference/model.py','reference/processor.py','reference/GAS_MANIFEST.json'},
+        'blue-contracts': {'reference/model.py','reference/processor.py','reference/GAS_MANIFEST.json','reference/chunks.py','reference/completion.py','reference/runtime.py'},
     }
     name=package.manifest['name']
     assert name in expected, 'Unexpected embedded reference tree: '+str(directory)
@@ -26,7 +26,9 @@ def verify_authoring_overrides(directory, package):
     source=json.loads(package.files['docs/sources.json'])
     declared={**source.get('overrides',{}), **source.get('resourceOverrides',{})}
     assert set(declared.values())==actual, 'Unbound authoring override'
-    spec=package.files['spec/'+('bex' if name=='blue-bex' else 'contracts')+'.md'].decode()
+    import yaml
+    rules=yaml.safe_load((directory/'blue-package.yaml').read_text())['protocol']['rules']
+    spec=package.files[rules].decode()
     for original,relative in declared.items():
         data=(directory/relative).read_bytes()
         if relative.endswith('.py'):
