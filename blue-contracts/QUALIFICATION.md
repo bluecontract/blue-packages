@@ -1,3 +1,24 @@
+# Final gas qualification
+
+The new edition requires deterministic final gas and charge-before-work budget
+checks. It changes canonical receipt and continuation formats. The frozen earlier
+reference is retained; explicit source overrides implement this edition. Java host
+support must use the new exact package/specification selection.
+
+Local release checks cover package integrity, byte-identical rebuilding, direct
+execution, fresh-worker chunks, cold replay and one-less-gas rollback. These checks
+are necessary evidence, not a claim of exhaustive cross-implementation conformance.
+Historical receipt fixtures are not silently rebound to the new edition.
+
+The earlier report below describes the initial reference delivery. In particular,
+its 100,000-gas allowance and unchanged-source statements do not describe this
+10,000,000-gas edition. Hash-seed independence remains a host obligation; omitting
+charge rows cannot repair nondeterministic execution or nondeterministic totals.
+
+---
+
+## Historical reference report (retained)
+
 # Qualification boundaries
 
 ## What is established
