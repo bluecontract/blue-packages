@@ -1,11 +1,11 @@
 # Blue BEX 1.0
 
-**Edition:** `blue-bex/2026-10-07-gas-10m-1`  
+**Edition:** `blue-bex/2026-10-12-final-gas-1`  
 **Normative form:** one complete specification with executable algorithm appendices
 
 ## Abstract
 
-BEX is a deterministic expression and statement language encoded as Blue-compatible data. It evaluates against explicit inputs and produces a value, an ordered changeset, ordered events and a logical work ledger. BEX does not perform document mutation or select externally ordered inputs.
+BEX is a deterministic expression and statement language encoded as Blue-compatible data. It evaluates against explicit inputs and produces a value, an ordered changeset, ordered events and a deterministic admitted gas total. BEX does not perform document mutation or select externally ordered inputs.
 
 ## Contents
 
@@ -51,7 +51,7 @@ A package distributes this specification; it does not install a processor. The p
 
 This edition selects Blue Language package `8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4`, whose complete specification Text is `H7WiYQ6GiWypRdFyWRcv99dsvTv6WnJYnu9eLYPQmWnc`. Node construction, exact references, specialization, output admission and BlueIds have the meaning defined by that Language release.
 
-BEX is independent of Contracts. A host may supply Language-backed matching, node identity, finite reads and explicit intrinsics. Contracts is one such host and binds the supplied BEX context and ledger according to its own specification. BEX MUST NOT substitute ambient state or an unversioned implementation for these declared interfaces.
+BEX is independent of Contracts. A host may supply Language-backed matching, node identity, finite reads and explicit intrinsics. Contracts is one such host and binds the supplied BEX context and meter according to its own specification. BEX MUST NOT substitute ambient state or an unversioned implementation for these declared interfaces.
 
 Package imports supply exact content. Authoring prefixes are local bindings and do not leak through transitive imports. An imported definition retains its exact references. Mounting another package cannot change the selected interpreter or replace an existing type reference. Within this edition's interpreted package graph, the selected Language release MUST agree throughout; cross-Language conversion and mixed-rule cyclic sets are not defined. One selected Language governs a complete cyclic identity set and its owning proof.
 
@@ -67,11 +67,11 @@ The executable algorithm appendix contains the complete evaluator and host-value
 <a id="section-4"></a>
 ## 4. Machine and invocation
 
-An invocation has a compiled program; an explicit context; a gas ledger; lexical function frames; an ordered changeset; and an ordered event list. Context supplies the selected document snapshot, event, current contract, previous step results, named bindings, and executing scope. Optional adapters provide finite document reads, Blue specialization checks, and exact-type intrinsics.
+An invocation has a compiled program; an explicit context; a gas meter; lexical function frames; an ordered changeset; and an ordered event list. Context supplies the selected document snapshot, event, current contract, previous step results, named bindings, and executing scope. Optional adapters provide finite document reads, Blue specialization checks, and exact-type intrinsics.
 
 No process-global variable is a program binding. No Python expression is evaluated from program text. The interpreter recognizes data forms, not Python, JavaScript, or embedded shell commands. An installed intrinsic is trusted host code and is outside that sandbox boundary.
 
-A successful invocation returns `Result(value, changeset, events, gas_used, gas_trace)`. It does not apply its changes. Returned effects remain ordinary BEX values until the Contracts output boundary has validated and converted them.
+A successful invocation returns `Result(value, changeset, events, gas_used)`. It does not apply its changes. Returned effects remain ordinary BEX values until the Contracts output boundary has validated and converted them.
 
 <a id="section-5"></a>
 ## 5. Value domains and absence
@@ -123,7 +123,7 @@ The context's matcher implements `$is` using Blue semantic admission and special
 `$nodeBlueId: EXPR` evaluates EXPR once and returns a Text containing the ordinary
 Language BlueId. Charge `nodeIdentityRequested = 5` after evaluating the operand
 and before calling the host's Language identity boundary. The boundary shares
-the invocation ledger and cannot use a separate unmetered hash implementation.
+the invocation meter and cannot use a separate unmetered hash implementation.
 
 An admitted exact host collection retains its selected exact identity, including
 owning-set member identity, without expanding its descendants. A newly computed
@@ -165,7 +165,7 @@ Iteration gas is charged for each admitted visited item. Short-circuiting stops 
 
 `let` declares function-frame slots. Parallel declarations evaluate their initializers against the old frame; an explicit declaration order enables ordered dependency between initializers. `set` updates an existing declared slot. Conditional declaration visibility is checked statically.
 
-Function calls use isolated frames, exact declared argument-name sets, and supplied Blue argument-pattern checks. Functions share the invocation's effect accumulators and gas ledger but do not implicitly capture another function's locals. Recursion is rejected during compilation. Business-process cycles therefore arise from Contracts event work, not recursive BEX function calls.
+Function calls use isolated frames, exact declared argument-name sets, and supplied Blue argument-pattern checks. Functions share the invocation's effect accumulators and gas meter but do not implicitly capture another function's locals. Recursion is rejected during compilation. Business-process cycles therefore arise from Contracts event work, not recursive BEX function calls.
 
 Explicit return exits the current function/body. Without an explicit result, the interpreter returns the accumulated changeset and events. A called function's return does not terminate its caller. Failure exits the invocation and does not authorize partial publication.
 
@@ -181,11 +181,15 @@ An intrinsic must have an exact static type ID present in the invocation's insta
 
 Compilation consumes no semantic gas. Each admitted expression, statement, read, call, pointer operation, collection item, append, and size-dependent operation is charged by the algorithm at its specified point. A failed charge is recorded as rejected work and does not increment admitted `used` gas.
 
+Accepted charges update the running scalar only. They have no canonical rows, ordinals or transcript. Results contain `gas_used`, not `gas_trace`. The default standalone allowance remains 10,000,000. A caller-supplied shared meter is never reset; each invocation reports its own admitted contribution. Local counters and the shared total still enforce each charge before work. Retain only the first rejected charge, without a charge ordinal; a failed meter cannot resume accepting work. Optional debug traces are noncanonical, off by default, and never required for conformance, replay or durable publication. A compatibility API may expose an empty trace accessor, but this is not a result field in the new protocol.
+
+This is a new exact BEX edition. Earlier publications retain their original trace-bearing result and conformance rules; hosts must select those rules explicitly when replaying earlier histories.
+
 The default scalar tariffs are: expression 1; statement 1; document read 2; event/current-contract/steps/variable read 1; result-value read 2; pointer get base 1; pointer set base 3; object set base 2; append-change/event base 5; iteration item 1; function call 2. Size/path contributions are defined by the algorithms, not by wall-clock time.
 
-A Compute step can impose a positive local cap while charging each admitted operation to a shared Contracts closure meter. A local-cap rejection is distinguished from shared-cap rejection in the trace. A cap is checked before work is admitted. Gas allowance, used gas, attempted rejected charge, and operational cancellation are different values.
+A Compute step can impose a positive local cap while charging each admitted operation to a shared Contracts closure meter. A local-cap rejection is distinguished from shared-cap rejection in the first-rejected-charge diagnostic. A cap is checked before work is admitted. Gas allowance, used gas, attempted rejected charge, and operational cancellation are different values.
 
-The trace and tariff in the executable annex define this edition. A conforming implementation preserves the admitted charges and first rejected charge for identical inputs. Equivalence to a different BEX release or another tariff is a separate interoperability claim, not an additional unstated rule.
+The charge positions and tariffs in the executable annex define this edition. A conforming implementation preserves the deterministic admitted gas total and first rejected charge for identical inputs. Equivalence to a different BEX release or another tariff is a separate interoperability claim, not an additional unstated rule.
 
 <a id="section-15"></a>
 ## 15. Blue output boundary
@@ -242,9 +246,9 @@ Collection equality keeps its ordered short-circuit comparisons. A host can prov
 <a id="section-22"></a>
 ## 22. Shared host metering
 
-When invoked by Contracts, BEX uses the same bounded meter: **10,000,000 maximum/default** for the complete Contracts attempt, with supported stricter local limits. No BEX frame, intrinsic, compiled-program cache or lower standalone-Gas setting can detach from or reset the parent ledger. Standalone BEX API budget configuration remains a separate API contract; it cannot enlarge the standard Contracts allowance.
+When invoked by Contracts, BEX uses the same bounded meter: **10,000,000 maximum/default** for the complete Contracts attempt, with supported stricter local limits. No BEX frame, intrinsic, compiled-program cache or lower standalone-Gas setting can detach from or reset the parent meter. Standalone BEX API budget configuration remains a separate API contract; it cannot enlarge the standard Contracts allowance.
 
-Work charges apply independently of physical resource controls. Conversion, Integer arithmetic, collections, strings and output sizing use the exact counters, quantities and charge positions defined here. Implementations MUST NOT substitute after-the-fact bit-length caps or wall-clock timeouts for the specified ledger. Any changed tariff requires a separately identified specification and conformance vectors. Preserve ordinary validation failure order and short-circuit behavior; no charges execute in an unselected branch.
+Work charges apply independently of physical resource controls. Conversion, Integer arithmetic, collections, strings and output sizing use the exact counters, quantities and charge positions defined here. Implementations MUST NOT substitute after-the-fact bit-length caps or wall-clock timeouts for the specified meter. Any changed tariff requires a separately identified specification and conformance vectors. Preserve ordinary validation failure order and short-circuit behavior; no charges execute in an unselected branch.
 
 Compiler structure checks remain semantically complete, including unused branches and forbidden recursive functions. Compilation still consumes no BEX semantic gas under this schedule; any inability to finish compilation is a prerequisite/host failure, not a fabricated failed debit. This rule neither exempts the containing Contracts work from its existing charges nor makes first-time authoring free in physical resources.
 
@@ -252,7 +256,7 @@ Compiler structure checks remain semantically complete, including unused branche
 ## 23. Resource-proportional work accounting
 
 Contracts continues to supply one shared meter with a maximum of 10000000. BEX
-compilation and host prerequisite acquisition are outside that invocation ledger.
+compilation and host prerequisite acquisition are outside that invocation meter.
 A host interruption is incomplete execution, never a BEX semantic rejection.
 
 Three additional BEX counters have unit weight 1: `integerWork`, `textWork`, and
@@ -286,7 +290,7 @@ Integer decimal conversion is precharged as above. No whole recursive output
 walk precedes a single future debit. Exact host transfer uses its canonical accounting form defined below,
 independent of inline/reference materialization; it does not expand untouched bodies. A rejected debit is never admitted;
 the first failed debit and its complete arbitrary-precision quantity are retained.
-Diagnostic size is not saturated. The complete admitted prefix and rejected charge are observable results of this schedule.
+Diagnostic size is not saturated. The admitted gas total and first rejected charge are observable results of this schedule; accepted-charge history is not retained.
 
 
 <a id="section-24"></a>
@@ -306,7 +310,7 @@ allocating/enumerating its key inventory; debit `valueMember` n*r and `textWork`
 b*(r+1) before sorting or comparing the keys. Sort ascending by Unicode code
 points. These prepaid deterministic envelope quantities cover key enumeration,
 ordering and key comparisons, not the implementation's actual sort comparison
-count. Zero-quantity calls remain ordered trace entries. Existing per-pair,
+count. Zero-quantity calls preserve charge ordering and failure checks without creating trace entries. Existing per-pair,
 Integer-limb and Text-block comparisons then apply to selected children only.
 No descendant value is materialized to sort keys. Lazy host metadata/access
 retains its host charges; BEX does not synthesize another host read charge.
@@ -323,8 +327,8 @@ own charges, once per lookup. Native runtime wrapper objects need not themselves
 be admissible Blue scalar documents; the Language output boundary is unchanged.
 
 Both corrections use the existing weight-1 counters and invoking owner, shared
-ledger and local-before-shared cap precedence. Rejection preserves the admitted
-prefix and exact first unaffordable charge. Host interruption is incomplete work,
+meter and local-before-shared cap precedence. Rejection preserves the admitted
+gas total and exact first unaffordable charge. Host interruption is incomplete work,
 not an invented completed rejection. A 10000000 allowance is not a time/RAM bound.
 
 
@@ -349,7 +353,7 @@ where `r=ceil(log2(n))`, or zero for an empty object. Use Unicode code-point key
 order. For each sorted key, debit `textWork=ceil(keyCodePoints/64)` before computing
 and yielding its UTF-16 length. Only after these key fragments have been paid
 request each child, in that same order. Do not materialize descendants to size
-the parent. Zero quantities keep the BEX meter's existing trace convention.
+the parent. Zero quantities follow the scalar metering rules and create no accepted-charge history.
 
 Undefined/null contribute no scalar fragment. For an Integer, debit
 `integerWork=max(1,ceil(bitLength(abs(value))/32))^2` before decimal conversion.
@@ -358,7 +362,7 @@ Render other supported scalar values by the existing rule; debit
 `max(1,renderedUTF16Length)`. The caller admits each yielded effect quantity
 before requesting the next fragment. Thus key-order blocks are code-point based,
 while effect size remains UTF-16 based. Ownership and shared/local cap precedence
-come from the calling ledger. Rejection stops this walk at that exact debit;
+come from the calling meter. Rejection stops this walk at that exact debit;
 no subsequent lookup, conversion or encoding is permitted.
 
 A supported host value exposes `accounting_view()`, a finite metering form.
@@ -498,7 +502,7 @@ A `do` block is an ordered list of statement objects. Local functions are static
 
 Undefined is a dedicated singleton, never Python `None`. An effect may use an explicit empty object, but a null effect value cannot be admitted as a Blue child. Native Python truthiness, Boolean-as-Integer behavior, hash iteration order and float rendering must not define the semantics by accident. Gas text sizes use the declared UTF-16 observation; object order uses the specified key ordering instead.
 
-There are no universal source-depth, call-frame, numeric-size or Blue-adapter Integer-size limits. Actual arithmetic, static recursion, exact numeric/Unicode formats and explicit program constraints remain. Implementations must distinguish incomplete host execution from a semantic error and implement the selected deterministic charges. A registered host intrinsic is trusted host code: semantic gas alone is not a CPU/memory/security sandbox. Conformance is to this edition: compare result, error, evaluation order and exact gas trace. No implementation may override the selected specification based solely on its own observed result.
+There are no universal source-depth, call-frame, numeric-size or Blue-adapter Integer-size limits. Actual arithmetic, static recursion, exact numeric/Unicode formats and explicit program constraints remain. Implementations must distinguish incomplete host execution from a semantic error and implement the selected deterministic charges. A registered host intrinsic is trusted host code: semantic gas alone is not a CPU/memory/security sandbox. Conformance is to this edition: compare result, error, evaluation order, deterministic admitted gas total and first rejected charge. No implementation may override the selected specification based solely on its own observed result.
 
 ### `$nodeBlueId`
 
@@ -770,7 +774,7 @@ class Compiler:
 ### `src/blue_bex/gas.py`
 
 ```python
-"""Deterministic admitted-charge ledger. Compilation consumes no semantic gas."""
+"""Deterministic scalar gas meter. Compilation consumes no semantic gas."""
 from dataclasses import dataclass, field
 from .values import BexError
 
@@ -786,7 +790,6 @@ class GasExhausted(BexError):
 class Gas:
     limit: int = 10000000
     used: int = 0
-    trace: list = field(default_factory=list)
     rejected: dict | None = None
     schedule: dict = field(default_factory=lambda: dict(DEFAULT))
     owner: str = 'BEX'
@@ -797,13 +800,13 @@ class Gas:
         if any(type(v) is not int or v < 0 for v in self.schedule.values()): raise ValueError('invalid tariff')
 
     def charge(self, counter: str, units: int = 1, *, amount: int | None = None):
+        if self.rejected is not None: raise GasExhausted(self.rejected['counter'])
         if type(units) is not int or units < 0: raise BexError('invalid charge units')
         cost = self.schedule[counter] * units if amount is None else amount
         if type(cost) is not int or cost < 0: raise BexError('invalid charge amount')
-        row = dict(ordinal=len(self.trace), owner=self.owner, counter=counter,
-                   units=units, amount=cost, before=self.used)
         if self.limit >= 0 and self.used + cost > self.limit:
-            self.rejected = dict(row, cap='LOCAL' if self.parent else 'SHARED', remaining=self.limit-self.used)
+            self.rejected = dict(owner=self.owner, counter=counter, units=units, amount=cost, before=self.used,
+                                 cap='LOCAL' if self.parent else 'SHARED', remaining=self.limit-self.used)
             if self.parent is not None:
                 # Preserve the *local* rejection in the closure receipt without
                 # falsely charging it as admitted parent work.
@@ -814,7 +817,6 @@ class Gas:
             self.parent.owner = self.owner
             try: self.parent.charge(counter, units, amount=cost)
             finally: self.parent.owner = old
-        self.trace.append(row)
         self.used += cost
 
     @property
@@ -858,7 +860,6 @@ class Result:
     changeset: list
     events: list
     gas_used: int
-    gas_trace: tuple
 
     def blue_output(self):
         return blue_value(self.value)
@@ -889,7 +890,7 @@ class Invocation:
         self.context=context;self.gas=gas;self.intrinsics=dict(intrinsics)
         self.constants=self.program.get('constants',{});self.functions=self.program.get('functions',{})
         self.changes=[];self.events=[];self.frames=[{}]
-        self.start_gas=gas.used;self.start_trace=len(gas.trace)
+        self.start_gas=gas.used
 
     def copy(self,value):
         # Values are immutable during evaluation: operators construct new
@@ -929,8 +930,7 @@ class Invocation:
         self.gas.charge('functionCall')
         if self.entry is not None:value=self.function(self.entry,{},charge=False)
         else:value=self.body(self.program)
-        return Result(clone(value),clone(self.changes),clone(self.events),self.gas.used-self.start_gas,
-                      tuple(clone(self.gas.trace[self.start_trace:])))
+        return Result(clone(value),clone(self.changes),clone(self.events),self.gas.used-self.start_gas)
 
     def body(self,b):
         try:
@@ -1640,8 +1640,8 @@ def host_boundary(fn):
 |---|---|
 | `src/blue_bex/__init__.py` | `820ef8825a174b5f9666b9b713d51e20bcf8fa6c509b79128fb373433033e8d8` |
 | `src/blue_bex/compiler.py` | `6af97e5067510b862cbb0edc808fc7903f4f0be51c8ff45a31df07be9bdfa55d` |
-| `src/blue_bex/gas.py` | `2acbcc45fb293a9e5ab19461a41b5043a36964b291b27112b47750602d885799` |
-| `src/blue_bex/runtime.py` | `7a7ffc5783f4a1e663052be0a1acc9b713770e0dc33bfe8baa3cf8f5db8a5184` |
+| `src/blue_bex/gas.py` | `78cb48147d907a6b84535563d5dddd543b6bf734447a184e7a50b49b5cc42803` |
+| `src/blue_bex/runtime.py` | `171ad8489e317d2a22326649e88fa64a8a45461d5956850c6d5080cd997c9b65` |
 | `src/blue_bex/values.py` | `59fc4bee80e54e5e9d64824ee18aed8a195220137f0eaaf5f1e58adb11951b8a` |
 | `src/blue_host/__init__.py` | `ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607` |
 

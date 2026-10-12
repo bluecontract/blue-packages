@@ -1,3 +1,11 @@
+# Current final-gas verification
+
+See [qualification](QUALIFICATION.md) and [migration](MIGRATION.md) for the new
+final-gas edition. The dated report below is historical; its identities and
+unchanged-source statements are not claims about this edition.
+
+---
+
 # Verification — 26 September 2026
 
 ## Verdict

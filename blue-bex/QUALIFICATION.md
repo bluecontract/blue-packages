@@ -1,3 +1,13 @@
+# Final-gas qualification
+
+The new BEX edition removes accepted-charge histories from the normative result
+and reference meter. Qualification compares value, effects, error, admitted total
+and the first rejected charge; it does not require a per-charge transcript.
+The earlier specification and reference sources remain immutable. The report
+below describes their original delivery, not the final-gas edition.
+
+---
+
 # Qualification boundaries
 
 ## What is established

@@ -1,8 +1,9 @@
-# Native Tasks — M1 preview
+# Native Tasks — clause-composed final-gas edition
 
-This unpublished preview is selected by PACKAGE-SOURCES.json for reproducible
-archive generation. Core catalogue adoption is a separate reviewed change.
-It is not a published release or a claim of complete application qualification.
+This package is selected by PACKAGE-SOURCES.json for reproducible archive generation.
+It uses the current final-gas dependency edition. Publication is identified by the
+reviewed collection release tag; Core adoption and agent execution are separate
+release steps.
 The separately reviewed M0 prototypes remain unchanged under verification/task-mvp-m0.
 
 `Task` is the plain domain base, extending `DocumentsDomain/Document`. It declares
@@ -49,7 +50,7 @@ Selecting this archive does not deploy Core or change an owned live runtime.
 Report acceptance has no package-level byte-size cap. Both successful and failed
 reports are validated against their native matcher, request identity and finality.
 Host execution still follows the selected native runtime's resource accounting.
-Prior 0.1.0-preview.1 and 0.1.0-preview.2 publications are retained under
+Prior 0.1.0-preview.1, 0.1.0-preview.2 and 0.1.0-preview.3 archives are retained under
 `releases/` with their exact bytes; this new publication does not rewrite existing
 documents or reports. The new plain Task has a new content identity; consumers
 must recognize its ancestry while retaining historical Task identities.

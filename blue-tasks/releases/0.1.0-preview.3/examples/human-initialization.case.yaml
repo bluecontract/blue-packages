@@ -1,0 +1,32 @@
+document: human-initialization.blue
+initial:
+  expect:
+    /taskWork/nextRequestNumber: 2
+    /taskWork/requests/request-1/disposition: pending
+steps:
+- operation: reportSuccess
+  channel: owner
+  request: {requestId: request-1, status: succeeded, result: 60}
+  status: FAILED
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: unissued, status: succeeded, result: 60}
+  status: FAILED
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-1, status: succeeded, result: '60'}
+  status: FAILED
+  rejectionOutcome: REJECTED
+  rejectionReason: INVALID_REQUEST
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-1, status: succeeded, result: 60}
+  expect:
+    /taskWork/latestReport/result: 60
+    /taskWork/requests/request-1/disposition: succeeded
+    /contracts/terminated/cause: Task accepted a final report
+  restore: true
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-1, status: succeeded, result: 60}
+  status: TERMINATED

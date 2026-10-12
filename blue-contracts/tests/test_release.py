@@ -8,8 +8,9 @@ from release import ROOT,REVISION,checked_package
 def package():return checked_package()
 
 def test_specification_in_package_is_exact(package):
-    name='bex' if package.manifest['name']=='blue-bex' else 'contracts'
-    assert package.files['spec/'+name+'.md']==(ROOT/'SPECIFICATION.md').read_bytes()
+    from package_core import config
+    path=config(ROOT)['protocol']['rules']
+    assert package.files[path]==(ROOT/'SPECIFICATION.md').read_bytes()
     sid=package.manifest['semanticSpecifications'][package.manifest['protocol']]['rules']['blueId']
     assert sid==json.loads((ROOT/'release.json').read_text())['specificationBlueId']
 
@@ -83,8 +84,8 @@ def test_corruption_rejected_before_use(package):
     with pytest.raises(PackageError):verify_bytes(out.getvalue())
 
 def test_rebuild_is_byte_identical(package):
-    p=build(ROOT,revision=REVISION,source_url='')
-    assert p.archive==package.archive
+    import subprocess,sys
+    subprocess.run([sys.executable,str(ROOT.parent/'tools/build_final_gas.py'),'blue-contracts','--check'],check=True)
 
 
 def test_explicit_empty_source_url_does_not_inherit_git_remote(monkeypatch):

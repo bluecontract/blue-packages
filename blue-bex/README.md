@@ -1,29 +1,38 @@
 # Blue BEX
 
-Blue BEX evaluates data-encoded expressions and statements using explicit inputs. It produces values, ordered proposed effects and a logical gas ledger. It does not mutate or publish documents.
+BEX evaluates explicit inputs into a value, ordered proposed changes and events,
+and a deterministic admitted gas total. It does not apply document changes.
 
-## Specification
+## Final gas edition
 
-`SPECIFICATION.md` is the complete specification, including the operator reference and six executable modules. The identical identified Text is `spec/bex.md` in the data package. Its exact Language dependency is Blue Language package `8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4`.
+`1.0.0-final-gas.1` checks each charge before work and accumulates scalar gas.
+Results have `value`, `changeset`, `events` and `gas_used`; accepted-charge rows
+and `gas_trace` are not part of this edition. The default standalone allowance
+remains 10,000,000. A supplied shared meter is never reset. Local and shared caps
+retain their rejection order and one compact first-rejected-charge diagnostic.
+A meter that has rejected work cannot resume accepting charges.
 
-This is a protocol package with no artificial operator types and no exported Java/Python classes. Ordinary function libraries can publish their own definitions using these semantics without changing the evaluator.
+`SPECIFICATION.md` and `spec/bex-final-gas.md` contain the identical complete
+normative text and six executable modules. The exact overrides and hashes are
+listed in `docs/sources.json`. The earlier specification remains in `spec/bex.md`
+and the frozen references remain unchanged for historical qualification.
 
-## Local use
+This is a new exact protocol identity. Hosts must retain the old edition when
+replaying old histories. Loading package data does not install an evaluator or
+authorize an intrinsic. Optional debug traces are noncanonical and off by default.
+
+## Local verification
+
+With Python 3.13+, pytest, PyYAML, Java 21 and `BLUE_JAVA_CLASSPATH` pointing to
+the qualified native Language runtime:
 
 ```sh
 ./blue-package verify
-./blue-package requirements
-./blue-package demo
 ./blue-package test
-./blue-package reference-tests
+python ../tools/build_final_gas.py blue-bex --check
 ```
 
-Python 3.13 or newer is required by the included reference; pytest is required only for tests. `build` reconstructs the pinned release and refuses to silently replace its identity. The data artifact is `dist/package.bluepkg`. It contains no executable installation hooks; the reference in this source repository is build/test material.
-
-## Release qualification
-
-This distribution is version `1.0.0-rc.2`. Its specification is complete; passing finite cases is not a universal conformance certificate. See `QUALIFICATION.md` and `VERIFICATION.md` in the source workspace for tested scope and host-integration limits.
-
-Changing the documentation changes package identity, not the evaluator's selected native rules. Changing this normative specification changes its identity. Loading the package does not install a BEX implementation or authorize an intrinsic.
-
-The default standalone gas allowance is 10,000,000. Under Contracts, the caller supplies the shared ledger; BEX never resets it. Previous publications remain in `editions/gas-100k/`.
+The new-edition tests execute the finite conformance vectors and cover shared
+meters, exact budgets, rejection and the absence of charge history. Historical
+reference tests must run against their original frozen edition. Passing a finite
+corpus does not establish universal conformance; see `QUALIFICATION.md`.
