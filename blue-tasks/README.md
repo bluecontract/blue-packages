@@ -5,8 +5,17 @@ archive generation. Core catalogue adoption is a separate reviewed change.
 It is not a published release or a claim of complete application qualification.
 The separately reviewed M0 prototypes remain unchanged under verification/task-mvp-m0.
 
-Task extends DocumentsDomain/Document with Clauses and declares root owner and
-performer Timeline Channels before bootstrap. Work Requested and Report Accepted
+`Task` is the plain domain base, extending `DocumentsDomain/Document`. It declares
+instructions and root owner/performer Timeline Channels before bootstrap, with no
+clause initialization or automatic work issuance. `Task with Clauses` extends
+`Task` and adds the same opt-in root-local clause initialization and amendment
+wiring as `Agreement with Clauses`. Add Work, launch, termination and other
+compatible clauses to this reusable host; the supplied examples select it.
+
+Execution is driven by the Task family's native Work Requested event and report
+protocol, not the presence of a `clauses` field or one concrete Task subtype.
+A plain Task can supply its own workflows implementing that protocol. The event
+alone does not replace performer authority, request identity or report validation. Work Requested and Report Accepted
 retain the native Events Request/Response ancestry. There is no Task Activation,
 mandatory authored taskId, Business session requirement, or task-kind enum.
 
@@ -40,8 +49,10 @@ Selecting this archive does not deploy Core or change an owned live runtime.
 Report acceptance has no package-level byte-size cap. Both successful and failed
 reports are validated against their native matcher, request identity and finality.
 Host execution still follows the selected native runtime's resource accounting.
-The prior 0.1.0-preview.1 publication is retained under `releases/` with its exact
-bytes; this new publication does not rewrite existing documents or reports.
+Prior 0.1.0-preview.1 and 0.1.0-preview.2 publications are retained under
+`releases/` with their exact bytes; this new publication does not rewrite existing
+documents or reports. The new plain Task has a new content identity; consumers
+must recognize its ancestry while retaining historical Task identities.
 
 Native workflow tests cover successful and failed reports above the former 32 KiB boundary, finality, replay,
 manual/out-of-order reports, and native termination. Bootstrap and complete case
