@@ -1,0 +1,56 @@
+document: manual-out-of-order.blue
+initial:
+  expect:
+    /taskWork/nextRequestNumber: 2
+steps:
+- operation: execute
+  channel: owner
+  request: {}
+  expect:
+    /taskWork/nextRequestNumber: 3
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-2, status: succeeded, result: 62}
+  expect:
+    /taskWork/latestReport/result: 62
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-1, status: succeeded, result: 60}
+  expect:
+    /taskWork/latestReport/result: 60
+    /taskWork/requests/request-2/disposition: succeeded
+  restore: true
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-1, status: succeeded, result: 60}
+  expect:
+    /taskWork/nextRequestNumber: 3
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-1, status: succeeded, result: 61}
+  status: FAILED
+- operation: execute
+  channel: performer
+  request: {}
+  status: FAILED
+- operation: terminate
+  channel: performer
+  request: {}
+  status: FAILED
+- operation: execute
+  channel: owner
+  request: {}
+  expect:
+    /taskWork/nextRequestNumber: 4
+    /taskWork/requests/request-3/disposition: pending
+- operation: terminate
+  channel: owner
+  request: {}
+  expect:
+    /taskWork/requests/request-3/disposition: pending
+    /contracts/terminated/cause: Task terminated by owner
+  restore: true
+- operation: reportSuccess
+  channel: performer
+  request: {requestId: request-3, status: succeeded, result: 63}
+  status: TERMINATED

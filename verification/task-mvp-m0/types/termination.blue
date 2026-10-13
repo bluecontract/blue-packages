@@ -1,0 +1,94 @@
+{
+  "name": "Termination Policy",
+  "type": "Clauses/Clause",
+  "hookAbi": "document-context-1",
+  "hookDefinition": {
+    "type": "Contracts/Compute Definition",
+    "functions": {
+      "validateConfiguration": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "allowed": true,
+              "code": ""
+            }
+          }
+        ]
+      },
+      "validateTransition": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "allowed": false,
+              "code": "M0_IMMUTABLE"
+            }
+          }
+        ]
+      },
+      "plan": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "$literal": {
+                "states": {},
+                "reads": [
+                  {
+                    "path": "/work",
+                    "kind": "object"
+                  }
+                ],
+                "contracts": {
+                  "m0FinalReport": {
+                    "kind": "channel",
+                    "contract": {
+                      "type": "Contracts/Triggered Event Channel",
+                      "event": {
+                        "type": "TaskM0/Report Accepted"
+                      }
+                    }
+                  },
+                  "m0Terminate": {
+                    "kind": "handler",
+                    "contract": {
+                      "type": "Contracts/Sequential Workflow",
+                      "channel": "m0FinalReport",
+                      "steps": [
+                        {
+                          "type": "Contracts/Compute",
+                          "do": [
+                            {
+                              "$failIf": {
+                                "cond": {
+                                  "$ne": [
+                                    {
+                                      "$document": "/work/accepted/requestId"
+                                    },
+                                    {
+                                      "$event": "/requestId"
+                                    }
+                                  ]
+                                },
+                                "message": "ACCEPTED_REPORT_REQUIRED"
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "Contracts/Terminate Processing",
+                          "cause": "M0 accepted final report"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

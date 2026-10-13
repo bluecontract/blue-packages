@@ -1,0 +1,707 @@
+{
+  "name": "Task Work Clause",
+  "description": "Native owner of the Task invocation ledger with discoverable success and failure reporting contracts. Preview qualification only.",
+  "type": "Clauses/Clause",
+  "hookAbi": "document-context-1",
+  "governsAmendments": true,
+  "hookDefinition": {
+    "type": "Contracts/Compute Definition",
+    "functions": {
+      "validateConfiguration": {
+        "args": {},
+        "do": [
+          {
+            "$failIf": {
+              "cond": {
+                "$not": {
+                  "$is": {
+                    "node": {
+                      "$get": {
+                        "object": {
+                          "$document": {
+                            "$pointerJoin": [
+                              "clauseRuntime",
+                              "work",
+                              "candidate",
+                              {
+                                "$const": "clauseKey"
+                              },
+                              "parameters",
+                              "reportRequest"
+                            ]
+                          }
+                        },
+                        "key": "name"
+                      }
+                    },
+                    "pattern": {
+                      "type": "Text",
+                      "schema": {
+                        "minLength": 1
+                      }
+                    }
+                  }
+                }
+              },
+              "message": "TASK_REPORT_DEFINITION_NAME_REQUIRED"
+            }
+          },
+          {
+            "$failIf": {
+              "cond": {
+                "$not": {
+                  "$and": [
+                    {
+                      "$eq": [
+                        {
+                          "$document": {
+                            "$pointerJoin": [
+                              "clauseRuntime",
+                              "work",
+                              "candidate",
+                              {
+                                "$const": "clauseKey"
+                              },
+                              "parameters",
+                              "reportRequest",
+                              "requestId",
+                              "schema",
+                              "required"
+                            ]
+                          }
+                        },
+                        true
+                      ]
+                    },
+                    {
+                      "$eq": [
+                        {
+                          "$document": {
+                            "$pointerJoin": [
+                              "clauseRuntime",
+                              "work",
+                              "candidate",
+                              {
+                                "$const": "clauseKey"
+                              },
+                              "parameters",
+                              "reportRequest",
+                              "status",
+                              "schema",
+                              "required"
+                            ]
+                          }
+                        },
+                        true
+                      ]
+                    },
+                    {
+                      "$eq": [
+                        {
+                          "$document": {
+                            "$pointerJoin": [
+                              "clauseRuntime",
+                              "work",
+                              "candidate",
+                              {
+                                "$const": "clauseKey"
+                              },
+                              "parameters",
+                              "reportRequest",
+                              "result",
+                              "schema",
+                              "required"
+                            ]
+                          }
+                        },
+                        true
+                      ]
+                    },
+                    {
+                      "$eq": [
+                        {
+                          "$nodeBlueId": {
+                            "$document": {
+                              "$pointerJoin": [
+                                "clauseRuntime",
+                                "work",
+                                "candidate",
+                                {
+                                  "$const": "clauseKey"
+                                },
+                                "parameters",
+                                "reportRequest",
+                                "requestId",
+                                "type"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "$nodeBlueId": {
+                            "$get": {
+                              "object": {
+                                "$literal": {
+                                  "type": "Text"
+                                }
+                              },
+                              "key": "type"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "$eq": [
+                        {
+                          "$nodeBlueId": {
+                            "$document": {
+                              "$pointerJoin": [
+                                "clauseRuntime",
+                                "work",
+                                "candidate",
+                                {
+                                  "$const": "clauseKey"
+                                },
+                                "parameters",
+                                "reportRequest",
+                                "status",
+                                "type"
+                              ]
+                            }
+                          }
+                        },
+                        {
+                          "$nodeBlueId": {
+                            "$get": {
+                              "object": {
+                                "$literal": {
+                                  "type": "Text"
+                                }
+                              },
+                              "key": "type"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "$gte": [
+                        {
+                          "$document": {
+                            "$pointerJoin": [
+                              "clauseRuntime",
+                              "work",
+                              "candidate",
+                              {
+                                "$const": "clauseKey"
+                              },
+                              "parameters",
+                              "reportRequest",
+                              "requestId",
+                              "schema",
+                              "minLength"
+                            ]
+                          }
+                        },
+                        1
+                      ]
+                    },
+                    {
+                      "$eq": [
+                        {
+                          "$document": {
+                            "$pointerJoin": [
+                              "clauseRuntime",
+                              "work",
+                              "candidate",
+                              {
+                                "$const": "clauseKey"
+                              },
+                              "parameters",
+                              "reportRequest",
+                              "status",
+                              "schema",
+                              "enum"
+                            ]
+                          }
+                        },
+                        [
+                          "succeeded"
+                        ]
+                      ]
+                    }
+                  ]
+                }
+              },
+              "message": "TASK_REPORT_ENVELOPE_REQUIRED"
+            }
+          },
+          {
+            "$return": {
+              "allowed": true,
+              "code": ""
+            }
+          }
+        ]
+      },
+      "validateTransition": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "allowed": false,
+              "code": "TASK_CONFIGURATION_IMMUTABLE"
+            }
+          }
+        ]
+      },
+      "plan": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "states": {
+                "taskWork": {
+                  "path": "/taskWork",
+                  "kind": "object",
+                  "initial": {
+                    "ownerClause": {
+                      "$const": "clauseKey"
+                    },
+                    "nextRequestNumber": 1,
+                    "requests": {},
+                    "latestReport": {}
+                  }
+                }
+              },
+              "contracts": {
+                "reportSuccess": {
+                  "kind": "handler",
+                  "contract": {
+                    "$pointerSet": {
+                      "object": {
+                        "$literal": {
+                          "type": "Contracts/Sequential Workflow Operation",
+                          "channel": "performer",
+                          "steps": [
+                            {
+                              "type": "Contracts/Compute",
+                              "definition": "taskReportFunctions",
+                              "do": [
+                                {
+                                  "$call": {
+                                    "function": "report",
+                                    "args": {
+                                      "report": {
+                                        "$binding": "call/request"
+                                      }
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "path": "/request",
+                      "val": {
+                        "$objectSet": {
+                          "object": {},
+                          "key": "blueId",
+                          "val": {
+                            "$nodeBlueId": {
+                              "$document": {
+                                "$pointerJoin": [
+                                  "clauseRuntime",
+                                  "work",
+                                  "candidate",
+                                  {
+                                    "$const": "clauseKey"
+                                  },
+                                  "parameters",
+                                  "reportRequest"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "reportFailure": {
+                  "kind": "handler",
+                  "contract": {
+                    "$literal": {
+                      "type": "Contracts/Sequential Workflow Operation",
+                      "channel": "performer",
+                      "request": {
+                        "requestId": {
+                          "type": "Text",
+                          "schema": {
+                            "required": true,
+                            "minLength": 1
+                          }
+                        },
+                        "status": {
+                          "type": "Text",
+                          "schema": {
+                            "required": true,
+                            "enum": [
+                              "failed"
+                            ]
+                          }
+                        },
+                        "error": {
+                          "type": "Text",
+                          "schema": {
+                            "required": true,
+                            "minLength": 1
+                          }
+                        },
+                        "schema": {
+                          "maxFields": 3
+                        },
+                        "name": "Task failed report request"
+                      },
+                      "steps": [
+                        {
+                          "type": "Contracts/Compute",
+                          "definition": "taskReportFunctions",
+                          "do": [
+                            {
+                              "$call": {
+                                "function": "report",
+                                "args": {
+                                  "report": {
+                                    "$binding": "call/request"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                "taskReportFunctions": {
+                  "kind": "definition",
+                  "contract": {
+                    "$pointerSet": {
+                      "object": {
+                        "$literal": {
+                          "type": "Contracts/Compute Definition",
+                          "functions": {
+                            "report": {
+                              "args": {
+                                "report": {}
+                              },
+                              "do": [
+                                {
+                                  "$let": {
+                                    "name": "requestId",
+                                    "expr": {
+                                      "$var": {
+                                        "name": "report",
+                                        "path": "/requestId"
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "$let": {
+                                    "name": "slotPath",
+                                    "expr": {
+                                      "$pointerJoin": [
+                                        "taskWork",
+                                        "requests",
+                                        {
+                                          "$var": "requestId"
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "$let": {
+                                    "name": "slot",
+                                    "expr": {
+                                      "$document": {
+                                        "$var": "slotPath"
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "$failIf": {
+                                    "cond": {
+                                      "$not": {
+                                        "$exists": {
+                                          "$var": "slot"
+                                        }
+                                      }
+                                    },
+                                    "message": "TASK_UNKNOWN_REQUEST"
+                                  }
+                                },
+                                {
+                                  "$if": {
+                                    "cond": {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "report",
+                                            "path": "/status"
+                                          }
+                                        },
+                                        "succeeded"
+                                      ]
+                                    },
+                                    "then": [
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$not": {
+                                              "$is": {
+                                                "node": {
+                                                  "$var": "report"
+                                                },
+                                                "pattern": {}
+                                              }
+                                            }
+                                          },
+                                          "message": "TASK_RESULT_MISMATCH"
+                                        }
+                                      },
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$not": {
+                                              "$exists": {
+                                                "$var": {
+                                                  "name": "report",
+                                                  "path": "/result"
+                                                }
+                                              }
+                                            }
+                                          },
+                                          "message": "TASK_RESULT_REQUIRED"
+                                        }
+                                      }
+                                    ],
+                                    "else": [
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$not": {
+                                              "$is": {
+                                                "node": {
+                                                  "$var": "report"
+                                                },
+                                                "pattern": {
+                                                  "error": {
+                                                    "type": "Text",
+                                                    "schema": {
+                                                      "required": true,
+                                                      "minLength": 1
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          },
+                                          "message": "TASK_FAILURE_ERROR_REQUIRED"
+                                        }
+                                      },
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$exists": {
+                                              "$var": {
+                                                "name": "report",
+                                                "path": "/result"
+                                              }
+                                            }
+                                          },
+                                          "message": "TASK_FAILURE_RESULT_FORBIDDEN"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "$let": {
+                                    "name": "reportIdentity",
+                                    "expr": {
+                                      "$nodeBlueId": {
+                                        "$var": "report"
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "$if": {
+                                    "cond": {
+                                      "$ne": [
+                                        {
+                                          "$var": {
+                                            "name": "slot",
+                                            "path": "/disposition"
+                                          }
+                                        },
+                                        "pending"
+                                      ]
+                                    },
+                                    "then": [
+                                      {
+                                        "$failIf": {
+                                          "cond": {
+                                            "$ne": [
+                                              {
+                                                "$nodeBlueId": {
+                                                  "$var": {
+                                                    "name": "slot",
+                                                    "path": "/report"
+                                                  }
+                                                }
+                                              },
+                                              {
+                                                "$var": "reportIdentity"
+                                              }
+                                            ]
+                                          },
+                                          "message": "TASK_FINAL_REPORT_CONFLICT"
+                                        }
+                                      },
+                                      {
+                                        "$return": {
+                                          "outcome": "alreadyFinal",
+                                          "requestId": {
+                                            "$var": "requestId"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "$appendChange": {
+                                    "op": "replace",
+                                    "path": {
+                                      "$var": "slotPath"
+                                    },
+                                    "val": {
+                                      "request": {
+                                        "$var": {
+                                          "name": "slot",
+                                          "path": "/request"
+                                        }
+                                      },
+                                      "disposition": {
+                                        "$var": {
+                                          "name": "report",
+                                          "path": "/status"
+                                        }
+                                      },
+                                      "report": {
+                                        "$objectSet": {
+                                          "object": {},
+                                          "key": "blueId",
+                                          "val": {
+                                            "$var": "reportIdentity"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "$appendChange": {
+                                    "op": "replace",
+                                    "path": "/taskWork/latestReport",
+                                    "val": {
+                                      "$var": "report"
+                                    }
+                                  }
+                                },
+                                {
+                                  "$appendEvent": {
+                                    "$merge": [
+                                      {
+                                        "$literal": {
+                                          "type": "Tasks/Task Report Accepted"
+                                        }
+                                      },
+                                      {
+                                        "requestId": {
+                                          "$var": "requestId"
+                                        },
+                                        "status": {
+                                          "$var": {
+                                            "name": "report",
+                                            "path": "/status"
+                                          }
+                                        },
+                                        "report": {
+                                          "$objectSet": {
+                                            "object": {},
+                                            "key": "blueId",
+                                            "val": {
+                                              "$var": "reportIdentity"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  }
+                                },
+                                {
+                                  "$return": {
+                                    "outcome": "acceptedNew",
+                                    "requestId": {
+                                      "$var": "requestId"
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      },
+                      "path": "/functions/report/do/4/$if/then/0/$failIf/cond/$not/$is/pattern",
+                      "val": {
+                        "$objectSet": {
+                          "object": {},
+                          "key": "blueId",
+                          "val": {
+                            "$nodeBlueId": {
+                              "$document": {
+                                "$pointerJoin": [
+                                  "clauseRuntime",
+                                  "work",
+                                  "candidate",
+                                  {
+                                    "$const": "clauseKey"
+                                  },
+                                  "parameters",
+                                  "reportRequest"
+                                ]
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "reads": []
+            }
+          }
+        ]
+      }
+    }
+  }
+}
