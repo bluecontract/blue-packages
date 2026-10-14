@@ -1,7 +1,58 @@
 name: Factory Functions
-type: Activation/Child Activation Functions
+type: Documents/Source Functions
 functions:
   create:
+    args:
+      input: {}
+      checked: {}
+    do:
+    - $let:
+        name: path
+        expr:
+          $var:
+            name: checked
+            path: /path
+    - $let:
+        name: key
+        expr:
+          $var:
+            name: checked
+            path: /key
+    - $let:
+        name: child
+        expr:
+          $call:
+            function: constructDocument
+            args:
+              input:
+                $var: input
+              checked:
+                $var: checked
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $var: child
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Document Started
+          clause:
+            $const: clauseKey
+          entityId:
+            $var: key
+          path:
+            $var: path
+    - $return:
+        outcome: acceptedNew
+        path:
+          $var: path
+        key:
+          $var: key
+  connectionSnapshots:
+    args: {}
+  checkCreation:
     args:
       input: {}
     do:
@@ -57,22 +108,44 @@ functions:
               default: {}
           templateBlueId:
             $nodeBlueId:
-              $document:
-                $const:
-                  name: bindings
-                  path: /template
+              $call:
+                function: configuredTemplate
+                args: {}
           sourcePaths:
             $pointerGet:
               object:
-                $const: parameters
+                $call:
+                  function: configurationParameters
+                  args: {}
               path: /sourcePaths
               default: {}
           inheritChannels:
             $pointerGet:
               object:
-                $const: parameters
+                $call:
+                  function: configurationParameters
+                  args: {}
               path: /inheritChannels
               default: []
+          values:
+            $pointerGet:
+              object:
+                $var: input
+              path: /values
+              default: {}
+          requestId:
+            $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+              default:
+                $var: key
+          partyBindings:
+            $pointerGet:
+              object:
+                $const: bindings
+              path: /parties
+              default: {}
     - $if:
         cond:
           $exists:
@@ -94,34 +167,143 @@ functions:
               $var: path
             key:
               $var: key
+    - $return:
+        outcome: acceptedNew
+        key:
+          $var: key
+        path:
+          $var: path
+        intent:
+          $var: intent
+  connectionConfiguration:
+    args: {}
+  configurationParameters:
+    args: {}
+    do:
+    - $return:
+        $pointerGet:
+          object:
+            $call:
+              function: connectionConfiguration
+              args: {}
+          path: /parameters
+          default: {}
+  configuredTemplate:
+    args: {}
+    do:
+    - $let:
+        name: p
+        expr:
+          $call:
+            function: configurationParameters
+            args: {}
+    - $if:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: p
+              path: /template
+        then:
+        - $return:
+            $pointerGet:
+              object:
+                $var: p
+              path: /template
+    - $return:
+        $pointerGet:
+          object:
+            $call:
+              function: connectionSnapshots
+              args: {}
+          path: /template
+  constructDocument:
+    args:
+      input: {}
+      checked: {}
+    do:
+    - $let:
+        name: key
+        expr:
+          $var:
+            name: checked
+            path: /key
+    - $let:
+        name: path
+        expr:
+          $var:
+            name: checked
+            path: /path
+    - $let:
+        name: intent
+        expr:
+          $var:
+            name: checked
+            path: /intent
     - $let:
         name: child
         expr:
-          $document:
-            $const:
-              name: bindings
-              path: /template
-    - $set:
-        name: child
-        expr:
           $call:
-            function: activateChild
-            args:
-              child:
-                $var: child
-              roles:
-                $pointerGet:
-                  object:
-                    $const: parameters
-                  path: /parties
-                  default: []
-              readerNames:
-                $pointerGet:
-                  object:
-                    $const: parameters
-                  path: /readers
-                  default: []
-              frozen: false
+            function: configuredTemplate
+            args: {}
+    - $if:
+        cond:
+          $ne:
+          - $size:
+              $pointerGet:
+                object:
+                  $const: bindings
+                path: /parties
+                default: {}
+          - 0
+        then:
+        - $set:
+            name: child
+            expr:
+              $call:
+                function: prepareChild
+                args:
+                  child:
+                    $var: child
+                  mapping:
+                    $pointerGet:
+                      object:
+                        $const: bindings
+                      path: /parties
+                  suppliedRoles:
+                    $pointerGet:
+                      object:
+                        $call:
+                          function: configurationParameters
+                          args: {}
+                      path: /suppliedParties
+                      default: []
+        else:
+        - $set:
+            name: child
+            expr:
+              $call:
+                function: activateChild
+                args:
+                  child:
+                    $var: child
+                  roles:
+                    $pointerGet:
+                      object:
+                        $call:
+                          function: configurationParameters
+                          args: {}
+                      path: /parties
+                      default: []
+                  readerNames:
+                    $pointerGet:
+                      object:
+                        $call:
+                          function: configurationParameters
+                          args: {}
+                      path: /readers
+                      default: []
+                  frozen: false
     - $failIf:
         cond:
           $exists:
@@ -133,8 +315,11 @@ functions:
         item: role
         in:
           $list:
-            $const:
-              name: parameters
+            $pointerGet:
+              object:
+                $call:
+                  function: configurationParameters
+                  args: {}
               path: /inheritChannels
         do:
         - $failIf:
@@ -245,8 +430,11 @@ functions:
               - $not:
                   $includes:
                     list:
-                      $const:
-                        name: parameters
+                      $pointerGet:
+                        object:
+                          $call:
+                            function: configurationParameters
+                            args: {}
                         path: /allowedFields
                     val:
                       $var: field
@@ -285,6 +473,127 @@ functions:
                   $var: field
                 val:
                   $var: nextValue
+    - $forEach:
+        item: fieldValue
+        in:
+          $pointerGet:
+            object:
+              $var: input
+            path: /values
+            default: {}
+        do:
+        - $let:
+            name: fieldPath
+            expr:
+              $get:
+                object:
+                  $pointerGet:
+                    object:
+                      $call:
+                        function: configurationParameters
+                        args: {}
+                    path: /fieldPaths
+                    default: {}
+                key:
+                  $var: field
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: fieldPath
+                  kind: text
+            message: PREPARATION_UNKNOWN_VALUE
+        - $let:
+            name: parts
+            expr:
+              $split:
+                text:
+                  $var: fieldPath
+                separator: /
+        - $failIf:
+            cond:
+              $or:
+              - $ne:
+                - $listGet:
+                    list:
+                      $var: parts
+                    index: 0
+                - ''
+              - $includes:
+                  list:
+                  - ''
+                  - contracts
+                  - clauses
+                  - activation
+                  - clauseRuntime
+                  - sources
+                  - type
+                  - blueId
+                  - instanceKey
+                  - creationIntent
+                  - preparationContext
+                  val:
+                    $listGet:
+                      list:
+                        $var: parts
+                      index: 1
+                      default: ''
+            message: PREPARATION_RESERVED_VALUE_PATH
+        - $let:
+            name: constraint
+            expr:
+              $pointerGet:
+                object:
+                  $var: child
+                path:
+                  $var: fieldPath
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $var: constraint
+            message: PREPARATION_VALUE_SLOT_REQUIRED
+        - $let:
+            name: witness
+            expr:
+              $choose:
+                cond:
+                  $isKind:
+                    val:
+                      $var: fieldValue
+                    kind: object
+                then:
+                  $objectSet:
+                    object:
+                      $var: fieldValue
+                    key: type
+                    val:
+                      $var: constraint
+                else:
+                  $objectFromEntries:
+                  - key: type
+                    val:
+                      $var: constraint
+                  - key: value
+                    val:
+                      $var: fieldValue
+        - $let:
+            name: validatedValue
+            expr:
+              $nodeBlueId:
+                $var: witness
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path:
+                  $var: fieldPath
+                val:
+                  $var: fieldValue
+        key: field
     - $let:
         name: sources
         expr: {}
@@ -293,8 +602,11 @@ functions:
         item: sourcePath
         in:
           $object:
-            $const:
-              name: parameters
+            $pointerGet:
+              object:
+                $call:
+                  function: configurationParameters
+                  args: {}
               path: /sourcePaths
         do:
         - $failIf:
@@ -338,12 +650,19 @@ functions:
     - $let:
         name: identity
         expr:
-          $concat:
+          $nodeBlueId:
+          # The native marker is sealed after initialization handlers finish.
+          # Clauses retain the same native lifecycle origin for startup factories.
           - $nodeBlueId:
-              $document: /contracts/initialized/document
-          - ':'
+              $choose:
+                cond:
+                  $exists:
+                    $document: /contracts/initialized/document
+                then:
+                  $document: /contracts/initialized/document
+                else:
+                  $document: /clauseRuntime/initialDocument
           - $const: clauseKey
-          - ':'
           - $var: key
     - $set:
         name: child
@@ -356,8 +675,11 @@ functions:
         item: identityPath
         in:
           $list:
-            $const:
-              name: parameters
+            $pointerGet:
+              object:
+                $call:
+                  function: configurationParameters
+                  args: {}
               path: /identityChildren
         do:
         - $failIf:
@@ -395,25 +717,337 @@ functions:
                   - $var: identity
                   - ':'
                   - $var: identityPath
-    - $appendChange:
-        op: add
-        path:
-          $var: path
-        val:
-          $var: child
-    - $appendEvent:
-        $merge:
-        - type: Commerce/Domain Event
-        - kind: Document Started
-          clause:
-            $const: clauseKey
-          entityId:
-            $var: key
-          path:
-            $var: path
     - $return:
-        outcome: acceptedNew
-        path:
-          $var: path
-        key:
-          $var: key
+        $var: child
+  configureSources:
+    args:
+      prepared: {}
+      checked: {}
+    do:
+    - $set:
+        name: prepared
+        expr:
+          $call:
+            function: configureDocumentAccess
+            args:
+              prepared:
+                $var: prepared
+    - $failIf:
+        cond:
+          $and:
+          - $gt:
+            - $size:
+                $pointerGet:
+                  object:
+                    $const: bindings
+                  path: /sources
+                  default: {}
+            - 0
+          - $gt:
+            - $size:
+                $pointerGet:
+                  object:
+                    $call:
+                      function: configurationParameters
+                      args: {}
+                  path: /sourcePaths
+                  default: []
+            - 0
+        message: SOURCE_LEGACY_MAPPING_CONFLICT
+    - $let:
+        name: mappings
+        expr:
+          $const:
+            name: bindings
+            path: /sources
+    - $let:
+        name: declarations
+        expr:
+          $call:
+            function: configuredSources
+            args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $var: mappings
+          - $size:
+              $var: declarations
+        message: SOURCE_MAPPING_INCOMPLETE
+    - $if:
+        cond:
+          $eq:
+          - $size:
+              $var: mappings
+          - 0
+        then:
+        - $return:
+            $var: prepared
+    - $failIf:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: prepared
+              path: /clauses/documentSources
+        message: SOURCE_CLAUSE_NAME_RESERVED
+    - $let:
+        name: requirements
+        expr: {}
+    - $forEach:
+        item: binding
+        in:
+          $var: mappings
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: validPartyName
+                  args:
+                    candidate:
+                      $var: alias
+            message: SOURCE_INVALID_NAME
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: declarations
+                  key:
+                    $var: alias
+            message: SOURCE_UNDECLARED_NAME
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: binding
+                  kind: text
+            message: SOURCE_BINDING_POINTER_REQUIRED
+        - $let:
+            name: source
+            expr:
+              $choose:
+                cond:
+                  $eq:
+                  - $var: binding
+                  - self
+                then:
+                  $document: ''
+                else:
+                  $document:
+                    $var: binding
+        - $let:
+            name: origin
+            expr:
+              $call:
+                function: processOrigin
+                args:
+                  document:
+                    $var: source
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: source
+                  path: /activation/active
+              - true
+            message: SOURCE_INACTIVE
+        - $let:
+            name: declaration
+            expr:
+              $get:
+                object:
+                  $var: declarations
+                key:
+                  $var: alias
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: sourceDeclarationMatches
+                  args:
+                    alias:
+                      $var: alias
+                    source:
+                      $var: source
+            message: SOURCE_DECLARATION_MISMATCH
+        - $set:
+            name: requirements
+            expr:
+              $objectSet:
+                object:
+                  $var: requirements
+                key:
+                  $var: alias
+                val:
+                  origin:
+                    $var: origin
+                  declaration:
+                    $objectFromEntries:
+                    - key: blueId
+                      val:
+                        $nodeBlueId:
+                          $var: declaration
+                  selectionPath:
+                    $choose:
+                      cond:
+                        $eq:
+                        - $var: binding
+                        - self
+                      then:
+                        $var:
+                          name: checked
+                          path: /path
+                      else: ''
+        key: alias
+    - $let:
+        name: bindings
+        expr: {}
+    - $forEach:
+        item: party
+        in:
+          $pointerGet:
+            object:
+              $var: prepared
+            path: /clauses/activation/parameters/parties
+        do:
+        - $set:
+            name: bindings
+            expr:
+              $objectSet:
+                object:
+                  $var: bindings
+                key:
+                  $concat:
+                  - bindSource_
+                  - $var: role
+                val:
+                  'on': workflow
+                  party:
+                    $var: role
+        key: role
+    - $let:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: prepared
+            path: /sources
+            val: {}
+    - $set:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: result
+            path: /clauses/documentSources
+            val:
+              $merge:
+              - type: Documents/Source Binding Clause
+              - parameters:
+                  requirements:
+                    $var: requirements
+                bindings:
+                  bind:
+                    $var: bindings
+    - $return:
+        $var: result
+  configuredSources:
+    args: {}
+    do:
+    - $fail: SOURCE_VALIDATOR_NOT_COMPILED
+  sourceDeclarationMatches:
+    args:
+      alias:
+        type: Text
+      source: {}
+    do:
+    - $fail: SOURCE_VALIDATOR_NOT_COMPILED
+  configureDocumentAccess:
+    args:
+      prepared: {}
+    do:
+    - $failIf:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: prepared
+              path: /clauses/documentAccess
+        message: DOCUMENT_ACCESS_CLAUSE_NAME_RESERVED
+    - $let:
+        name: bindings
+        expr: {}
+    - $forEach:
+        item: party
+        in:
+          $pointerGet:
+            object:
+              $var: prepared
+            path: /clauses/activation/parameters/parties
+        do:
+        - $set:
+            name: bindings
+            expr:
+              $objectSet:
+                object:
+                  $var: bindings
+                key:
+                  $concat:
+                  - registerAccess_
+                  - $var: role
+                val:
+                  'on': workflow
+                  party:
+                    $var: role
+        key: role
+    - $return:
+        $pointerSet:
+          object:
+            $var: prepared
+          path: /clauses/documentAccess
+          val:
+            $merge:
+            - type: Documents/Document Access Clause
+            - bindings:
+                register:
+                  $var: bindings
+  configuredTemplateValue:
+    args:
+      path:
+        type: Text
+    do:
+    - $let:
+        name: p
+        expr:
+          $call:
+            function: configurationParameters
+            args: {}
+    - $let:
+        name: templatePath
+        expr:
+          $choose:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /template
+            then:
+              $concat:
+              - /clauses/
+              - $const: clauseKey
+              - /parameters/template
+            else:
+              $pointerGet:
+                object:
+                  $const: bindings
+                path: /template
+    - $return:
+        $document:
+          $concat:
+          - $var: templatePath
+          - $var: path

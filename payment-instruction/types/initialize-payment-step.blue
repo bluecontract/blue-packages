@@ -5,9 +5,17 @@ definition:
 do:
 - $if:
     cond:
-      $not:
-        $exists:
-          $document: /payment/accepted
+      $and:
+      - $not:
+          $exists:
+            $document: /payment/accepted
+      - $or:
+        - $not:
+            $exists:
+              $document: /clauses/activation
+        - $eq:
+          - $document: /activation/active
+          - true
     then:
     - $call:
         function: initialize

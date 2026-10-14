@@ -1,0 +1,87 @@
+name: Bank Transfer Contract
+type: PaymentInstruction/Payment Instruction with Clauses
+description: One payer-requested transfer with separate bank confirmation. Unknown outcomes reconcile against the
+  same request. There is no synthetic card authorization or capture; a refund is a separate transfer instruction.
+paymentTerms:
+  method: bank-transfer
+  evidence: bankConfirmation
+contracts:
+  requestTransfer:
+    type: Contracts/Sequential Workflow Operation
+    channel: payer
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ACME/Bank Transfer Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: request
+          args:
+            input:
+              $object:
+                $binding: call/request
+  confirmTransfer:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ACME/Bank Transfer Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: record
+          args:
+            input:
+              $object:
+                $binding: call/request
+            status: completed
+  reportTransferUnknown:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ACME/Bank Transfer Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: record
+          args:
+            input:
+              $object:
+                $binding: call/request
+            status: unknown
+  declineTransfer:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ACME/Bank Transfer Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: record
+          args:
+            input:
+              $object:
+                $binding: call/request
+            status: declined

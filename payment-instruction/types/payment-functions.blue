@@ -665,6 +665,9 @@ functions:
       input: {}
     do:
     - $call:
+        function: requireReservationMethod
+        args: {}
+    - $call:
         function: guarantor
     - $call:
         function: key
@@ -815,6 +818,9 @@ functions:
         type: Text
       input: {}
     do:
+    - $call:
+        function: requireReservationMethod
+        args: {}
     - $let:
         name: path
         expr: /payment
@@ -1769,3 +1775,21 @@ functions:
           $var: nextValue
     - $return:
         changed: true
+  requireReservationMethod:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - reservation
+              - card
+              - myos-customer
+              val:
+                $pointerGet:
+                  object:
+                    $document: /paymentTerms
+                  path: /method
+                  default: reservation
+        message: PAYMENT_METHOD_UNSUPPORTED_ACTION

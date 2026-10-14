@@ -1,0 +1,58 @@
+name: Shipment Preparation Functions
+type: Documents/Preparation Functions
+functions:
+  domainPrepare:
+    args:
+      prepared: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $var: prepared
+              pattern:
+                type: Shipping/Shipping Instruction with Clauses
+        message: SHIPPING_INSTRUCTION_TEMPLATE_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: prepared
+                  path: /clauses/activation/parameters/parties
+              key: carrier
+        message: SHIPMENT_CARRIER_REQUIRED
+    - $let:
+        name: terms
+        expr:
+          $pointerGet:
+            object:
+              $var: prepared
+            path: /shipmentTerms
+            default: {}
+    - $return:
+        $var: terms
+  domainValidateCandidate:
+    args:
+      frozenTerms: {}
+      candidate: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $var: frozenTerms
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /shipmentTerms
+              default: {}
+        message: SHIPMENT_TERMS_MISMATCH
+    - $return: true
+  domainNextActions:
+    args:
+      documentRef: {}
+    do:
+    - $return: []

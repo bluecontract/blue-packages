@@ -1,5 +1,5 @@
 name: Amendments Functions
-type: Contracts/Compute Definition
+type: Amendments/Amendment Proposal Functions
 functions:
   initialize:
     args:
@@ -22,13 +22,6 @@ functions:
       input: {}
     do:
     - $let:
-        name: s
-        expr:
-          $document:
-            $const:
-              name: bindings
-              path: /state
-    - $let:
         name: actor
         expr:
           $binding: call/channel
@@ -43,366 +36,51 @@ functions:
               val:
                 $var: actor
         message: APPROVER_REQUIRED
-    - $failIf:
-        cond:
-          $ne:
-          - $pointerGet:
-              object:
-                $var: input
-              path: /expectedRevision
-          - $pointerGet:
-              object:
-                $var: s
-              path: /revision
-        message: STALE_REVISION
-    - $failIf:
-        cond:
-          $not:
-            $includes:
-              list:
-                $const:
-                  name: parameters
-                  path: /paths
-              val:
-                $pointerGet:
-                  object:
-                    $var: input
-                  path: /path
-        message: FIELD_NOT_AMENDABLE
-    - $failIf:
-        cond:
-          $ne:
-          - $document:
-              $const:
-                name: bindings
-                path: /editable
-          - true
-        message: TERMS_FROZEN
-    - $let:
-        name: id
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /proposalId
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $var: id
-                kind: text
-            - $ne:
-              - $var: id
-              - ''
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $var: id
-                    separator: /
-              - 1
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $var: id
-                    separator: '~'
-              - 1
-        message: INVALID_PROPOSAL_ID
-    - $let:
-        name: p
-        expr:
-          id:
-            $var: id
-          revision:
-            $pointerGet:
-              object:
-                $var: s
-              path: /revision
-          path:
-            $pointerGet:
-              object:
-                $var: input
-              path: /path
-          replacement:
-            $pointerGet:
-              object:
-                $var: input
-              path: /replacement
-          approvals: {}
-    - $if:
-        cond:
-          $eq:
-          - $pointerGet:
-              object:
-                $var: s
-              path: /proposal/id
-          - $var: id
-        then:
-        - $failIf:
-            cond:
-              $not:
-                $and:
-                - $eq:
-                  - $pointerGet:
-                      object:
-                        $var: s
-                      path: /proposal/replacement
-                  - $pointerGet:
-                      object:
-                        $var: input
-                      path: /replacement
-                - $eq:
-                  - $pointerGet:
-                      object:
-                        $var: s
-                      path: /proposal/path
-                  - $pointerGet:
-                      object:
-                        $var: input
-                      path: /path
-                - $eq:
-                  - $pointerGet:
-                      object:
-                        $var: s
-                      path: /proposal/revision
-                  - $pointerGet:
-                      object:
-                        $var: input
-                      path: /expectedRevision
-            message: PROPOSAL_ID_CONFLICT
-        - $return:
-            outcome: duplicate
-    - $failIf:
-        cond:
-          $exists:
-            $get:
-              object:
-                $pointerGet:
-                  object:
-                    $var: s
-                  path: /history
-              key:
-                $var: id
-        message: PROPOSAL_ID_USED
-    - $appendChange:
-        op: replace
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /proposal
-        val:
-          $var: p
-    - $appendEvent:
-        $merge:
-        - type: Commerce/Domain Event
-        - kind: Amendment Proposed
-          clause:
-            $const: clauseKey
-          proposalId:
-            $var: id
     - $return:
-        outcome: acceptedNew
+        $call:
+          function: recordProposal
+          args:
+            input:
+              $var: input
   approve:
     args:
       input: {}
     do:
-    - $let:
-        name: s
-        expr:
-          $document:
-            $const:
-              name: bindings
-              path: /state
-    - $let:
-        name: p
-        expr:
-          $pointerGet:
-            object:
-              $var: s
-            path: /proposal
-    - $let:
-        name: actor
-        expr:
-          $binding: call/channel
-    - $failIf:
-        cond:
-          $not:
-            $includes:
-              list:
-                $const:
-                  name: parameters
-                  path: /approvers
-              val:
-                $var: actor
-        message: APPROVER_REQUIRED
-    - $if:
-        cond:
-          $eq:
-          - $get:
-              object:
-                $pointerGet:
-                  object:
-                    $var: s
-                  path: /history
-              key:
-                $pointerGet:
-                  object:
-                    $var: input
-                  path: /proposalId
-          - true
-        then:
-        - $return:
-            outcome: duplicate
-    - $failIf:
-        cond:
-          $ne:
-          - $pointerGet:
-              object:
-                $var: input
-              path: /proposalId
-          - $pointerGet:
-              object:
-                $var: p
-              path: /id
-        message: PROPOSAL_CHANGED
-    - $failIf:
-        cond:
-          $ne:
-          - $document:
-              $const:
-                name: bindings
-                path: /editable
-          - true
-        message: TERMS_FROZEN
-    - $let:
-        name: a
-        expr:
-          $pointerGet:
-            object:
-              $var: p
-            path: /approvals
-    - $if:
-        cond:
-          $eq:
-          - $get:
-              object:
-                $var: a
-              key:
-                $var: actor
-          - true
-        then:
-        - $return:
-            outcome: duplicate
-    - $set:
-        name: a
-        expr:
-          $objectSet:
-            object:
-              $var: a
-            key:
-              $var: actor
-            val: true
-    - $let:
-        name: ready
-        expr: true
-    - $forEach:
-        item: role
-        in:
-          $const:
-            name: parameters
-            path: /approvers
-        do:
-        - $if:
-            cond:
-              $ne:
-              - $get:
-                  object:
-                    $var: a
-                  key:
-                    $var: role
-              - true
-            then:
-            - $set:
-                name: ready
-                expr: false
-    - $appendChange:
-        op: replace
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /proposal/approvals
-        val:
-          $var: a
-    - $if:
-        cond:
-          $var: ready
-        then:
-        - $appendChange:
-            op: replace
-            path:
-              $pointerGet:
-                object:
-                  $var: p
-                path: /path
-            val:
-              $pointerGet:
-                object:
-                  $var: p
-                path: /replacement
-        - $appendChange:
-            op: add
-            path:
-              $concat:
-              - $const:
-                  name: bindings
-                  path: /state
-              - /history/
-              - $pointerGet:
-                  object:
-                    $var: p
-                  path: /id
-            val: true
-        - $appendChange:
-            op: replace
-            path:
-              $concat:
-              - $const:
-                  name: bindings
-                  path: /state
-              - /revision
-            val:
-              $add:
-              - $pointerGet:
-                  object:
-                    $var: s
-                  path: /revision
-              - 1
-        - $appendChange:
-            op: replace
-            path:
-              $concat:
-              - $const:
-                  name: bindings
-                  path: /state
-              - /proposal
-            val: {}
-        - $appendEvent:
-            $merge:
-            - type: Commerce/Domain Event
-            - kind: Amendment Applied
-              clause:
-                $const: clauseKey
-              proposalId:
-                $pointerGet:
-                  object:
-                    $var: p
-                  path: /id
     - $return:
-        outcome: acceptedNew
+        $call:
+          function: approveAmendmentProposal
+          args:
+            input:
+              $var: input
+            parameters:
+              $const: parameters
+            bindings:
+              $const: bindings
+            clauseKey:
+              $const: clauseKey
+            state:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state
+  recordProposal:
+    args:
+      input: {}
+    do:
+    - $return:
+        $call:
+          function: recordAmendmentProposal
+          args:
+            input:
+              $var: input
+            parameters:
+              $const: parameters
+            bindings:
+              $const: bindings
+            clauseKey:
+              $const: clauseKey
+            state:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state

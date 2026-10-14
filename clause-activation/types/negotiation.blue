@@ -1,0 +1,788 @@
+name: Negotiation Functions
+type: Activation/Activation Functions
+functions:
+  proposalRecord:
+    args:
+      input: {}
+    do:
+    - $return:
+        $call:
+          function: recordAmendmentProposal
+          args:
+            input:
+              $var: input
+            parameters:
+              $const: parameters
+            bindings:
+              $const: bindings
+            clauseKey:
+              $const: clauseKey
+            state:
+              $resultValue:
+                $const:
+                  name: bindings
+                  path: /state
+  proposalApprove:
+    args:
+      input: {}
+    do:
+    - $return:
+        $call:
+          function: approveAmendmentProposal
+          args:
+            input:
+              $var: input
+            parameters:
+              $const: parameters
+            bindings:
+              $const: bindings
+            clauseKey:
+              $const: clauseKey
+            state:
+              $resultValue:
+                $const:
+                  name: bindings
+                  path: /state
+  negotiationAuthority:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: EXACT_REVIEW_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $resultValue: /activation/required
+              val:
+                $binding: call/channel
+        message: REQUIRED_APPROVER_ONLY
+    - $return: true
+  proposeChanges:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: negotiationAuthority
+        args: {}
+    - $failIf:
+        cond:
+          $eq:
+          - $resultValue: /activation/everActivated
+          - true
+        message: NEGOTIATION_CLOSED
+    - $if:
+        cond:
+          $isKind:
+            val:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /proposalId
+            kind: text
+        then:
+        - $failIf:
+            cond:
+              $eq:
+              - $get:
+                  object:
+                    $resultValue: /activation/negotiation/history
+                  key:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /proposalId
+              - true
+            message: PROPOSAL_ALREADY_CLOSED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /baseTermsRef
+          - $resultValue: /activation/terms/ref
+        message: TERMS_CHANGED
+    - $let:
+        name: fields
+        expr:
+          $resultValue: /activation/terms/fields
+    - $let:
+        name: changes
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /changes
+            default: []
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: changes
+              kind: list
+        message: TERMS_CHANGES_LIST_REQUIRED
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $var: changes
+          - 0
+        message: EMPTY_TERMS_CHANGE
+    - $let:
+        name: seen
+        expr: []
+    - $let:
+        name: candidate
+        expr:
+          $resultValue: ''
+    - $forEach:
+        item: change
+        in:
+          $var: changes
+        do:
+        - $let:
+            name: path
+            expr:
+              $pointerGet:
+                object:
+                  $var: change
+                path: /path
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $const: fieldPaths
+                  val:
+                    $var: path
+            message: FIELD_NOT_NEGOTIABLE
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                  $var: seen
+                val:
+                  $var: path
+            message: DUPLICATE_TERMS_PATH
+        - $set:
+            name: seen
+            expr:
+              $listConcat:
+              - $var: seen
+              - - $var: path
+        - $let:
+            name: replacement
+            expr:
+              $pointerGet:
+                object:
+                  $var: change
+                path: /replacement
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $kind:
+                    $resultValue:
+                      $var: path
+                - $kind:
+                    $var: replacement
+            message: TERMS_FIELD_TYPE_MISMATCH
+        - $set:
+            name: fields
+            expr:
+              $objectSet:
+                object:
+                  $var: fields
+                key:
+                  $var: path
+                val:
+                  $var: replacement
+        - $set:
+            name: candidate
+            expr:
+              $pointerSet:
+                object:
+                  $var: candidate
+                path:
+                  $var: path
+                op: set
+                val:
+                  $var: replacement
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validTermsCandidate
+              args:
+                candidate:
+                  $var: candidate
+        message: INVALID_TERMS_CANDIDATE
+    - $let:
+        name: termsRef
+        expr:
+          $nodeBlueId:
+            definition:
+              $resultValue: /activation/terms/definition
+            fields:
+              $var: fields
+    - $failIf:
+        cond:
+          $eq:
+          - $var: termsRef
+          - $resultValue: /activation/terms/ref
+        message: TERMS_UNCHANGED
+    - $if:
+        cond:
+          $and:
+          - $exists:
+              $resultValue: /activation/negotiation/proposal/id
+          - $ne:
+            - $pointerGet:
+                object:
+                  $var: input
+                path: /proposalId
+            - $resultValue: /activation/negotiation/proposal/id
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /supersedes
+              - $resultValue: /activation/negotiation/proposal/id
+            message: PROPOSAL_PENDING
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - /activation/negotiation/history/
+              - $resultValue: /activation/negotiation/proposal/id
+            val: true
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - /activation/negotiation/outcomes/
+              - $resultValue: /activation/negotiation/proposal/id
+            val: SUPERSEDED
+        - $appendChange:
+            op: replace
+            path: /activation/negotiation/proposal
+            val: {}
+    - $call:
+        function: proposalRecord
+        args:
+          input:
+            proposalId:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /proposalId
+            expectedRevision:
+              $resultValue: /activation/negotiation/revision
+            path: /activation/terms/fields
+            replacement:
+              $var: fields
+            preservePending: true
+    - $appendChange:
+        op: add
+        path: /activation/negotiation/proposal/baseTermsRef
+        val:
+          $resultValue: /activation/terms/ref
+    - $appendChange:
+        op: add
+        path: /activation/negotiation/proposal/termsRef
+        val:
+          $var: termsRef
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $resultValue: /activation/negotiation/proposal/proposer
+        then:
+        - $appendChange:
+            op: add
+            path: /activation/negotiation/proposal/proposer
+            val:
+              $binding: call/channel
+    - $return:
+        $var: termsRef
+  proposeAndActivate:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: termsRef
+        expr:
+          $call:
+            function: proposeChanges
+            args:
+              input:
+                $var: input
+    - $return:
+        $call:
+          function: activate
+          args:
+            input:
+              termsRef:
+                $var: termsRef
+              proposalId:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /proposalId
+  activate:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: negotiationAuthority
+        args: {}
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /termsRef
+              kind: text
+        message: TERMS_REFERENCE_REQUIRED
+    - $if:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /termsRef
+          - $resultValue: /activation/terms/ref
+        then:
+        - $failIf:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /proposalId
+            message: CURRENT_TERMS_HAVE_NO_PROPOSAL
+        - $return:
+            $call:
+              function: approve
+              args:
+                input:
+                  revision:
+                    $resultValue: /activation/revision
+                  termsRef:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /termsRef
+    - $let:
+        name: proposal
+        expr:
+          $resultValue: /activation/negotiation/proposal
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /proposalId
+          - $pointerGet:
+              object:
+                $var: proposal
+              path: /id
+        message: PROPOSAL_CHANGED
+    - $failIf:
+        cond:
+          $or:
+          - $not:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: proposal
+                  path: /termsRef
+          - $ne:
+            - $pointerGet:
+                object:
+                  $var: input
+                path: /termsRef
+            - $pointerGet:
+                object:
+                  $var: proposal
+                path: /termsRef
+        message: TERMS_CHANGED
+    - $call:
+        function: validateStoredOffer
+        args:
+          proposal:
+            $var: proposal
+    - $let:
+        name: approved
+        expr:
+          $objectSet:
+            object:
+              $pointerGet:
+                object:
+                  $var: proposal
+                path: /approvals
+                default: {}
+            key:
+              $binding: call/channel
+            val: true
+    - $call:
+        function: proposalApprove
+        args:
+          input:
+            proposalId:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /proposalId
+    - $if:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $resultValue: /activation/negotiation/history
+              path:
+                $concat:
+                - /
+                - $pointerGet:
+                    object:
+                      $var: proposal
+                    path: /id
+          - true
+        then:
+        - $forEach:
+            item: replacement
+            in:
+              $pointerGet:
+                object:
+                  $var: proposal
+                path: /replacement
+            do:
+            - $appendChange:
+                op: replace
+                path:
+                  $var: path
+                val:
+                  $var: replacement
+            key: path
+        - $appendChange:
+            op: replace
+            path: /activation/terms/ref
+            val:
+              $pointerGet:
+                object:
+                  $var: proposal
+                path: /termsRef
+        - $appendChange:
+            op: replace
+            path: /activation/termsRevision
+            val:
+              $add:
+              - $resultValue: /activation/termsRevision
+              - 1
+        - $appendChange:
+            op: replace
+            path: /activation/revision
+            val:
+              $add:
+              - $resultValue: /activation/revision
+              - 1
+        - $appendChange:
+            op: replace
+            path: /activation/approved
+            val:
+              $var: approved
+        - $appendChange:
+            op: replace
+            path: /activation/negotiation/editable
+            val: false
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - /activation/negotiation/outcomes/
+              - $pointerGet:
+                  object:
+                    $var: proposal
+                  path: /id
+            val: APPLIED
+        - $call:
+            function: commitState
+            args:
+              state:
+                $resultValue: /activation
+    - $return: true
+  closeProposal:
+    args:
+      input: {}
+      outcome:
+        type: Text
+    do:
+    - $call:
+        function: negotiationAuthority
+        args: {}
+    - $failIf:
+        cond:
+          $eq:
+          - $resultValue: /activation/everActivated
+          - true
+        message: NEGOTIATION_CLOSED
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $resultValue: /activation/negotiation/proposal/id
+        message: PROPOSAL_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /proposalId
+          - $resultValue: /activation/negotiation/proposal/id
+        message: PROPOSAL_CHANGED
+    - $if:
+        cond:
+          $eq:
+          - $var: outcome
+          - WITHDRAWN
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $resultValue: /activation/negotiation/proposal/proposer
+              - $binding: call/channel
+            message: PROPOSER_REQUIRED
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /activation/negotiation/history/
+          - $pointerGet:
+              object:
+                $var: input
+              path: /proposalId
+        val: true
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /activation/negotiation/outcomes/
+          - $pointerGet:
+              object:
+                $var: input
+              path: /proposalId
+        val:
+          $var: outcome
+    - $appendChange:
+        op: replace
+        path: /activation/negotiation/proposal
+        val: {}
+    - $return: true
+  withdrawProposal:
+    args:
+      input: {}
+    do:
+    - $return:
+        $call:
+          function: closeProposal
+          args:
+            input:
+              $var: input
+            outcome: WITHDRAWN
+  rejectProposal:
+    args:
+      input: {}
+    do:
+    - $return:
+        $call:
+          function: closeProposal
+          args:
+            input:
+              $var: input
+            outcome: REJECTED
+  withdrawAcceptance:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: negotiationAuthority
+        args: {}
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /termsRef
+              kind: text
+        message: TERMS_REFERENCE_REQUIRED
+    - $failIf:
+        cond:
+          $eq:
+          - $resultValue: /activation/everActivated
+          - true
+        message: NEGOTIATION_CLOSED
+    - $if:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /termsRef
+          - $resultValue: /activation/terms/ref
+        then:
+        - $failIf:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /proposalId
+            message: CURRENT_TERMS_HAVE_NO_PROPOSAL
+        - $appendChange:
+            op: replace
+            path: /activation/approved
+            val:
+              $objectSet:
+                object:
+                  $resultValue: /activation/approved
+                key:
+                  $binding: call/channel
+                val: false
+        - $call:
+            function: commitState
+            args:
+              state:
+                $resultValue: /activation
+        - $return: true
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /proposalId
+          - $resultValue: /activation/negotiation/proposal/id
+        message: PROPOSAL_CHANGED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /termsRef
+          - $resultValue: /activation/negotiation/proposal/termsRef
+        message: TERMS_CHANGED
+    - $appendChange:
+        op: replace
+        path: /activation/negotiation/proposal/approvals
+        val:
+          $objectSet:
+            object:
+              $resultValue: /activation/negotiation/proposal/approvals
+            key:
+              $binding: call/channel
+            val: false
+    - $return: true
+  validTermsCandidate:
+    args:
+      candidate: {}
+    do:
+    - $return: false
+  validateStoredOffer:
+    args:
+      proposal: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: proposal
+              path: /baseTermsRef
+          - $resultValue: /activation/terms/ref
+        message: TERMS_CHANGED
+    - $let:
+        name: fields
+        expr:
+          $pointerGet:
+            object:
+              $var: proposal
+            path: /replacement
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $var: fields
+          - $size:
+              $const: fieldPaths
+        message: INVALID_STORED_TERMS_FIELDS
+    - $let:
+        name: candidate
+        expr:
+          $resultValue: ''
+    - $forEach:
+        key: path
+        item: replacement
+        in:
+          $var: fields
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $const: fieldPaths
+                  val:
+                    $var: path
+            message: FIELD_NOT_NEGOTIABLE
+        - $set:
+            name: candidate
+            expr:
+              $pointerSet:
+                object:
+                  $var: candidate
+                path:
+                  $var: path
+                op: set
+                val:
+                  $var: replacement
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validTermsCandidate
+              args:
+                candidate:
+                  $var: candidate
+        message: INVALID_TERMS_CANDIDATE
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              definition:
+                $resultValue: /activation/terms/definition
+              fields:
+                $var: fields
+          - $pointerGet:
+              object:
+                $var: proposal
+              path: /termsRef
+        message: STORED_TERMS_IDENTITY_MISMATCH
+    - $return: true

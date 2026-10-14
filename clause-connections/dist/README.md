@@ -28,3 +28,24 @@ managed embedding bindings, shared Compute Definitions, `actionResult`, and
 
 
 Unpublished candidate. Authored Blue/BEX definitions are authoritative. See ../docs/payment-family.md for the tested package selection and integration boundaries.
+
+## Conditions on a named action
+
+`parameters.conditions.<actionName>` adds a BEX predicate to every connection of
+that action. It is evaluated after the action's original requirement and typed
+arguments, before preflight or any `before`, action or `after` effects. It can only
+add a restriction. A false result fails with `ACTION_CONDITION_FAILED`; an unknown
+action name is rejected during planning. Omitting a condition adds no restriction.
+Conditions use the action's own document and selected named sources, not an
+incoming observer's state. Cross-document changes require explicit application
+events when they are intended to trigger an action automatically.
+
+## Structural state
+
+A clause type can declare `initialState`, keyed by a pointer binding name, with an
+object initial value. Connection planning contributes that state through the
+ordinary Clauses state-ownership checks. This installs data without dispatching
+a business action and does not grant an exception to Activation. Ledger and
+Amendments use it for their empty initial state. A state-only clause may omit
+`actions`; a supplied action declaration must still be an object. Only the admitted clause type
+supplies this declaration; runtime requests cannot inject a state initializer.

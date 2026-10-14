@@ -1,0 +1,955 @@
+name: Attachment Rules
+type: Parties/Party Access Functions
+functions:
+  samePrimary:
+    args:
+      left: {}
+      right: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var:
+                name: left
+                path: /lead/channel
+        message: ATTACHMENT_PRIMARY_CHANNEL_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var:
+                name: right
+                path: /lead/channel
+        message: ATTACHMENT_PRIMARY_CHANNEL_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $var:
+                name: left
+                path: /lead/channel
+          - $nodeBlueId:
+              $var:
+                name: right
+                path: /lead/channel
+        message: ATTACHMENT_PRIMARY_CHANNEL_MISMATCH
+    - $let:
+        name: leftKeys
+        expr:
+          $pointerGet:
+            object:
+              $var: left
+            path: /readerKeys
+            default: []
+    - $let:
+        name: rightKeys
+        expr:
+          $pointerGet:
+            object:
+              $var: right
+            path: /readerKeys
+            default: []
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $var: leftKeys
+          - 0
+        message: ATTACHMENT_PRIMARY_KEYS_REQUIRED
+    - $forEach:
+        item: keySet
+        in:
+        - $var: leftKeys
+        - $var: rightKeys
+        do:
+        - $let:
+            name: seen
+            expr: []
+        - $forEach:
+            item: key
+            in:
+              $var: keySet
+            do:
+            - $failIf:
+                cond:
+                  $includes:
+                    list:
+                      $var: seen
+                    val:
+                      $var: key
+                message: ATTACHMENT_DUPLICATE_PRIMARY_KEY
+            - $set:
+                name: seen
+                expr:
+                  $listConcat:
+                  - $var: seen
+                  - - $var: key
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $var: leftKeys
+          - $size:
+              $var: rightKeys
+        message: ATTACHMENT_PRIMARY_KEYS_MISMATCH
+    - $forEach:
+        item: key
+        in:
+          $var: leftKeys
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: rightKeys
+                  val:
+                    $var: key
+            message: ATTACHMENT_PRIMARY_KEYS_MISMATCH
+    - $forEach:
+        item: key
+        in:
+          $var: rightKeys
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: leftKeys
+                  val:
+                    $var: key
+            message: ATTACHMENT_PRIMARY_KEYS_MISMATCH
+    - $return: true
+  checkRoster:
+    args:
+      parent: {}
+      child: {}
+      authority:
+        type: Text
+      cross:
+        type: Boolean
+    do:
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $keys:
+                $var: parent
+          - 0
+        message: ATTACHMENT_PARENT_PARTIES_REQUIRED
+    - $forEach:
+        item: party
+        in:
+          $var: parent
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: child
+                  key:
+                    $var: role
+            message: ATTACHMENT_PARENT_PARTY_MISSING
+        - $call:
+            function: samePrimary
+            args:
+              left:
+                $var: party
+              right:
+                $get:
+                  object:
+                    $var: child
+                  key:
+                    $var: role
+        key: role
+    - $forEach:
+        item: party
+        in:
+          $var: child
+        do:
+        - $failIf:
+            cond:
+              $and:
+              - $ne:
+                - $var: role
+                - $var: authority
+              - $not:
+                  $hasKey:
+                    object:
+                      $var: parent
+                    key:
+                      $var: role
+            message: ATTACHMENT_UNDECLARED_PARTY
+        key: role
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var: child
+              key:
+                $var: authority
+        message: ATTACHMENT_AUTHORITY_MISSING
+    - $if:
+        cond:
+          $var: cross
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: parent
+                  key:
+                    $var: authority
+            message: ATTACHMENT_AUTHORITY_NOT_IN_PARENT
+    - $return: true
+  checkStateExpression:
+    args:
+      expression: {}
+    do:
+    - $let:
+        name: pendingNodes
+        expr:
+        - $var: expression
+    - $forEach:
+        item: depth
+        in:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+        - 18
+        - 19
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+        - 26
+        - 27
+        - 28
+        - 29
+        - 30
+        - 31
+        do:
+        - $let:
+            name: nextNodes
+            expr: []
+        - $forEach:
+            item: expressionNode
+            in:
+              $var: pendingNodes
+            do:
+            - $if:
+                cond:
+                  $isKind:
+                    val:
+                      $var: expressionNode
+                    kind: object
+                then:
+                - $forEach:
+                    item: nestedNode
+                    in:
+                      $var: expressionNode
+                    do:
+                    - $failIf:
+                        cond:
+                          $includes:
+                            list:
+                            - $event
+                            - $binding
+                            - $var
+                            - $resultValue
+                            - $call
+                            - $const
+                            - $steps
+                            - $currentContract
+                            - $intrinsic
+                            - $events
+                            - $changeset
+                            val:
+                              $var: field
+                        message: ATTACHMENT_STATE_RECHECK_REQUIRES_DOCUMENT_EXPRESSION
+                    - $set:
+                        name: nextNodes
+                        expr:
+                          $listConcat:
+                          - $var: nextNodes
+                          - - $var: nestedNode
+                    key: field
+            - $if:
+                cond:
+                  $isKind:
+                    val:
+                      $var: expressionNode
+                    kind: list
+                then:
+                - $set:
+                    name: nextNodes
+                    expr:
+                      $listConcat:
+                      - $var: nextNodes
+                      - $var: expressionNode
+        - $set:
+            name: pendingNodes
+            expr:
+              $var: nextNodes
+        - $if:
+            cond:
+              $eq:
+              - $size:
+                  $var: pendingNodes
+              - 0
+            then:
+            - $return: true
+    - $failIf:
+        cond: true
+        message: ATTACHMENT_STATE_EXPRESSION_TOO_DEEP
+  compileHooks:
+    args:
+      hooks: {}
+      allowed: []
+      key:
+        type: Text
+    do:
+    - $let:
+        name: bindings
+        expr: {}
+    - $let:
+        name: signals
+        expr: []
+    - $let:
+        name: dependencies
+        expr: []
+    - $let:
+        name: cross
+        expr: false
+    - $forEach:
+        item: connections
+        in:
+          $var: hooks
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: allowed
+                  val:
+                    $var: action
+            message: ATTACHMENT_UNKNOWN_ACTION
+        - $let:
+            name: lowered
+            expr: {}
+        - $forEach:
+            item: hook
+            in:
+              $var: connections
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $call:
+                      function: validPartyName
+                      args:
+                        candidate:
+                          $var: hookName
+                message: ATTACHMENT_INVALID_HOOK_NAME
+            - $let:
+                name: scope
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: hook
+                    path: /in
+                    default: instruction
+            - $failIf:
+                cond:
+                  $not:
+                    $includes:
+                      list:
+                      - instruction
+                      - parent
+                      val:
+                        $var: scope
+                message: ATTACHMENT_UNKNOWN_SCOPE
+            - $let:
+                name: mode
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: hook
+                    path: /on
+                    default: workflow
+            - $let:
+                name: rechecks
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: hook
+                    path: /recheckOn
+                    default: []
+            - $failIf:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $var: rechecks
+                      kind: list
+                message: ATTACHMENT_RECHECK_PATHS_REQUIRED
+            - $if:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: hook
+                    key: recheckOn
+                then:
+                - $failIf:
+                    cond:
+                      $not:
+                        $and:
+                        - $eq:
+                          - $var: scope
+                          - parent
+                        - $eq:
+                          - $var: mode
+                          - state
+                    message: ATTACHMENT_RECHECK_REQUIRES_PARENT_STATE
+                - $failIf:
+                    cond:
+                      $or:
+                      - $hasKey:
+                          object:
+                            $var: hook
+                          key: before
+                      - $hasKey:
+                          object:
+                            $var: hook
+                          key: after
+                    message: ATTACHMENT_RECHECK_EFFECTS_NOT_ALLOWED
+                - $call:
+                    function: checkStateExpression
+                    args:
+                      expression:
+                        $pointerGet:
+                          object:
+                            $var: hook
+                          path: /params
+                          default: {}
+                - $call:
+                    function: checkStateExpression
+                    args:
+                      expression:
+                        $pointerGet:
+                          object:
+                            $var: hook
+                          path: /when
+                          default: true
+            - $let:
+                name: result
+                expr:
+                  $pointerSet:
+                    object:
+                      $pointerSet:
+                        object:
+                          $var: hook
+                        path: /in
+                        op: remove
+                    path: /recheckOn
+                    op: remove
+            - $if:
+                cond:
+                  $eq:
+                  - $var: scope
+                  - parent
+                then:
+                - $set:
+                    name: cross
+                    expr: true
+                - $set:
+                    name: dependencies
+                    expr:
+                      $listConcat:
+                      - $var: dependencies
+                      - - action:
+                            $var: action
+                          hook:
+                            $var: hookName
+                          'on':
+                            $var: mode
+                          path:
+                            $pointerGet:
+                              object:
+                                $var: hook
+                              path: /path
+                              default: ''
+                - $failIf:
+                    cond:
+                      $not:
+                        $includes:
+                          list:
+                          - state
+                          - event
+                          val:
+                            $var: mode
+                    message: ATTACHMENT_PARENT_SOURCE_REQUIRED
+                - $set:
+                    name: result
+                    expr:
+                      $merge:
+                      - $var: result
+                      - 'on': embedded
+                        path: /sources/parent
+                - $if:
+                    cond:
+                      $eq:
+                      - $var: mode
+                      - event
+                    then:
+                    - $failIf:
+                        cond:
+                          $not:
+                            $hasKey:
+                              object:
+                                $var: hook
+                              key: event
+                        message: ATTACHMENT_PARENT_EVENT_REQUIRED
+                - $if:
+                    cond:
+                      $eq:
+                      - $var: mode
+                      - state
+                    then:
+                    - $failIf:
+                        cond:
+                          $not:
+                            $startsWith:
+                            - $pointerGet:
+                                object:
+                                  $var: hook
+                                path: /path
+                                default: ''
+                            - /
+                        message: ATTACHMENT_STATE_PATH_REQUIRED
+                    - $failIf:
+                        cond:
+                          $not:
+                            $hasKey:
+                              object:
+                                $var: hook
+                              key: equals
+                        message: ATTACHMENT_STATE_VALUE_REQUIRED
+                    - $let:
+                        name: signal
+                        expr:
+                          $concat:
+                          - $var: action
+                          - _
+                          - $var: hookName
+                    - $set:
+                        name: signals
+                        expr:
+                          $listConcat:
+                          - $var: signals
+                          - - id:
+                                $var: signal
+                              path:
+                                $var:
+                                  name: hook
+                                  path: /path
+                    - $set:
+                        name: result
+                        expr:
+                          $pointerSet:
+                            object:
+                              $var: result
+                            path: /equals
+                            op: remove
+                    - $set:
+                        name: result
+                        expr:
+                          $pointerSet:
+                            object:
+                              $var: result
+                            path: /event
+                            val:
+                              $merge:
+                              - type: Attachments/Source Changed
+                              - attachment:
+                                  $var: key
+                                hook:
+                                  $var: signal
+                    - $set:
+                        name: result
+                        expr:
+                          $pointerSet:
+                            object:
+                              $var: result
+                            path: /when
+                            val:
+                              $objectSet:
+                                object: {}
+                                key: $and
+                                val:
+                                - $objectSet:
+                                    object: {}
+                                    key: $eq
+                                    val:
+                                    - $objectSet:
+                                        object: {}
+                                        key: $document
+                                        val:
+                                          $concat:
+                                          - /sources/parent
+                                          - $var:
+                                              name: hook
+                                              path: /path
+                                    - $var:
+                                        name: hook
+                                        path: /equals
+                                - $pointerGet:
+                                    object:
+                                      $var: hook
+                                    path: /when
+                                    default: true
+                - $let:
+                    name: selectedPath
+                    expr:
+                      $literal:
+                        $concat:
+                        - /sources/parent
+                        - $document: /clauses/attachment/parameters/instructionPath
+                        - /contracts/initialized/document
+                - $let:
+                    name: selected
+                    expr:
+                      $objectSet:
+                        object: {}
+                        key: $document
+                        val:
+                          $var: selectedPath
+                - $set:
+                    name: result
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: result
+                        path: /when
+                        val:
+                          $objectSet:
+                            object: {}
+                            key: $and
+                            val:
+                            - $objectSet:
+                                object: {}
+                                key: $choose
+                                val:
+                                  cond:
+                                    $objectSet:
+                                      object: {}
+                                      key: $exists
+                                      val:
+                                        $var: selected
+                                  then:
+                                    $objectSet:
+                                      object: {}
+                                      key: $eq
+                                      val:
+                                      - $objectSet:
+                                          object: {}
+                                          key: $nodeBlueId
+                                          val:
+                                            $var: selected
+                                      - $literal:
+                                          $nodeBlueId:
+                                            $document: /contracts/initialized/document
+                                  else: false
+                            - $pointerGet:
+                                object:
+                                  $var: result
+                                path: /when
+                                default: true
+                - $set:
+                    name: result
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: result
+                        path: /before
+                        val:
+                          $listConcat:
+                          - $literal:
+                            - $failIf:
+                                cond:
+                                  $ne:
+                                  - $document: /sources/parent/activation/active
+                                  - true
+                                message: ATTACHMENT_PARENT_INACTIVE
+                            - $failIf:
+                                cond:
+                                  $not:
+                                    $hasKey:
+                                      object:
+                                        $document: /sources/parent/activation/parties
+                                      key:
+                                        $document: /clauses/attachment/parameters/authority
+                                message: ATTACHMENT_AUTHORITY_NOT_IN_PARENT
+                            - $forEach:
+                                item: parentParty
+                                in:
+                                  $document: /sources/parent/activation/parties
+                                do:
+                                - $let:
+                                    name: childParty
+                                    expr:
+                                      $get:
+                                        object:
+                                          $document: /activation/parties
+                                        key:
+                                          $var: role
+                                - $failIf:
+                                    cond:
+                                      $ne:
+                                      - $nodeBlueId:
+                                          $var:
+                                            name: parentParty
+                                            path: /lead/channel
+                                      - $nodeBlueId:
+                                          $var:
+                                            name: childParty
+                                            path: /lead/channel
+                                    message: ATTACHMENT_PRIMARY_CHANNEL_MISMATCH
+                                - $failIf:
+                                    cond:
+                                      $ne:
+                                      - $size:
+                                          $var:
+                                            name: parentParty
+                                            path: /readerKeys
+                                      - $size:
+                                          $var:
+                                            name: childParty
+                                            path: /readerKeys
+                                    message: ATTACHMENT_PRIMARY_KEYS_MISMATCH
+                                - $forEach:
+                                    item: primaryKey
+                                    in:
+                                      $var:
+                                        name: parentParty
+                                        path: /readerKeys
+                                    do:
+                                    - $failIf:
+                                        cond:
+                                          $not:
+                                            $includes:
+                                              list:
+                                                $var:
+                                                  name: childParty
+                                                  path: /readerKeys
+                                              val:
+                                                $var: primaryKey
+                                        message: ATTACHMENT_PRIMARY_KEYS_MISMATCH
+                                - $forEach:
+                                    item: primaryKey
+                                    in:
+                                      $var:
+                                        name: childParty
+                                        path: /readerKeys
+                                    do:
+                                    - $failIf:
+                                        cond:
+                                          $not:
+                                            $includes:
+                                              list:
+                                                $var:
+                                                  name: parentParty
+                                                  path: /readerKeys
+                                              val:
+                                                $var: primaryKey
+                                        message: ATTACHMENT_PRIMARY_KEYS_MISMATCH
+                                key: role
+                          - $pointerGet:
+                              object:
+                                $var: result
+                              path: /before
+                              default: []
+                else:
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $var: mode
+                      - workflow
+                    message: ATTACHMENT_LOCAL_WORKFLOW_REQUIRED
+            - $failIf:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: lowered
+                    key:
+                      $var: hookName
+                message: ATTACHMENT_HOOK_NAME_COLLISION
+            - $set:
+                name: lowered
+                expr:
+                  $objectSet:
+                    object:
+                      $var: lowered
+                    key:
+                      $var: hookName
+                    val:
+                      $var: result
+            - $let:
+                name: recheckIndex
+                expr: 0
+            - $let:
+                name: seenPaths
+                expr: []
+            - $forEach:
+                item: path
+                in:
+                  $var: rechecks
+                do:
+                - $failIf:
+                    cond:
+                      $or:
+                      - $not:
+                          $startsWith:
+                          - $var: path
+                          - /
+                      - $eq:
+                        - $var: path
+                        - /
+                      - $startsWith:
+                        - $var: path
+                        - /sources
+                      - $includes:
+                          list:
+                            $var: seenPaths
+                          val:
+                            $var: path
+                    message: ATTACHMENT_INVALID_RECHECK_PATH
+                - $set:
+                    name: seenPaths
+                    expr:
+                      $listConcat:
+                      - $var: seenPaths
+                      - - $var: path
+                - $let:
+                    name: recheckName
+                    expr:
+                      $concat:
+                      - $var: hookName
+                      - _recheck_
+                      - $text:
+                          $var: recheckIndex
+                - $failIf:
+                    cond:
+                      $hasKey:
+                        object:
+                          $var: lowered
+                        key:
+                          $var: recheckName
+                    message: ATTACHMENT_HOOK_NAME_COLLISION
+                - $set:
+                    name: lowered
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: lowered
+                        key:
+                          $var: recheckName
+                        val:
+                          $merge:
+                          - $pointerSet:
+                              object:
+                                $var: result
+                              path: /event
+                              op: remove
+                          - 'on': change
+                            path:
+                              $var: path
+                - $set:
+                    name: recheckIndex
+                    expr:
+                      $add:
+                      - $var: recheckIndex
+                      - 1
+            key: hookName
+        - $set:
+            name: bindings
+            expr:
+              $objectSet:
+                object:
+                  $var: bindings
+                key:
+                  $var: action
+                val:
+                  $var: lowered
+        key: action
+    - $return:
+        relationship:
+          $choose:
+            cond:
+              $var: cross
+            then: cross-embedded
+            else: one-way
+        bindings:
+          $var: bindings
+        signals:
+          $var: signals
+        parentDependencies:
+          $var: dependencies
+  requireCaller:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: ATTACHMENT_EXACT_REVIEW_REQUIRED
+    - $call:
+        function: requireActive
+        args:
+          channel:
+            $binding: call/channel
+          workflow: true
+    - $return: true
+  origin:
+    args:
+      document: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $var: document
+                path: /contracts/initialized/document
+        message: ATTACHMENT_INITIALIZED_DOCUMENT_REQUIRED
+    - $return:
+        $nodeBlueId:
+          $pointerGet:
+            object:
+              $var: document
+            path: /contracts/initialized/document

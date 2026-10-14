@@ -1,0 +1,93 @@
+name: Admission Consent Functions
+type: Contracts/Compute Definition
+functions:
+  recordConsent:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: item
+        expr:
+          $document:
+            $const: itemPath
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /admissionRef
+          - $const: admissionRef
+        message: ADMISSION_WRONG_CONSENT_SCOPE
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: item
+              path: /admissionRef
+          - $const: admissionRef
+        message: ADMISSION_STALE_CONSENT
+    - $let:
+        name: decision
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /decision
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - approve
+              - decline
+              val:
+                $var: decision
+        message: ADMISSION_INVALID_CONSENT
+    - $let:
+        name: path
+        expr:
+          $concat:
+          - $const: itemPath
+          - /consents/
+          - $const: party
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: path
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $var: path
+              - $var: decision
+            message: ADMISSION_CONSENT_ALREADY_FINAL
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: item
+              path: /status
+          - admission_pending
+        message: ADMISSION_NOT_PENDING
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $var: decision
+    - $appendEvent:
+        $merge:
+        - type: Documents/Document Admission Progress
+        - admissionRef:
+            $const: admissionRef
+          party:
+            $const: party
+          status:
+            $var: decision
+    - $return:
+        outcome: acceptedNew

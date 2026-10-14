@@ -1,0 +1,1934 @@
+name: Preparation Functions
+type: Documents/Admission Functions
+functions:
+  processStatePath:
+    args: {}
+    do:
+    - $return:
+        $concat:
+        - /process_
+        - $const: clauseKey
+  itemPath:
+    args:
+      key:
+        type: Text
+    do:
+    - $return:
+        $concat:
+        - $call:
+            function: processStatePath
+            args: {}
+        - /entries/
+        - $nodeBlueId:
+            $var: key
+  processContext:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: cardinality
+        expr:
+          $document:
+            $concat:
+            - /clauses/
+            - $const: clauseKey
+            - /type/cardinality
+    - $let:
+        name: key
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /key
+            default: single
+    - $failIf:
+        cond:
+          $or:
+          - $not:
+              $isKind:
+                val:
+                  $var: key
+                kind: text
+          - $eq:
+            - $var: key
+            - ''
+        message: PREPARATION_KEY_REQUIRED
+    - $failIf:
+        cond:
+          $and:
+          - $eq:
+            - $var: cardinality
+            - single
+          - $ne:
+            - $var: key
+            - single
+        message: PREPARATION_SINGLETON_KEY
+    - $let:
+        name: destinationBinding
+        expr:
+          $document:
+            $concat:
+            - /clauses/
+            - $const: clauseKey
+            - /type/destinationBinding
+    - $let:
+        name: destination
+        expr:
+          $get:
+            object:
+              $const: bindings
+            key:
+              $var: destinationBinding
+    - $let:
+        name: escapedKey
+        expr:
+          $join:
+            list:
+              $split:
+                text:
+                  $join:
+                    list:
+                      $split:
+                        text:
+                          $var: key
+                        separator: '~'
+                    separator: ~0
+                separator: /
+            separator: ~1
+    - $let:
+        name: path
+        expr:
+          $choose:
+            cond:
+              $eq:
+              - $var: cardinality
+              - single
+            then:
+              $var: destination
+            else:
+              $concat:
+              - $var: destination
+              - /
+              - $var: escapedKey
+    - $let:
+        name: requestId
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default:
+              $var: key
+    - $failIf:
+        cond:
+          $or:
+          - $not:
+              $isKind:
+                val:
+                  $var: requestId
+                kind: text
+          - $eq:
+            - $var: requestId
+            - ''
+        message: PREPARATION_REQUEST_ID_REQUIRED
+    - $let:
+        name: intent
+        expr:
+          fields:
+            $pointerGet:
+              object:
+                $var: input
+              path: /fields
+              default: {}
+          values:
+            $pointerGet:
+              object:
+                $var: input
+              path: /values
+              default: {}
+          requestId:
+            $var: requestId
+          configuration:
+            $nodeBlueId:
+              $call:
+                function: connectionConfiguration
+                args: {}
+          template:
+            $nodeBlueId:
+              $call:
+                function: configuredTemplate
+                args: {}
+    - $return:
+        key:
+          $var: key
+        path:
+          $var: path
+        itemPath:
+          $call:
+            function: itemPath
+            args:
+              key:
+                $var: key
+        requestId:
+          $var: requestId
+        intent:
+          $var: intent
+        outcome: acceptedNew
+  checkPreparation:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $pointerGet:
+                object:
+                  $const: bindings
+                path: /parties
+                default: {}
+          - 0
+        message: PREPARATION_PARTY_MAPPING_REQUIRED
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: processContext
+            args:
+              input:
+                $var: input
+    - $let:
+        name: existing
+        expr:
+          $document:
+            $var:
+              name: context
+              path: /itemPath
+    - $if:
+        cond:
+          $exists:
+            $var: existing
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: existing
+                  path: /intent
+              - $var:
+                  name: context
+                  path: /intent
+            message: PREPARATION_OBLIGATION_CONFLICT
+        - $return:
+            $merge:
+            - $var: context
+            - outcome: duplicate
+    - $failIf:
+        cond:
+          $exists:
+            $document:
+              $var:
+                name: context
+                path: /path
+        message: PREPARATION_DESTINATION_OCCUPIED
+    - $return:
+        $var: context
+  sharedPrepare:
+    args:
+      input: {}
+      checked: {}
+    do:
+    - $let:
+        name: parameters
+        expr:
+          $call:
+            function: configurationParameters
+            args: {}
+    - $let:
+        name: obtain
+        expr:
+          $pointerGet:
+            object:
+              $var: parameters
+            path: /obtain
+            default: create
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - create
+              - provide
+              val:
+                $var: obtain
+        message: PREPARATION_OBTAIN_INVALID
+    - $failIf:
+        cond:
+          $and:
+          - $eq:
+            - $var: obtain
+            - create
+          - $gt:
+            - $size:
+                $pointerGet:
+                  object:
+                    $var: parameters
+                  path: /suppliedParties
+                  default: []
+            - 0
+        message: PREPARATION_CREATE_HAS_UNRESOLVED_PARTIES
+    - $let:
+        name: prepared
+        expr:
+          $call:
+            function: constructDocument
+            args:
+              input:
+                $var: input
+              checked:
+                $var: checked
+    - $set:
+        name: prepared
+        expr:
+          $call:
+            function: configureSources
+            args:
+              prepared:
+                $var: prepared
+              checked:
+                $var: checked
+    - $let:
+        name: domainTerms
+        expr:
+          $call:
+            function: checkedDomainPrepare
+            args:
+              prepared:
+                $var: prepared
+    - $let:
+        name: slots
+        expr:
+          $call:
+            function: specializationSlots
+            args:
+              prepared:
+                $var: prepared
+    - $let:
+        name: requirementRef
+        expr:
+          $nodeBlueId:
+            $var: prepared
+    - $let:
+        name: item
+        expr:
+          $merge:
+          - $var: checked
+          - prepared:
+              $var: prepared
+            requirementRef:
+              $var: requirementRef
+            domainTerms:
+              $var: domainTerms
+            status: awaiting_provider
+            obtain:
+              $var: obtain
+            supplier:
+              $pointerGet:
+                object:
+                  $var: parameters
+                path: /suppliedBy
+                default: ''
+            slots:
+              $var: slots
+    - $if:
+        cond:
+          $eq:
+          - $var: obtain
+          - create
+        then:
+        - $appendChange:
+            op: add
+            path:
+              $var:
+                name: checked
+                path: /path
+            val:
+              $var: prepared
+        - $set:
+            name: item
+            expr:
+              $merge:
+              - $var: item
+              - status: selected
+                documentOrigin:
+                  $var: requirementRef
+    - $appendChange:
+        op: add
+        path:
+          $var:
+            name: checked
+            path: /itemPath
+        val:
+          $var: item
+    - $appendEvent:
+        $merge:
+        - type: Documents/Document Prepared
+        - clauseId:
+            $const: clauseKey
+          itemKey:
+            $var:
+              name: checked
+              path: /key
+          requestId:
+            $var:
+              name: checked
+              path: /requestId
+          requirementRef:
+            $var: requirementRef
+          status:
+            $pointerGet:
+              object:
+                $var: item
+              path: /status
+    - $if:
+        cond:
+          $eq:
+          - $var: obtain
+          - provide
+        then:
+        - $failIf:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: parameters
+                  path: /suppliedBy
+                  default: ''
+              - ''
+            message: PREPARATION_SUPPLIER_REQUIRED
+        - $appendEvent:
+            $merge:
+            - type: Documents/Document Provision Requested
+            - clauseId:
+                $const: clauseKey
+              itemKey:
+                $var:
+                  name: checked
+                  path: /key
+              inResponseTo:
+                $var:
+                  name: checked
+                  path: /requestId
+              requirementRef:
+                $var: requirementRef
+              party:
+                $pointerGet:
+                  object:
+                    $var: parameters
+                  path: /suppliedBy
+    - $return:
+        $merge:
+        - $var: checked
+        - outcome: acceptedNew
+  checkProvision:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: key
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /key
+            default: single
+    - $let:
+        name: itemPath
+        expr:
+          $call:
+            function: itemPath
+            args:
+              key:
+                $var: key
+    - $let:
+        name: item
+        expr:
+          $document:
+            $var: itemPath
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: item
+        message: PREPARATION_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: item
+              path: /obtain
+          - provide
+        message: PREPARATION_PROVISION_NOT_EXPECTED
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $var:
+              name: item
+              path: /supplier
+        message: PREPARATION_WRONG_SUPPLIER
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /inResponseTo
+          - $var:
+              name: item
+              path: /requestId
+        message: PREPARATION_WRONG_REQUEST
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /requirementRef
+          - $var:
+              name: item
+              path: /requirementRef
+        message: PREPARATION_WRONG_REQUIREMENT
+    - $failIf:
+        cond:
+          $includes:
+            list:
+            - reapproval_required
+            - admission_denied
+            - cancelled
+            - cancellation_requested
+            val:
+              $pointerGet:
+                object:
+                  $var: item
+                path: /status
+        message: PREPARATION_SCOPE_NOT_PROVISIONABLE
+    - $let:
+        name: candidate
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /document
+    - $let:
+        name: original
+        expr:
+          $pointerGet:
+            object:
+              $var: candidate
+            path: /contracts/initialized/document
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: original
+        message: PREPARATION_INITIALIZED_DOCUMENT_REQUIRED
+    - $let:
+        name: origin
+        expr:
+          $nodeBlueId:
+            $var: original
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $call:
+                function: normalizeSlots
+                args:
+                  source:
+                    $var: original
+                  slots:
+                    $var:
+                      name: item
+                      path: /slots
+          - $nodeBlueId:
+              $call:
+                function: normalizeSlots
+                args:
+                  source:
+                    $var:
+                      name: item
+                      path: /prepared
+                  slots:
+                    $var:
+                      name: item
+                      path: /slots
+        message: PREPARATION_UNREVIEWED_SOURCE
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $call:
+                function: normalizedClausePolicy
+                args:
+                  policy:
+                    $call:
+                      function: candidateClausePolicy
+                      args:
+                        candidate:
+                          $var: candidate
+                        slots:
+                          $var:
+                            name: item
+                            path: /slots
+          - $nodeBlueId:
+              $call:
+                function: normalizedClausePolicy
+                args:
+                  policy:
+                    $call:
+                      function: candidateClausePolicy
+                      args:
+                        candidate:
+                          $var:
+                            name: item
+                            path: /prepared
+                        slots:
+                          $var:
+                            name: item
+                            path: /slots
+        message: PREPARATION_EFFECTIVE_POLICY_CHANGED
+    - $call:
+        function: validateProviderSlots
+        args:
+          original:
+            $var: original
+          candidate:
+            $var: candidate
+          item:
+            $var: item
+    - $let:
+        name: domainValid
+        expr:
+          $call:
+            function: checkedDomainValidateCandidate
+            args:
+              frozenTerms:
+                $var:
+                  name: item
+                  path: /domainTerms
+              candidate:
+                $var: candidate
+    - $failIf:
+        cond:
+          $ne:
+          - $var: domainValid
+          - true
+        message: PREPARATION_DOMAIN_REJECTED
+    - $if:
+        cond:
+          $exists:
+            $var:
+              name: item
+              path: /documentOrigin
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: item
+                  path: /documentOrigin
+              - $var: origin
+            message: PREPARATION_REPLACEMENT_FORBIDDEN
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $eq:
+          - $var:
+              name: item
+              path: /status
+          - cancellation_requested
+        message: PREPARATION_CANCELLATION_RECONCILIATION_REQUIRED
+    - $let:
+        name: checked
+        expr:
+          outcome: acceptedNew
+          item:
+            $var: item
+          itemPath:
+            $var: itemPath
+          candidate:
+            $var: candidate
+          origin:
+            $var: origin
+    - $let:
+        name: staged
+        expr:
+          $call:
+            function: candidateStage
+            args:
+              checked:
+                $var: checked
+    - $if:
+        cond:
+          $eq:
+          - $nodeBlueId:
+              $var: staged
+          - $nodeBlueId:
+              $var: item
+        then:
+        - $return:
+            outcome: duplicate
+    - $return:
+        $merge:
+        - $var: checked
+        - staged:
+            $var: staged
+  sharedProvide:
+    args:
+      checked: {}
+    do:
+    - $let:
+        name: staged
+        expr:
+          $var:
+            name: checked
+            path: /staged
+    - $if:
+        cond:
+          $ne:
+          - $var:
+              name: staged
+              path: /status
+          - ready
+        then:
+        - $if:
+            cond:
+              $eq:
+              - $nodeBlueId:
+                  $var: staged
+              - $nodeBlueId:
+                  $var:
+                    name: checked
+                    path: /item
+            then:
+            - $return:
+                outcome: duplicate
+        - $appendChange:
+            op: add
+            path:
+              $var:
+                name: checked
+                path: /itemPath
+            val:
+              $var: staged
+        - $call:
+            function: installAdmissionConsentOperations
+            args:
+              item:
+                $var: staged
+        - $appendEvent:
+            $merge:
+            - type: Documents/Document Admission Progress
+            - clauseId:
+                $const: clauseKey
+              itemKey:
+                $var:
+                  name: staged
+                  path: /key
+              status:
+                $var:
+                  name: staged
+                  path: /status
+        - $return:
+            outcome: acceptedNew
+            status:
+              $var:
+                name: staged
+                path: /status
+    - $let:
+        name: item
+        expr:
+          $var:
+            name: checked
+            path: /staged
+    - $appendChange:
+        op: add
+        path:
+          $var:
+            name: checked
+            path: /itemPath
+        val:
+          $merge:
+          - $var: item
+          - status: selected
+            documentOrigin:
+              $var:
+                name: checked
+                path: /origin
+    - $appendChange:
+        op: add
+        path:
+          $var:
+            name: item
+            path: /path
+        val:
+          $objectFromEntries:
+          - key: blueId
+            val:
+              $nodeBlueId:
+                $var:
+                  name: checked
+                  path: /candidate
+    - $appendEvent:
+        $merge:
+        - type: Documents/Document Selected
+        - clauseId:
+            $const: clauseKey
+          itemKey:
+            $var:
+              name: item
+              path: /key
+          inResponseTo:
+            $var:
+              name: item
+              path: /requestId
+          documentOrigin:
+            $var:
+              name: checked
+              path: /origin
+    - $return:
+        outcome: acceptedNew
+  sharedRefresh:
+    args: {}
+    do:
+    - $forEach:
+        item: item
+        in:
+          $pointerGet:
+            object:
+              $document:
+                $call:
+                  function: processStatePath
+                  args: {}
+            path: /entries
+            default: {}
+        do:
+        - $if:
+            cond:
+              $exists:
+                $var:
+                  name: item
+                  path: /documentOrigin
+            then:
+            - $let:
+                name: selected
+                expr:
+                  $document:
+                    $var:
+                      name: item
+                      path: /path
+            - $if:
+                cond:
+                  $exists:
+                    $pointerGet:
+                      object:
+                        $var: selected
+                      path: /contracts/initialized/document
+                then:
+                - $let:
+                    name: origin
+                    expr:
+                      $nodeBlueId:
+                        $pointerGet:
+                          object:
+                            $var: selected
+                          path: /contracts/initialized/document
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $var: origin
+                      - $var:
+                          name: item
+                          path: /documentOrigin
+                    message: PREPARATION_SELECTED_IDENTITY_CHANGED
+                - $let:
+                    name: ready
+                    expr:
+                      $and:
+                      - $eq:
+                        - $pointerGet:
+                            object:
+                              $var: selected
+                            path: /activation/active
+                        - true
+                      - $call:
+                          function: namedSourcesReady
+                          args:
+                            document:
+                              $var: selected
+                - $let:
+                    name: status
+                    expr:
+                      $choose:
+                        cond:
+                          $var: ready
+                        then: usable
+                        else: selected
+                - $if:
+                    cond:
+                      $ne:
+                      - $var:
+                          name: item
+                          path: /status
+                      - $var: status
+                    then:
+                    - $appendChange:
+                        op: add
+                        path:
+                          $var:
+                            name: item
+                            path: /itemPath
+                        val:
+                          $merge:
+                          - $var: item
+                          - status:
+                              $var: status
+                    - $if:
+                        cond:
+                          $var: ready
+                        then:
+                        - $appendEvent:
+                            $merge:
+                            - type: Documents/Document Attached
+                            - clauseId:
+                                $const: clauseKey
+                              itemKey:
+                                $var:
+                                  name: item
+                                  path: /key
+                              inResponseTo:
+                                $var:
+                                  name: item
+                                  path: /requestId
+                              documentOrigin:
+                                $var: origin
+                - $let:
+                    name: actions
+                    expr:
+                      $choose:
+                        cond:
+                          $var: ready
+                        then:
+                          $call:
+                            function: checkedDomainNextActions
+                            args:
+                              documentRef:
+                                path:
+                                  $var:
+                                    name: item
+                                    path: /path
+                                documentOrigin:
+                                  $var: origin
+                        else: []
+                - $if:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: item
+                          path: /nextActions
+                          default: []
+                      - $var: actions
+                    then:
+                    - $appendChange:
+                        op: add
+                        path:
+                          $concat:
+                          - $var:
+                              name: item
+                              path: /itemPath
+                          - /nextActions
+                        val:
+                          $var: actions
+                    - $forEach:
+                        item: actionDescription
+                        in:
+                          $var: actions
+                        do:
+                        - $failIf:
+                            cond:
+                              $not:
+                                $hasKey:
+                                  object:
+                                    $pointerGet:
+                                      object:
+                                        $var: selected
+                                      path: /activation/parties
+                                  key:
+                                    $pointerGet:
+                                      object:
+                                        $var: actionDescription
+                                      path: /party
+                            message: PREPARATION_ACTION_PARTY_NOT_DECLARED
+                        - $appendEvent:
+                            $merge:
+                            - $var: actionDescription
+                            - clauseId:
+                                $const: clauseKey
+                              itemKey:
+                                $var:
+                                  name: item
+                                  path: /key
+                              inResponseTo:
+                                $var:
+                                  name: item
+                                  path: /requestId
+                              documentOrigin:
+                                $var: origin
+        key: itemId
+    - $return:
+        outcome: acceptedNew
+  sharedCancel:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: path
+        expr:
+          $call:
+            function: itemPath
+            args:
+              key:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /key
+                  default: single
+    - $let:
+        name: item
+        expr:
+          $document:
+            $var: path
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: item
+        message: PREPARATION_REQUIRED
+    - $failIf:
+        cond:
+          $exists:
+            $var:
+              name: item
+              path: /documentOrigin
+        message: PREPARATION_SELECTED_PROCESS_REQUIRES_DOMAIN_CANCELLATION
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: item
+              path: /status
+          - cancellation_requested
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $merge:
+          - $var: item
+          - status: cancellation_requested
+    - $appendEvent:
+        $merge:
+        - type: Documents/Preparation Cancellation Requested
+        - clauseId:
+            $const: clauseKey
+          itemKey:
+            $var:
+              name: item
+              path: /key
+          inResponseTo:
+            $var:
+              name: item
+              path: /requestId
+    - $return:
+        outcome: acceptedNew
+  domainPrepare:
+    args:
+      prepared: {}
+  domainValidateCandidate:
+    args:
+      frozenTerms: {}
+      candidate: {}
+  domainNextActions:
+    args:
+      documentRef: {}
+  checkedDomainPrepare:
+    args:
+      prepared: {}
+    do:
+    - $let:
+        name: priorChanges
+        expr:
+          $size:
+            $changeset: {}
+    - $let:
+        name: priorEvents
+        expr:
+          $size:
+            $events: {}
+    - $let:
+        name: answer
+        expr:
+          $call:
+            function: domainPrepare
+            args:
+              prepared:
+                $var: prepared
+    - $failIf:
+        cond:
+          $or:
+          - $ne:
+            - $var: priorChanges
+            - $size:
+                $changeset: {}
+          - $ne:
+            - $var: priorEvents
+            - $size:
+                $events: {}
+        message: PREPARATION_DOMAIN_HOOK_MUST_BE_PURE
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: answer
+              kind: object
+        message: PREPARATION_DOMAIN_RESULT_INVALID
+    - $return:
+        $var: answer
+  checkedDomainValidateCandidate:
+    args:
+      frozenTerms: {}
+      candidate: {}
+    do:
+    - $let:
+        name: priorChanges
+        expr:
+          $size:
+            $changeset: {}
+    - $let:
+        name: priorEvents
+        expr:
+          $size:
+            $events: {}
+    - $let:
+        name: answer
+        expr:
+          $call:
+            function: domainValidateCandidate
+            args:
+              frozenTerms:
+                $var: frozenTerms
+              candidate:
+                $var: candidate
+    - $failIf:
+        cond:
+          $or:
+          - $ne:
+            - $var: priorChanges
+            - $size:
+                $changeset: {}
+          - $ne:
+            - $var: priorEvents
+            - $size:
+                $events: {}
+        message: PREPARATION_DOMAIN_HOOK_MUST_BE_PURE
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: answer
+              kind: boolean
+        message: PREPARATION_DOMAIN_RESULT_INVALID
+    - $return:
+        $var: answer
+  checkedDomainNextActions:
+    args:
+      documentRef: {}
+    do:
+    - $let:
+        name: priorChanges
+        expr:
+          $size:
+            $changeset: {}
+    - $let:
+        name: priorEvents
+        expr:
+          $size:
+            $events: {}
+    - $let:
+        name: answer
+        expr:
+          $call:
+            function: domainNextActions
+            args:
+              documentRef:
+                $var: documentRef
+    - $failIf:
+        cond:
+          $or:
+          - $ne:
+            - $var: priorChanges
+            - $size:
+                $changeset: {}
+          - $ne:
+            - $var: priorEvents
+            - $size:
+                $events: {}
+        message: PREPARATION_DOMAIN_HOOK_MUST_BE_PURE
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: answer
+              kind: list
+        message: PREPARATION_DOMAIN_RESULT_INVALID
+    - $failIf:
+        cond:
+          $gt:
+          - $size:
+              $var: answer
+          - 16
+        message: PREPARATION_TOO_MANY_NEXT_ACTIONS
+    - $forEach:
+        item: actionDescription
+        in:
+          $var: answer
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $is:
+                  node:
+                    $var: actionDescription
+                  pattern:
+                    type: Documents/Clause Response
+            message: PREPARATION_ACTION_DESCRIPTION_INVALID
+    - $return:
+        $var: answer
+  normalizedClausePolicy:
+    args:
+      policy: {}
+    do:
+    - $let:
+        name: normalized
+        expr: {}
+    - $forEach:
+        item: clause
+        key: clauseName
+        in:
+          $var: policy
+        do:
+        - $let:
+            name: entry
+            expr:
+              $objectSet:
+                object:
+                  parameters:
+                    $pointerGet:
+                      object:
+                        $var: clause
+                      path: /parameters
+                      default: {}
+                  bindings:
+                    $pointerGet:
+                      object:
+                        $var: clause
+                      path: /bindings
+                      default: {}
+                key: type
+                val:
+                  $pointerGet:
+                    object:
+                      $var: clause
+                    path: /type
+        - $forEach:
+            item: label
+            in:
+            - name
+            - description
+            do:
+            - $if:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: clause
+                    key:
+                      $var: label
+                then:
+                - $set:
+                    name: entry
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: entry
+                        key:
+                          $var: label
+                        val:
+                          $get:
+                            object:
+                              $var: clause
+                            key:
+                              $var: label
+        - $set:
+            name: normalized
+            expr:
+              $objectSet:
+                object:
+                  $var: normalized
+                key:
+                  $var: clauseName
+                val:
+                  $var: entry
+    - $return:
+        $var: normalized
+  slotWitness:
+    args:
+      candidate: {}
+      slot: {}
+    do:
+    - $let:
+        name: declaration
+        expr:
+          $call:
+            function: configuredConstraint
+            args:
+              slot:
+                $var: slot
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /datum
+        message: PREPARATION_SLOT_UNFILLED
+    - $let:
+        name: witness
+        expr:
+          $choose:
+            cond:
+              $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /datum
+                kind: object
+            then:
+              $objectSet:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /datum
+                key: type
+                val:
+                  $var: declaration
+            else:
+              $objectFromEntries:
+              - key: type
+                val:
+                  $var: declaration
+              - key: value
+                val:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /datum
+    - $let:
+        name: validated
+        expr:
+          $nodeBlueId:
+            $var: witness
+    - $return: true
+  specializationSlots:
+    args:
+      prepared: {}
+    do:
+    - $let:
+        name: parameters
+        expr:
+          $call:
+            function: configurationParameters
+            args: {}
+    - $let:
+        name: slots
+        expr: []
+    - $forEach:
+        item: declaration
+        in:
+          $pointerGet:
+            object:
+              $call:
+                function: configuredTemplate
+                args: {}
+            path: /clauses/activation/parameters/parties
+        do:
+        - $set:
+            name: slots
+            expr:
+              $listConcat:
+              - $var: slots
+              - - path:
+                    $concat:
+                    - /clauses/activation/parameters/parties/
+                    - $var: role
+                  role:
+                    $var: role
+                  kind: party
+                  declaration:
+                    $var: declaration
+                  supplied:
+                    $includes:
+                      list:
+                        $pointerGet:
+                          object:
+                            $var: parameters
+                          path: /suppliedParties
+                          default: []
+                      val:
+                        $var: role
+                  primary:
+                    $pointerGet:
+                      object:
+                        $var: prepared
+                      path:
+                        $concat:
+                        - /clauses/activation/parameters/parties/
+                        - $var: role
+        key: role
+    - $forEach:
+        item: path
+        in:
+          $pointerGet:
+            object:
+              $var: parameters
+            path: /specialization/dataPaths
+            default: []
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: path
+                  kind: text
+            message: PREPARATION_DATA_PATH_REQUIRED
+        - $let:
+            name: segments
+            expr:
+              $split:
+                text:
+                  $var: path
+                separator: /
+        - $failIf:
+            cond:
+              $or:
+              - $ne:
+                - $listGet:
+                    list:
+                      $var: segments
+                    index: 0
+                - ''
+              - $includes:
+                  list:
+                  - ''
+                  - clauses
+                  - contracts
+                  - activation
+                  - clauseRuntime
+                  - sources
+                  - type
+                  - blueId
+                  - instanceKey
+                  - creationIntent
+                  - preparationContext
+                  val:
+                    $listGet:
+                      list:
+                        $var: segments
+                      index: 1
+                      default: ''
+            message: PREPARATION_RESERVED_DATA_PATH
+        - $let:
+            name: declaration
+            expr:
+              $pointerGet:
+                object:
+                  $var: prepared
+                path:
+                  $var: path
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $var: declaration
+            message: PREPARATION_DATA_SLOT_REQUIRED
+        - $forEach:
+            item: prior
+            in:
+              $var: slots
+            do:
+            - $failIf:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var: path
+                    - $var:
+                        name: prior
+                        path: /path
+                  - $startsWith:
+                    - $var: path
+                    - $concat:
+                      - $var:
+                          name: prior
+                          path: /path
+                      - /
+                  - $startsWith:
+                    - $var:
+                        name: prior
+                        path: /path
+                    - $concat:
+                      - $var: path
+                      - /
+                message: PREPARATION_OVERLAPPING_DATA_PATHS
+        - $set:
+            name: slots
+            expr:
+              $listConcat:
+              - $var: slots
+              - - path:
+                    $var: path
+                  kind: data
+                  declaration:
+                    $var: declaration
+    - $return:
+        $var: slots
+  normalizeSlots:
+    args:
+      source: {}
+      slots: []
+    do:
+    - $let:
+        name: normalized
+        expr:
+          $var: source
+    - $let:
+        name: transportContracts
+        expr:
+          $pointerGet:
+            object:
+              $var: source
+            path: /contracts
+            default: {}
+    - $forEach:
+        item: slot
+        in:
+          $var: slots
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: slot
+                  path: /kind
+              - party
+            then:
+            - $let:
+                name: role
+                expr:
+                  $var:
+                    name: slot
+                    path: /role
+            - $let:
+                name: transport
+                expr:
+                  $get:
+                    object:
+                      $var: transportContracts
+                    key:
+                      $var: role
+            - $if:
+                cond:
+                  $exists:
+                    $var: transport
+                then:
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $var: transport
+                      - $pointerGet:
+                          object:
+                            $var: source
+                          path:
+                            $concat:
+                            - $var:
+                                name: slot
+                                path: /path
+                            - /lead/channel
+                    message: PREPARATION_PARTY_CHANNEL_MISMATCH
+            - $set:
+                name: transportContracts
+                expr:
+                  $objectFromEntries:
+                    $filter:
+                      in:
+                        $entries:
+                          $var: transportContracts
+                      item: entry
+                      where:
+                        $ne:
+                        - $var:
+                            name: entry
+                            path: /key
+                        - $var: role
+        - $set:
+            name: normalized
+            expr:
+              $pointerSet:
+                object:
+                  $var: normalized
+                path:
+                  $var:
+                    name: slot
+                    path: /path
+                val:
+                  $call:
+                    function: configuredConstraint
+                    args:
+                      slot:
+                        $var: slot
+    - $return:
+        $objectSet:
+          object:
+            $var: normalized
+          key: contracts
+          val:
+            $var: transportContracts
+  candidateClausePolicy:
+    args:
+      candidate: {}
+      slots: []
+    do:
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $var: candidate
+            path: /clauses
+    - $forEach:
+        item: slot
+        in:
+          $var: slots
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: slot
+                  path: /kind
+              - party
+            then:
+            - $set:
+                name: policy
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: policy
+                    path:
+                      $concat:
+                      - /activation/parameters/parties/
+                      - $var:
+                          name: slot
+                          path: /role
+                    val:
+                      $call:
+                        function: configuredConstraint
+                        args:
+                          slot:
+                            $var: slot
+    - $return:
+        $var: policy
+  validateProviderSlots:
+    args:
+      original: {}
+      candidate: {}
+      item: {}
+    do:
+    - $let:
+        name: roles
+        expr: 0
+    - $forEach:
+        item: slot
+        in:
+          $var:
+            name: item
+            path: /slots
+        do:
+        - $let:
+            name: originalValue
+            expr:
+              $pointerGet:
+                object:
+                  $var: original
+                path:
+                  $var:
+                    name: slot
+                    path: /path
+        - $call:
+            function: slotWitness
+            args:
+              candidate:
+                datum:
+                  $var: originalValue
+              slot:
+                $var: slot
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: slot
+                  path: /kind
+              - party
+            then:
+            - $set:
+                name: roles
+                expr:
+                  $add:
+                  - $var: roles
+                  - 1
+            - $let:
+                name: currentParty
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path:
+                      $concat:
+                      - /activation/parties/
+                      - $var:
+                          name: slot
+                          path: /role
+            - $call:
+                function: slotWitness
+                args:
+                  candidate:
+                    datum:
+                      $var: currentParty
+                  slot:
+                    $var: slot
+            - $call:
+                function: requireSameMainParty
+                args:
+                  left:
+                    $var: originalValue
+                  right:
+                    $var: currentParty
+            - $if:
+                cond:
+                  $not:
+                    $var:
+                      name: slot
+                      path: /supplied
+                then:
+                - $call:
+                    function: requireSameMainParty
+                    args:
+                      left:
+                        $var:
+                          name: slot
+                          path: /primary
+                      right:
+                        $var: originalValue
+            else:
+            - $let:
+                name: currentValue
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path:
+                      $var:
+                        name: slot
+                        path: /path
+            - $call:
+                function: slotWitness
+                args:
+                  candidate:
+                    datum:
+                      $var: currentValue
+                  slot:
+                    $var: slot
+            - $failIf:
+                cond:
+                  $ne:
+                  - $nodeBlueId:
+                      $var: currentValue
+                  - $nodeBlueId:
+                      $var: originalValue
+                message: PREPARATION_PROVIDER_DATA_CHANGED
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /activation/parties
+          - $var: roles
+        message: PREPARATION_UNDECLARED_PARTY
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/required
+              default: []
+          - $pointerGet:
+              object:
+                $var: item
+              path: /prepared/clauses/activation/parameters/required
+              default: []
+        message: PREPARATION_APPROVAL_POLICY_CHANGED
+    - $return: true
+  configuredConstraint:
+    args:
+      slot: {}
+    do:
+    - $return:
+        $pointerGet:
+          object:
+            $call:
+              function: configuredTemplate
+              args: {}
+          path:
+            $var:
+              name: slot
+              path: /path
+  checkCandidateSources:
+    args:
+      candidate: {}
+    do:
+    - $forEach:
+        item: requirement
+        in:
+          $pointerGet:
+            object:
+              $var: candidate
+            path: /clauses/documentSources/parameters/requirements
+            default: {}
+        do:
+        - $let:
+            name: source
+            expr:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path:
+                  $concat:
+                  - /sources/
+                  - $var: alias
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: source
+                    path: /contracts/initialized
+            message: PREPARATION_SOURCE_NOT_LINKED
+        - $failIf:
+            cond:
+              $ne:
+              - $call:
+                  function: processOrigin
+                  args:
+                    document:
+                      $var: source
+              - $var:
+                  name: requirement
+                  path: /origin
+            message: SOURCE_IDENTITY_MISMATCH
+        - $call:
+            function: requireRosterCoverage
+            args:
+              required:
+                $pointerGet:
+                  object:
+                    $var: candidate
+                  path: /activation/parties
+              available:
+                $pointerGet:
+                  object:
+                    $var: source
+                  path: /activation/parties
+        key: alias
+    - $return: true
+  checkCancellation:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: path
+        expr:
+          $call:
+            function: itemPath
+            args:
+              key:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /key
+                  default: single
+    - $let:
+        name: item
+        expr:
+          $document:
+            $var: path
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: item
+        message: PREPARATION_REQUIRED
+    - $failIf:
+        cond:
+          $exists:
+            $var:
+              name: item
+              path: /documentOrigin
+        message: PREPARATION_SELECTED_PROCESS_REQUIRES_DOMAIN_CANCELLATION
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: item
+              path: /status
+          - cancellation_requested
+        then:
+        - $return:
+            outcome: duplicate
+    - $return:
+        outcome: acceptedNew

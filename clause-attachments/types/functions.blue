@@ -1,0 +1,985 @@
+name: Attachment Functions
+type: Attachments/Attachment Rules
+functions:
+  requireInvocation:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $const: automatic
+        then:
+        - $call:
+            function: requireCaller
+            args: {}
+        else:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /activation/active
+              - true
+            message: ATTACHMENT_PARENT_INACTIVE
+    - $return: true
+  prepare:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: requireInvocation
+        args: {}
+    - $let:
+        name: spec
+        expr:
+          $merge:
+          - authority: guarantor
+            payer: customer
+            payee: seller
+            hooks: {}
+          - $document:
+              $concat:
+              - /clauses/
+              - $const: key
+              - /parameters
+    - $let:
+        name: roster
+        expr:
+          $document: /activation/parties
+    - $let:
+        name: authority
+        expr:
+          $var:
+            name: spec
+            path: /authority
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: input
+            key: authorityParty
+        then:
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: roster
+                key:
+                  $var: authority
+            then:
+            - $call:
+                function: samePrimary
+                args:
+                  left:
+                    $get:
+                      object:
+                        $var: roster
+                      key:
+                        $var: authority
+                  right:
+                    $var:
+                      name: input
+                      path: /authorityParty
+        - $set:
+            name: roster
+            expr:
+              $objectSet:
+                object:
+                  $var: roster
+                key:
+                  $var: authority
+                val:
+                  $var:
+                    name: input
+                    path: /authorityParty
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var: roster
+              key:
+                $var: authority
+        message: ATTACHMENT_AUTHORITY_PROFILE_REQUIRED
+    - $call:
+        function: checkRoster
+        args:
+          parent:
+            $var: roster
+          child:
+            $var: roster
+          authority:
+            $var: authority
+          cross: false
+    - $let:
+        name: compiled
+        expr:
+          $call:
+            function: compileHooks
+            args:
+              hooks:
+                $var:
+                  name: spec
+                  path: /hooks
+              allowed:
+                $const: allowed
+              key:
+                $const: key
+    - $let:
+        name: parentInitialized
+        expr:
+          $exists:
+            $document: /contracts/initialized/document
+    - $failIf:
+        cond:
+          $and:
+          - $not:
+              $var: parentInitialized
+          - $eq:
+            - $var:
+                name: compiled
+                path: /relationship
+            - cross-embedded
+        message: ATTACHMENT_CROSS_REQUIRES_INITIALIZED_PARENT
+    - $let:
+        name: requestIdentity
+        expr:
+          $choose:
+            cond:
+              $var: parentInitialized
+            then:
+              $call:
+                function: origin
+                args:
+                  document:
+                    $document: ''
+            else:
+              $nodeBlueId:
+                $document: ''
+    - $let:
+        name: policy
+        expr:
+          parentOrigin:
+            $choose:
+              cond:
+                $var: parentInitialized
+              then:
+                $var: requestIdentity
+              else: ''
+          attachment:
+            $const: key
+          authority:
+            $var: authority
+          relationship:
+            $var:
+              name: compiled
+              path: /relationship
+          linkBy:
+            $const: actor
+          kind:
+            $const: kind
+          instructionPath:
+            $const: instructionPath
+    - $let:
+        name: template
+        expr:
+          $var:
+            name: spec
+            path: /template
+    - $let:
+        name: values
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /values
+            default: {}
+    - $forEach:
+        item: fieldValue
+        in:
+          $var: values
+        do:
+        - $let:
+            name: fieldPath
+            expr:
+              $get:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: spec
+                    path: /fieldPaths
+                    default: {}
+                key:
+                  $var: field
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $var: fieldPath
+            message: PREPARATION_UNKNOWN_FIELD
+        - $failIf:
+            cond:
+              $not:
+                $or:
+                - $startsWith:
+                  - $var: fieldPath
+                  - /paymentTerms/
+                - $startsWith:
+                  - $var: fieldPath
+                  - /destination/
+                - $startsWith:
+                  - $var: fieldPath
+                  - /terms/
+            message: PREPARATION_UNSAFE_FIELD_PATH
+        - $set:
+            name: template
+            expr:
+              $pointerSet:
+                object:
+                  $var: template
+                path:
+                  $var: fieldPath
+                val:
+                  $var: fieldValue
+        key: field
+    - $set:
+        name: template
+        expr:
+          $pointerSet:
+            object:
+              $var: template
+            path: /instanceKey
+            val:
+              $concat:
+              - $var: requestIdentity
+              - ':'
+              - $const: key
+    - $set:
+        name: template
+        expr:
+          $pointerSet:
+            object:
+              $var: template
+            path: /clauses/activation
+            val:
+              $merge:
+              - type: Activation/Activation Clause
+              - parameters:
+                  parties:
+                    $var: roster
+                  required: []
+                  frozen: true
+                  accessPaths:
+                    $document: /activation/accessPaths
+    - $let:
+        name: accessDocuments
+        expr: {}
+    - $let:
+        name: childAccessPaths
+        expr: []
+    - $let:
+        name: accessIndex
+        expr: 0
+    - $forEach:
+        item: accessPath
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /accessPaths
+            default: []
+        do:
+        - $let:
+            name: accessKey
+            expr:
+              $text:
+                $var: accessIndex
+        - $set:
+            name: accessDocuments
+            expr:
+              $objectSet:
+                object:
+                  $var: accessDocuments
+                key:
+                  $var: accessKey
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: accessPath
+        - $set:
+            name: childAccessPaths
+            expr:
+              $listConcat:
+              - $var: childAccessPaths
+              - - $concat:
+                  - /attachmentAccess/
+                  - $var: accessKey
+        - $set:
+            name: accessIndex
+            expr:
+              $add:
+              - $var: accessIndex
+              - 1
+    - $set:
+        name: template
+        expr:
+          $pointerSet:
+            object:
+              $var: template
+            path: /attachmentAccess
+            val:
+              $var: accessDocuments
+    - $set:
+        name: template
+        expr:
+          $pointerSet:
+            object:
+              $var: template
+            path: /clauses/activation/parameters/accessPaths
+            val:
+              $var: childAccessPaths
+    - $set:
+        name: template
+        expr:
+          $pointerSet:
+            object:
+              $var: template
+            path: /contracts
+            val:
+              $merge:
+              - $pointerGet:
+                  object:
+                    $var: template
+                  path: /contracts
+                  default: {}
+              - $call:
+                  function: transports
+                  args:
+                    roster:
+                      $var: roster
+    - $set:
+        name: template
+        expr:
+          $pointerSet:
+            object:
+              $var: template
+            path: /clauses/attachment
+            val:
+              $merge:
+              - type: Attachments/Attachment Endpoint
+              - parameters:
+                  $var: policy
+    - $if:
+        cond:
+          $ne:
+          - $const: kind
+          - document
+        then:
+        - $set:
+            name: template
+            expr:
+              $pointerSet:
+                object:
+                  $var: template
+                path: /clauses/hooks
+                val:
+                  $merge:
+                  - $objectSet:
+                      object: {}
+                      key: type
+                      val:
+                        $objectSet:
+                          object: {}
+                          key: blueId
+                          val:
+                            $const: requestType
+                  - bindings:
+                      $var:
+                        name: compiled
+                        path: /bindings
+    - $let:
+        name: primaryParties
+        expr: {}
+    - $forEach:
+        item: party
+        in:
+          $var: roster
+        do:
+        - $set:
+            name: primaryParties
+            expr:
+              $objectSet:
+                object:
+                  $var: primaryParties
+                key:
+                  $var: role
+                val:
+                  channelBlueId:
+                    $nodeBlueId:
+                      $var:
+                        name: party
+                        path: /lead/channel
+                  readerKeys:
+                    $var:
+                      name: party
+                      path: /readerKeys
+        key: role
+    - $let:
+        name: request
+        expr:
+          policy:
+            $var: policy
+          document:
+            $var: template
+          documentBlueId:
+            $nodeBlueId:
+              $var: template
+          signals:
+            $var:
+              name: compiled
+              path: /signals
+          requirements:
+            relationship:
+              $var:
+                name: compiled
+                path: /relationship
+            attachBy:
+              $const: actor
+            instructionType:
+              $const: instructionType
+            authority:
+              role:
+                $var: authority
+              mustJoinParent:
+                $eq:
+                - $var:
+                    name: compiled
+                    path: /relationship
+                - cross-embedded
+            parties:
+              $var: primaryParties
+            terms:
+              $pointerGet:
+                object:
+                  $var: template
+                path:
+                  $const: termsPath
+            parentDependencies:
+              $var:
+                name: compiled
+                path: /parentDependencies
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $const: requestPath
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $const: requestPath
+              - $var: request
+            message: ATTACHMENT_REQUEST_ALREADY_PREPARED
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path:
+          $const: requestPath
+        val:
+          $var: request
+    - $return:
+        outcome: acceptedNew
+  normalizeSource:
+    args:
+      source: {}
+    do:
+    - $let:
+        name: normalized
+        expr:
+          $pointerSet:
+            object:
+              $var: source
+            path: /clauses/activation/parameters/parties
+            val: {}
+    - $let:
+        name: normalizedContracts
+        expr:
+          $pointerGet:
+            object:
+              $var: source
+            path: /contracts
+            default: {}
+    - $forEach:
+        item: channel
+        in:
+          $keys:
+            $call:
+              function: transports
+              args:
+                roster:
+                  $pointerGet:
+                    object:
+                      $var: source
+                    path: /clauses/activation/parameters/parties
+        do:
+        - $set:
+            name: normalizedContracts
+            expr:
+              $pointerSet:
+                object:
+                  $var: normalizedContracts
+                path:
+                  $concat:
+                  - /
+                  - $var: channel
+                op: remove
+    - $return:
+        $pointerSet:
+          object:
+            $var: normalized
+          path: /contracts
+          val:
+            $var: normalizedContracts
+  checkCandidate:
+    args:
+      candidate: {}
+    do:
+    - $let:
+        name: request
+        expr:
+          $document:
+            $const: requestPath
+    - $let:
+        name: origin
+        expr:
+          $call:
+            function: checkPreparedCandidate
+            args:
+              candidate:
+                $var: candidate
+    - $call:
+        function: checkRoster
+        args:
+          parent:
+            $document: /activation/parties
+          child:
+            $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/parties
+          authority:
+            $document:
+              $concat:
+              - /clauses/
+              - $const: key
+              - /parameters/authority
+          cross:
+            $eq:
+            - $var:
+                name: request
+                path: /policy/relationship
+            - cross-embedded
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: request
+              path: /policy/relationship
+          - cross-embedded
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: candidate
+                  path: /attachmentLink/parentOrigin
+              - $call:
+                  function: origin
+                  args:
+                    document:
+                      $document: ''
+            message: ATTACHMENT_PARENT_LINK_REQUIRED
+        - $call:
+            function: checkRoster
+            args:
+              parent:
+                $document: /activation/parties
+              child:
+                $pointerGet:
+                  object:
+                    $var: candidate
+                  path: /sources/parent/activation/parties
+              authority:
+                $document:
+                  $concat:
+                  - /clauses/
+                  - $const: key
+                  - /parameters/authority
+              cross: true
+    - $return:
+        $var: origin
+  signal:
+    args: {}
+    do:
+    - $forEach:
+        item: signal
+        in:
+          $pointerGet:
+            object:
+              $document:
+                $const: requestPath
+            path: /signals
+            default: []
+        do:
+        - $appendEvent:
+            $merge:
+            - type: Attachments/Source Changed
+            - attachment:
+                $const: key
+              hook:
+                $var:
+                  name: signal
+                  path: /id
+    - $return: true
+  requireReady:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $concat:
+              - /clauses/
+              - $const: key
+              - /parameters/attachWhen
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $document:
+                    $concat:
+                    - /clauses/
+                    - $const: key
+                    - /parameters/attachWhen/path
+              - $document:
+                  $concat:
+                  - /clauses/
+                  - $const: key
+                  - /parameters/attachWhen/equals
+            message: ATTACHMENT_NOT_READY
+    - $return: true
+  attach:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: requireInvocation
+        args: {}
+    - $call:
+        function: requireReady
+        args: {}
+    - $let:
+        name: candidate
+        expr:
+          $var:
+            name: input
+            path: /document
+    - $let:
+        name: origin
+        expr:
+          $call:
+            function: checkCandidate
+            args:
+              candidate:
+                $var: candidate
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $const: instructionPath
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $call:
+                  function: origin
+                  args:
+                    document:
+                      $document:
+                        $const: instructionPath
+              - $var: origin
+            message: ATTACHMENT_REPLACEMENT_FORBIDDEN
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path:
+          $const: instructionPath
+        val:
+          $objectSet:
+            object: {}
+            key: blueId
+            val:
+              $nodeBlueId:
+                $var: candidate
+    - $appendChange:
+        op: add
+        path:
+          $const: statePath
+        val:
+          status: attached
+          documentOrigin:
+            $var: origin
+    - $call:
+        function: signal
+        args: {}
+    - $return:
+        outcome: acceptedNew
+  create:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: requireInvocation
+        args: {}
+    - $call:
+        function: requireReady
+        args: {}
+    - $failIf:
+        cond:
+          $not:
+            $const: allowCreate
+        message: ATTACHMENT_EXTERNAL_INSTRUCTION_REQUIRED
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $const: instructionPath
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $const: requestPath
+        message: ATTACHMENT_PREPARE_FIRST
+    - $let:
+        name: request
+        expr:
+          $document:
+            $const: requestPath
+    - $let:
+        name: child
+        expr:
+          $var:
+            name: request
+            path: /document
+    - $call:
+        function: checkRoster
+        args:
+          parent:
+            $document: /activation/parties
+          child:
+            $var:
+              name: child
+              path: /clauses/activation/parameters/parties
+          authority:
+            $document:
+              $concat:
+              - /clauses/
+              - $const: key
+              - /parameters/authority
+          cross:
+            $eq:
+            - $var:
+                name: request
+                path: /policy/relationship
+            - cross-embedded
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: request
+              path: /policy/relationship
+          - cross-embedded
+        then:
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path: /sources/parent
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $binding: call/document
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path: /attachmentLink
+                val:
+                  parentOrigin:
+                    $var:
+                      name: request
+                      path: /policy/parentOrigin
+    - $appendChange:
+        op: add
+        path:
+          $const: instructionPath
+        val:
+          $var: child
+    - $appendChange:
+        op: add
+        path:
+          $const: statePath
+        val:
+          status: attached
+          request:
+            $var:
+              name: request
+              path: /document/instanceKey
+    - $call:
+        function: signal
+        args: {}
+    - $return:
+        outcome: acceptedNew
+  checkPreparedCandidate:
+    args:
+      candidate: {}
+    do:
+    - $let:
+        name: request
+        expr:
+          $document:
+            $const: requestPath
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: request
+        message: ATTACHMENT_PREPARE_FIRST
+    - $let:
+        name: origin
+        expr:
+          $call:
+            function: origin
+            args:
+              document:
+                $var: candidate
+    - $let:
+        name: original
+        expr:
+          $pointerGet:
+            object:
+              $var: candidate
+            path: /contracts/initialized/document
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $call:
+                function: normalizeSource
+                args:
+                  source:
+                    $var: original
+          - $nodeBlueId:
+              $call:
+                function: normalizeSource
+                args:
+                  source:
+                    $var:
+                      name: request
+                      path: /document
+        message: ATTACHMENT_UNREVIEWED_SOURCE
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /clauses/attachment
+          - $var:
+              name: request
+              path: /document/clauses/attachment
+        message: ATTACHMENT_POLICY_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /clauses/hooks
+          - $var:
+              name: request
+              path: /document/clauses/hooks
+        message: ATTACHMENT_HOOKS_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path:
+                $const: termsPath
+          - $pointerGet:
+              object:
+                $var:
+                  name: request
+                  path: /document
+              path:
+                $const: termsPath
+        message: ATTACHMENT_TERMS_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /instanceKey
+          - $var:
+              name: request
+              path: /document/instanceKey
+        message: ATTACHMENT_REQUEST_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/active
+          - true
+        message: ATTACHMENT_INSTRUCTION_INACTIVE
+    - $call:
+        function: checkRoster
+        args:
+          parent:
+            $var:
+              name: request
+              path: /document/clauses/activation/parameters/parties
+          child:
+            $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/parties
+          authority:
+            $var:
+              name: request
+              path: /policy/authority
+          cross: false
+    - $return:
+        $var: origin

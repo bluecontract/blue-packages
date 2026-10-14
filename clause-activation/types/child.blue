@@ -1,7 +1,7 @@
 name: Child Activation Functions
-type: Parties/Party Access Functions
-description: Snapshot explicitly reused parent parties into a child. This copies access evidence and never
-  gives a new party permission implicitly.
+type: Activation/Activation Functions
+description: Prepare independently declared child parties from explicit mappings; retain legacy same-role construction
+  for existing callers.
 functions:
   activateChild:
     args:
@@ -204,3 +204,209 @@ functions:
         key: key
     - $return:
         $var: result
+  prepareChild:
+    args:
+      child: {}
+      mapping: {}
+      suppliedRoles: []
+    do:
+    - $failIf:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: child
+              path: /contracts/initialized
+        message: CHILD_ALREADY_INITIALIZED
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  $var: child
+                path: /clauses/activation/type
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  type: Activation/Activation Clause
+                path: /type
+        message: CHILD_ACTIVATION_REQUIRED
+    - $let:
+        name: roster
+        expr:
+          $call:
+            function: resolvePartyMappings
+            args:
+              parties:
+                $document: /activation/parties
+              declarations:
+                $pointerGet:
+                  object:
+                    $var: child
+                  path: /clauses/activation/parameters/parties
+                  default: {}
+              mapping:
+                $var: mapping
+              suppliedRoles:
+                $var: suppliedRoles
+    - $let:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/activation/parameters/parties
+            val:
+              $var: roster
+    - $let:
+        name: paths
+        expr:
+          $pointerGet:
+            object:
+              $var: child
+            path: /clauses/activation/parameters/accessPaths
+            default: []
+    - $forEach:
+        item: path
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /accessPaths
+            default: []
+        do:
+        - $let:
+            name: target
+            expr:
+              $concat:
+              - /timelineAccess/configurer
+              - $text:
+                  $size:
+                    $var: paths
+        - $failIf:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: result
+                  path:
+                    $var: target
+            message: CHILD_ACCESS_PATH_CONFLICT
+        - $set:
+            name: result
+            expr:
+              $pointerSet:
+                object:
+                  $var: result
+                path:
+                  $var: target
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: path
+        - $set:
+            name: paths
+            expr:
+              $listConcat:
+              - $var: paths
+              - - $var: target
+    - $set:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: result
+            path: /clauses/activation/parameters/accessPaths
+            val:
+              $var: paths
+    - $let:
+        name: resolvedRoster
+        expr: {}
+    - $forEach:
+        item: party
+        key: role
+        in:
+          $var: roster
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: party
+                  path: /lead/channel
+            then:
+            - $set:
+                name: resolvedRoster
+                expr:
+                  $objectSet:
+                    object:
+                      $var: resolvedRoster
+                    key:
+                      $var: role
+                    val:
+                      $var: party
+    - $forEach:
+        item: transport
+        key: channelName
+        in:
+          $call:
+            function: transports
+            args:
+              roster:
+                $var: resolvedRoster
+        do:
+        - $let:
+            name: channelPath
+            expr:
+              $concat:
+              - /contracts/
+              - $var: channelName
+        - $let:
+            name: existingChannel
+            expr:
+              $pointerGet:
+                object:
+                  $var: result
+                path:
+                  $var: channelPath
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $var: existingChannel
+              - $ne:
+                - $var: existingChannel
+                - $var: transport
+            message: CHILD_CHANNEL_CONFLICT
+        - $set:
+            name: result
+            expr:
+              $pointerSet:
+                object:
+                  $var: result
+                path:
+                  $var: channelPath
+                val:
+                  $var: transport
+    - $return:
+        $var: result
+  bindChild:
+    args:
+      child: {}
+      mapping: {}
+    do:
+    - $return:
+        $call:
+          function: prepareChild
+          args:
+            child:
+              $var: child
+            mapping:
+              $var: mapping
+            suppliedRoles: []

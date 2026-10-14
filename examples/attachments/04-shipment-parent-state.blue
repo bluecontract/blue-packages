@@ -1,0 +1,62 @@
+name: Shipment requested when the agreement is ready
+type: Agreements/Agreement with Clauses
+x: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+        carrier:
+          type: Parties/Party
+          displayName: Carrier
+      required: []
+      allowNewParties: true
+  status:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setReady:
+          do:
+          - $appendChange:
+              op: replace
+              path: /x
+              val: 1
+    bindings:
+      setReady:
+        setReady:
+          'on': workflow
+          party: customer
+  instruction:
+    type: Attachments/Shipment Clause
+    parameters:
+      authority: carrier
+      payer: customer
+      payee: seller
+      template:
+        name: Shipment
+        type: Shipping/Shipping Instruction with Clauses
+        clauses: {}
+        sources: {}
+        destination: 2 Blue Street, Prague
+      hooks:
+        requestShipment:
+          whenReady:
+            'on': state
+            in: parent
+            path: /x
+            equals: 1
+            params:
+              requestId: ship
+              amountMinor: 200
+    bindings:
+      request: /instructionRequest
+      instruction: /instruction
