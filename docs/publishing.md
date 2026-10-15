@@ -9,7 +9,7 @@ source packages with Java 21 and `tools/build-payment-family.sh`; compare exact
 archive hashes on a second build. Native changes additionally require runtime
 qualification; data installation cannot grant native support.
 
-`python3 tools/release.py assets --output build/release` prepares the 30 selected
+`python3 tools/release.py assets --output build/release` prepares the 31 selected
 archives, their catalogue and checksums. It does not overwrite existing output
 or publish anything. The release workflow prepares artifacts for pull requests
 and main. A separately authorized `blue-packages-*` tag publishes its exact

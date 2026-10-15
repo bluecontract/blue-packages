@@ -1,0 +1,62 @@
+{
+  "name": "Terminate On Owner Request Clause",
+  "type": "Clauses/Clause",
+  "hookAbi": "document-context-1",
+  "hookDefinition": {
+    "type": "Contracts/Compute Definition",
+    "functions": {
+      "validateConfiguration": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "allowed": true,
+              "code": ""
+            }
+          }
+        ]
+      },
+      "validateTransition": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "allowed": false,
+              "code": "TASK_CONFIGURATION_IMMUTABLE"
+            }
+          }
+        ]
+      },
+      "plan": {
+        "args": {},
+        "do": [
+          {
+            "$return": {
+              "$literal": {
+                "states": {},
+                "reads": [],
+                "contracts": {
+                  "terminate": {
+                    "kind": "handler",
+                    "contract": {
+                      "type": "Contracts/Sequential Workflow Operation",
+                      "channel": "owner",
+                      "steps": [
+                        {
+                          "type": "Contracts/Terminate Processing",
+                          "cause": "Task terminated by owner"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "governsAmendments": true,
+  "description": "Optional owner-only native termination. Pending request evidence remains retained and later requests or reports follow native terminated processing rules."
+}
