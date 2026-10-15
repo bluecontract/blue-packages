@@ -40,7 +40,8 @@ class ReleaseTests(unittest.TestCase):
 
     def test_current_catalogue_and_generated_views_are_consistent(self):
         rows = release.selections(release.ROOT)
-        self.assertEqual(31, len(rows))
+        self.assertEqual(34, len(rows))
+        self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments'} <= {row['name'] for row in rows})
         self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-tasks' for row in rows))
         self.assertFalse((release.ROOT / 'editions').exists())

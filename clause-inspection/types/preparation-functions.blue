@@ -1,0 +1,97 @@
+name: Inspection Preparation Functions
+type: Documents/Preparation Functions
+functions:
+  domainPrepare:
+    args:
+      prepared: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: prepared
+                  path: /clauses/activation/parameters/parties
+              key: inspector
+        message: INSPECTOR_ROLE_REQUIRED
+    - $let:
+        name: terms
+        expr:
+          $pointerGet:
+            object:
+              $var: prepared
+            path: /inspectionTerms
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $pointerGet:
+                  object:
+                    $var: terms
+                  path: /scopeId
+              kind: text
+        message: INSPECTION_SCOPE_ID_REQUIRED
+    - $failIf:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $var: terms
+              path: /scopeId
+          - ''
+        message: INSPECTION_SCOPE_ID_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: terms
+              path: /standard
+          - approved-scope-review
+        message: INSPECTION_STANDARD_UNSUPPORTED
+    - $return:
+        $var: terms
+  domainValidateCandidate:
+    args:
+      frozenTerms: {}
+      candidate: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $var: frozenTerms
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /inspectionTerms
+        message: INSPECTION_TERMS_MISMATCH
+    - $return: true
+  domainNextActions:
+    args:
+      documentRef: {}
+    do:
+    - $let:
+        name: selected
+        expr:
+          $document:
+            $var:
+              name: documentRef
+              path: /path
+    - $if:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $var: selected
+              path: /result/status
+          - recorded
+        then:
+        - $return: []
+    - $return:
+      - type: Inspection/Inspection Required
+        party: inspector
+        document:
+          $var: documentRef

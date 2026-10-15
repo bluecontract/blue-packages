@@ -1,0 +1,75 @@
+# Executable preparation candidate. Participant transports are supplied at bootstrap.
+name: Seller performs local delivery
+type: Agreements/Agreement with Clauses
+x: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+        carrier:
+          type: Parties/Party
+          displayName: Carrier
+      required: []
+      allowNewParties: true
+  status:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setReady:
+          do:
+          - $appendChange:
+              op: replace
+              path: /x
+              val: 1
+    bindings:
+      setReady:
+        setReady:
+          'on': workflow
+          party: customer
+  instruction:
+    type: Attachments/Shipment Preparation Clause
+    parameters:
+      authority: carrier
+      payer: customer
+      payee: seller
+      template:
+        name: Shipment
+        type: Shipping/Shipping Instruction with Clauses
+        clauses: {}
+        sources: {}
+        destination: 2 Blue Street, Prague
+      hooks:
+        requestShipment:
+          confirm:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+      obtain: create
+      suppliedBy: seller
+    bindings:
+      request: /instructionRequest
+      instruction: /instruction
+      begin:
+        prepareDocument:
+          'on': workflow
+          party: customer
+      provide:
+        provideDocument:
+          'on': workflow
+          party: seller
+      resume:
+        resumeDocument:
+          'on': workflow
+          party: seller

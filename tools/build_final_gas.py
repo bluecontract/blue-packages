@@ -14,6 +14,37 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def dependency_order(root, names):
+    """Build every declared dependency first, including currently inactive exports."""
+    import yaml
+    root = root.resolve()
+    selected = set(names)
+    complete, active, ordered = set(), set(), []
+
+    def visit(name):
+        if name in complete:
+            return
+        if name in active:
+            raise ValueError('Package dependency cycle at ' + name)
+        folder = root / name
+        if folder.parent != root or name not in selected:
+            raise ValueError('Dependency is absent from the source inventory: ' + name)
+        active.add(name)
+        config = yaml.safe_load((folder / 'blue-package.yaml').read_text())
+        for declaration in config.get('imports', {}).values():
+            archive = (folder / declaration['path']).resolve()
+            dependency = archive.parent.parent
+            if dependency.parent != root or archive != dependency / 'dist/package.bluepkg':
+                raise ValueError('Unsupported package import path: ' + declaration['path'])
+            visit(dependency.name)
+        active.remove(name)
+        complete.add(name)
+        ordered.append(name)
+
+    for name in names:
+        visit(name)
+    return ordered
+
 def build(package, check=False):
     all_packages = package == 'all'
     if all_packages and check:
@@ -50,7 +81,7 @@ def build(package, check=False):
         names = [package]
         if all_packages:
             inventory = json.loads((ROOT/'PACKAGE-SOURCES.json').read_text())
-            names = [name for name in inventory['foundations'] + inventory['packages']
+            names = [name for name in dependency_order(ROOT, inventory['foundations'] + inventory['packages'])
                      if name != 'blue-language']
         for name in names:
             subprocess.run([java, '-Xmx1500m', '-cp', str(classes)+os.pathsep+classpath,

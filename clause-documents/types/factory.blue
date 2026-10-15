@@ -1,23 +1,38 @@
 name: Documents Clause
-type: Connections/Connected Clause
+type: Documents/Document Base
+description: Keyed collection using the same preparation, provision and readiness lifecycle as Document
+  Clause. start is the compatibility alias of prepare.
+actionDefinition:
+  type: Documents/Document Preparation Functions
+cardinality: keyed
+destinationBinding: collection
 bindingTypes:
-  template: pointer
   collection: pointer
 embedsCollections:
 - collection
-actionDefinition:
-  type: Documents/Factory Functions
 actions:
   start:
     resultContract: outcome-v1
+    defaults:
+      fields: {}
+      values: {}
+    preflight:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: checkPreparation
+            args:
+              input:
+                $var: params
     do:
     - $set:
         name: actionResult
         expr:
           $call:
-            function: create
+            function: sharedPrepare
             args:
               input:
                 $var: params
-    defaults:
-      fields: {}
+              checked:
+                $var: actionResult

@@ -1,0 +1,99 @@
+name: Attachment Endpoint Functions
+type: Attachments/Attachment Rules
+functions:
+  linkParent:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: requireCaller
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $const:
+              name: spec
+              path: /relationship
+          - cross-embedded
+        message: ATTACHMENT_RETURN_LINK_NOT_NEEDED
+    - $let:
+        name: parent
+        expr:
+          $var:
+            name: input
+            path: /document
+    - $failIf:
+        cond:
+          $ne:
+          - $call:
+              function: origin
+              args:
+                document:
+                  $var: parent
+          - $const:
+              name: spec
+              path: /parentOrigin
+        message: ATTACHMENT_WRONG_PARENT
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: parent
+              path: /activation/active
+          - true
+        message: ATTACHMENT_PARENT_INACTIVE
+    - $call:
+        function: checkRoster
+        args:
+          parent:
+            $pointerGet:
+              object:
+                $var: parent
+              path: /activation/parties
+          child:
+            $document: /activation/parties
+          authority:
+            $const:
+              name: spec
+              path: /authority
+          cross: true
+    - $if:
+        cond:
+          $exists:
+            $document: /sources/parent
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $call:
+                  function: origin
+                  args:
+                    document:
+                      $document: /sources/parent
+              - $const:
+                  name: spec
+                  path: /parentOrigin
+            message: ATTACHMENT_REPLACEMENT_FORBIDDEN
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path: /sources/parent
+        val:
+          $objectSet:
+            object: {}
+            key: blueId
+            val:
+              $nodeBlueId:
+                $var: parent
+    - $appendChange:
+        op: add
+        path: /attachmentLink
+        val:
+          parentOrigin:
+            $const:
+              name: spec
+              path: /parentOrigin
+    - $return:
+        outcome: acceptedNew

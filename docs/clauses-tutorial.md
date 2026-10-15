@@ -1,6 +1,6 @@
 # Build connected applications with clauses
 
-This is the guide to the single current clause package set in this repository. It replaces the earlier catalogue of overlapping, narrowly named clauses. Package sources live at the repository root. `PUBLIC-CLAUSES.json` selects the public families; `PACKAGES.json` pins their exact built identities.
+This tutorial describes the connection model and the earlier domain-facade API. The unpublished `0.8.0-preview.1` introduces independent document preparation: `Documents/Document Clause`, `Payment/Payment Clause`, and their keyed collections use prepare/provide/resume instead of the earlier start facade. See the [Documents API](../clause-documents/README.md) and [Payment API](../clause-payment/README.md) before copying the domain examples below. The earlier Payment facade is explicitly named `Payment/Legacy Payment Clause` in this preview. Package sources live at the repository root; `PACKAGES.json` pins their exact built identities.
 
 The packages are unpublished candidates. The examples are real Blue source documents, accompanied by executable Java scenarios. Local scenario validation, authenticated multi-account integration, and AWS deployment are separate checks. A passing local example does not certify a banking integration or a production deployment.
 

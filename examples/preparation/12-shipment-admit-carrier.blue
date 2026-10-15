@@ -1,0 +1,99 @@
+name: Approve a new carrier before connecting its shipment
+type: Agreements/Agreement with Clauses
+x: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+      required: []
+      allowNewParties: true
+  status:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setReady:
+          do:
+          - $appendChange:
+              op: replace
+              path: /x
+              val: 1
+    bindings:
+      setReady:
+        setReady:
+          'on': workflow
+          party: customer
+  instruction:
+    type: Attachments/Shipment Preparation Clause
+    parameters:
+      authority: carrier
+      payer: customer
+      payee: seller
+      template:
+        name: Shipment
+        type: Shipping/Shipping Instruction with Clauses
+        clauses: {}
+        sources: {}
+        destination: 2 Blue Street, Prague
+      hooks:
+        requestShipment:
+          whenReady:
+            'on': state
+            in: parent
+            path: /x
+            equals: 1
+            params:
+              requestId: ship
+              amountMinor: 200
+      obtain: provide
+      suppliedBy: seller
+      admissionClause: partyChanges
+    bindings:
+      request: /instructionRequest
+      instruction: /instruction
+      begin:
+        prepareDocument:
+          'on': workflow
+          party: customer
+      provide:
+        provideDocument:
+          'on': workflow
+          party: seller
+      resume:
+        resumeDocument:
+          'on': workflow
+          party: seller
+  partyChanges:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers:
+      - customer
+      - seller
+      paths:
+      - /admission_instruction
+    bindings:
+      state: /amendments
+      editable: /termsEditable
+      approve:
+        approveBuyer:
+          'on': workflow
+          party: customer
+          params:
+            $object:
+              $var: trigger
+        approveSeller:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+termsEditable: true

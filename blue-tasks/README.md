@@ -1,9 +1,11 @@
-# Native Tasks — clause-composed final-gas edition
+# Native Tasks — clause-composed access-events candidate
 
 This package is selected by PACKAGE-SOURCES.json for reproducible archive generation.
-It uses the current final-gas dependency edition. Publication is identified by the
-reviewed collection release tag; Core adoption and agent execution are separate
-release steps.
+The root version `0.1.0-preview.3.access-events.1` uses the current candidate
+Coordination and clause dependencies. The exact final-gas edition from main is
+preserved under `releases/0.1.0-preview.3.finalgas.1/`, including its original
+archive and lock. Task definitions are unchanged; this is a distinct unpublished
+dependency build. Core adoption and agent execution remain separate release steps.
 The separately reviewed M0 prototypes remain unchanged under verification/task-mvp-m0.
 
 `Task` is the plain domain base, extending `DocumentsDomain/Document`. It declares

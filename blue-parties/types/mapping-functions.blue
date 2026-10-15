@@ -1,0 +1,432 @@
+name: Party Mapping Functions
+type: Parties/Party Access Functions
+description: Resolve explicit receiver roles to actual main identities. This grants neither access nor
+  consent.
+functions:
+  requireSameMainParty:
+    args:
+      left: {}
+      right: {}
+    do:
+    - $forEach:
+        item: party
+        in:
+        - $var: left
+        - $var: right
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $pointerGet:
+                      object:
+                        $var: party
+                      path: /readerKeys
+                  kind: list
+            message: PARTY_PRIMARY_KEYS_REQUIRED
+        - $forEach:
+            item: readerKey
+            in:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /readerKeys
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var: readerKey
+                        kind: text
+                    - $ne:
+                      - $var: readerKey
+                      - ''
+                message: PARTY_INVALID_PRIMARY_KEY
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var:
+                name: left
+                path: /lead/channel
+        message: PARTY_PRIMARY_CHANNEL_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var:
+                name: right
+                path: /lead/channel
+        message: PARTY_PRIMARY_CHANNEL_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $var:
+                name: left
+                path: /lead/channel
+          - $nodeBlueId:
+              $var:
+                name: right
+                path: /lead/channel
+        message: PARTY_PRIMARY_CHANNEL_MISMATCH
+    - $let:
+        name: leftKeys
+        expr:
+          $pointerGet:
+            object:
+              $var: left
+            path: /readerKeys
+            default: []
+    - $let:
+        name: rightKeys
+        expr:
+          $pointerGet:
+            object:
+              $var: right
+            path: /readerKeys
+            default: []
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $var: leftKeys
+          - 0
+        message: PARTY_PRIMARY_KEYS_REQUIRED
+    - $forEach:
+        item: keySet
+        in:
+        - $var: leftKeys
+        - $var: rightKeys
+        do:
+        - $let:
+            name: seen
+            expr: []
+        - $forEach:
+            item: key
+            in:
+              $var: keySet
+            do:
+            - $failIf:
+                cond:
+                  $includes:
+                    list:
+                      $var: seen
+                    val:
+                      $var: key
+                message: PARTY_DUPLICATE_PRIMARY_KEY
+            - $set:
+                name: seen
+                expr:
+                  $listConcat:
+                  - $var: seen
+                  - - $var: key
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $var: leftKeys
+          - $size:
+              $var: rightKeys
+        message: PARTY_PRIMARY_KEYS_MISMATCH
+    - $forEach:
+        item: key
+        in:
+          $var: leftKeys
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: rightKeys
+                  val:
+                    $var: key
+            message: PARTY_PRIMARY_KEYS_MISMATCH
+    - $forEach:
+        item: key
+        in:
+          $var: rightKeys
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: leftKeys
+                  val:
+                    $var: key
+            message: PARTY_PRIMARY_KEYS_MISMATCH
+    - $return: true
+  mapParties:
+    args:
+      parties: {}
+      declarations: {}
+      mapping: {}
+    do:
+    - $return:
+        $call:
+          function: resolvePartyMappings
+          args:
+            parties:
+              $var: parties
+            declarations:
+              $var: declarations
+            mapping:
+              $var: mapping
+            suppliedRoles: []
+  resolvePartyMappings:
+    args:
+      parties: {}
+      declarations: {}
+      mapping: {}
+      suppliedRoles: []
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: parties
+                kind: object
+            - $isKind:
+                val:
+                  $var: declarations
+                kind: object
+            - $isKind:
+                val:
+                  $var: mapping
+                kind: object
+        message: PARTY_MAPPING_OBJECTS_REQUIRED
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $size:
+                $var: parties
+            - 0
+          - $eq:
+            - $size:
+                $var: declarations
+            - 0
+        message: PARTY_MAPPING_EMPTY_ROSTER
+    - $forEach:
+        item: slotRole
+        in:
+          $var: suppliedRoles
+        do:
+        - $failIf:
+            cond:
+              $or:
+              - $not:
+                  $hasKey:
+                    object:
+                      $var: declarations
+                    key:
+                      $var: slotRole
+              - $hasKey:
+                  object:
+                    $var: mapping
+                  key:
+                    $var: slotRole
+            message: PARTY_SUPPLIED_SLOT_INVALID
+    - $forEach:
+        item: binding
+        in:
+          $var: mapping
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: declarations
+                  key:
+                    $var: receiver
+            message: PARTY_MAPPING_UNKNOWN_ROLE
+        key: receiver
+    - $let:
+        name: resolved
+        expr: {}
+    - $forEach:
+        item: declaration
+        in:
+          $var: declarations
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: validPartyName
+                  args:
+                    candidate:
+                      $var: receiver
+            message: PARTY_MAPPING_INVALID_ROLE
+        - $if:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: mapping
+                  key:
+                    $var: receiver
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $includes:
+                      list:
+                        $var: suppliedRoles
+                      val:
+                        $var: receiver
+                message: PARTY_MAPPING_MISSING_ROLE
+            - $set:
+                name: resolved
+                expr:
+                  $objectSet:
+                    object:
+                      $var: resolved
+                    key:
+                      $var: receiver
+                    val:
+                      $var: declaration
+            else:
+            - $let:
+                name: binding
+                expr:
+                  $get:
+                    object:
+                      $var: mapping
+                    key:
+                      $var: receiver
+            - $let:
+                name: selected
+                expr:
+                  $var: binding
+            - $if:
+                cond:
+                  $isKind:
+                    val:
+                      $var: binding
+                    kind: text
+                then:
+                - $failIf:
+                    cond:
+                      $not:
+                        $hasKey:
+                          object:
+                            $var: parties
+                          key:
+                            $var: binding
+                    message: PARTY_MAPPING_UNKNOWN_CONFIGURER_ROLE
+                - $set:
+                    name: selected
+                    expr:
+                      $get:
+                        object:
+                          $var: parties
+                        key:
+                          $var: binding
+            - $call:
+                function: requireSameMainParty
+                args:
+                  left:
+                    $var: selected
+                  right:
+                    $var: selected
+            - $failIf:
+                cond:
+                  $not:
+                    $is:
+                      node:
+                        $var: selected
+                      pattern:
+                        type: Parties/Party
+                message: PARTY_MAPPING_PARTY_REQUIRED
+            - $let:
+                name: specializationWitness
+                expr:
+                  $objectSet:
+                    object:
+                      $var: selected
+                    key: type
+                    val:
+                      $var: declaration
+            - $let:
+                name: validatedIdentity
+                expr:
+                  $nodeBlueId:
+                    $var: specializationWitness
+            - $set:
+                name: resolved
+                expr:
+                  $objectSet:
+                    object:
+                      $var: resolved
+                    key:
+                      $var: receiver
+                    val:
+                      $var: selected
+        key: receiver
+    - $forEach:
+        item: party
+        in:
+          $var: parties
+        do:
+        - $call:
+            function: requireSameMainParty
+            args:
+              left:
+                $var: party
+              right:
+                $var: party
+        - $let:
+            name: represented
+            expr: false
+        - $forEach:
+            item: selected
+            in:
+              $var: resolved
+            do:
+            - $if:
+                cond:
+                  $and:
+                  - $exists:
+                      $var:
+                        name: selected
+                        path: /lead/channel
+                  - $eq:
+                    - $nodeBlueId:
+                        $pointerGet:
+                          object:
+                            $var: party
+                          path: /lead/channel
+                    - $nodeBlueId:
+                        $pointerGet:
+                          object:
+                            $var: selected
+                          path: /lead/channel
+                then:
+                - $call:
+                    function: requireSameMainParty
+                    args:
+                      left:
+                        $var: party
+                      right:
+                        $var: selected
+                - $set:
+                    name: represented
+                    expr: true
+            key: receiverRole
+        - $failIf:
+            cond:
+              $not:
+                $var: represented
+            message: PARTY_MAPPING_MAIN_IDENTITY_MISSING
+        key: configurerRole
+    - $return:
+        $var: resolved

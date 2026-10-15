@@ -1,0 +1,1301 @@
+name: Admission Functions
+type: Documents/Factory Functions
+functions:
+  candidateStage:
+    args:
+      checked: {}
+    do:
+    - $let:
+        name: item
+        expr:
+          $var:
+            name: checked
+            path: /item
+    - $let:
+        name: candidate
+        expr:
+          $var:
+            name: checked
+            path: /candidate
+    - $if:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: item
+              path: /candidateOrigin
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: item
+                  path: /candidateOrigin
+              - $var:
+                  name: checked
+                  path: /origin
+            message: PREPARATION_CANDIDATE_REPLACEMENT_FORBIDDEN
+    - $let:
+        name: missing
+        expr: {}
+    - $let:
+        name: needsHost
+        expr: false
+    - $forEach:
+        item: sourceBinding
+        in:
+          $pointerGet:
+            object:
+              $const: bindings
+            path: /sources
+            default: {}
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $var: sourceBinding
+              - self
+            then:
+            - $set:
+                name: needsHost
+                expr: true
+        key: alias
+    - $if:
+        cond:
+          $var: needsHost
+        then:
+        - $forEach:
+            item: party
+            in:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /activation/parties
+            do:
+            - $if:
+                cond:
+                  $not:
+                    $call:
+                      function: rosterCovers
+                      args:
+                        required:
+                          $objectSet:
+                            object: {}
+                            key:
+                              $var: role
+                            val:
+                              $var: party
+                        available:
+                          $document: /activation/parties
+                then:
+                - $let:
+                    name: hostRole
+                    expr:
+                      $var: role
+                - $if:
+                    cond:
+                      $hasKey:
+                        object:
+                          $document: /activation/parties
+                        key:
+                          $var: role
+                    then:
+                    - $set:
+                        name: hostRole
+                        expr:
+                          $concat:
+                          - participant_
+                          - $nodeBlueId:
+                              $pointerGet:
+                                object:
+                                  $var: party
+                                path: /lead/channel
+                - $set:
+                    name: missing
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: missing
+                        key:
+                          $var: hostRole
+                        val:
+                          $var: party
+            key: role
+    - $let:
+        name: nextItem
+        expr:
+          $merge:
+          - $var: item
+          - candidateRef:
+              $objectFromEntries:
+              - key: blueId
+                val:
+                  $nodeBlueId:
+                    $var: candidate
+            candidateOrigin:
+              $var:
+                name: checked
+                path: /origin
+    - $if:
+        cond:
+          $ne:
+          - $size:
+              $var: missing
+          - 0
+        then:
+        - $failIf:
+            cond:
+              $eq:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $document: /clauses/activation/parameters
+                    path: /admission/approvers
+                    default: []
+              - 0
+            message: PREPARATION_ADMISSION_POLICY_REQUIRED
+        - $let:
+            name: accessDocuments
+            expr:
+              $call:
+                function: candidatePartyAccessDocuments
+                args:
+                  candidate: {$var: candidate}
+                  parties: {$var: missing}
+        - $let:
+            name: token
+            expr:
+              itemPath:
+                $var:
+                  name: item
+                  path: /itemPath
+              requirementRef:
+                $var:
+                  name: item
+                  path: /requirementRef
+              candidateOrigin:
+                $var:
+                  name: checked
+                  path: /origin
+              activationRevision:
+                $document: /activation/revision
+              parties:
+                $var: missing
+              accessDocuments: {$var: accessDocuments}
+              attempt:
+                $pointerGet:
+                  object:
+                    $var: item
+                  path: /admissionAttempt
+                  default: 0
+              accessScope:
+                processOrigin:
+                  $call:
+                    function: processOrigin
+                    args:
+                      document:
+                        $document: ''
+                parties:
+                  $merge:
+                  - $document: /activation/parties
+                  - $var: missing
+                readers:
+                  $pointerGet:
+                    object:
+                      $document: /activation
+                    path: /readers
+                    default: {}
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: item
+                  path: /admissionToken
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $nodeBlueId:
+                      $var:
+                        name: item
+                        path: /admissionToken
+                  - $nodeBlueId:
+                      $var: token
+                message: ADMISSION_REAPPROVAL_REQUIRED
+        - $return:
+            $merge:
+            - $var: nextItem
+            - status: admission_pending
+              admissionToken:
+                $var: token
+              admissionRef:
+                $nodeBlueId:
+                  $var: token
+              consents:
+                $pointerGet:
+                  object:
+                    $var: item
+                  path: /consents
+                  default: {}
+    - $if:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/active
+          - true
+        then:
+        - $return:
+            $merge:
+            - $var: nextItem
+            - status: awaiting_activation
+    - $let:
+        name: linked
+        expr: true
+    - $forEach:
+        item: requirement
+        in:
+          $pointerGet:
+            object:
+              $var: candidate
+            path: /clauses/documentSources/parameters/requirements
+            default: {}
+        do:
+        - $let:
+            name: source
+            expr:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path:
+                  $concat:
+                  - /sources/
+                  - $var: alias
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: source
+                    path: /contracts/initialized
+            then:
+            - $set:
+                name: linked
+                expr: false
+            else:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $call:
+                      function: processOrigin
+                      args:
+                        document:
+                          $var: source
+                  - $var:
+                      name: requirement
+                      path: /origin
+                message: SOURCE_IDENTITY_MISMATCH
+            - $if:
+                cond:
+                  $not:
+                    $call:
+                      function: rosterCovers
+                      args:
+                        required:
+                          $pointerGet:
+                            object:
+                              $var: candidate
+                            path: /activation/parties
+                        available:
+                          $pointerGet:
+                            object:
+                              $var: source
+                            path: /activation/parties
+                then:
+                - $set:
+                    name: linked
+                    expr: false
+            - $if:
+                cond:
+                  $ne:
+                  - $pointerGet:
+                      object:
+                        $var: source
+                      path: /activation/active
+                  - true
+                then:
+                - $set:
+                    name: linked
+                    expr: false
+        key: alias
+    - $if:
+        cond:
+          $not:
+            $var: linked
+        then:
+        - $return:
+            $merge:
+            - $var: nextItem
+            - status: linking
+    - $return:
+        $merge:
+        - $var: nextItem
+        - status: ready
+  installAdmissionConsentOperations:
+    args:
+      item: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $var: item
+                path: /admissionToken
+        then:
+        - $return: false
+    - $if:
+        cond:
+          $not:
+            $call:
+              function: accessValid
+              args:
+                roster:
+                  $merge:
+                  - $document: /activation/parties
+                  - $var: {name: item, path: /admissionToken/parties}
+                readers:
+                  $pointerGet: {object: {$document: /activation}, path: /readers, default: {}}
+                accessPaths:
+                  $pointerGet: {object: {$document: /activation}, path: /accessPaths, default: []}
+        then:
+        - $return: false
+    - $forEach:
+        item: party
+        in:
+          $var:
+            name: item
+            path: /admissionToken/parties
+        do:
+        - $let:
+            name: suffix
+            expr:
+              $concat:
+              - $const: clauseKey
+              - _
+              - $nodeBlueId:
+                - $var:
+                    name: item
+                    path: /admissionRef
+                - $var: role
+        - $let:
+            name: channel
+            expr:
+              $concat:
+              - admissionConsent_
+              - $var: suffix
+        - $let:
+            name: operation
+            expr:
+              $concat:
+              - consentAdmission_
+              - $var: suffix
+        - $let:
+            name: channelDeclaration
+            expr:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /lead/channel
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $concat:
+                  - /contracts/
+                  - $var: channel
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $nodeBlueId:
+                      $document:
+                        $concat:
+                        - /contracts/
+                        - $var: channel
+                  - $nodeBlueId:
+                      $var: channelDeclaration
+                message: ADMISSION_CONSENT_CHANNEL_CONFLICT
+            else:
+            - $appendChange:
+                op: add
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: channel
+                val:
+                  $var: channelDeclaration
+        - $let:
+            name: handler
+            expr:
+              $merge:
+              - type: Contracts/Sequential Workflow Operation
+              - channel:
+                  $var: channel
+                steps:
+                - $merge:
+                  - type: Contracts/Compute
+                  - definition:
+                      $objectFromEntries:
+                      - key: blueId
+                        val:
+                          $nodeBlueId:
+                            type: Documents/Admission Consent Functions
+                    constants:
+                      itemPath:
+                        $var:
+                          name: item
+                          path: /itemPath
+                      admissionRef:
+                        $var:
+                          name: item
+                          path: /admissionRef
+                      party:
+                        $var: role
+                    do:
+                      $literal:
+                      - $return:
+                          $call:
+                            function: recordConsent
+                            args:
+                              input:
+                                $binding: call/request
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $concat:
+                  - /contracts/
+                  - $var: operation
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $nodeBlueId:
+                      $document:
+                        $concat:
+                        - /contracts/
+                        - $var: operation
+                  - $nodeBlueId:
+                      $var: handler
+                message: ADMISSION_CONSENT_OPERATION_CONFLICT
+            else:
+            - $appendChange:
+                op: add
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: operation
+                val:
+                  $var: handler
+        key: role
+    - $return: true
+  nextAdmissionRequest:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $call:
+            function: retireInvalidAdmission
+            args: {}
+        then:
+        - $return:
+            ready: false
+    - $let:
+        name: state
+        expr:
+          $document:
+            $concat:
+            - /process_
+            - $const: clauseKey
+    - $if:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: state
+              path: /admission/ledger/proposal/id
+        then:
+        - $return:
+            ready: false
+    - $forEach:
+        item: item
+        in:
+          $pointerGet:
+            object:
+              $var: state
+            path: /entries
+            default: {}
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: item
+                  path: /status
+              - admission_pending
+            then:
+            - $if:
+                cond:
+                  $ne:
+                  - $var:
+                      name: item
+                      path: /admissionToken/activationRevision
+                  - $document: /activation/revision
+                then:
+                - $appendChange:
+                    op: add
+                    path:
+                      $concat:
+                      - $var:
+                          name: item
+                          path: /itemPath
+                      - /status
+                    val: reapproval_required
+                - $appendEvent:
+                    $merge:
+                    - type: Documents/Document Admission Progress
+                    - admissionRef:
+                        $var:
+                          name: item
+                          path: /admissionRef
+                      status: reapproval_required
+                - $return:
+                    ready: false
+            - $if:
+                cond:
+                  $not:
+                    $exists:
+                      $pointerGet:
+                        object:
+                          $var: state
+                        path:
+                          $concat:
+                          - /admission/grants/
+                          - $var:
+                              name: item
+                              path: /admissionRef
+                then:
+                - $return:
+                    ready: true
+                    request:
+                      proposalId:
+                        $var:
+                          name: item
+                          path: /admissionRef
+                      expectedRevision:
+                        $pointerGet:
+                          object:
+                            $var: state
+                          path: /admission/ledger/revision
+                      path:
+                        $concat:
+                        - $concat:
+                          - /process_
+                          - $const: clauseKey
+                        - /admission/grants
+                      preservePending: true
+                      replacement:
+                        $objectSet:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: state
+                              path: /admission/grants
+                              default: {}
+                          key:
+                            $var:
+                              name: item
+                              path: /admissionRef
+                          val:
+                            $var:
+                              name: item
+                              path: /admissionToken
+        key: itemId
+    - $return:
+        ready: false
+  admissionInstallRequest:
+    args: {}
+    do:
+    - $let:
+        name: state
+        expr:
+          $document:
+            $concat:
+            - /process_
+            - $const: clauseKey
+    - $forEach:
+        item: item
+        in:
+          $pointerGet:
+            object:
+              $var: state
+            path: /entries
+            default: {}
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: item
+                  path: /status
+              - admission_pending
+            then:
+            - $let:
+                name: token
+                expr:
+                  $var:
+                    name: item
+                    path: /admissionToken
+            - $if:
+                cond:
+                  $and:
+                  - $eq:
+                    - $pointerGet:
+                        object:
+                          $var: state
+                        path:
+                          $concat:
+                          - /admission/ledger/history/
+                          - $var:
+                              name: item
+                              path: /admissionRef
+                    - true
+                  - $eq:
+                    - $pointerGet:
+                        object:
+                          $var: state
+                        path:
+                          $concat:
+                          - /admission/grants/
+                          - $var:
+                              name: item
+                              path: /admissionRef
+                    - $var: token
+                then:
+                - $call:
+                    function: installAdmissionConsentOperations
+                    args:
+                      item: {$var: item}
+                - $let:
+                    name: consented
+                    expr: true
+                - $let:
+                    name: denied
+                    expr: false
+                - $forEach:
+                    item: party
+                    in:
+                      $var:
+                        name: token
+                        path: /parties
+                    do:
+                    - $if:
+                        cond:
+                          $ne:
+                          - $pointerGet:
+                              object:
+                                $var: item
+                              path:
+                                $concat:
+                                - /consents/
+                                - $var: role
+                          - approve
+                        then:
+                        - $set:
+                            name: consented
+                            expr: false
+                    - $if:
+                        cond:
+                          $eq:
+                          - $pointerGet:
+                              object:
+                                $var: item
+                              path:
+                                $concat:
+                                - /consents/
+                                - $var: role
+                          - decline
+                        then:
+                        - $set:
+                            name: denied
+                            expr: true
+                    key: role
+                - $if:
+                    cond:
+                      $var: denied
+                    then:
+                    - $appendChange:
+                        op: add
+                        path:
+                          $concat:
+                          - $var:
+                              name: item
+                              path: /itemPath
+                          - /status
+                        val: admission_denied
+                    - $appendEvent:
+                        $merge:
+                        - type: Documents/Document Admission Progress
+                        - admissionRef:
+                            $var:
+                              name: item
+                              path: /admissionRef
+                          status: admission_denied
+                    - $return:
+                        ready: false
+                - $if:
+                    cond:
+                      $and:
+                      - $eq:
+                        - $pointerGet:
+                            object:
+                              $var: token
+                            path: /activationRevision
+                        - $document: /activation/revision
+                      - $ne:
+                        - $pointerGet:
+                            object:
+                              $var: item
+                            path: /accessRequested
+                            default: ''
+                        - $var:
+                            name: item
+                            path: /admissionRef
+                    then:
+                    - $appendChange:
+                        op: add
+                        path:
+                          $concat:
+                          - $pointerGet:
+                              object:
+                                $var: item
+                              path: /itemPath
+                          - /accessRequested
+                        val:
+                          $var:
+                            name: item
+                            path: /admissionRef
+                    - $appendEvent:
+                        $merge:
+                        - type: Activation/Party Addition Requested
+                        - admissionRef:
+                            $pointerGet:
+                              object:
+                                $var: item
+                              path: /admissionRef
+                          expectedRevision:
+                            $pointerGet:
+                              object:
+                                $var: token
+                              path: /activationRevision
+                          parties:
+                            $pointerGet:
+                              object:
+                                $var: token
+                              path: /parties
+                          accessDocuments:
+                            $pointerGet:
+                              object: {$var: token}
+                              path: /accessDocuments
+                          itemPath:
+                            $pointerGet:
+                              object:
+                                $var: item
+                              path: /itemPath
+                          clauseKey:
+                            $const: clauseKey
+                    # Applying accessRequested can trigger the admission observer
+                    # again. The next step must use that fresh state, not also
+                    # install from this pre-change decision.
+                    - $return:
+                        ready: false
+                - $if:
+                    cond:
+                      $and:
+                      - $var: consented
+                      - $eq:
+                        - $var:
+                            name: token
+                            path: /activationRevision
+                        - $document: /activation/revision
+                      - $call:
+                          function: accessValid
+                          args:
+                            roster:
+                              $merge:
+                              - $document: /activation/parties
+                              - $var:
+                                  name: token
+                                  path: /parties
+                            readers:
+                              $pointerGet:
+                                object:
+                                  $document: /activation
+                                path: /readers
+                                default: {}
+                            accessPaths:
+                              $pointerGet:
+                                object:
+                                  $document: /activation
+                                path: /accessPaths
+                                default: []
+                    then:
+                    - $appendChange:
+                        op: add
+                        path:
+                          $concat:
+                          - $var:
+                              name: item
+                              path: /itemPath
+                          - /status
+                        val: installing
+                    - $return:
+                        ready: true
+                        itemPath:
+                          $var:
+                            name: item
+                            path: /itemPath
+                        request:
+                          expectedRevision:
+                            $var:
+                              name: token
+                              path: /activationRevision
+                          parties:
+                            $var:
+                              name: token
+                              path: /parties
+                          admissionRef:
+                            $var:
+                              name: item
+                              path: /admissionRef
+        key: itemId
+    - $return:
+        ready: false
+  finishAdmission:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: item
+        expr:
+          $document:
+            $var:
+              name: input
+              path: /itemPath
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: item
+              path: /status
+          - installing
+        message: ADMISSION_INSTALLATION_STATE
+    - $call:
+        function: requireRosterCoverage
+        args:
+          required:
+            $var:
+              name: item
+              path: /admissionToken/parties
+          available:
+            $document: /activation/parties
+    - $appendChange:
+        op: add
+        path:
+          $var:
+            name: input
+            path: /itemPath
+        val:
+          $merge:
+          - $var: item
+          - status: linking
+            admittedRevision:
+              $document: /activation/revision
+    - $appendEvent:
+        $merge:
+        - type: Documents/Document Admission Progress
+        - admissionRef:
+            $var:
+              name: item
+              path: /admissionRef
+          status: admitted
+    - $return:
+        outcome: acceptedNew
+  retireAdmission:
+    args:
+      item: {}
+      reason:
+        type: Text
+    do:
+    - $let:
+        name: path
+        expr:
+          $concat:
+          - $concat:
+            - /process_
+            - $const: clauseKey
+          - /admission
+    - $let:
+        name: ledger
+        expr:
+          $document:
+            $concat:
+            - $var: path
+            - /ledger
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var:
+              name: item
+              path: /itemPath
+          - /status
+        val:
+          $var: reason
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $var: path
+          - /retired/
+          - $var:
+              name: item
+              path: /admissionRef
+        val:
+          reason:
+            $var: reason
+          token:
+            $var:
+              name: item
+              path: /admissionToken
+          consents:
+            $pointerGet:
+              object:
+                $var: item
+              path: /consents
+              default: {}
+    - $if:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $var: ledger
+              path: /proposal/id
+          - $var:
+              name: item
+              path: /admissionRef
+        then:
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - $var: path
+              - /ledger/revision
+            val:
+              $add:
+              - $pointerGet:
+                  object:
+                    $var: ledger
+                  path: /revision
+              - 1
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - $var: path
+              - /ledger/proposal
+            val: {}
+    - $appendEvent:
+        $merge:
+        - type: Documents/Document Admission Progress
+        - clauseId:
+            $const: clauseKey
+          itemKey:
+            $var:
+              name: item
+              path: /key
+          admissionRef:
+            $var:
+              name: item
+              path: /admissionRef
+          status:
+            $var: reason
+    - $return: true
+  retireInvalidAdmission:
+    args: {}
+    do:
+    - $forEach:
+        key: itemId
+        item: item
+        in:
+          $pointerGet:
+            object:
+              $document:
+                $concat:
+                - /process_
+                - $const: clauseKey
+            path: /entries
+            default: {}
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: item
+                  path: /status
+              - admission_pending
+            then:
+            - $let:
+                name: denied
+                expr: false
+            - $forEach:
+                key: role
+                item: decision
+                in:
+                  $pointerGet:
+                    object:
+                      $var: item
+                    path: /consents
+                    default: {}
+                do:
+                - $if:
+                    cond:
+                      $eq:
+                      - $var: decision
+                      - decline
+                    then:
+                    - $set:
+                        name: denied
+                        expr: true
+            - $if:
+                cond:
+                  $var: denied
+                then:
+                - $return:
+                    $call:
+                      function: retireAdmission
+                      args:
+                        item:
+                          $var: item
+                        reason: admission_denied
+            - $if:
+                cond:
+                  $ne:
+                  - $var:
+                      name: item
+                      path: /admissionToken/activationRevision
+                  - $document: /activation/revision
+                then:
+                - $return:
+                    $call:
+                      function: retireAdmission
+                      args:
+                        item:
+                          $var: item
+                        reason: reapproval_required
+    - $return: false
+  rebaseAdmission:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: EXACT_REVIEW_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $pointerGet:
+                  object:
+                    $document: /clauses/activation/parameters
+                  path: /admission/approvers
+                  default: []
+              val:
+                $binding: call/channel
+        message: APPROVER_REQUIRED
+    - $let:
+        name: key
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /key
+            default: single
+    - $let:
+        name: path
+        expr:
+          $concat:
+          - $concat:
+            - /process_
+            - $const: clauseKey
+          - /entries/
+          - $nodeBlueId:
+              $var: key
+    - $let:
+        name: item
+        expr:
+          $document:
+            $var: path
+    - $if:
+        cond:
+          $and:
+          - $exists:
+              $pointerGet:
+                object:
+                  $var: item
+                path: /lastRebasedAdmissionRef
+          - $eq:
+            - $var:
+                name: input
+                path: /admissionRef
+            - $var:
+                name: item
+                path: /lastRebasedAdmissionRef
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /admissionRef
+          - $pointerGet:
+              object:
+                $var: item
+              path: /admissionRef
+        message: ADMISSION_STALE_REBASE
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: item
+              path: /status
+          - reapproval_required
+        message: ADMISSION_REBASE_NOT_REQUIRED
+    - $let:
+        name: fresh
+        expr: {}
+    - $forEach:
+        key: field
+        item: datum
+        in:
+          $var: item
+        do:
+        - $if:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - admissionToken
+                  - admissionRef
+                  - consents
+                  val:
+                    $var: field
+            then:
+            - $set:
+                name: fresh
+                expr:
+                  $objectSet:
+                    object:
+                      $var: fresh
+                    key:
+                      $var: field
+                    val:
+                      $var: datum
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $merge:
+          - $var: fresh
+          - status: awaiting_provider
+            admissionAttempt:
+              $add:
+              - $pointerGet:
+                  object:
+                    $var: item
+                  path: /admissionAttempt
+                  default: 0
+              - 1
+            lastRebasedAdmissionRef:
+              $var:
+                name: item
+                path: /admissionRef
+    - $appendEvent:
+        $merge:
+        - type: Documents/Document Admission Progress
+        - clauseId:
+            $const: clauseKey
+          itemKey:
+            $var: key
+          status: reprovision_required
+          supersededAdmissionRef:
+            $var:
+              name: item
+              path: /admissionRef
+    - $return:
+        outcome: acceptedNew
+
+  candidatePartyAccessDocuments:
+    args:
+      candidate: {}
+      parties: {}
+    do:
+    - $let: {name: documents, expr: {}}
+    - $forEach:
+        key: role
+        item: channel
+        in: {$call: {function: transports, args: {roster: {$var: parties}}}}
+        do:
+        - $forEach:
+            item: path
+            in: {$pointerGet: {object: {$var: candidate}, path: /activation/accessPaths, default: []}}
+            do:
+            - $let:
+                name: access
+                expr: {$pointerGet: {object: {$var: candidate}, path: {$var: path}}}
+            - $forEach:
+                item: timeline
+                in: {$pointerGet: {object: {$var: access}, path: /allowedTimelines, default: []}}
+                do:
+                - $if:
+                    cond:
+                      $eq:
+                      - {$nodeBlueId: {$objectFromEntries: {$entries: {$var: timeline}}}}
+                      - {$nodeBlueId: {$objectFromEntries: {$entries: {$pointerGet: {object: {$var: channel}, path: /timeline, default: {}}}}}}
+                    then:
+                    - $set:
+                        name: documents
+                        expr: {$objectSet: {object: {$var: documents}, key: {$var: role}, val: {$var: access}}}
+    - $call:
+        function: requirePartyAccessDocuments
+        args:
+          parties: {$var: parties}
+          documents: {$var: documents}
+    - $return: {$var: documents}

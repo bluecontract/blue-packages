@@ -1,0 +1,168 @@
+name: Preparation Admission Functions
+type: Attachments/Attachment Access Functions
+functions:
+  admit:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $or:
+          - $not:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /requiresAdmission
+                default: false
+          - $not:
+              $exists:
+                $pointerGet:
+                  object:
+                    $document:
+                      $concat:
+                      - /preparation_
+                      - $const: key
+                  path: /admission
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: proposal
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $concat:
+                - /preparation_
+                - $const: key
+            path: /admission
+    - $if:
+        cond:
+          $ne:
+          - $document:
+              $concat:
+              - /admission_
+              - $const: key
+          - $var:
+              name: proposal
+              path: /replacement
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: amendmentPath
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $concat:
+                - /clauses/
+                - $const: admissionKey
+            path: /bindings/state
+            default: /amendments
+    - $failIf:
+        cond:
+          $ne:
+          - $document:
+              $concat:
+              - $var: amendmentPath
+              - /history/
+              - $var:
+                  name: proposal
+                  path: /proposalId
+          - true
+        message: PREPARATION_UNAPPROVED_ADMISSION
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $document:
+                  $const: requestPath
+              path: /documentBlueId
+          - $var:
+              name: proposal
+              path: /replacement/requirementRef
+        message: PREPARATION_WRONG_REQUIREMENT
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /candidateOrigin
+          - $var:
+              name: proposal
+              path: /replacement/candidateOrigin
+        message: PREPARATION_WRONG_CANDIDATE
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $concat:
+              - /activation/parties/
+              - $const: authority
+        then:
+        - $return:
+            outcome: duplicate
+    - $if:
+        cond:
+          $ne:
+          - $document: /activation/revision
+          - $var:
+              name: proposal
+              path: /replacement/activationRevision
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: roster
+        expr:
+          $objectSet:
+            object:
+              $document: /activation/parties
+            key:
+              $const: authority
+            val:
+              $var:
+                name: proposal
+                path: /replacement/profile
+    - $if:
+        cond:
+          $not:
+            $call:
+              function: accessValid
+              args:
+                roster:
+                  $var: roster
+                readers:
+                  $pointerGet:
+                    object:
+                      $document: /activation
+                    path: /readers
+                    default: {}
+                accessPaths:
+                  $pointerGet:
+                    object:
+                      $document: /activation
+                    path: /accessPaths
+                    default: []
+        then:
+        - $return:
+            outcome: duplicate
+    - $call:
+        function: installAuthority
+        args:
+          input:
+            replacement:
+              $var:
+                name: proposal
+                path: /replacement/profile
+    - $return:
+        outcome: acceptedNew

@@ -388,6 +388,81 @@ functions:
         key: role
     - $return:
         $var: allowed
+  businessReady:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document: /activation
+        then:
+        - $return: true
+    - $let:
+        name: state
+        expr:
+          $document: /activation
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: state
+            path: /closed
+            default: false
+        then:
+        - $return: false
+    - $forEach:
+        item: role
+        in:
+          $pointerGet:
+            object:
+              $var: state
+            path: /required
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $pointerGet:
+                  object:
+                    $var: state
+                  path:
+                    $concat:
+                    - /approved/
+                    - $var: role
+                  default: false
+            then:
+            - $return: false
+    - $if:
+        cond:
+          $not:
+            $call:
+              function: termsCurrent
+              args: {}
+        then:
+        - $return: false
+    - $return:
+        $call:
+          function: accessValid
+          args:
+            roster:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /parties
+                default: {}
+            readers:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /readers
+                default: {}
+            accessPaths:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /accessPaths
+                default: []
   requireActive:
     args:
       channel:
@@ -453,4 +528,26 @@ functions:
                         channel:
                           $var: channel
                 message: REPRESENTATIVE_NO_LONGER_AUTHORIZED
+    - $return: true
+  termsCurrent:
+    args: {}
+    do:
+    - $forEach:
+        item: agreed
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /terms/fields
+            default: {}
+        do:
+        - $if:
+            cond:
+              $ne:
+              - $document:
+                  $var: path
+              - $var: agreed
+            then:
+            - $return: false
+        key: path
     - $return: true

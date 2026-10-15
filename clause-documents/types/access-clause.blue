@@ -1,0 +1,45 @@
+name: Document Access Clause
+type: Connections/Connected Clause
+actionDefinition:
+  type: Documents/Document Access Functions
+bindingTypes:
+  grants: pointer
+defaultBindings:
+  grants: /documentAccess
+  refresh:
+    accessRegistered:
+      'on': change
+      path: /activation/accessPaths
+embedsCollections:
+- grants
+actions:
+  register:
+    observation: true
+    resultContract: outcome-v1
+    defaults:
+      documents:
+        $pointerGet:
+          object:
+            $var: trigger
+          path: /documents
+          default: []
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: registerDocumentAccess
+            args:
+              input:
+                $merge:
+                - $var: params
+                - basePath:
+                    $const:
+                      name: bindings
+                      path: /grants
+  refresh:
+    observation: true
+    do:
+    - $call:
+        function: refresh
+        args: {}

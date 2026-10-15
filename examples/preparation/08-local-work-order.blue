@@ -1,0 +1,68 @@
+# Executable preparation candidate. Participant transports are supplied at bootstrap.
+name: Work order
+type: Agreements/Agreement with Clauses
+x: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+        guarantor:
+          type: Parties/Party
+          displayName: Payment institution
+        provider:
+          type: Parties/Party
+          displayName: Service provider
+      required: []
+      allowNewParties: true
+  status:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setReady:
+          do:
+          - $appendChange:
+              op: replace
+              path: /x
+              val: 1
+    bindings:
+      setReady:
+        setReady:
+          'on': workflow
+          party: customer
+  instruction:
+    type: Attachments/Document Preparation Clause
+    parameters:
+      obtain: create
+      authority: provider
+      suppliedBy: seller
+      template:
+        name: Inspection work order
+        type: DocumentsDomain/Document with Clauses
+        terms:
+          task: Inspect the delivered equipment
+        clauses: {}
+    bindings:
+      request: /instructionRequest
+      instruction: /instruction
+      begin:
+        prepareDocument:
+          'on': workflow
+          party: customer
+      provide:
+        provideDocument:
+          'on': workflow
+          party: seller
+      resume:
+        resumeDocument:
+          'on': workflow
+          party: seller

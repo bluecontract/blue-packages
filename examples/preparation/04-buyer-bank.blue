@@ -1,0 +1,88 @@
+# Executable preparation candidate. Participant transports are supplied at bootstrap.
+name: Buyer supplies a bank payment
+type: Agreements/Agreement with Clauses
+x: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+      required: []
+      allowNewParties: true
+  status:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setReady:
+          do:
+          - $appendChange:
+              op: replace
+              path: /x
+              val: 1
+    bindings:
+      setReady:
+        setReady:
+          'on': workflow
+          party: customer
+  instruction:
+    type: Attachments/Payment Preparation Clause
+    parameters:
+      authority: guarantor
+      payer: customer
+      payee: seller
+      template:
+        name: Payment Instruction
+        type: PaymentInstruction/Payment Instruction with Clauses
+        clauses: {}
+        sources: {}
+        paymentTerms:
+          currency: EUR
+          amountMinor: 200
+          limitMinor: 200
+          payerChannel: customer
+          payeeChannel: seller
+          guarantorChannel: guarantor
+          allowedPayees:
+          - seller
+          recipientApprovalRequired: false
+      hooks:
+        requestCapture:
+          confirm:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: customer
+            params:
+              $object:
+                $var: trigger
+      obtain: provide
+      suppliedBy: customer
+    bindings:
+      request: /instructionRequest
+      instruction: /instruction
+      begin:
+        prepareDocument:
+          'on': workflow
+          party: customer
+      provide:
+        provideDocument:
+          'on': workflow
+          party: customer
+      resume:
+        resumeDocument:
+          'on': workflow
+          party: customer

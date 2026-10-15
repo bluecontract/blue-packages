@@ -1,0 +1,66 @@
+name: Source Binding Clause
+type: Connections/Connected Clause
+description: Binds only the exact declared independent sources through an authorized participant operation.
+actionDefinition:
+  type: Documents/Source Functions
+bindingTypes:
+  sources: pointer
+actions:
+  bind:
+    resultContract: outcome-v1
+    defaults:
+      alias:
+        $pointerGet:
+          object:
+            $var: trigger
+          path: /alias
+          default: ''
+      document:
+        $pointerGet:
+          object:
+            $var: trigger
+          path: /document
+          default: {}
+      sourcePath:
+        $pointerGet:
+          object:
+            $var: trigger
+          path: /sourcePath
+          default: ''
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: bindSource
+            args:
+              input:
+                $var: params
+  refresh:
+    observation: true
+    resultContract: outcome-v1
+    automatic:
+      'on': initialized
+      once: true
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: refreshSourceReadiness
+            args: {}
+embedsCollections:
+- sources
+defaultBindings:
+  sources: /sources
+  refresh:
+    sourceChanged:
+      'on': change
+      path: /sources
+    sourceAdvanced:
+      'on': collection
+      path: /sources
+      embed: false
+    ownActivationChanged:
+      'on': change
+      path: /activation

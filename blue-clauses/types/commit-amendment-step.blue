@@ -661,6 +661,7 @@ do:
                     - handler
                     - embedding
                     - definition
+                    - policy
                   val:
                     $var:
                       name: c
@@ -685,6 +686,26 @@ do:
                       $var: contract
                     pattern:
                       type: Contracts/Compute Definition
+            then:
+            - $call:
+                function: reject
+                args:
+                  code: CONTRIBUTION_ROLE_MISMATCH
+            - $return: {}
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $var:
+                    name: c
+                    path: /kind
+                - policy
+              - $not:
+                  $is:
+                    node:
+                      $var: contract
+                    pattern:
+                      type: Dispatch/Document Dispatch Policy
             then:
             - $call:
                 function: reject
@@ -1245,9 +1266,14 @@ do:
     item: ck
     in:
       $keys:
-        $merge:
-        - $document: /clauses
-        - $var: candidate
+        $choose:
+          cond:
+            $var: initializing
+          then: {}
+          else:
+            $merge:
+            - $document: /clauses
+            - $var: candidate
     do:
     - $if:
         cond:
@@ -1300,6 +1326,8 @@ do:
     op: add
     path: /clauseRuntime
     val:
+      initialDocument:
+        $document: /clauseRuntime/initialDocument
       revision:
         $var: revision
       configurationId:
@@ -1455,6 +1483,7 @@ do:
           $literal:
           - channel
           - definition
+          - policy
           - embedding
           - handler
         do:

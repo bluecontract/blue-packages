@@ -25,7 +25,9 @@ def check(root=ROOT):
     operations = load(root / 'payment-instruction/types/payment-instruction.blue')['contracts']
     assert set(metadata['guarantorOperations']) <= operations.keys(), 'Undeclared domain operation'
     assert 'confirm' not in operations, 'Generic confirmation must not be the public operation'
-    requests = load(root / 'payment-instruction/types/payment-request-actions.blue')['actions']
+    request_clause = load(root / 'payment-instruction/types/payment-request-actions.blue')
+    assert request_clause['type'] == 'PaymentInstruction/Payment Action Definitions'
+    requests = load(root / 'payment-instruction/types/payment-action-definitions.blue')['actions']
     payment = load(root / 'clause-payment/types/conditional-base.blue')
     assert not set(metadata['guarantorOperations']) & (set(requests) | set(payment['actions']) | set(payment['childActions'])), 'Guarantor operation leaked into a clause'
     assert load(root / 'payment-instruction/types/host-with-clauses.blue')['type'] == 'PaymentInstruction/Payment Instruction'

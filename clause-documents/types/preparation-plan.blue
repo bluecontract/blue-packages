@@ -1,0 +1,873 @@
+name: Preparation Plan
+type: Connections/Connection Planning Functions
+functions:
+  validateConfiguration:
+    args: {}
+    do:
+    - $return:
+        $call:
+          function: validateConnectionsConfiguration
+          args: {}
+  validateTransition:
+    args: {}
+    do:
+    - $return:
+        allowed: false
+        code: PREPARATION_IMMUTABLE_WHILE_OBLIGATIONS_EXIST
+  plan:
+    args: {}
+    do:
+    - $let:
+        name: plan
+        expr:
+          $call:
+            function: planConnections
+            args: {}
+    - $let:
+        name: statePath
+        expr:
+          $concat:
+          - /process_
+          - $const: clauseKey
+    - $let:
+        name: clause
+        expr:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+    - $let:
+        name: destinationBinding
+        expr:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+            - /type/destinationBinding
+    - $let:
+        name: destination
+        expr:
+          $get:
+            object:
+              $pointerGet:
+                object:
+                  $var: clause
+                path: /bindings
+            key:
+              $var: destinationBinding
+    - $let:
+        name: definition
+        expr:
+          $objectFromEntries:
+          - key: blueId
+            val:
+              $nodeBlueId:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+                  - /type/actionDefinition/type
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path: /states/process
+            val:
+              path:
+                $var: statePath
+              kind: object
+              initial:
+                entries: {}
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/processUpdate_
+              - $const: clauseKey
+            val:
+              kind: channel
+              contract:
+                $merge:
+                - type: Contracts/Document Update Channel
+                - path:
+                    $var: destination
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/refreshProcesses_
+              - $const: clauseKey
+            val:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow
+                - channel:
+                    $concat:
+                    - processUpdate_
+                    - $const: clauseKey
+                  steps:
+                  - $merge:
+                    - type: Contracts/Compute
+                    - definition:
+                        $var: definition
+                      constants:
+                        clauseKey:
+                          $const: clauseKey
+                        bindings: {}
+                      do:
+                        $literal:
+                        - $call:
+                            function: sharedRefresh
+                            args: {}
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/processEmbedded_
+              - $const: clauseKey
+            val:
+              kind: channel
+              contract:
+                type: Contracts/Embedded Node Channel
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/refreshEmbeddedProcesses_
+              - $const: clauseKey
+            val:
+              $pointerSet:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: plan
+                    path:
+                      $concat:
+                      - /contracts/refreshProcesses_
+                      - $const: clauseKey
+                path: /contract/channel
+                val:
+                  $concat:
+                  - processEmbedded_
+                  - $const: clauseKey
+    - $set:
+        name: plan
+        expr:
+          $call:
+            function: planAdmission
+            args:
+              base:
+                $var: plan
+              definition:
+                $var: definition
+    - $set:
+        name: plan
+        expr:
+          $call:
+            function: planDocumentAccess
+            args:
+              base:
+                $var: plan
+              definition:
+                $var: definition
+    - $set:
+        name: plan
+        expr:
+          $call:
+            function: planSourceValidators
+            args:
+              base:
+                $var: plan
+    - $return:
+        $var: plan
+  planAdmission:
+    args:
+      base: {}
+      definition: {}
+    do:
+    - $let:
+        name: approvers
+        expr:
+          $pointerGet:
+            object:
+              $document: /clauseRuntime/work/candidate/activation/parameters
+            path: /admission/approvers
+            default: []
+    - $if:
+        cond:
+          $eq:
+          - $size:
+              $var: approvers
+          - 0
+        then:
+        - $return:
+            $var: base
+    - $let:
+        name: seen
+        expr: []
+    - $forEach:
+        item: role
+        in:
+          $var: approvers
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $document: /clauseRuntime/work/candidate/activation/parameters/parties
+                  key:
+                    $var: role
+            message: ADMISSION_APPROVER_NOT_A_PARTY
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                  $var: seen
+                val:
+                  $var: role
+            message: ADMISSION_DUPLICATE_APPROVER
+        - $set:
+            name: seen
+            expr:
+              $listConcat:
+              - $var: seen
+              - - $var: role
+    - $let:
+        name: statePath
+        expr:
+          $concat:
+          - /process_
+          - $const: clauseKey
+    - $let:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: base
+            path: /states/process/initial/admission
+            val:
+              ledger:
+                revision: 1
+                proposal: {}
+                history: {}
+              grants: {}
+              editable: true
+              retired: {}
+    - $let:
+        name: amendmentConstants
+        expr:
+          clauseKey:
+            $concat:
+            - admission_
+            - $const: clauseKey
+          bindings:
+            state:
+              $concat:
+              - $var: statePath
+              - /admission/ledger
+            editable:
+              $concat:
+              - $var: statePath
+              - /admission/editable
+          parameters:
+            approvers:
+              $var: approvers
+            paths:
+            - $concat:
+              - $var: statePath
+              - /admission/grants
+    - $let:
+        name: sharedConstants
+        expr:
+          clauseKey:
+            $const: clauseKey
+          bindings: {}
+    - $let:
+        name: steps
+        expr:
+        - $merge:
+          - type: Contracts/Compute
+          - name: nextAdmission
+            definition:
+              $var: definition
+            constants:
+              $var: sharedConstants
+            do:
+              $literal:
+              - $return:
+                  $call:
+                    function: nextAdmissionRequest
+                    args: {}
+        - $merge:
+          - type: Contracts/Compute
+          - name: openAdmission
+            definition:
+              $objectFromEntries:
+              - key: blueId
+                val:
+                  $nodeBlueId:
+                    type: Amendments/Amendments Functions
+            constants:
+              $var: amendmentConstants
+            do:
+              $literal:
+              - $if:
+                  cond:
+                    $not:
+                      $steps:
+                        path: /ready
+                        step: nextAdmission
+                  then:
+                  - $return:
+                      outcome: skipped
+              - $return:
+                  $call:
+                    function: recordProposal
+                    args:
+                      input:
+                        $steps:
+                          path: /request
+                          step: nextAdmission
+        - $merge:
+          - type: Contracts/Compute
+          - name: installAdmission
+            definition:
+              $var: definition
+            constants:
+              $var: sharedConstants
+            do:
+              $literal:
+              - $return:
+                  $call:
+                    function: admissionInstallRequest
+                    args: {}
+        - $merge:
+          - type: Contracts/Compute
+          - name: activateAdmission
+            definition:
+              $objectFromEntries:
+              - key: blueId
+                val:
+                  $nodeBlueId:
+                    type: Activation/Activation Functions
+            do:
+              $literal:
+              - $if:
+                  cond:
+                    $not:
+                      $steps:
+                        path: /ready
+                        step: installAdmission
+                  then:
+                  - $return:
+                      outcome: skipped
+              - $return:
+                  $call:
+                    function: admitApprovedParties
+                    args:
+                      input:
+                        $merge:
+                        - $steps:
+                            path: /request
+                            step: installAdmission
+                        - runtimeDefinition:
+                            $const: runtimeDefinition
+            constants:
+              runtimeDefinition:
+                $objectFromEntries:
+                - key: blueId
+                  val:
+                    $nodeBlueId:
+                      type: Activation/Activation Functions
+        - $merge:
+          - type: Contracts/Compute
+          - name: finishAdmission
+            definition:
+              $var: definition
+            constants:
+              $var: sharedConstants
+            do:
+              $literal:
+              - $if:
+                  cond:
+                    $not:
+                      $steps:
+                        path: /ready
+                        step: installAdmission
+                  then:
+                  - $return:
+                      outcome: skipped
+              - $return:
+                  $call:
+                    function: finishAdmission
+                    args:
+                      input:
+                        $steps: installAdmission
+    - $forEach:
+        item: watchPath
+        in:
+          process:
+            $var: statePath
+          activation: /activation
+        do:
+        - $let:
+            name: channelName
+            expr:
+              $concat:
+              - admissionUpdate_
+              - $const: clauseKey
+              - _
+              - $text:
+                  $var: watchIndex
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: channelName
+                val:
+                  kind: channel
+                  contract:
+                    $merge:
+                    - type: Contracts/Document Update Channel
+                    - path:
+                        $var: watchPath
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: channelName
+                  - Handler
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel:
+                        $var: channelName
+                      steps:
+                        $var: steps
+        key: watchIndex
+    - $forEach:
+        item: role
+        in:
+          $var: approvers
+        do:
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path:
+                  $concat:
+                  - /contracts/approveAdmission_
+                  - $const: clauseKey
+                  - _
+                  - $var: role
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow Operation
+                    - channel:
+                        $var: role
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition:
+                            $objectFromEntries:
+                            - key: blueId
+                              val:
+                                $nodeBlueId:
+                                  type: Amendments/Amendments Functions
+                          constants:
+                            $var: amendmentConstants
+                          do:
+                            $literal:
+                            - $failIf:
+                                cond:
+                                  $ne:
+                                  - $binding: call/requireExactDocumentVersion
+                                  - true
+                                message: EXACT_REVIEW_REQUIRED
+                            - $return:
+                                $call:
+                                  function: approve
+                                  args:
+                                    input:
+                                      $binding: call/request
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path:
+                  $concat:
+                  - /contracts/rebaseAdmission_
+                  - $const: clauseKey
+                  - _
+                  - $var: role
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow Operation
+                    - channel:
+                        $var: role
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition:
+                            $var: definition
+                          constants:
+                            $var: sharedConstants
+                          do:
+                            $literal:
+                            - $return:
+                                $call:
+                                  function: rebaseAdmission
+                                  args:
+                                    input:
+                                      $binding: call/request
+    - $return:
+        $var: plan
+  planDocumentAccess:
+    args:
+      base: {}
+      definition: {}
+    do:
+    - $let:
+        name: result
+        expr:
+          $var: base
+    - $let:
+        name: basePath
+        expr:
+          $concat:
+          - /processAccess_
+          - $const: clauseKey
+    - $forEach:
+        item: party
+        in:
+          $document: /clauseRuntime/work/candidate/activation/parameters/parties
+        do:
+        - $set:
+            name: result
+            expr:
+              $pointerSet:
+                object:
+                  $var: result
+                path:
+                  $concat:
+                  - /contracts/registerAccess_
+                  - $const: clauseKey
+                  - _
+                  - $var: role
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow Operation
+                    - channel:
+                        $var: role
+                      request: {}
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition:
+                            $var: definition
+                          do:
+                            $literal:
+                            - $call:
+                                function: registerDocumentAccess
+                                args:
+                                  input:
+                                    $merge:
+                                    - $binding: call/request
+                                    - basePath:
+                                        $const: accessBasePath
+                          constants:
+                            accessBasePath:
+                              $var: basePath
+                            clauseKey:
+                              $const: clauseKey
+                            bindings: {}
+                      - type: Activation/Refresh Activation
+        key: role
+    - $let:
+        name: embedded
+        expr:
+          $pointerGet:
+            object:
+              $var: result
+            path: /contracts/embedded
+            default:
+              kind: embedding
+              contract:
+                type: Contracts/Process Embedded
+                paths: []
+                collectionPaths: []
+    - $set:
+        name: embedded
+        expr:
+          $pointerSet:
+            object:
+              $var: embedded
+            path: /contract/collectionPaths
+            val:
+              $listConcat:
+              - $pointerGet:
+                  object:
+                    $var: embedded
+                  path: /contract/collectionPaths
+                  default: []
+              - - $var: basePath
+    - $set:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: result
+            path: /contracts/embedded
+            val:
+              $var: embedded
+    - $return:
+        $var: result
+
+  planSourceValidators:
+    args:
+      base: {}
+    do:
+    - $forEach:
+        key: contractId
+        item: entry
+        in:
+          $pointerGet:
+            object:
+              $var: base
+            path: /contracts
+        do:
+        - $forEach:
+            index: stepIndex
+            item: compute
+            in:
+              $pointerGet:
+                object:
+                  $var: entry
+                path: /contract/steps
+                default: []
+            do:
+            - $if:
+                cond:
+                  $exists:
+                    $pointerGet:
+                      object:
+                        $var: compute
+                      path: /functions/connectionConfiguration
+                then:
+                - $let:
+                    name: configuration
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: compute
+                        path: /functions/connectionConfiguration/expr/$literal
+                - $let:
+                    name: template
+                    expr:
+                      $choose:
+                        cond:
+                          $exists:
+                            $pointerGet:
+                              object:
+                                $var: configuration
+                              path: /parameters/template
+                        then:
+                          $pointerGet:
+                            object:
+                              $var: configuration
+                            path: /parameters/template
+                        else:
+                          $pointerGet:
+                            object:
+                              $var: compute
+                            path: /functions/connectionSnapshots/expr/$literal/template
+                - $let:
+                    name: declarations
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: template
+                        path: /sources
+                        default: {}
+                - $forEach:
+                    key: clauseId
+                    item: clause
+                    in:
+                      $pointerGet:
+                        object:
+                          $var: template
+                        path: /clauses
+                        default: {}
+                    do:
+                    - $forEach:
+                        key: alias
+                        item: sourceDeclaration
+                        in:
+                          $pointerGet:
+                            object:
+                              $var: clause
+                            path: /parameters/sources
+                            default: {}
+                        do:
+                        - $if:
+                            cond:
+                              $hasKey:
+                                object:
+                                  $var: declarations
+                                key:
+                                  $var: alias
+                            then:
+                            - $failIf:
+                                cond:
+                                  $ne:
+                                  - $get:
+                                      object:
+                                        $var: declarations
+                                      key:
+                                        $var: alias
+                                  - $var: sourceDeclaration
+                                message: SOURCE_DECLARATION_CONFLICT
+                        - $set:
+                            name: declarations
+                            expr:
+                              $objectSet:
+                                object:
+                                  $var: declarations
+                                key:
+                                  $var: alias
+                                val:
+                                  $var: sourceDeclaration
+                - $let:
+                    name: matcherBody
+                    expr: []
+                - $forEach:
+                    key: alias
+                    item: declaration
+                    in:
+                      $var: declarations
+                    do:
+                    - $let:
+                        name: branch
+                        expr:
+                          $pointerSet:
+                            object:
+                              $pointerSet:
+                                object:
+                                  $literal:
+                                    $if:
+                                      cond:
+                                        $eq:
+                                        - $var: alias
+                                        - ''
+                                      then:
+                                      - $return:
+                                          $is:
+                                            node:
+                                              $var: source
+                                            pattern: {}
+                                path: /$if/cond/$eq/1
+                                val:
+                                  $var: alias
+                            path: /$if/then/0/$return/$is/pattern
+                            val:
+                              $var: declaration
+                    - $set:
+                        name: matcherBody
+                        expr:
+                          $listConcat:
+                          - $var: matcherBody
+                          - - $var: branch
+                - $set:
+                    name: matcherBody
+                    expr:
+                      $listConcat:
+                      - $var: matcherBody
+                      - $literal:
+                        - $return: false
+                - $set:
+                    name: compute
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: compute
+                        path: /functions/configuredSources
+                        val:
+                          args: {}
+                          expr:
+                            $objectFromEntries:
+                            - key: $literal
+                              val:
+                                $var: declarations
+                - $set:
+                    name: compute
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: compute
+                        path: /functions/sourceDeclarationMatches
+                        val:
+                          args:
+                            alias:
+                              type: Text
+                            source: {}
+                          do:
+                            $var: matcherBody
+                - $set:
+                    name: base
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: base
+                        path:
+                          $concat:
+                          - /contracts/
+                          - $var: contractId
+                          - /contract/steps/
+                          - $text:
+                              $var: stepIndex
+                        val:
+                          $var: compute
+    - $return:
+        $var: base
