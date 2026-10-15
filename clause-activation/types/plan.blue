@@ -304,6 +304,8 @@ functions:
                       $call:
                         function: requestPartyAddition
                         args: {}
+                # A separate Compute sees the installed access documents and request.
+                - type: Activation/Refresh Activation
             activationInitializedRefresh:
               kind: handler
               contract:
@@ -727,6 +729,27 @@ functions:
                   name: s
                   expr:
                     $document: /activation
+              - $if:
+                  cond:
+                    $and:
+                    - {$eq: [{$binding: dispatch/kind}, EXTERNAL]}
+                    - {$exists: {$pointerGet: {object: {$var: s}, path: /channelsAdmittedAfter}}}
+                    - $lte:
+                      - {$binding: timestamp}
+                      - {$pointerGet: {object: {$var: s}, path: /channelsAdmittedAfter}}
+                  then:
+                  - $return:
+                      allowed: false
+                      reason: REQUEST_PRECEDES_PARTY_ADMISSION
+              - $if:
+                  cond:
+                    $ne:
+                    - {$pointerGet: {object: {$var: s}, path: /accessReady, default: false}}
+                    - true
+                  then:
+                  - $return:
+                      allowed: false
+                      reason: DOCUMENT_ACCESS_UNAVAILABLE
               - $if:
                   cond:
                     $not:
