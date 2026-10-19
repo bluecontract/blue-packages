@@ -140,7 +140,7 @@ A value shaped like a completion is not evidence it was executed. Accept only a 
 <a id="section-6"></a>
 ## 6. Standard categories and complete type catalogue
 
-**C06.** Only **Marker**, **Channel** and **Handler** are permitted top-level contract categories. `Contract` is an abstract common ancestor. `Operation` specializes Handler. A Sequential Workflow Operation is therefore a Handler. Process Embedded is a Marker. Standard steps inherit the abstract Contract definition solely to share declarations; their executable role is nested step, and placing them directly in `contracts` is invalid.
+**C06.** **Marker**, **Channel** and **Handler** are the ordinary top-level categories; an exact registered `dispatch-policy` Compute subtype is also permitted under the Dispatch role rules in this edition. `Contract` is an abstract common ancestor. `Operation` specializes Handler. A Sequential Workflow Operation is therefore a Handler. Process Embedded is a Marker. Standard steps inherit the abstract Contract definition solely to share declarations; their executable role is nested step, and placing them directly in `contracts` is invalid.
 
 All registered definitions include the exact specification reference. `name` and `description` are Language labels, not inherited business defaults. Runtime contracts may carry these labels. `order` is an optional signed 32-bit Integer; omitted means zero. Unknown standard runtime fields are rejected, including `when`. Catalogue declaration holes do not cause absent options to appear configured.
 
@@ -524,7 +524,7 @@ An unchanged large value retains its exact BlueId. Any eager/cached implementati
 
 **C28.** A RuntimeBinding pins the exact custom type ID, exact semantics-document ID, role, header/body field names, private gas namespace and tariff, optional inheritance to descendants, explicit peer fields, and live or ledger meter mode. The full record is immutable and committed in snapshots. Installing new types does not install their executable behavior. Standard implementations cannot be rebound. Conflicting bindings fail.
 
-Roles are external-channel, processor-channel, handler, marker and nested step. These are runtime roles within the three top-level categories, not additional contract categories. A channel type must descend from Channel; a handler from Handler; a marker from Marker; a step from Contract. Standard abstract catalogue types do not count as concrete implementations. Descendant inheritance is enabled only by the binding's explicit flag.
+Roles are external-channel, processor-channel, handler, marker, nested step and dispatch-policy. A dispatch-policy must descend from Compute; its selected exact binding is the only exception to nested Compute placement. A channel type must descend from Channel; a handler from Handler; a marker from Marker; a step from Contract. Standard abstract catalogue types do not count as concrete implementations. Descendant inheritance is enabled only by the binding's explicit flag.
 
 An external-channel callback receives read-only header, complete original event, integer timestamp, prior checkpoint, bounded declared-peer lookup and live meter. It returns exactly a Boolean. It cannot return another event, a payload path or a delivery plan.
 
@@ -1350,7 +1350,7 @@ removes accidental duplicate establishment, not actual reads or new construction
 
 ```json
 {
-  "profile": "contracts-deterministic-gas-4",
+  "profile": "contracts-deterministic-gas-6",
   "status": "Ten-million-gas edition: shared default and maximum 10000000; numerical tariffs, charge ordering and rollback are unchanged.",
   "sharedMaximum": 10000000,
   "weights": {
@@ -1423,9 +1423,203 @@ removes accidental duplicate establishment, not actual reads or new construction
 ```
 
 <a id="algorithms"></a>
-## Appendix C. Complete executable algorithms
+## Deterministic execution context and traversal (2026-10-17)
 
-The following module blocks define this edition's reference procedures. File names identify modules within the abstract reference system; they are not external normative downloads. The selected Language and BEX operations have the exact bindings in §2. The host-value module is included where used.
+This edition retains the 10,000,000 shared default and maximum, charge-before-work,
+member ceilings, admitted-prefix gas, shared-cap tie precedence and atomic rollback.
+Accepted charge histories remain excluded from canonical final-gas evidence.
+The following refinements govern this edition; historical publications remain
+unchanged and are not compatible substitutions for this specification.
+
+### Ordering domains
+
+| Domain | Required order |
+| --- | --- |
+| Language canonical objects and BlueIds | Existing unsigned UTF-16 Language order |
+| Typed enum scalar keys | Unsigned UTF-16, `Language.ordered`; outer effective group order unchanged |
+| Contracts declarations, members, channels and error scans | Unicode code points |
+| Contracts semantic pointer comparisons | Decoded-segment tuples, each segment in code-point order |
+| Stored graph edge/vector serialization keys | `(source, raw pointer)` in code-point order, as in the executable reference |
+| Private Contracts JSON object keys | Unicode code points; this is not Language canonicalization |
+| Explicit source, emission, checkpoint and batch arrays | Their prescribed sequence; never sorted after execution |
+| Runtime type-slot alias precheck | Present slots in `itemType`, `keyType`, `type`, `valueType` order |
+| Count-predicate metering | Present `minItems`, `maxItems`, `minFields`, `maxFields`, `minLength`, `maxLength` |
+
+Every traversal affecting gas, a selected error, a commitment or output sequence
+uses its specified order, independent of map insertion, process seed, locale,
+worker completion or cache state. The metered bottom-up declaration merge begins
+in raw-key code-point order and preserves its `(order, key, typeID)` comparisons.
+Enum ordering adds no physical-sort charge and preserves typed scalar keys,
+duplicate/group elimination, first effective group occurrence and primitive
+category/payload comparison stopping behavior. Source enum lists are unchanged.
+Text count comparisons remain before enum examination; List counts remain before
+item traversal. Language validation remains authoritative for exact admission.
+
+Private canonical JSON accepts null, Boolean, arbitrary exact Integer, Text,
+sequences and Text-keyed objects. It rejects floating and Decimal carriers.
+The private encoder, including streaming/digest paths, uses the executable
+`canonical` function's bytes and error rules. Language/BEX numeric and UTF-16
+identity rules are unchanged.
+
+### Complete invocation identity
+
+Successful preparation freezes verified logical admission context against the
+original receiver before child installation, allocations or local turns. The
+private projection is keyed by exact binding identity and contains only the
+binding verifier's closed semantic result. Verifiers must reject unrecognized
+fields and must exclude signatures, credentials, local capability tokens,
+physical cache state and other proof-encoding details. Arbitrary submitted
+evidence is never made authoritative by hashing it.
+
+The ordinary `contracts.invocation/2` record is closed over `input`, `event`,
+`timestamp`, `gas`, `release`, and `admissions`. The receiving
+`contracts.receiving/2` record is closed over `input`, `mode`, `sources`, `policy`,
+and `admissions`; mode is exactly HISTORICAL or LIVE. Sources retain the supplied
+validated descriptor sequence. HISTORICAL has empty admissions. The original
+snapshot commits the exact active runtime profile. Both records are sealed after
+admission verification and before invocation-derived allocations.
+
+Before verification succeeds, validation and metering failures use a distinct
+`contracts.attempt/2` or `contracts.receiving-attempt/2` identity committing the
+same selected inputs but no purported verified admissions. The failure outcome
+and receipt commit the diagnostic and admitted gas prefix. The attempt identity
+is not a claim that unverified evidence has semantic authority. Preparation keeps
+its existing charged preflight order. The public process interface remains the
+three-input document/event/timestamp interface.
+
+### Terminal receiving
+
+After the required original-input validation, admission and seed checks, LIVE
+rejects an already terminated root with the direct PROCESS terminal disposition;
+it does not install later child results. HISTORICAL may perform exact seedless
+structural adoption for finite previously frozen host obligations. Active
+receivers retain historical callbacks. Structural installation into a silent
+terminated member of an actual live cyclic unit remains permitted and does not
+reopen that member's external handlers.
+
+### Exact active profiles
+
+Runtime availability does not activate execution. The selected active binding
+sequence is fixed before initialization and must exactly match snapshots,
+received source completions and chunks. No implicit additive promotion is
+defined. New binding authors order validated type IDs by ASCII bytes and tariff
+counter names by Unicode code points, preserving specified header/body/peer
+field sequences and rejecting duplicates. This normalization is not execution
+work. Retained binding arrays are never normalized during restore.
+
+
+### Dispatch role and native integration
+
+
+### E1. Role, ownership and binding
+
+Contracts defines the `dispatch-policy` role and the hook below. The concrete Document Dispatch Policy type is a subtype of the selected Contracts/Compute and carries this specification as its governing rules. Runtimes select its exact published type and rules IDs.
+
+Select the binding before document initialization. Preserve the concrete role's current non-inherited exact type support, no header/peer fields, `body_fields` sequence `expr, do, constants, functions, entry, definition`, live meter mode and `dispatchPolicyCheck` price 1 in this edition. The namespace is `documentDispatchV1`; tariff is the ordered vector `[["dispatchPolicyCheck", 1]]`. Binding type_id and semantics_id are respectively the published policy type and this rules Text.
+
+The concrete policy remains a subtype of `Contracts/Compute` and is admitted as an exact top-level `/contracts` `dispatch-policy` declaration. Arbitrary subtype inheritance or nested executable roles do not acquire this policy behavior.
+
+### E2. Delivery hook and immutable context
+
+Run the gate after existing liveness checks, native work-occurrence recording/charging and channel-existence checking, before any handler-candidate matching for that delivery. The local document includes completed child results required by the schedule. There is no new implicit parent lookup.
+
+Use the ordinary Compute context plus a runtime-owned closed object `{kind, channel, operation}`. `kind` is one of EXTERNAL, TRIGGERED, EMBEDDED, UPDATE, INITIALIZATION, TERMINATION; `channel` is the selected exact local key; `operation` is the natively selected operation or null. Never derive native kind from payload strings. Original processing event, current payload, current declaration, explicit timestamp, call, scope and no-prior-step-results follow existing Compute rules; preserve initialization's absence semantics.
+
+### E3. Order, purity and errors
+
+If no policies exist, no extra policy sorting pass or charge occurs. Otherwise, freeze the local declaration map, execute the metered Contracts sort over **all** declarations, then filter policies. Evaluate every policy in that order. Charge its check before evaluation. Require no staged document changes, events or termination effects. Require a closed result `{allowed: Boolean, reason?: Text}`, without coercion.
+
+A valid false does not skip later policies. A BEX failure, gas interruption or malformed result interrupts via its proper error path. Preserve the validation precedence: evaluation/interruption; effect rejection; record shape; Boolean field; optional Text reason. Current matching codes are `EFFECTFUL_DISPATCH_POLICY`, `INVALID_RECORD`, `INVALID_DISPATCH_DECISION` and `INVALID_DISPATCH_REASON`. If all policies allow, ordinary handler scheduling performs its separate prescribed sorting pass. Physical reuse must not remove logical gas.
+
+### E4. Denial and checkpoint
+
+A valid denial skips handlers for that delivery. It does not cancel independent child progress or all other deliveries. A denied external seed is consumed/checkpointed **if the enclosing attempt commits**. Later access restoration does not replay it; a caller submits a new occurrence to retry. Thus Contracts may return APPLIED while the requested business operation is denied. A later error/exhaustion rolls back the enclosing tentative attempt's checkpoint/state, while previously sealed independent source results survive.
+
+Missing resources are incomplete work, not a false policy result. Pre-Contracts authority rejection is also distinct and must not invent a successful native checkpoint.
+
+### E5. Committed evidence and reporting
+
+Add `dispatchDecisions` to the local-completion schema. It is present if and only if at least one policy decision was validated in that completed local turn; otherwise it is omitted. Its order is native delivery order, then canonical policy order. Each row contains:
+
+`delivery`, `policy`, `declaration`, `channel`, `kind`, `operation`, `allowed`, `reason`.
+
+`delivery` references the existing `contracts.work/completion-1` occurrence identity; it is not a second event wrapper. `declaration` is the policy declaration's exact BlueId. `operation` is Text or explicit null. Normalize absent `reason` to empty Text for allow and `DISPATCH_REJECTED` for deny. Validate field types and closed records. Only validated decisions in a completed local result enter this successful-completion sequence; failure evidence follows the selected existing failed-attempt schema and never fabricates a completed decision.
+
+Bind this field through every completion, chunk, source-receiving, export/restore and receipt verifier. Detached decision rows do not grant authority.
+
+Each `delivery` must identify a work occurrence in the same local turn/member. `channel` and `kind` must match that occurrence; `operation` must match native selection; `declaration` must match the selected policy. Reject missing, duplicated, reordered or mismatched decisions. Record-shape checking and hashing alone do not establish this correspondence.
+
+Coordination derives per-delivery rejection information from these rows. Preserve one row per delivery/policy, including operation-less raw external events. For a requested operation's aggregate report, a denial on its addressed delivery produces the standardized disposition code `DISPATCH_REJECTED`. Authored reasons such as `DOCUMENT_ACCESS_UNAVAILABLE` remain in the rejected decision details in canonical order; they do not replace that code or the native Contracts `APPLIED` status. Unrelated allowed child/delivery work remains represented as committed. For raw events or mixed deliveries, per-delivery evidence is authoritative and aggregate labels must preserve partial allowed progress. For an addressed operation report `DISPATCH_REJECTED` if any decision on its addressed delivery denies. For a raw or mixed input retain ordered per-delivery decisions and report `PARTIAL` when allowed work and denied work coexist; an aggregate does not erase committed progress.
+
+### E6. Activation remains authored
+
+Keep Timeline Access as a provider-controlled document; update both permission lists before its ordinary `Coordination/Timeline Access Updated` event. Activation uses the existing Embedded Node Channel and completed child state. Recovery requires the true native EMBEDDED path and the authored access-control channel/instance checks. Direct approvals, amendments and business requests remain non-executing while required access is lost; preserve approvals and channel history. Do not add the removed Embedded State Channel/EMBEDDED_UPDATE mechanism or native business-state hooks.
+
+
+
+### Constructor reference prerequisite order (2026-10-17 correction 2)
+
+A metered Language constructor callback MUST NOT expose host-set iteration as
+logical gas order. Runtime normalization constructs inline type and specification
+slots first in the already prescribed input-key order and passes their established
+exact references to Language. During each resulting node construction, collect
+all reference-only `remember` occurrences; before establishing the next node,
+pay their unchanged direct identity prerequisites in exact BlueId ASCII order.
+Preserve occurrence multiplicity. Flush any remainder before the constructor
+returns. Sorting this inventory adds no gas. Node construction and validation
+remain in their existing order, with charge-before-work and atomic rollback.
+The same rule applies while synthesizing a multi-contribution captured recipe.
+It does not alter Language identity, admission, refinement or output values.
+
+This corrects a further observable ordering defect in the first deterministic
+candidate: normalization of a Dictionary with Integer `valueType` completed with
+the same total gas but, with budget 245, failed at admitted gas 245 for seed 0 and
+234 for seed 7. The original candidate and failed observations remain evidence.
+The four-slot runtime alias check retains its separate explicit slot order.
+
+
+### Effective document reads and staged overlays (2026-10-17 correction 3)
+
+Direct document reads, selected exact subviews and ordinary BEX member/item
+access MUST use the same effective collection interface. The presence of
+`$resultValue` elsewhere in a Compute program MUST NOT change an unrelated
+`$document` observation. In particular, a non-core `type` member is a captured
+effective reference view, not an ordinary object whose sole member is `blueId`.
+Its Blue output remains the finite exact reference. Contracts, labels and
+ordinary members use their existing effective visibility; hidden core metadata
+does not become an enumerated business field. Scalars use BEX scalar semantics.
+
+Charge `objectMemberRead` once before each attempted exact object member access,
+including a missing member and the special type/contracts/label members. Charge
+`listItemRead` once for a selected in-bounds exact list item. BEX validates index
+syntax and bounds before selecting an item; an invalid or out-of-range index
+does not charge an item access. Preserve BEX value-pointer parsing, including
+both empty and slash root paths, non-NFC field spellings and arbitrary-length
+index text. Contracts graph/semantic pointer validation remains a different
+boundary. Split reads retain the same invocation manifest inventory and the
+same per-access tariffs; they cannot bypass special-member charges. These are
+intentional logical-count and effective-projection corrections, not only a
+physical optimization. Prices, maximum budget and rollback remain unchanged.
+
+Every selected exact subview, and every saved Compute document-read callback,
+retains its captured resolver together with the invocation logical ledger.
+Opening through that ledger uses the captured source, never a later refreshed
+processor resolver. A staged overlay copies only changed ancestors; untouched
+exact children keep that captured context. Missing evidence propagates as the
+existing resource outcome. Finite wire views and exact-transfer accounting are
+not effective document views and remain unchanged.
+
+Staged authored BEX dictionaries are not exact host capabilities. The existing
+document overlay pointer interface can interpret a one-field `blueId` dictionary
+when continuing through it, using the captured resolver and the same logical
+ledger. A terminal such dictionary, or its explicitly requested `blueId` field,
+remains authored data; generic BEX access to that dictionary remains ordinary
+BEX access. The direct/split equivalence above applies to exact effective views,
+not to an assertion that arbitrary staged dictionaries have already undergone
+Language normalization or admission. No trusted provenance is inferred from
+reference-shaped authored data.
+
+## Appendix C. Complete executable algorithms
 
 ### `src/blue_contracts/reference/__init__.py`
 
@@ -1874,7 +2068,7 @@ class Attempt:
     def accept_chunk(self,token,completion):
         require(not self._finished and self.outcome is None, 'ATTEMPT_FINISHED')
         descriptor=token.descriptor if isinstance(token,ChunkToken) else closed(token,{'format','token','input','history'})['token']
-        require(self._token is not None and descriptor==self._token._descriptor, 'STALE_CHUNK_TOKEN')
+        require(self._token is not None and canonical(descriptor)==canonical(self._token._descriptor), 'STALE_CHUNK_TOKEN')
         wire=completion.to_data() if isinstance(completion,ChunkResult) else deepcopy(completion)
         closed(wire,{'identity','token','outcome','snapshot','events','work','changes','checkpoints','gas','rejected','turns','rounds','units','logicalPrefix'})
         require(wire['token']==self._token.identity, 'CHUNK_INPUT_MISMATCH')
@@ -2045,6 +2239,7 @@ class Frame:
     consumed: list = field(default_factory=list)
     writer: dict | None = None
     writes: list = field(default_factory=list)
+    dispatch_decisions: list = field(default_factory=list)
 
 
 @dataclass
@@ -2383,7 +2578,8 @@ class CompletionMachine:
                 consumedSeeds=[asdict(s) for s in self.frame.consumed],
                 writes=deepcopy(self.frame.writes),
                 retiredTickets=[t.wire() for b in incoming for t in b.tickets if not self.ticket_live(t)],
-                gas=self.meter.used-start))
+                gas=self.meter.used-start,
+                **({'dispatchDecisions':deepcopy(self.frame.dispatch_decisions)} if self.frame.dispatch_decisions else {})))
             self.turns.append(completion)
             new = set(self.state.documents) - set(sealed.documents)
             owned = new | {key}
@@ -2590,6 +2786,47 @@ def resolve_definition(attempt,key,step):
             visit(child);out[field]=blue.bex_data(child)
             require(type(out[field]) is dict,'INVALID_COMPUTE_DEFINITION',field=field)
     return out
+```
+
+### `src/blue_contracts/reference/dispatch.py`
+
+```python
+"""Pure per-delivery policy hook; policy decisions are authored in BEX."""
+from .model import closed, require
+from .runtime import RuntimeMeter
+
+
+def admit(run, member, channel, payload, kind, operation, call, declarations, delivery):
+    if not any(d['_role'] == 'extension_dispatch_policy' for d in declarations.values()):
+        return True
+    allowed = True
+    # Sorting all declarations is charged even though only policies are evaluated.
+    for key, header in run.ordered(declarations):
+        if header['_role'] != 'extension_dispatch_policy':
+            continue
+        policy = run.reg.declaration(header['_recipe'])
+        meter = RuntimeMeter(run.meter, policy['_extension'].binding, member)
+        meter.charge('dispatchPolicyCheck')
+        meter.merge()
+        definition = run.compute_definition(member, policy)
+        program = run.program(policy)
+        overlay = {**program, 'functions': {**(definition or {}).get('functions', {}),
+                                           **policy.get('functions', {})}}
+        context = run.context(member, payload, policy, {}, call, overlay_program=overlay)
+        context.bindings['dispatch'] = {'kind': kind, 'channel': channel, 'operation': operation}
+        result = run.engine.bex.execute(program, context, gas=run.meter,
+                                        entry=policy.get('entry'), definition=definition)
+        require(not result.changeset and not result.events, 'EFFECTFUL_DISPATCH_POLICY')
+        decision = closed(result.value, {'allowed'}, {'reason'})
+        require(type(decision['allowed']) is bool, 'INVALID_DISPATCH_DECISION')
+        require('reason' not in decision or type(decision['reason']) is str, 'INVALID_DISPATCH_REASON')
+        accept = decision['allowed']
+        allowed = allowed and accept
+        run.frame.dispatch_decisions.append(dict(
+            delivery=delivery, policy=key, declaration=run.blue.identity(run.blue.exact(policy['_recipe'])),
+            channel=channel, kind=kind, operation=operation, allowed=accept,
+            reason=decision.get('reason', '' if accept else 'DISPATCH_REJECTED')))
+    return allowed
 ```
 
 ### `src/blue_contracts/reference/generalization.py`
@@ -3030,6 +3267,7 @@ from collections.abc import Mapping, Sequence
 from blue_host import HostIncomplete, HOST_FAILURES, incomplete, host_boundary
 from algorithms import blue as L
 from blue_language import Language
+from blue_bex.values import segments as bex_segments, index as bex_index, BexError
 from blue_bex.values import UNDEFINED,blue_value,HostValue,pointer_get,kind
 from .model import ContractError,NeedResources,require,segments,LIMITS
 
@@ -3082,7 +3320,7 @@ class ExactValue(HostValue):
 
     def _head(self):
         if self._logical:
-            for part in self._recipe.parts:self._logical.open(part)
+            for part in self._recipe.parts:self._logical.open(part,self._blue)
         return self._blue.head(self._recipe)
 
     def _child(self, key):
@@ -3107,15 +3345,14 @@ class ExactObject(ExactValue, Mapping):
     def __len__(self): return sum(1 for _ in self)
     def __getitem__(self, key):
         h = self._head()
-        if key == 'type' and h.type_id and h.type_id not in L.CORE_NAME:return {'blueId': h.type_id}
-        if key == 'contracts' and h.contracts is not None:
-            return self._blue.view(self._blue.child(self._recipe,key), logical=self._logical,depth=self._depth+1)
-        if key in ('name', 'description'):
-            n = self._blue.open(self._blue.exact(self._recipe))
-            if n.has(key):return n.get(key)
-        if key not in h.fields:raise KeyError(key)
-        result = self._child(key)
-        if result is UNDEFINED:raise KeyError(key)
+        if self._logical:self._logical.meter.contracts('objectMemberRead')
+        # The effective collection inventory is shared by all BEX access forms.
+        visible = key in h.fields or (key == 'contracts' and h.contracts is not None) or (
+            key == 'type' and h.type_id and h.type_id not in L.CORE_NAME) or (
+            key in ('name','description') and key in h.labels)
+        if not visible:raise KeyError(key)
+        result = self._blue.view(self._blue.child(self._recipe,key),logical=self._logical,depth=self._depth+1)
+        if result is UNDEFINED and key not in ('contracts','type','name','description'):raise KeyError(key)
         return result
 
 
@@ -3124,8 +3361,11 @@ class ExactList(ExactValue, Sequence):
     def __len__(self): return len(self._head().items)
     def __getitem__(self, index):
         if isinstance(index, slice):return [self[i] for i in range(*index.indices(len(self)))]
-        if not 0 <= index < len(self):raise IndexError(index)
-        return self._child(index)
+        if type(index) is not int:raise TypeError('List index must be an integer')
+        h = self._head()
+        if not 0 <= index < len(h.items):raise IndexError(index)
+        if self._logical:self._logical.meter.contracts('listItemRead')
+        return self._blue.view(self._blue.child(self._recipe,index),logical=self._logical,depth=self._depth+1)
 
 class WireObject(HostValue, Mapping):
     """A finite exact output manifest; references stay one-field objects."""
@@ -3337,7 +3577,7 @@ class Bridge:
         r = r if isinstance(r, L.Recipe) else L.recipe(r)
         captured = copy(self)  # Capture resolver/context, not a future refresh.
         if logical:
-            for part in r.parts:logical.open(part)
+            for part in r.parts:logical.open(part,captured)
         h = captured.head(r)
         if h.value is not L.ABSENT:return h.value
         if h.items is not None:return ExactList(captured, r, logical,depth)
@@ -3361,15 +3601,19 @@ class Bridge:
     def read(self,node,path,view='canonical'):
         require(view in ('canonical','resolved'),'INVALID_VIEW');r=self.select(node,path)
         return self.project(r) if r is not None else UNDEFINED
-    def read_bex(self,value,path):
-        if isinstance(value, HostValue):return pointer_get(value,path)
-        at=value
-        for k in segments('' if path=='/' else path):
-            if isinstance(at,dict) and set(at)=={'blueId'}:at=self.view(L.Ref(at['blueId']))
+    def read_bex(self,value,path,*,logical=None):
+        # Plain overlay containers retain their exact children. Each such child
+        # supplies its own captured resolver and the same invocation ledger.
+        at=value;source=self
+        for k in bex_segments(path):
+            if isinstance(at,ExactValue):source=at._blue;logical=at._logical
+            if isinstance(at,dict) and set(at)=={'blueId'} and k!='blueId':
+                at=source.view(L.Ref(at['blueId']),logical=logical)
             if kind(at)=='object':at=at.get(k,UNDEFINED)
             elif kind(at)=='list':
-                if not k.isdigit() or k!='0' and k.startswith('0'):return UNDEFINED
-                i=int(k);at=at[i] if i<len(at) else UNDEFINED
+                try:i=bex_index(k,len(at))
+                except BexError:return UNDEFINED
+                at=at[i]
             else:return UNDEFINED
         return deepcopy(at)
     def matches(self,value,pattern,*,logical=None):
@@ -3519,7 +3763,8 @@ def canonical(value):
         from decimal import Decimal
         return str(Decimal(value)).encode('ascii')
     if type(value) is str:
-        value.encode('utf-8');return json.dumps(value,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+        try:return json.dumps(value,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+        except UnicodeEncodeError:raise ContractError('INVALID_RECORD') from None
     if type(value) in (list,tuple):return b'['+b','.join(canonical(v) for v in value)+b']'
     require(type(value) is dict and all(type(k) is str for k in value),'INVALID_RECORD')
     return b'{'+b','.join(canonical(k)+b':'+canonical(value[k]) for k in sorted(value))+b'}'
@@ -3951,7 +4196,7 @@ class Run(CompletionMachine):
         self.admission_evidence=deepcopy(admission_evidence or {});self.external_admissions={}
         self.admission=admission;self.meter=Meter(gas_limit,local_limits,state.documents)
         self.views=engine.archive.bindings()
-        self.invocation=digest('contracts.invocation/completion-1',dict(input=state.identity,event=self.event_id,
+        self.invocation=digest('contracts.attempt/2',dict(input=state.identity,event=self.event_id,
             timestamp=timestamp,gas=self.meter.policy(),release=engine.registry.specification))
         self.graph=Graph(self.state,self.reg,engine.archive.restrict(self.views),self.meter,self.invocation)
         if self.event_id:self.graph.logical.carried_roots.add(self.event_id)
@@ -3960,6 +4205,19 @@ class Run(CompletionMachine):
         self.settlements=[];self.effect_count=0
         self.opened=set();self.headers=set();self.activation={k:0 for k in state.documents}
         self.setup_completion();self.graph.changes=self.changes
+    def seal_invocation(self):
+        """Bind verified logical context before any invocation-derived work."""
+        from .model import canonical
+        canonical(self.external_admissions)
+        if getattr(self, 'receiving', False):
+            self.invocation=digest('contracts.receiving/2',dict(input=self.input.identity,
+                mode=self.receiving_mode,sources=self.receiving_sources,
+                policy=self.meter.policy(),admissions=deepcopy(self.external_admissions)))
+        else:
+            self.invocation=digest('contracts.invocation/2',dict(input=self.input.identity,
+                event=self.event_id,timestamp=self.timestamp,gas=self.meter.policy(),
+                release=self.reg.specification,admissions=deepcopy(self.external_admissions)))
+        self.graph.cause=self.invocation
     def runtime_node(self,value,**kwargs):
         if self.frame is not None:self.meter.owner=self.frame.key
         return self.blue.node(value,logical=self.graph.logical,**kwargs)
@@ -3996,8 +4254,10 @@ class Run(CompletionMachine):
         if not self.admission:
             from .runtime import prepare_admissions
             prepare_admissions(self)
+            self.seal_invocation()
             self.call,self.call_record=recognize_call(self.reg,self.event)
             self.seeds=select_seeds(self)
+        else:self.seal_invocation()
         self.meter.owner=''
         if self.graph.terminated(self.state.root):return self.fail_result('TERMINATED',None)
         self.phase=self.new_phase('INITIALIZE')
@@ -4049,12 +4309,14 @@ class Run(CompletionMachine):
             if type(value) is dict:return '$resultValue' in value or any(overlays(x) for k,x in value.items() if k!='$literal')
             return False
         body=self.state.documents[key].body
+        from copy import copy
+        captured=copy(self.blue)
         view=self.blue.view(body,logical=self.graph.logical) if overlays(self.program(contract) if overlay_program is None else overlay_program) else body
         event=event_observation(self.reg,payload,logical=self.graph.logical)
         binding={'processingEvent':event_observation(self.reg,self.event,logical=self.graph.logical) if self.event is not None else UNDEFINED,
                  'timestamp':self.timestamp if self.timestamp is not None else UNDEFINED,
                  'call':event_observation(self.reg,call,logical=self.graph.logical) if call is not None else UNDEFINED}
-        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,'' if p=='/' else p) if isinstance(d,(L.Node,L.Ref)) else self.blue.read_bex(d,p),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
+        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,p,source=captured) if isinstance(d,(L.Node,L.Ref)) else captured.read_bex(d,p,logical=self.graph.logical),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
     def evaluate(self,key,payload,contract,steps,expr,call=None):
         self.meter.owner=key;result=self.engine.bex.execute({'expr':expr},self.context(key,payload,contract,steps,call),gas=self.meter);require(not result.changeset and not result.events,'EFFECTFUL_EXPRESSION');return result.value
     def work_record(self,key,channel,payload,kind):
@@ -4091,6 +4353,8 @@ class Run(CompletionMachine):
     def dispatch_local(self,key,channel,payload,kind,operation=None,allow_terminating=False,call=None):
         if not self.live(key) and not (allow_terminating and key in self.terminating):return
         self.work_record(key,channel,payload,kind);cs=self.reg.contracts(self.state.documents[key].body);require(channel in cs,'MISSING_HANDLER_CHANNEL');frozen=[]
+        from .dispatch import admit
+        if not admit(self,key,channel,payload,kind,operation,call,cs,self.work[-1]['identity']):return
         for hkey,h in self.ordered(cs):
             if h['_role'] not in EXECUTABLE or h['channel']!=channel:continue
             if h['_role']=='operation' and (kind!='EXTERNAL' or operation is None or hkey!=operation):continue
@@ -4278,7 +4542,7 @@ from dataclasses import dataclass
 from secrets import token_hex
 from blue_host import HostIncomplete, HOST_FAILURES, incomplete, host_boundary
 from algorithms import blue as L
-from .model import require, digest
+from .model import require, digest, canonical
 from .completion import Batch, vector
 from .graph import Graph
 
@@ -4307,7 +4571,7 @@ class CompletionStore:
 
     def capture(self, outcome, members):
         record = self._outcomes.get(outcome.receipt)
-        require(record is not None and record[1].observations() == outcome.observations(),
+        require(record is not None and canonical(record[1].observations()) == canonical(outcome.observations()),
                 'UNESTABLISHED_SOURCE_COMPLETION')
         before, result, event, timestamp = record
         members = frozenset(members)
@@ -4361,7 +4625,7 @@ def _begin_receiving(processor, snapshot, completions, *, live=False, evidence=N
     for record in records:
         require(not owners.intersection(record['members']), 'OVERLAPPING_SOURCE_COMPLETIONS')
         owners.update(record['members'])
-        require(record['before'].release == snapshot.release and record['before'].runtimes == snapshot.runtimes,
+        require(record['before'].release == snapshot.release and canonical(record['before'].runtimes) == canonical(snapshot.runtimes),
                 'INCOMPATIBLE_SOURCE_RUNTIME')
     require(snapshot.root not in owners, 'CYCLIC_RECEIVING_REQUIRES_ATOMIC_INVOCATION')
 
@@ -4378,8 +4642,13 @@ def _begin_receiving(processor, snapshot, completions, *, live=False, evidence=N
                 from .runtime import prepare_admissions
                 from .channels import recognize_call, select_seeds
                 prepare_admissions(self)
+                self.seal_invocation()
                 self.call, self.call_record = recognize_call(self.reg, self.event)
                 self.seeds = tuple(s for s in select_seeds(self) if s.document not in owners)
+                self.meter.owner = ''
+                if self.graph.terminated(self.state.root):
+                    return self.fail_result('TERMINATED', None)
+            else:self.seal_invocation()
             before_routes = {k: self.capture_routes(k) for k in owners}
             carried = {}
             for record in records:
@@ -4448,9 +4717,11 @@ def _begin_receiving(processor, snapshot, completions, *, live=False, evidence=N
                        processor.gas_limit, admission=event is None, local_limits=processor.local_limits,
                        admission_evidence=evidence)
     run.receiving = True
-    run.invocation = digest('contracts.receiving/1', dict(input=snapshot.identity,
-        sources=[r['descriptor']['identity'] for r in records], policy=run.meter.policy()))
-    run.graph.invocation = run.invocation
+    run.receiving_mode = 'LIVE' if live else 'HISTORICAL'
+    run.receiving_sources = [r['descriptor']['identity'] for r in records]
+    run.invocation = digest('contracts.receiving-attempt/2', dict(input=snapshot.identity,
+        mode=run.receiving_mode,sources=run.receiving_sources,policy=run.meter.policy()))
+    run.graph.cause = run.invocation
     return Attempt(run)
 ```
 
@@ -4491,7 +4762,7 @@ class Registry:
         from .runtime import Runtime
         self.blue.certify(L.Ref(binding.type_id),'definition');self.blue.certify(L.Ref(binding.semantics_id))
         require(binding.type_id not in self.by_id,'STANDARD_RUNTIME_REBIND')
-        parent={'external-channel':'Channel','processor-channel':'Channel','handler':'Handler','marker':'Marker','step':'Contract'}[binding.role]
+        parent={'external-channel':'Channel','processor-channel':'Channel','handler':'Handler','marker':'Marker','step':'Contract','dispatch-policy':'Compute'}[binding.role]
         require(self.types[parent] in L.ancestry(binding.type_id,self.blue.context),'INVALID_RUNTIME_CATEGORY',category=parent)
         previous=self.extensions.get(binding.type_id)
         if previous is not None:
@@ -4575,7 +4846,7 @@ class Registry:
         for k in sorted(ch.fields):
             token(k);r=L.child_recipe(ch,k);role=self.role(r)
             if k in MARKERS:require(role==MARKERS[k],'INVALID_PROCESSOR_STATE',key=k);continue
-            require(role not in set(MARKERS.values()),'MISPLACED_PROCESSOR_STATE',key=k);d=self.declaration(r,demand=False);require(d['_role'] in EXTERNAL|INTERNAL|EXECUTABLE|{'embedding','generalization','extension_marker','compute_definition'},'INVALID_CONTRACT_ROLE',role=d['_role'])
+            require(role not in set(MARKERS.values()),'MISPLACED_PROCESSOR_STATE',key=k);d=self.declaration(r,demand=False);require(d['_role'] in EXTERNAL|INTERNAL|EXECUTABLE|{'embedding','generalization','extension_marker','compute_definition','extension_dispatch_policy'},'INVALID_CONTRACT_ROLE',role=d['_role'])
             if d['_role']=='embedding':require(k=='embedded','EMBEDDING_KEY')
             if d['_role']=='generalization':require(k=='generalization','GENERALIZATION_KEY');self.policy(body)
             result[k]=d
@@ -4672,16 +4943,17 @@ class RuntimeBinding:
     def __post_init__(self):
         L.final_id(self.type_id);L.final_id(self.semantics_id);token(self.namespace)
         require(self.namespace not in ('bex','contracts'),'RESERVED_GAS_NAMESPACE')
-        require(self.role in ('external-channel','processor-channel','handler','marker','step'),'INVALID_RUNTIME_ROLE')
+        require(self.role in ('external-channel','processor-channel','handler','marker','step','dispatch-policy'),'INVALID_RUNTIME_ROLE')
         require(type(self.inherits_to_subtypes) is bool,'INVALID_RUNTIME_BINDING')
         require(self.meter_mode in ('live','ledger'),'INVALID_RUNTIME_METER_MODE')
         for value in (self.header_fields,self.body_fields,self.tariff,self.peer_fields):require(type(value) is tuple,'MUTABLE_RUNTIME_BINDING')
         fields=self.header_fields+self.body_fields
         require(len(fields)==len(set(fields)),'AMBIGUOUS_RUNTIME_FIELDS')
         for name in fields:token(name);require(not name.startswith('_') and name not in ('type','specification','name','description','order'),'INVALID_RUNTIME_FIELD')
-        require(set(self.peer_fields)<=set(self.header_fields),'INVALID_PEER_FIELDS')
+        require(len(set(self.peer_fields)) == len(self.peer_fields) and set(self.peer_fields)<=set(self.header_fields),'INVALID_PEER_FIELDS')
         require(len(dict(self.tariff))==len(self.tariff),'DUPLICATE_RUNTIME_COUNTER')
         for name,weight in self.tariff:token(name);integer(weight)
+        object.__setattr__(self, 'tariff', tuple(sorted(self.tariff)))
 
     def wire(self):
         def lists(value):
@@ -4749,7 +5021,7 @@ class Runtime:
     """An installed implementation is trusted deterministic code, not a sandbox."""
     def __init__(self,binding,implementation):
         self.binding=binding;self.implementation=implementation
-        self.role={'external-channel':'extension_external','processor-channel':'extension_channel','handler':'extension_handler','marker':'extension_marker','step':'extension_step'}[binding.role]
+        self.role={'external-channel':'extension_external','processor-channel':'extension_channel','handler':'extension_handler','marker':'extension_marker','step':'extension_step','dispatch-policy':'extension_dispatch_policy'}[binding.role]
         if binding.role in ('handler','step'):require(callable(getattr(implementation,'execute',None)),'MISSING_RUNTIME_EXECUTOR')
         if binding.role=='external-channel':
             require(callable(getattr(implementation,'accept',None)),'MISSING_RUNTIME_CHANNEL_FUNCTION',function='accept')
@@ -4858,7 +5130,10 @@ def prepare_admissions(run):
             verified = runtime.implementation.verify_admission(context)
             require(type(verified) is dict, 'INVALID_VERIFIED_ADMISSION')
             # Retain a private data copy; accept_external freezes each read.
-            result[binding] = data_copy(verified)
+            projection = data_copy(verified)
+            from .model import canonical
+            canonical(projection)
+            result[binding] = projection
         except ContractError:
             raise
         except HOST_FAILURES as exc:raise incomplete(exc) from exc
@@ -5033,6 +5308,31 @@ class LogicalWork:
         self.exact_values={}
         self.partition=None
 
+    def construction_context(self,blue):
+        """Schedule constructor reference prerequisites independently of sets.
+
+        Normalized type/metadata slots are exact references. Language may visit
+        those references in any physical order; their identity prerequisites are
+        paid in exact-ID order before the resulting node is established. Keep
+        every occurrence, including duplicate references to the same identity.
+        """
+        from copy import copy
+        context=copy(blue.context);pending=[]
+        def flush():
+            references=sorted(pending,key=lambda ref:ref.id);pending.clear()
+            for ref in references:self.establish(ref)
+        def remember(node):
+            if isinstance(node,L.Ref):
+                pending.append(node);return node
+            flush()
+            identity=self.establish(node)
+            if isinstance(node,L.Node):
+                context.bodies[identity]=node
+                blue.note_identity(node,identity)
+            return node
+        context.remember=remember
+        return context,flush
+
     def exact(self,recipe,blue):
         """Captured exact content; prepay synthesis of multi-part recipes.
 
@@ -5044,15 +5344,10 @@ class LogicalWork:
         from copy import copy
         key=recipe.key()
         if key not in self.exact_values:
-            context=copy(blue.context)
-            def remember(node):
-                identity=self.establish(node)
-                if isinstance(node,L.Node):
-                    context.bodies[identity]=node
-                    blue.note_identity(node,identity)
-                return node
-            context.remember=remember
-            try:node=L.recipe_exact_value(recipe,context)
+            context,flush=self.construction_context(blue)
+            try:
+                node=L.recipe_exact_value(recipe,context)
+                flush()
             except L.Failure as error:blue.translate(error)
             # Carry the prepaid identity explicitly. Native continuation copies
             # can change handles; a physical cache must not decide whether this
@@ -5062,11 +5357,12 @@ class LogicalWork:
         if isinstance(node,L.Node):blue.note_identity(node,identity)
         return node
 
-    def open(self,node):
-        identity=self.blue.identity(node)
+    def open(self,node,source=None):
+        source=self.blue if source is None else source
+        identity=source.identity(node)
         if identity not in self.manifests:
             self.meter.contracts('nodeManifestOpened');self.manifests.add(identity)
-        return self.blue.open(node)
+        return source.open(node)
 
     def compare(self,left,right):
         self.meter.contracts('scalarComparison')
@@ -5116,18 +5412,9 @@ class LogicalWork:
             if parent is L.ABSENT:break
             self.meter.contracts('typeEdgeFollowed');node=parent
 
-    def read(self,node,path):
-        from .model import segments,require,LIMITS
-        r=L.recipe(node)
-        depth=0
-        for name in segments(path):
-            depth+=1
-            for part in r.parts:self.open(part)
-            head=self.blue.head(r)
-            self.meter.contracts('listItemRead' if head.items is not None else 'objectMemberRead')
-            r=self.blue.child(r,name)
-            if r is None:break
-        return self.blue.view(r,logical=self,depth=depth)
+    def read(self,node,path,*,source=None):
+        source=self.blue if source is None else source
+        return source.read_bex(source.view(node,logical=self),path,logical=self)
 
     def establish(self,node,previous=None,*,token=None,scope=None):
         # Input witnesses come from admission/opening, never a resolver cache.
@@ -5242,16 +5529,7 @@ class LogicalWork:
         from copy import copy
         from blue_bex.values import HostValue,kind,UNDEFINED
         from .language import ExactValue
-        context=copy(self.blue.context)
-        def remember(node):
-            identity=self.establish(node)
-            if isinstance(node,L.Node):
-                context.bodies[identity]=node
-                # Constructed evidence is now explicit, after the successful
-                # charge prefix. Every raw occurrence still pays normalization.
-                self.blue.note_identity(node,identity)
-            return node
-        context.remember=remember
+        context,flush=self.construction_context(self.blue)
         def literal(value):
             if type(value) is str:self.meter.contracts('identityInputTextBlock',(len(value)+63)//64)
             elif type(value) is int:
@@ -5284,15 +5562,27 @@ class LogicalWork:
                         raw[key]=[build(item) for item in part]
                     else:raw[key]=None if part is None else build(part)
                 # Preserve runtime rejection of string aliases in type slots.
-                for key in L.TYPES & set(raw):
-                    if type(value[key]) is str:
+                for key in ('itemType', 'keyType', 'type', 'valueType'):
+                    if key in raw and type(value[key]) is str:
                         from .model import require
                         require(False,'UNRESOLVED_RUNTIME_TYPE',alias=value[key])
             elif kind(value)=='list':
                 self.meter.contracts('identityInputMember',len(value))
                 raw={'items':[build(item) for item in value]}
             else:raw=self.blue.normalize_input(literal(value),aliases=False)
-            return L.normalize(raw,context,'exact')
+            # Each inline slot was constructed by build() above. Carry its
+            # already established token into Language's slot normalization, so
+            # the callback inventory contains references in every presentation.
+            if isinstance(raw,dict):
+                for key in L.ordered((L.TYPES|L.REFERENCE_METADATA)&set(raw)):
+                    part=raw[key]
+                    if isinstance(part,L.Node):
+                        identity=self.blue.known_identity(part)
+                        from .model import require
+                        require(identity is not None,'MISSING_CONSTRUCTION_EVIDENCE')
+                        raw[key]=L.Ref(identity)
+            result=L.normalize(raw,context,'exact');flush()
+            return result
         try:
             node=build(value)
             if certify:
@@ -5334,10 +5624,11 @@ class LogicalWork:
                             self.meter.contracts('integerLimbOperation',limbs)
                 elif type(value) is str and constraints.counts:
                     self.meter.contracts('textBlockExamined',(len(value)+63)//64)
-                    for count in constraints.counts.values():self.compare(len(value),count)
+                    for name in ('minItems', 'maxItems', 'minFields', 'maxFields', 'minLength', 'maxLength'):
+                        if name in constraints.counts:self.compare(len(value),constraints.counts[name])
                 if constraints.enum is not None:
                     for group in constraints.enum:
-                        for alternative in group:
+                        for alternative in L.ordered(group):
                             self.meter.contracts('validationMemberExamined')
                             _,core,other=constraints.enum_values[alternative]
                             if type(other) is type(value) and self.compare(value,other)==0:break
@@ -5348,7 +5639,8 @@ class LogicalWork:
                 if h.value_type or h.key_type:self.meter.contracts('validationMemberExamined')
                 visit(child,before,seen)
             if h.items is not None:
-                for count in constraints.counts.values():self.compare(len(h.items),count)
+                for name in ('minItems', 'maxItems', 'minFields', 'maxFields', 'minLength', 'maxLength'):
+                    if name in constraints.counts:self.compare(len(h.items),constraints.counts[name])
                 for i in range(len(h.items)):
                     child=L.child_recipe(h,i);before=L.child_recipe(prior,i) if prior and prior.items is not None and i<len(prior.items) else None
                     if before is not None and child.key()==before.key() and not h.constraints.unique:continue
@@ -5410,23 +5702,28 @@ def host_boundary(fn):
 
 ```json
 {
-  "src/blue_contracts/reference/__init__.py": "78bed996244ac5fab47a02c2455614e69b920a4268f0a7fda241a54702b34bef",
-  "src/blue_contracts/reference/catalogue.py": "51e75dfa01394a8b2493292d2dfc4c79c3b2031c8035a85882b284126c7585df",
-  "src/blue_contracts/reference/channels.py": "1af7e3f1ba921fe0c4adac9d60f0b26e7b0e5c106d8c58fd3a801c3c0310160c",
-  "src/blue_contracts/reference/chunks.py": "489c4b9cdfb4c5e6eaf7a6d12ce4c309b2e47e398917e882614f73cef59ffa22",
-  "src/blue_contracts/reference/completion.py": "25c4b98e9511256368e7398a544a29400410c74aa65bcda8218a950db955685a",
-  "src/blue_contracts/reference/compute.py": "147caf84e70bebb5e3dec2bd3f5d437a25b85e172d3d12e1b4c3725f79fa76ba",
-  "src/blue_contracts/reference/generalization.py": "1f24b86271755ae5f1b5132c31de85d12d05d2a19c7c4b5d493201b953dff887",
-  "src/blue_contracts/reference/graph.py": "106b07e478bf77e2314b28044e0338429958ac58397db83f142ae0d5d8247b17",
-  "src/blue_contracts/reference/language.py": "2ae90402ede1299c0cd43c770406e0572ea8b68a384ce0d4bc01734da4b2f889",
-  "src/blue_contracts/reference/model.py": "03e18943f5d4b9d05ef9ed62c8bb97cf4376986785d60f264d97f031d5ec0c31",
-  "src/blue_contracts/reference/policy.py": "2423e9d280e20db1d08d8d6c42a8a8e4ab8e53d5f335866a27dd0eb7f2433121",
-  "src/blue_contracts/reference/processor.py": "5f7c59d07f3e265f42423f9652e56a5edef474af1d5567adf6c1426e1db1345e",
-  "src/blue_contracts/reference/receiving.py": "f5d56b66afd83cc0128883018b412282145238f6a956e4077bb530996039c7ff",
-  "src/blue_contracts/reference/registry.py": "93a3b8bad491d80782778e8032798f4671ee2a996f39694d44baa2f700bced6a",
-  "src/blue_contracts/reference/runtime.py": "6b53f8a0e312aab38d03905d962fda9476b448fd1c4979b073e2181a48c9b67c",
-  "src/blue_contracts/reference/storage.py": "eae5dc318c226628d2a68a37175b10232846ed2611b1a8db4a007bbd6266458f",
-  "src/blue_contracts/reference/work.py": "bdff38e23e770ce1cd47d99535cd668c59865c301f97b5622bc5c0812e64ff5f",
-  "src/blue_host/__init__.py": "ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607"
+  "format": "blue-source-binding/1",
+  "edition": "2026-10-17-deterministic-3",
+  "modules": {
+    "src/blue_contracts/reference/__init__.py": "78bed996244ac5fab47a02c2455614e69b920a4268f0a7fda241a54702b34bef",
+    "src/blue_contracts/reference/catalogue.py": "51e75dfa01394a8b2493292d2dfc4c79c3b2031c8035a85882b284126c7585df",
+    "src/blue_contracts/reference/channels.py": "1af7e3f1ba921fe0c4adac9d60f0b26e7b0e5c106d8c58fd3a801c3c0310160c",
+    "src/blue_contracts/reference/chunks.py": "f691f8f6ec8abf25f2b6544bd8d4af332cccd7282ab0b5cf437f172bf8d8edfe",
+    "src/blue_contracts/reference/completion.py": "f599cf15dffe1a578c648c049934d3c153f88fa752d6447b866d6351b16490fd",
+    "src/blue_contracts/reference/compute.py": "147caf84e70bebb5e3dec2bd3f5d437a25b85e172d3d12e1b4c3725f79fa76ba",
+    "src/blue_contracts/reference/dispatch.py": "335aa5cfc43808368028f3bd7da40996b0ffdc9c91fef1af1df195af560088db",
+    "src/blue_contracts/reference/generalization.py": "1f24b86271755ae5f1b5132c31de85d12d05d2a19c7c4b5d493201b953dff887",
+    "src/blue_contracts/reference/graph.py": "106b07e478bf77e2314b28044e0338429958ac58397db83f142ae0d5d8247b17",
+    "src/blue_contracts/reference/language.py": "ecc0a111b3f6b2f679c32660bbe83ebb2a54040a61f261e82b29d5a81ec90cd4",
+    "src/blue_contracts/reference/model.py": "2f6c15c43c5a89fe6cbf41764c9f4fb417f0fb04fc309e8447337e5a08d4ea71",
+    "src/blue_contracts/reference/policy.py": "2423e9d280e20db1d08d8d6c42a8a8e4ab8e53d5f335866a27dd0eb7f2433121",
+    "src/blue_contracts/reference/processor.py": "44c6b1545f2a5b37dd037863b11c0d6373a3769b74957b28861de335bb6fb600",
+    "src/blue_contracts/reference/receiving.py": "723d489a97632eae0b0a5880613341727d6f93fc2042c30215a7668355d5ab27",
+    "src/blue_contracts/reference/registry.py": "e5f66ac022cd5ed54e203fd4d03eea6145aef7eaab5595ddeeb9c038124f8fd8",
+    "src/blue_contracts/reference/runtime.py": "8cc8305082cb347d792d9f3f3e4d773440772a119d869144e699e8ef0e19047f",
+    "src/blue_contracts/reference/storage.py": "eae5dc318c226628d2a68a37175b10232846ed2611b1a8db4a007bbd6266458f",
+    "src/blue_contracts/reference/work.py": "734074d174baa62601c3dc75001e9ae151363881fc472ec4a1467fe22e830ff2",
+    "src/blue_host/__init__.py": "ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607"
+  }
 }
 ```

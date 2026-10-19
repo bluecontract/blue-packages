@@ -76,7 +76,7 @@ ACME's public control history. The exact timeline in the request selects the sou
 {
   "type": "Coordination/Timeline Entry",
   "timeline": {
-    "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+    "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
   },
   "timestamp": 1791288000000000,
   "actor": {
@@ -93,7 +93,7 @@ ACME's public control history. The exact timeline in the request selects the sou
 {
   "type": "Coordination/Timeline Entry",
   "timeline": {
-    "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+    "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
   },
   "timestamp": 1791288002000000,
   "actor": {
@@ -104,7 +104,7 @@ ACME's public control history. The exact timeline in the request selects the sou
   },
   "message": "Hello 2",
   "prevEntry": {
-    "blueId": "GajRtdu14ELqjvrR1nGbnv1CWpG5E9Uuv8TvnzNFKrcj"
+    "blueId": "B8K1fuVQV3rQwxkPk38MtmSuLXK6MQDYexA5BcPhp2Jp"
   }
 }
 ```
@@ -126,7 +126,7 @@ provider to fetch the public history; no extra lookup identifier is needed.
   "type": "Coordination/Timeline Access",
   "allowedTimelines": [
     {
-      "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+      "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
     }
   ],
   "allowedKeys": [
@@ -149,7 +149,7 @@ provider to fetch the public history; no extra lookup identifier is needed.
 ```
 
 
-The document's initial BlueId is `5gAmgyeMdvYVZhHC4QJnvLgrnktSa1k7P4YwXixv6kNu`. Its public channel
+The document's initial BlueId is `7snCqm1ESL7HBuCpRUiF6U8SU6YYv1UN8UjU95s9xeHq`. Its public channel
 means the Signed Timeline with that provider, that URL and publicRead=true, carrying
 no additional API location. The signed provider descriptor confirms that this is ACME's reserved control timeline.
 ACME publishes the complete initial document there to confirm its initial grants.
@@ -173,7 +173,7 @@ lists. There is no version precondition or revision number.
 {
   "type": "Contracts/Operation Request",
   "document": {
-    "blueId": "5gAmgyeMdvYVZhHC4QJnvLgrnktSa1k7P4YwXixv6kNu"
+    "blueId": "7snCqm1ESL7HBuCpRUiF6U8SU6YYv1UN8UjU95s9xeHq"
   },
   "channel": "provider",
   "operation": "update",
@@ -181,10 +181,10 @@ lists. There is no version precondition or revision number.
     "type": "Coordination/Timeline Access Update",
     "allowedTimelines": [
       {
-        "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+        "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
       },
       {
-        "blueId": "7s84My5goBx3MMmWp9XeNCVoMN1XLHJLUJcMy71YTYwz"
+        "blueId": "FPHtFoyFWdFYBPpKNeTBW9ihgbenEF4ozB1w4ss9LiFF"
       }
     ],
     "allowedKeys": [
@@ -205,10 +205,10 @@ document has these permission fields:
 {
   "allowedTimelines": [
     {
-      "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+      "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
     },
     {
-      "blueId": "7s84My5goBx3MMmWp9XeNCVoMN1XLHJLUJcMy71YTYwz"
+      "blueId": "FPHtFoyFWdFYBPpKNeTBW9ihgbenEF4ozB1w4ss9LiFF"
     }
   ],
   "allowedKeys": [
@@ -235,7 +235,7 @@ this bare request to the shared read URL:
 {
   "type": "Coordination/Read Timeline Request",
   "timeline": {
-    "blueId": "DWs7SRJ9GjJ291kfsJg9YvvZVCei71HVXpK3zVGjuCMK"
+    "blueId": "49WcAmiCcMDouWmQi38zFgD6nrZrLPSdRSwcg1DwKvDg"
   },
   "limit": 100
 }
@@ -251,43 +251,43 @@ This is the complete signed response, with the initial publication and update:
 {
   "type": "Coordination/Provider Attestation",
   "provider": {
-    "blueId": "DqSrLRvQXMzhv7ZSpRTQHwKpVCv4NHJE1ywZyUC6cC8z"
+    "blueId": "FMLpUzFTiLqEd5mcK1s7JbUr892wzPs7FTT128X6BjAN"
   },
   "object": {
     "type": "Coordination/Timeline Read Response",
     "request": {
-      "blueId": "b2wEdBBdzPaiSzwC8VtwUxcmMAtzwkNji3F9TXzwwGD"
+      "blueId": "2zq2t4rcHe3xSCmiqKpVffUxxvsNHmbifFuCnhpwYQvC"
     },
     "checkpoint": {
       "type": "Coordination/Timeline Attestation",
       "timeline": {
-        "blueId": "DWs7SRJ9GjJ291kfsJg9YvvZVCei71HVXpK3zVGjuCMK"
+        "blueId": "49WcAmiCcMDouWmQi38zFgD6nrZrLPSdRSwcg1DwKvDg"
       },
       "guarantee": {
         "type": "Coordination/Timeline Completeness Guarantee",
         "timeline": {
-          "blueId": "DWs7SRJ9GjJ291kfsJg9YvvZVCei71HVXpK3zVGjuCMK"
+          "blueId": "49WcAmiCcMDouWmQi38zFgD6nrZrLPSdRSwcg1DwKvDg"
         },
         "completeBefore": 1791288003000000,
         "lastEntry": {
-          "blueId": "o1P1s15w5ujXUMezTQwHeiUApJYb93zgprtfoq2jfok"
+          "blueId": "FrfZ6MBZKcHRtoC81UhQ1ysNn4VyhdMYXuSKr5zf7Anj"
         }
       },
-      "signature": "ba971baf039295c7efaae6dceecc531314390bd67443aadc998820e3946bbcfa198bbcbe61745edde15c8acb10d549b24a647f32ef3098bde35a3a25145ce90b"
+      "signature": "22eec7c97e74f03c4fa7ef501e35e00c78bf6e5351a877d2eb739259a17899b4b664b69efe90209f2cb4b90fa0a216bf05aaf78ae1397b78ef5ba70e9ac9c108"
     },
     "page": {
       "type": "Coordination/Timeline Entries Page",
       "timeline": {
-        "blueId": "DWs7SRJ9GjJ291kfsJg9YvvZVCei71HVXpK3zVGjuCMK"
+        "blueId": "49WcAmiCcMDouWmQi38zFgD6nrZrLPSdRSwcg1DwKvDg"
       },
       "checkpoint": {
-        "blueId": "8ZHfkH7XPVJVT8JDPm1NmN4vpcsQ2FdSMRPierwee4nB"
+        "blueId": "CN1B6c59oxPmaA24TdXq61iSLFTUrGR1txhNaPaZhbgi"
       },
       "entries": [
         {
           "type": "Coordination/Timeline Entry",
           "timeline": {
-            "blueId": "DWs7SRJ9GjJ291kfsJg9YvvZVCei71HVXpK3zVGjuCMK"
+            "blueId": "49WcAmiCcMDouWmQi38zFgD6nrZrLPSdRSwcg1DwKvDg"
           },
           "timestamp": 1791287999000000,
           "actor": {
@@ -298,7 +298,7 @@ This is the complete signed response, with the initial publication and update:
             "type": "Coordination/Timeline Access",
             "allowedTimelines": [
               {
-                "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+                "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
               }
             ],
             "allowedKeys": [
@@ -322,7 +322,7 @@ This is the complete signed response, with the initial publication and update:
         {
           "type": "Coordination/Timeline Entry",
           "timeline": {
-            "blueId": "DWs7SRJ9GjJ291kfsJg9YvvZVCei71HVXpK3zVGjuCMK"
+            "blueId": "49WcAmiCcMDouWmQi38zFgD6nrZrLPSdRSwcg1DwKvDg"
           },
           "timestamp": 1791288002500000,
           "actor": {
@@ -332,7 +332,7 @@ This is the complete signed response, with the initial publication and update:
           "message": {
             "type": "Contracts/Operation Request",
             "document": {
-              "blueId": "5gAmgyeMdvYVZhHC4QJnvLgrnktSa1k7P4YwXixv6kNu"
+              "blueId": "7snCqm1ESL7HBuCpRUiF6U8SU6YYv1UN8UjU95s9xeHq"
             },
             "channel": "provider",
             "operation": "update",
@@ -340,10 +340,10 @@ This is the complete signed response, with the initial publication and update:
               "type": "Coordination/Timeline Access Update",
               "allowedTimelines": [
                 {
-                  "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+                  "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
                 },
                 {
-                  "blueId": "7s84My5goBx3MMmWp9XeNCVoMN1XLHJLUJcMy71YTYwz"
+                  "blueId": "FPHtFoyFWdFYBPpKNeTBW9ihgbenEF4ozB1w4ss9LiFF"
                 }
               ],
               "allowedKeys": [
@@ -353,17 +353,17 @@ This is the complete signed response, with the initial publication and update:
             }
           },
           "prevEntry": {
-            "blueId": "GenWvGs2A9JZGCRS3PB24yMLQNns32qSVR9XdapXgDcP"
+            "blueId": "A9qi38eHhMYGhdUMkvbkjXS47xYrPXHXaGnHHtSr1Z7P"
           },
           "operation": {
-            "blueId": "C9CVFN2KiGMLJzR37Js4gvbaguUpxCZQi7owsfgqywv"
+            "blueId": "CdqJF57N9pkBAnj2fWGFNpyT46RwepC3q2ufGs3iHct8"
           }
         }
       ],
       "hasMore": false
     }
   },
-  "signature": "61a76d826025207a6a45cb35d162e762b29bbdd2decbdd5e36627eceec4b44ecf617f09d2904144fcb85dec63e578baf92cf27478036f827c0c5d051f6210306"
+  "signature": "f473eccd64f2f99964bf63990b3d9d80cae57233d8e23264ff9070cf8c3967df41b23337f4d890d14c036b11315728790c9ddb8305b947bb073c79454b57080d"
 }
 ```
 
@@ -390,12 +390,12 @@ already identifies the provider. Both requests use
   "request": {
     "type": "Coordination/Read Timeline Request",
     "timeline": {
-      "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+      "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
     },
     "limit": 100
   },
   "publicKey": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
-  "signature": "a4ce28722e35a94f4c407e2e3477477b388edf80ab9db206e827971e8e5c81727358654bdfc2d44bd77e4880d90e75ca4f9e08fd10f69844e33074a6fe358c0b"
+  "signature": "e4640a23a31f642bd1d21b7ef2f626f3e281d9faebb0052c4d77013a1136a8fe7fd76185752f2e0e687c1d35304df58ff313b7e401e5fbe544ef866f1199f204"
 }
 ```
 
@@ -405,15 +405,15 @@ already identifies the provider. Both requests use
   "request": {
     "type": "Coordination/Read Timeline Request",
     "timeline": {
-      "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+      "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
     },
     "limit": 100,
     "afterEntry": {
-      "blueId": "GajRtdu14ELqjvrR1nGbnv1CWpG5E9Uuv8TvnzNFKrcj"
+      "blueId": "B8K1fuVQV3rQwxkPk38MtmSuLXK6MQDYexA5BcPhp2Jp"
     }
   },
   "publicKey": "a09aa5f47a6759802ff955f8dc2d2a14a5c99d23be97f864127ff9383455a4f0",
-  "signature": "73c7bcee9fb7f6964538b02a59d26ebae5a002c1aecffff0f85765ae53cfd214036b48344c5e0d0ca5b82f724e77dccc250b6d717efcb685e588ffdc18f2bc06"
+  "signature": "a2ec5742cdb37bc660593dcb21456f2bf0339bcb3f7a4b5192f0ab88debcca5277ea3d0bfa1d7065525c677e5ee23731c02cda5bcf339f3e28633b5f8fd7b802"
 }
 ```
 
@@ -428,43 +428,43 @@ same fixture, along with the individual response for each request.
 {
   "type": "Coordination/Provider Attestation",
   "provider": {
-    "blueId": "DqSrLRvQXMzhv7ZSpRTQHwKpVCv4NHJE1ywZyUC6cC8z"
+    "blueId": "FMLpUzFTiLqEd5mcK1s7JbUr892wzPs7FTT128X6BjAN"
   },
   "object": {
     "type": "Coordination/Timeline Read Response",
     "request": {
-      "blueId": "2GAJW4Xfwo7hcczyX3SMWTmuhD3UZ4UMfn3jgt6uaeQu"
+      "blueId": "FAjoeuNo6YYQzXV7YbV4YkFNYUc5ZsyVcnKCSYVV75z1"
     },
     "checkpoint": {
       "type": "Coordination/Timeline Attestation",
       "timeline": {
-        "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+        "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
       },
       "guarantee": {
         "type": "Coordination/Timeline Completeness Guarantee",
         "timeline": {
-          "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+          "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
         },
         "completeBefore": 1791288003000000,
         "lastEntry": {
-          "blueId": "A3gVTvQJFTTkkbrp9tx2bRA9FayCmoRQojGkc8VQE1kJ"
+          "blueId": "Bb5KCVAM2PZztXnxuS62WSixaJtGTnLgDYdLtE87Hze2"
         }
       },
-      "signature": "28d466fc0c28fc648df2f3e82599e86ccb962b83d000b4ed13945b77d9810ede7aed8645084c3c1edd0eb0b996c141619362db5e633b1e0deb6f5beeb4009607"
+      "signature": "d7a8720a6e173a44eabf13df0c3075c43cd95aef420db0cd98087fddb7dca6b3933f21ab2c7b82146f6cc4d20a326fba305923e6226c1132695d9dfd3061d500"
     },
     "page": {
       "type": "Coordination/Timeline Entries Page",
       "timeline": {
-        "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+        "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
       },
       "checkpoint": {
-        "blueId": "8Azrc39MMfH9JqeWoPZwcgDbQebQ5m4fwtkNnZp2F2T7"
+        "blueId": "DMwsY98JHW7sBUMehb1ysXXLoLrGbA3V9tHL5Vyf5YCy"
       },
       "entries": [
         {
           "type": "Coordination/Timeline Entry",
           "timeline": {
-            "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+            "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
           },
           "timestamp": 1791288000000000,
           "actor": {
@@ -478,7 +478,7 @@ same fixture, along with the individual response for each request.
         {
           "type": "Coordination/Timeline Entry",
           "timeline": {
-            "blueId": "67uHAw9iqVeVfkLoJvcscrn5yR6EVtVJiKFmnjD7SuaG"
+            "blueId": "A3fAipLNZrLCPwwdZoXVMgmvNNGEEPCANwyUjd6iTv4x"
           },
           "timestamp": 1791288002000000,
           "actor": {
@@ -489,14 +489,14 @@ same fixture, along with the individual response for each request.
           },
           "message": "Hello 2",
           "prevEntry": {
-            "blueId": "GajRtdu14ELqjvrR1nGbnv1CWpG5E9Uuv8TvnzNFKrcj"
+            "blueId": "B8K1fuVQV3rQwxkPk38MtmSuLXK6MQDYexA5BcPhp2Jp"
           }
         }
       ],
       "hasMore": false
     }
   },
-  "signature": "a471741942e751e7d7b314aaad26eb6efe71cb126fa4cac0c7aff6e06c4c75c4d163c18280e33a651708f67f3e712868e24084546261d81920235545dc298604"
+  "signature": "c8d9984d022d22648720c7c73913785db42e27851d7bc5e94d5424ad0d3d2a80dca72798bc28c3886f5931620ab515901b45dffe9c157599f9a8b4deea764f03"
 }
 ```
 

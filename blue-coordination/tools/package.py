@@ -1,169 +1,79 @@
 #!/usr/bin/env python3
-"""Build this isolated candidate using the shared publisher and installed Blue library.
-
-prepare is an explicit authoring operation: updates pins, frozen rules and source
-specification references. Ordinary build/check refuse such changes.
-"""
+"""Current Coordination authoring checks and the shared native package builder."""
 from pathlib import Path
 import argparse
-import atexit
-import importlib.resources
+import hashlib
 import json
 import os
-import shutil
+import subprocess
 import sys
-import tempfile
-import types
-import zipfile
+from blue_language import Language
+from blue_repository import Repository
+from blue_packages.reader import read_package
 
 ROOT = Path(__file__).resolve().parents[1]
 HOME = Path(os.environ.get('BLUE_PACKAGES_DIR', ROOT.parent)).resolve()
-if not (HOME / 'blue-contracts/tools/package_core.py').is_file():
-    raise SystemExit('Set BLUE_PACKAGES_DIR to the shared blue-packages checkout.')
-sys.dont_write_bytecode = True
-sys.path.insert(0, str(HOME / 'blue-contracts/tools'))
-_temp = tempfile.TemporaryDirectory(prefix='coordination-publisher-')
-atexit.register(_temp.cleanup)
-standard = Path(_temp.name) / 'python/src/registry/standard'
-standard.mkdir(parents=True)
-for name in ('Package.json', 'ProtocolSpecification.json'):
-    (standard / name).write_bytes((importlib.resources.files('registry') / 'standard' / name).read_bytes())
-with zipfile.ZipFile(HOME / 'blue-contracts/dist/package.bluepkg') as z:
-    legacy_toolchain = json.loads(z.read('package.json'))['toolchain']['blueArchiveSha256']
-bootstrap = types.ModuleType('bootstrap')
-bootstrap.WORKSPACE = Path(_temp.name)
-bootstrap.ROOT = HOME / 'blue-contracts'
-# Compatibility identifier required by the shared distribution adapter. Actual
-# build implementation and source digest are separately recorded in provenance.
-bootstrap.LOCK = {'blue': {'archiveSha256': legacy_toolchain}}
-sys.modules['bootstrap'] = bootstrap
-from package_core import build, wire, Language, Repository, sha, source, verify_bytes, read_package, require, current_ledger
-from blue_language.physical import PhysicalCache
-
 
 def config():
     return json.loads((ROOT / 'blue-package.yaml').read_text())
 
+def current_ledger(root=ROOT):
+    root = Path(root)
+    expected = json.loads((ROOT / 'spec/frozen.json').read_text())
+    rel = config()['protocol']['rules']
+    if expected[rel] != 'sha256:' + hashlib.sha256((root / rel).read_bytes()).hexdigest():
+        raise ValueError('frozen specification mismatch')
+    return expected
 
-def dependencies(refresh=False):
-    cfg = config()
-    packages = {}
+def dependencies():
+    cfg = config(); packages = {}; pins = {'format': 2, 'imports': {}}
     for prefix, item in cfg['imports'].items():
-        relative = Path(item['path'])
-        require(relative.parts[0] == '..' and '..' not in relative.parts[1:], 'Unsafe import path')
-        selected = (HOME / Path(*relative.parts[1:])).resolve()
-        require(selected.is_relative_to(HOME), 'Import escapes shared package home')
-        packages[prefix] = read_package(selected)
-    pins = {'format': 2, 'imports': {prefix: {
-        'path': cfg['imports'][prefix]['path'], 'packageBlueId': p.manifest['packageBlueId'],
-        'archiveSha256': p.archive_sha, 'repositoryIdentity': p.repository.identity,
-        'name': p.manifest['name'], 'version': p.manifest['version']
-    } for prefix, p in packages.items()}}
-    if not refresh:
-        require(pins == json.loads((ROOT / 'blue-package.lock.json').read_text()), 'Dependency pins changed; explicit prepare required')
-    return packages, pins
+        path = (ROOT / item['path']).resolve()
+        if not path.is_relative_to(HOME):
+            raise ValueError('Import escapes shared package home')
+        package = packages[prefix] = read_package(path)
+        pins['imports'][prefix] = dict(path=item['path'], packageBlueId=package.blue_id,
+            archiveSha256=package.archive_sha, name=package.manifest['name'], version=package.manifest['version'])
+    if pins != json.loads((ROOT / 'blue-package.lock.json').read_text()):
+        raise ValueError('Dependency pins changed')
+    return packages
 
-
-def context(validate=True):
-    packages, _ = dependencies(refresh=not validate)
+def context():
     language = Language(core_contracts=False)
+    for entry in config()['exports']:
+        raw=json.loads((ROOT/entry['path']).read_text())
+        if 'specification' in raw:
+            expected=json.loads((HOME/'blue-coordination/docs/runtime-catalogue.json').read_text())['specification']
+            if raw['specification'] != {'blueId': expected}:
+                raise ValueError('Incorrect source specification: ' + entry['path'])
+    packages = dependencies()
     for prefix, package in packages.items():
         language.enable_repository(Repository.from_payload('import:' + prefix,
-            {prefix + '/' + e['name']: e['blueId'] for e in package.manifest['exports']}, package.repository.records))
-    rules = language.create(wire({'type': 'Text', 'value': (ROOT / 'spec/coordination.md').read_text()}).decode(), format='json')
-    language.publish_document(rules)
-    aliases = {}
+            {prefix + '/' + name: bid for name, bid in package.exports.items()}, package.repository.records))
+    rules = language.create(json.dumps({'type': 'Text', 'value': (ROOT / config()['protocol']['rules']).read_text()}), format='json')
+    language.publish_document(rules); aliases = {}
+    package = read_package(ROOT / 'dist/package.bluepkg')
+    declared_rules = package.manifest['semanticSpecifications'][package.manifest['protocol']]['rules']['blueId']
+    if rules.blue_id != declared_rules: raise ValueError('Compiled rules differ from source')
     for entry in config()['exports']:
-        raw = source((ROOT / entry['path']).read_bytes())
-        require(raw.get('specification') == {'blueId': rules.blue_id}, 'Incorrect source specification: ' + entry['path'])
-        document = language.admit_definition(wire(raw).decode(), format='json')
-        language.publish_document(document)
-        alias = 'Coordination/' + entry['name']
-        language.aliases[alias] = document.blue_id
-        aliases[alias] = document.blue_id
+        raw = json.loads((ROOT / entry['path']).read_text())
+        if 'specification' in raw and raw['specification'] != {'blueId': rules.blue_id}:
+            raise ValueError('Incorrect source specification: ' + entry['path'])
+    aliases = {'Coordination/' + name: bid for name, bid in package.exports.items()}
+    language.enable_repository(Repository.from_payload('current-coordination', aliases, package.repository.records))
     return language, aliases, rules.blue_id
-
-
-def prepare():
-    packages, pins = dependencies(refresh=True)
-    (ROOT / 'blue-package.lock.json').write_bytes(wire(pins))
-    rules_text = (ROOT / 'spec/coordination.md').read_text()
-    lang = Language(core_contracts=False)
-    rules = lang.create(wire({'type': 'Text', 'value': rules_text}).decode(), format='json')
-    (ROOT / 'spec/frozen.json').write_bytes(wire({'spec/coordination.md': sha(rules_text.encode())}))
-    for entry in config()['exports']:
-        path = ROOT / entry['path']
-        raw = source(path.read_bytes())
-        raw['specification'] = {'blueId': rules.blue_id}
-        path.write_text(json.dumps(raw, ensure_ascii=False, indent=2) + '\n')
-    _, aliases, _ = context()
-    print('Prepared', len(aliases), 'types; rules', rules.blue_id)
-
-
-def compile_package():
-    cfg = config()
-    packages, pins = dependencies()
-    current_ledger(ROOT)
-    language, aliases, rules = context()
-    with tempfile.TemporaryDirectory(prefix='coordination-build-') as temp:
-        stage = Path(temp).resolve()
-        names = {cfg['readme'], cfg['protocol']['rules'], 'spec/frozen.json', *cfg['files']}
-        for name in names:
-            path = stage / name
-            require(path.resolve().is_relative_to(stage), 'Unsafe source path')
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes((ROOT / name).read_bytes())
-        (stage / 'inputs').mkdir()
-        stage_pins = json.loads(json.dumps(pins))
-        for prefix, p in packages.items():
-            relative = 'inputs/' + prefix + '.bluepkg'
-            (stage / relative).write_bytes(p.archive)
-            cfg['imports'][prefix]['path'] = relative
-            stage_pins['imports'][prefix]['path'] = relative
-        repository = Repository.from_payload(cfg['name'], aliases, language.provider.snapshot())
-        data = (repository._json + '\n').encode()
-        relative = 'inputs/authored.repository.json'
-        (stage / relative).write_bytes(data)
-        cfg['inputs'] = [{'path': relative, 'sha256': sha(data), 'identity': repository.identity}]
-        cfg['exports'] = [{'name': e['name'], 'fromInput': relative, 'inputAlias': 'Coordination/' + e['name']} for e in cfg['exports']]
-        (stage / 'blue-package.yaml').write_bytes(wire(cfg))
-        (stage / 'blue-package.lock.json').write_bytes(wire(stage_pins))
-        package = build(stage, revision='coordination-inputs-0.2.0-rc.2-20261006', source_url='')
-        verify_bytes(package.archive)
-    return package
-
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['prepare', 'build', 'check', 'verify', 'inspect'])
+    parser.add_argument('command', choices=['build', 'check', 'verify', 'inspect'])
     args = parser.parse_args()
-    with PhysicalCache(65536).scope():
-        if args.command == 'prepare':
-            prepare()
-            return
-        if args.command in ('inspect', 'verify'):
-            p = read_package(ROOT / 'dist/package.bluepkg')
-        else:
-            p = compile_package()
-            expected = {**p.files, 'package.bluepkg': p.archive}
-            if args.command == 'build':
-                out = ROOT / 'dist'
-                out.mkdir(exist_ok=True)
-                for obsolete in sorted(out.rglob('*'), reverse=True):
-                    if obsolete.is_file() and obsolete.relative_to(out).as_posix() not in expected:
-                        obsolete.unlink()
-                    elif obsolete.is_dir() and not any(obsolete.iterdir()):
-                        obsolete.rmdir()
-                for name, data in expected.items():
-                    path = out / name
-                    path.parent.mkdir(parents=True, exist_ok=True)
-                    path.write_bytes(data)
-            else:
-                actual = {x.relative_to(ROOT / 'dist').as_posix(): x.read_bytes() for x in (ROOT / 'dist').rglob('*') if x.is_file()}
-                require(actual == expected, 'Source-to-distribution mismatch')
-        print(json.dumps({'verified': True, 'name': p.manifest['name'], 'version': p.manifest['version'],
-            'packageBlueId': p.manifest['packageBlueId'], 'archiveSha256': p.archive_sha,
-            'exports': len(p.manifest['exports'])}, indent=2))
+    if args.command in ('build', 'check'):
+        command = [sys.executable, str(HOME / 'tools/build_final_gas.py'), ROOT.name]
+        if args.command == 'check': command.append('--check')
+        subprocess.run(command, check=True)
+    current_ledger()
+    package = read_package(ROOT / 'dist/package.bluepkg')
+    print(json.dumps(dict(verified=True, name=package.manifest['name'],
+        packageBlueId=package.blue_id, archiveSha256=package.archive_sha, exports=len(package.exports)), indent=2))
 
-if __name__ == '__main__':
-    main()
+if __name__ == '__main__': main()

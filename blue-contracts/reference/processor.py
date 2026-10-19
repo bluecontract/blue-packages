@@ -179,7 +179,7 @@ class Run(CompletionMachine):
         self.admission_evidence=deepcopy(admission_evidence or {});self.external_admissions={}
         self.admission=admission;self.meter=Meter(gas_limit,local_limits,state.documents)
         self.views=engine.archive.bindings()
-        self.invocation=digest('contracts.invocation/completion-1',dict(input=state.identity,event=self.event_id,
+        self.invocation=digest('contracts.attempt/2',dict(input=state.identity,event=self.event_id,
             timestamp=timestamp,gas=self.meter.policy(),release=engine.registry.specification))
         self.graph=Graph(self.state,self.reg,engine.archive.restrict(self.views),self.meter,self.invocation)
         if self.event_id:self.graph.logical.carried_roots.add(self.event_id)
@@ -188,6 +188,19 @@ class Run(CompletionMachine):
         self.settlements=[];self.effect_count=0
         self.opened=set();self.headers=set();self.activation={k:0 for k in state.documents}
         self.setup_completion();self.graph.changes=self.changes
+    def seal_invocation(self):
+        """Bind verified logical context before any invocation-derived work."""
+        from .model import canonical
+        canonical(self.external_admissions)
+        if getattr(self, 'receiving', False):
+            self.invocation=digest('contracts.receiving/2',dict(input=self.input.identity,
+                mode=self.receiving_mode,sources=self.receiving_sources,
+                policy=self.meter.policy(),admissions=deepcopy(self.external_admissions)))
+        else:
+            self.invocation=digest('contracts.invocation/2',dict(input=self.input.identity,
+                event=self.event_id,timestamp=self.timestamp,gas=self.meter.policy(),
+                release=self.reg.specification,admissions=deepcopy(self.external_admissions)))
+        self.graph.cause=self.invocation
     def runtime_node(self,value,**kwargs):
         if self.frame is not None:self.meter.owner=self.frame.key
         return self.blue.node(value,logical=self.graph.logical,**kwargs)
@@ -224,8 +237,10 @@ class Run(CompletionMachine):
         if not self.admission:
             from .runtime import prepare_admissions
             prepare_admissions(self)
+            self.seal_invocation()
             self.call,self.call_record=recognize_call(self.reg,self.event)
             self.seeds=select_seeds(self)
+        else:self.seal_invocation()
         self.meter.owner=''
         if self.graph.terminated(self.state.root):return self.fail_result('TERMINATED',None)
         self.phase=self.new_phase('INITIALIZE')
@@ -277,12 +292,14 @@ class Run(CompletionMachine):
             if type(value) is dict:return '$resultValue' in value or any(overlays(x) for k,x in value.items() if k!='$literal')
             return False
         body=self.state.documents[key].body
+        from copy import copy
+        captured=copy(self.blue)
         view=self.blue.view(body,logical=self.graph.logical) if overlays(self.program(contract) if overlay_program is None else overlay_program) else body
         event=event_observation(self.reg,payload,logical=self.graph.logical)
         binding={'processingEvent':event_observation(self.reg,self.event,logical=self.graph.logical) if self.event is not None else UNDEFINED,
                  'timestamp':self.timestamp if self.timestamp is not None else UNDEFINED,
                  'call':event_observation(self.reg,call,logical=self.graph.logical) if call is not None else UNDEFINED}
-        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,'' if p=='/' else p) if isinstance(d,(L.Node,L.Ref)) else self.blue.read_bex(d,p),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
+        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,p,source=captured) if isinstance(d,(L.Node,L.Ref)) else captured.read_bex(d,p,logical=self.graph.logical),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
     def evaluate(self,key,payload,contract,steps,expr,call=None):
         self.meter.owner=key;result=self.engine.bex.execute({'expr':expr},self.context(key,payload,contract,steps,call),gas=self.meter);require(not result.changeset and not result.events,'EFFECTFUL_EXPRESSION');return result.value
     def work_record(self,key,channel,payload,kind):
@@ -319,6 +336,8 @@ class Run(CompletionMachine):
     def dispatch_local(self,key,channel,payload,kind,operation=None,allow_terminating=False,call=None):
         if not self.live(key) and not (allow_terminating and key in self.terminating):return
         self.work_record(key,channel,payload,kind);cs=self.reg.contracts(self.state.documents[key].body);require(channel in cs,'MISSING_HANDLER_CHANNEL');frozen=[]
+        from .dispatch import admit
+        if not admit(self,key,channel,payload,kind,operation,call,cs,self.work[-1]['identity']):return
         for hkey,h in self.ordered(cs):
             if h['_role'] not in EXECUTABLE or h['channel']!=channel:continue
             if h['_role']=='operation' and (kind!='EXTERNAL' or operation is None or hkey!=operation):continue

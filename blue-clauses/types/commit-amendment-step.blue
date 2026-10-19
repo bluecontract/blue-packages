@@ -877,9 +877,11 @@ do:
                         key:
                           $var: key
                   - $ne:
-                    - $document:
-                        $var: path
-                    - $var: contract
+                    - $nodeBlueId:
+                        $document:
+                          $var: path
+                    - $nodeBlueId:
+                        $var: contract
                 then:
                 - $call:
                     function: reject
@@ -1509,14 +1511,23 @@ do:
                         name: c
                         path: /kind
                     - $var: category
-                  - $ne:
-                    - $document:
-                        $concat:
-                        - /contracts/
-                        - $var: key
-                    - $var:
-                        name: c
-                        path: /contract
+                  - $or:
+                    - $not:
+                        $exists:
+                          $document:
+                            $concat:
+                            - /contracts/
+                            - $var: key
+                    - $ne:
+                      - $nodeBlueId:
+                          $document:
+                            $concat:
+                            - /contracts/
+                            - $var: key
+                      - $nodeBlueId:
+                          $var:
+                            name: c
+                            path: /contract
                 then:
                 - $appendChange:
                     op: add

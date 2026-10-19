@@ -39,7 +39,8 @@ def canonical(value):
         from decimal import Decimal
         return str(Decimal(value)).encode('ascii')
     if type(value) is str:
-        value.encode('utf-8');return json.dumps(value,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+        try:return json.dumps(value,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+        except UnicodeEncodeError:raise ContractError('INVALID_RECORD') from None
     if type(value) in (list,tuple):return b'['+b','.join(canonical(v) for v in value)+b']'
     require(type(value) is dict and all(type(k) is str for k in value),'INVALID_RECORD')
     return b'{'+b','.join(canonical(k)+b':'+canonical(value[k]) for k in sorted(value))+b'}'

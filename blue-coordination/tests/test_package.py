@@ -23,12 +23,14 @@ class PackageTests(unittest.TestCase):
 
     def test_all_exports_have_explicit_current_rules(self):
         for export in publisher.config()['exports']:
-            raw = json.loads((publisher.ROOT / export['path']).read_text())
+            bid = self.e.aliases['Coordination/' + export['name']]
+            raw = json.loads(self.e.language.verify(bid))
             self.assertEqual(raw['specification'], {'blueId': self.e.rules}, export['name'])
             self.assertIn('Coordination/' + export['name'], self.e.aliases)
 
     def test_distribution_has_one_example_document_and_fixture(self):
-        self.assertEqual(publisher.config()['files'], ['docs/examples.md', 'examples/protocol.json'])
+        self.assertEqual(publisher.config()['files'], ['docs/examples.md', 'examples/protocol.json',
+            'spec/timeline-access-events.md', 'spec/execution.md', 'spec/host-contract.md', 'spec/qualification.md'])
         names = {e['name'] for e in publisher.config()['exports']}
         self.assertIn('Agent Actor', names)
         self.assertNotIn('Provider Actor', names)
@@ -58,7 +60,7 @@ class PackageTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'frozen specification mismatch'):
                 publisher.current_ledger(root)
 
-    def test_missing_source_specification_rejected(self):
+    def test_foreign_source_specification_rejected(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             for name in ('blue-package.yaml', 'blue-package.lock.json'):
@@ -67,7 +69,7 @@ class PackageTests(unittest.TestCase):
             shutil.copytree(publisher.ROOT / 'types', root / 'types')
             target = root / publisher.config()['exports'][0]['path']
             raw = json.loads(target.read_text())
-            del raw['specification']
+            raw['specification'] = {'blueId': 'foreign'}
             target.write_text(json.dumps(raw))
             with patch.object(publisher, 'ROOT', root):
                 with self.assertRaisesRegex(ValueError, 'Incorrect source specification'):

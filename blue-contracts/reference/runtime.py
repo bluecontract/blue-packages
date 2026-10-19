@@ -40,16 +40,17 @@ class RuntimeBinding:
     def __post_init__(self):
         L.final_id(self.type_id);L.final_id(self.semantics_id);token(self.namespace)
         require(self.namespace not in ('bex','contracts'),'RESERVED_GAS_NAMESPACE')
-        require(self.role in ('external-channel','processor-channel','handler','marker','step'),'INVALID_RUNTIME_ROLE')
+        require(self.role in ('external-channel','processor-channel','handler','marker','step','dispatch-policy'),'INVALID_RUNTIME_ROLE')
         require(type(self.inherits_to_subtypes) is bool,'INVALID_RUNTIME_BINDING')
         require(self.meter_mode in ('live','ledger'),'INVALID_RUNTIME_METER_MODE')
         for value in (self.header_fields,self.body_fields,self.tariff,self.peer_fields):require(type(value) is tuple,'MUTABLE_RUNTIME_BINDING')
         fields=self.header_fields+self.body_fields
         require(len(fields)==len(set(fields)),'AMBIGUOUS_RUNTIME_FIELDS')
         for name in fields:token(name);require(not name.startswith('_') and name not in ('type','specification','name','description','order'),'INVALID_RUNTIME_FIELD')
-        require(set(self.peer_fields)<=set(self.header_fields),'INVALID_PEER_FIELDS')
+        require(len(set(self.peer_fields)) == len(self.peer_fields) and set(self.peer_fields)<=set(self.header_fields),'INVALID_PEER_FIELDS')
         require(len(dict(self.tariff))==len(self.tariff),'DUPLICATE_RUNTIME_COUNTER')
         for name,weight in self.tariff:token(name);integer(weight)
+        object.__setattr__(self, 'tariff', tuple(sorted(self.tariff)))
 
     def wire(self):
         def lists(value):
@@ -117,7 +118,7 @@ class Runtime:
     """An installed implementation is trusted deterministic code, not a sandbox."""
     def __init__(self,binding,implementation):
         self.binding=binding;self.implementation=implementation
-        self.role={'external-channel':'extension_external','processor-channel':'extension_channel','handler':'extension_handler','marker':'extension_marker','step':'extension_step'}[binding.role]
+        self.role={'external-channel':'extension_external','processor-channel':'extension_channel','handler':'extension_handler','marker':'extension_marker','step':'extension_step','dispatch-policy':'extension_dispatch_policy'}[binding.role]
         if binding.role in ('handler','step'):require(callable(getattr(implementation,'execute',None)),'MISSING_RUNTIME_EXECUTOR')
         if binding.role=='external-channel':
             require(callable(getattr(implementation,'accept',None)),'MISSING_RUNTIME_CHANNEL_FUNCTION',function='accept')
@@ -226,7 +227,10 @@ def prepare_admissions(run):
             verified = runtime.implementation.verify_admission(context)
             require(type(verified) is dict, 'INVALID_VERIFIED_ADMISSION')
             # Retain a private data copy; accept_external freezes each read.
-            result[binding] = data_copy(verified)
+            projection = data_copy(verified)
+            from .model import canonical
+            canonical(projection)
+            result[binding] = projection
         except ContractError:
             raise
         except HOST_FAILURES as exc:raise incomplete(exc) from exc

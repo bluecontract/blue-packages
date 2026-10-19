@@ -1,14 +1,16 @@
 from pathlib import Path
 import io,json,re,hashlib,zipfile
 import pytest
-from package_core import read_package,verify_bytes,build,mount,Language,PackageError
-from release import ROOT,REVISION,checked_package
+from blue_packages.reader import read_package,verify_bytes,mount,PackageError
+from blue_language import Language
+ROOT=Path(__file__).resolve().parents[1]
+def config(root):return json.loads((root/'blue-package.yaml').read_text())
+def checked_package():return read_package(ROOT/'dist/package.bluepkg')
 
 @pytest.fixture(scope='module')
 def package():return checked_package()
 
 def test_specification_in_package_is_exact(package):
-    from package_core import config
     path=config(ROOT)['protocol']['rules']
     assert package.files[path]==(ROOT/'SPECIFICATION.md').read_bytes()
     sid=package.manifest['semanticSpecifications'][package.manifest['protocol']]['rules']['blueId']
@@ -23,9 +25,12 @@ def test_clean_protocol_has_one_rules_document(package):
 def test_included_algorithms_are_exact():
     source=json.loads((ROOT/'docs/sources.json').read_text())
     text=(ROOT/'SPECIFICATION.md').read_text()
-    assert len(source['modules']) in (6,18)
+    assert len(source['modules']) == 19
     for name,digest in source['modules'].items():
-        data=((ROOT/source['overrides'][name]) if name in source.get('overrides',{}) else (ROOT.parent/'verification/reference/blue-contracts/python'/name)).read_bytes()
+        import importlib
+        module=name.removeprefix('src/').removesuffix('.py').replace('/','.')
+        if module.endswith('.__init__'):module=module[:-9]
+        data=Path(importlib.import_module(module).__file__).read_bytes()
         assert digest==hashlib.sha256(data).hexdigest() or digest=='sha256:'+hashlib.sha256(data).hexdigest()
         assert '```python\n'+data.decode().rstrip()+'\n```' in text
 
@@ -43,7 +48,7 @@ def test_exact_dependency_selection(package):
     assert root['imports']['language']['blueId']=='8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4'
     spec=package.manifest['semanticSpecifications'][package.manifest['protocol']]
     if package.manifest['name']=='blue-contracts':
-        selected=read_package(ROOT/'inputs/bex.bluepkg')
+        selected=read_package(ROOT.parent/'blue-bex/dist/package.bluepkg')
         assert root['imports']['bex']['blueId']==selected.manifest['packageBlueId']
         assert spec['requires']['bex']['blueId']==selected.manifest['protocol']
     else:
@@ -87,14 +92,6 @@ def test_rebuild_is_byte_identical(package):
     import subprocess,sys
     subprocess.run([sys.executable,str(ROOT.parent/'tools/build_final_gas.py'),'blue-contracts','--check'],check=True)
 
-
-def test_explicit_empty_source_url_does_not_inherit_git_remote(monkeypatch):
-    import package_v2
-    monkeypatch.setattr(package_v2, 'git', lambda *args: 'git@github.com:example/local-checkout.git')
-    explicit = package_v2._source_info(ROOT, 'fixed-revision', '')
-    inferred = package_v2._source_info(ROOT, 'fixed-revision', None)
-    assert explicit == {'revision': 'fixed-revision', 'repository': ''}
-    assert inferred == {'revision': 'fixed-revision', 'repository': 'https://github.com/example/local-checkout'}
 
 
 def prior_publication():

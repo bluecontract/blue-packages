@@ -4,7 +4,7 @@ One current package set lives at the repository root. `PACKAGE-SOURCES.json` sel
 
 Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [executable examples](examples/apps). They use Activation and clauses throughout. Raw contracts are implementation details of reusable packages. The Payment clause exposes requests; guarantor operations belong to the Payment Instruction.
 
-The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,000 maximum), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
+The foundations are Language, BEX, Contracts (immutable deterministic edition 3, 10,000,000 maximum), canonical Coordination, Time data and Mandates. The selected execution profile excludes timer roles. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 
 ## Build and verify
 
@@ -18,16 +18,22 @@ python3 tools/check_clause_tutorial.py
 python3 -m unittest discover -s tools -p 'test_release.py'
 ```
 
-The builder packages the BEX authored in `.blue` files. It does not generate business logic in JavaScript. Java execution and authenticated integration tests live in the companion Core checkout. The isolated runner uses `blue.core.ClauseAppsExamples`; full Core validation uses `bash scripts/check.sh`.
+The builder packages the BEX authored in `.blue` files. It does not generate business logic in JavaScript. Standalone Java execution and authenticated integration tests live in `../blue-java`; its release gate is `./gradlew check`. Python executes the same archives through `blue_packages.Runtime` and compares all 35 current non-timer scenarios with Java using `tools/qualify_standalone_catalogue.py`. The Java runner retains the original authored assertions in `blue.core.ClauseAppsExamples`.
 
-The final-gas edition enforces every charge but omits per-charge receipt histories.
-It has new exact identities; existing documents must keep their original runtime.
-See [Contracts migration](blue-contracts/MIGRATION.md).
+The deterministic edition enforces every charge but omits accepted per-charge receipt histories.
+The candidate supports one current runtime only. Older snapshots and stored
+formats are rejected; live migration and backwards compatibility are not provided.
+Original publications and qualification captures remain historical evidence.
 
-For the matching Core branch, run its `scripts/import-final-gas.py --packages
-/path/to/blue-packages` after validation. This preserves Core's authored examples
-and retained 10M publications, builds its internal Coordination bridge and Task
-fixture, and updates the new default pins. The general example exporter should
-only be used when intentionally replacing Core's example sources.
+Canonical deterministic sources are in `blue-contracts/reference`;
+`tools/build_deterministic_reference.py --check` verifies their complete
+publication. `tools/build_coordination_spec.py --check` verifies the single
+canonical Coordination publication. Earlier publications and archive bytes are retained as historical evidence;
+they are not alternate executable selections. Never replace content under an existing BlueId.
+Python and standalone Java select exact current profile identities independently
+of catalogue availability. See `docs/deterministic-source-inventory-revision.json`
+for the reviewed release-inventory metadata update.
 
 These are unpublished candidates, not a production certification or a live financial service. See the tutorial for execution boundaries and the distinction between protocol requests and confirmed external outcomes.
+
+[Current qualification and publication labels](docs/current-candidate-20261019.md).

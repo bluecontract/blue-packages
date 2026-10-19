@@ -1,5 +1,6 @@
 from pathlib import Path
 import copy
+import os
 import json
 import sys
 import unittest
@@ -15,7 +16,8 @@ class ExampleTests(unittest.TestCase):
     def setUpClass(cls):
         cls.scope=PhysicalCache(65536).scope();cls.scope.__enter__()
         cls.addClassCleanup(cls.scope.__exit__,None,None,None)
-        cls.f=json.loads((publisher.ROOT/'examples/protocol.json').read_text())
+        fixture=Path(os.environ.get('BLUE_COORDINATION_EXAMPLE',publisher.ROOT/'examples/protocol.json'))
+        cls.f=json.loads(fixture.read_text())
         cls.e=Exact()
         for definition in cls.f['definitions']:
             assert cls.e.define(definition['alias'],definition['body'])==definition['blueId']
