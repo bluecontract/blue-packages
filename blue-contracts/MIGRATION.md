@@ -1,14 +1,10 @@
-# Final gas edition
+# Current unpublished candidate
 
-The 2026-10-12 edition keeps deterministic tariffs, charge-before-work,
-the 10,000,000 shared maximum, member-local ceilings and atomic rollback.
-It removes accepted-charge rows from canonical evidence. Outcomes keep final
-admitted gas and one compact rejection diagnostic; turns/units keep scalar gas.
-Chunk verification still verifies execution, not a caller-supplied total.
+This package has one current specification, selected by `blue-package.yaml` and
+compiled into `dist/package.bluepkg`. Python and Java use these exact bytes.
+Older runtime editions and live stored-data migration are unsupported.
 
-This changes native specification, type, package and receipt identities. Select
-the new edition explicitly for new documents. Do not reinterpret old snapshots,
-receipts or pending invocations; retain their original runtime and packages.
-Frozen `spec/contracts.md` records the preceding trace-bearing edition.
-New normative rules are in `spec/contracts-final-gas.md`; the root specification
-is an exact copy. Derived Python source overrides are listed in `docs/sources.json`.
+Current qualification is recorded in `../../evidence/single-version-20261018/`.
+The predecessor of this document is preserved under
+`../../evidence/single-version-20261018/current-guidance/`.
+Historical results do not qualify this candidate.

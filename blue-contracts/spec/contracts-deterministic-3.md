@@ -1,6 +1,6 @@
 # Blue Contracts 1.0
 
-**Edition:** `blue-contracts/2026-10-07-gas-10m-1`  
+**Edition:** `blue-contracts/2026-10-12-final-gas-1`  
 **Normative form:** one complete specification with executable algorithm appendices
 
 ## Abstract
@@ -51,7 +51,7 @@ A package distributes this specification; it does not install a processor. The p
 
 This edition selects Blue Language package `8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4` and its complete specification Text `H7WiYQ6GiWypRdFyWRcv99dsvTv6WnJYnu9eLYPQmWnc`. Language is a direct prerequisite: document admission, effective types, specialization, exact references, specification metadata, cyclic identities and BlueIds use its defined operations.
 
-This edition requires Blue BEX package `6m7CxeDA9F74LyfU1H5zYGmo6ozXr4zJFbh7j6F6QJ7a`, protocol specification `H4bhWaD45C4MbrWYgj3Z6kXY9NoBa6gYms9mnbRMyta7`, and normative rules Text `7m8k8P8b8Kn2jHF96EQogWTpsouytXmDFQ3qdmWdY5A3`. Every BEX-bearing position in an invocation uses that evaluator contract and the host interfaces defined here. Selecting another package or operator table MUST NOT substitute another BEX mode. BEX values and proposed effects are not automatically admitted Blue values; the output boundaries below are mandatory.
+This edition requires Blue BEX package `6L2cQG3oSX4WPkXoTvGXeTEjn41WYnjdNKSo1F61xonc`, protocol specification `9X3Ws96pyH1SdP4yuXpkNfWPfW3vJCzDzhdza3u9NpoB`, and normative rules Text `8ncKHLULWkzyNKEHfzpswF6iKZfc3H1DzDpgH8UC1hV`. Every BEX-bearing position in an invocation uses that evaluator contract and the host interfaces defined here. Selecting another package or operator table MUST NOT substitute another BEX mode. BEX values and proposed effects are not automatically admitted Blue values; the output boundaries below are mandatory.
 
 Coordination is not a prerequisite of Contracts. A higher-level host may establish external ordering, authority and durable histories; it supplies the original accepted event and timestamp through the public transition defined here. Contracts does not query a timeline provider or assign actor authority on its own.
 
@@ -103,10 +103,10 @@ The original event's identity is established with the unchanged validated Langua
 | `APPLIED` | Complete resulting state and selected-root emissions | The attempt can commit, including graceful termination. |
 | `FAILED` | Original input snapshot; no public events | Invalid call, invalid effect, validation failure, explicit BEX failure, unsupported demanded executable or another defined Contracts error. |
 | `GAS_LIMIT_EXCEEDED` | Original input snapshot; no public events | The next logical charge exceeds the shared or owner-local remaining allowance. The admitted prefix and rejected charge are reported. |
-| `NEEDS_RESOURCES` | Original input snapshot; no public events | Required exact content or managed-view evidence is unavailable. This suspended attempt reports no completed semantic gas ledger; rerun from the original inputs after evidence is supplied. |
+| `NEEDS_RESOURCES` | Original input snapshot; no public events | Required exact content or managed-view evidence is unavailable. This suspended attempt reports no completed semantic gas result; rerun from the original inputs after evidence is supplied. |
 | `TERMINATED` | Original input snapshot; no public events | The selected root was already legitimately terminated. |
 
-Invalid SDK arguments, invalid fresh Source admission and invalid configuration may raise `ContractError` before a runnable attempt exists. They are never a successful partial processing result. Gas and traces returned with a failed runnable attempt are diagnostic, not committed application effects.
+Invalid SDK arguments, invalid fresh Source admission and invalid configuration may raise `ContractError` before a runnable attempt exists. They are never a successful partial processing result. Gas and the compact rejection details returned with a failed runnable attempt are diagnostic, not committed application effects.
 
 An explicit `initialize(document)` lifecycle action is also provided. It has no invented external event or timestamp. It returns an `Outcome`. `create(document)` is a convenience that requires successful initialization and returns its document. `admit(members, root, bindings)` is a graph authoring facility, not an alternative event ingress. Its `Link` objects and symbolic member labels are not legal runtime patch values.
 
@@ -133,14 +133,14 @@ Exact managed bindings are updated from completed results by the processor. This
 
 ### 3.2 Completion records
 
-`TurnCompletion`, `RoundSeal` and `UnitCompletion` are closed processor records defined in the annex, not new top-level contract categories or user-authored business documents. A completion binds exact before/after views, the original cause, relevant frozen local inputs, the profile, ordered event occurrences and its logical work segment. Its source events contain no parent paths. Each receiver supplies and checks its own captured occurrence tickets.
+`TurnCompletion`, `RoundSeal` and `UnitCompletion` are closed processor records defined in the annex, not new top-level contract categories or user-authored business documents. A completion binds exact before/after views, the original cause, relevant frozen local inputs, the profile, ordered event occurrences and its scalar gas contribution. Its source events contain no parent paths. Each receiver supplies and checks its own captured occurrence tickets.
 
 A value shaped like a completion is not evidence it was executed. Accept only a result produced through the current attempt's verified chunk protocol, or an implementation's explicitly verified equivalent result with all the same bindings. Merely verifying the after-document's BlueId does not establish the calculation. This revision defines no public third-party proof-admission protocol.
 
 <a id="section-6"></a>
 ## 6. Standard categories and complete type catalogue
 
-**C06.** Only **Marker**, **Channel** and **Handler** are permitted top-level contract categories. `Contract` is an abstract common ancestor. `Operation` specializes Handler. A Sequential Workflow Operation is therefore a Handler. Process Embedded is a Marker. Standard steps inherit the abstract Contract definition solely to share declarations; their executable role is nested step, and placing them directly in `contracts` is invalid.
+**C06.** **Marker**, **Channel** and **Handler** are the ordinary top-level categories; an exact registered `dispatch-policy` Compute subtype is also permitted under the Dispatch role rules in this edition. `Contract` is an abstract common ancestor. `Operation` specializes Handler. A Sequential Workflow Operation is therefore a Handler. Process Embedded is a Marker. Standard steps inherit the abstract Contract definition solely to share declarations; their executable role is nested step, and placing them directly in `contracts` is invalid.
 
 All registered definitions include the exact specification reference. `name` and `description` are Language labels, not inherited business defaults. Runtime contracts may carry these labels. `order` is an optional signed 32-bit Integer; omitted means zero. Unknown standard runtime fields are rejected, including `when`. Catalogue declaration holes do not cause absent options to appear configured.
 
@@ -524,7 +524,7 @@ An unchanged large value retains its exact BlueId. Any eager/cached implementati
 
 **C28.** A RuntimeBinding pins the exact custom type ID, exact semantics-document ID, role, header/body field names, private gas namespace and tariff, optional inheritance to descendants, explicit peer fields, and live or ledger meter mode. The full record is immutable and committed in snapshots. Installing new types does not install their executable behavior. Standard implementations cannot be rebound. Conflicting bindings fail.
 
-Roles are external-channel, processor-channel, handler, marker and nested step. These are runtime roles within the three top-level categories, not additional contract categories. A channel type must descend from Channel; a handler from Handler; a marker from Marker; a step from Contract. Standard abstract catalogue types do not count as concrete implementations. Descendant inheritance is enabled only by the binding's explicit flag.
+Roles are external-channel, processor-channel, handler, marker, nested step and dispatch-policy. A dispatch-policy must descend from Compute; its selected exact binding is the only exception to nested Compute placement. A channel type must descend from Channel; a handler from Handler; a marker from Marker; a step from Contract. Standard abstract catalogue types do not count as concrete implementations. Descendant inheritance is enabled only by the binding's explicit flag.
 
 An external-channel callback receives read-only header, complete original event, integer timestamp, prior checkpoint, bounded declared-peer lookup and live meter. It returns exactly a Boolean. It cannot return another event, a payload path or a delivery plan.
 
@@ -540,21 +540,25 @@ All extension callbacks obey the same frame and completion boundary. An UPDATE e
 <a id="section-17"></a>
 ## 17. Logical gas and host-independent resource semantics
 
-This edition raises the shared default and maximum from 100,000 to 10,000,000 gas units per entire atomic attempt, including embedded members and cyclic rounds. Numerical tariffs, debit ordering, rejected-charge accounting and rollback are unchanged. Explicit smaller invocation budgets and member-local ceilings remain supported.
+This edition retains the shared default and maximum of 10,000,000 gas units per entire atomic attempt, including embedded members and cyclic rounds. Numerical tariffs, debit ordering, rejected-charge accounting and rollback are unchanged. Explicit smaller invocation budgets and member-local ceilings remain supported.
 
-Prior editions retain their original identities and 100,000 maximum. Hosts MUST select the rules and budget maximum bound to a document's edition and MUST NOT silently upgrade retained snapshots, invocations or receipts. The allowance is permission for logical work, not a CPU or memory reservation or a guarantee of physical completion.
+Prior editions retain their original identities and their specified maximum: 100,000 for the earlier editions and 10,000,000 for the preceding gas-10m edition. Hosts MUST select the rules and budget maximum bound to a document's edition and MUST NOT silently upgrade retained snapshots, invocations or receipts. The allowance is permission for logical work, not a CPU or memory reservation or a guarantee of physical completion.
 
 **C29.** the logical gas schedule appendix and the metering appendix define the exact logical meter. The shared maximum and default remain **10,000,000**. There are no unrelated structural/resource ceilings. Gas MUST NOT be increased beyond the specified maximum, disabled, or charged by host time or memory. Existing numerical tariffs are retained unless an explicitly recorded and qualified metering correction is necessary. Any such correction must define its exact counter, units, charge position and order before publication; preserve BEX value/evaluation semantics and distinguish the changed gas edition from physical optimization.
 
-One shared ledger covers the complete rooted attempt; the default/maximum shared allowance remains 10000000. Member ceilings are additional constraints on that same logical ledger. A charge is `(ordinal, namespace, counter, units, amount, owner)` and is debited before its work. Retain the defined shared/local exhaustion tie-break and rejected-charge accounting. Rollback does not refund admitted work.
+One shared scalar gas meter covers the complete rooted attempt; the default/maximum shared allowance remains 10000000. Member ceilings are additional constraints on that same meter. Charge the specified amount before its work; update the total and any configured member-local total. Accepted charges have no canonical row, ordinal or transcript. Retain the shared/local exhaustion tie-break and one compact first-rejected-charge diagnostic. Rollback does not refund admitted work.
 
-The canonical logical schedule is the dependency order, local turn order and component-round order in the annex. Chunk dispatch, transport, wall time and physical cache reads create no extra semantic charges. A cached chunk supplies the same verified logical segment; replay it against the attempt's current ledger **before** accepting any effects. It cannot skip work, reset allowances, erase a rejected prefix or be merged twice. Runtime callback namespaces and sealed runtimeLedger rules follow the metering appendix.
+This edition removes accepted-charge traces from outcomes, receipts, portable chunks and completion records. The deterministic final admitted `gas` total is the public metering result. Optional debug traces are noncanonical, off by default, and MUST NOT affect identities, replay, state or charge decisions. They are not required for conformance or durable publication. Prior editions and their receipts keep their original meanings.
+
+Turn and unit records carry a scalar `gas` contribution instead of `workSegment`. Continuation commitments bind the current shared total and configured member-local totals, not an accepted-charge transcript. A scalar supplied by an untrusted worker is not proof of execution. Verify execution against the captured input and current remaining budgets, or use an unchanged trusted in-process result; re-execute when a cached result cannot establish the exact exhaustion boundary. Never debit an unaffordable completed scalar and claim it is the first rejected primitive charge.
+
+The canonical logical schedule is the dependency order, local turn order and component-round order in the annex. Chunk dispatch, transport, wall time and physical cache reads create no extra semantic charges. A cached chunk supplies the same verified execution and scalar gas contribution; verify it against the attempt's current meter **before** accepting any effects. It cannot skip work, reset allowances, erase a rejected prefix or be merged twice. Runtime callback namespaces and sealed runtimeLedger rules follow the metering appendix.
 
 A standalone `process(B, e, t)` includes its own setup and root projection. Its scalar gas is not blindly added to another standalone `process(A, ...)`. Full equivalence uses one normalized attempt: shared preflight/finalization once, each logical member computation once per prescribed turn, each receiver's required application work, and the selected root's projection once.
 
 The protocol has no separate maximum document/edge count, contract-map size, workflow-step count, patch/emission/route/dispatch count, turn/round count, content/path/filter/program depth, executable-body size, token length or generalization-search length. Keep the required syntax/normalization and exact value/format rules; remove only the unrelated resource ceilings. Explicit authored constraints and supported stricter member gas budgets remain enforceable.
 
-The standard whole-attempt gas maximum is still 10,000,000, not 10,000,000 per member, page, chunk or component round. Existing explicitly selected lower test/invocation budgets and member-local ceilings remain supported and bound into execution evidence; a machine-specific shortage must not silently lower the authoritative budget. Exactly spending the remaining gas is allowed if no further charged work is required; the next unaffordable charge is rejected before its corresponding work. Do not change the existing tie-break or first-rejected-charge record.
+The standard whole-attempt gas maximum is still 10,000,000, not 10,000,000 per member, page, chunk or component round. Existing explicitly selected lower test/invocation budgets and member-local ceilings remain supported and bound into execution evidence; a machine-specific shortage must not silently lower the authoritative budget. Exactly spending the remaining gas is allowed if no further charged work is required; the next unaffordable charge is rejected before its corresponding work. Retain the existing tie-break and rejected-charge fields except the legacy ordinal; this edition does not record an accepted-charge position.
 
 All repeatable semantic progress formerly protected only by a removed count guard must have a defined positive logical charge or a finite structural termination argument. A scalar-expression base charge is not evidence that arbitrary-size arithmetic, copying or materialization is adequately metered. Review these paths before claiming gas-bounded processing. Reuse defined counters/quantities where they already describe the work; do not derive costs from Language's physical step count, a worker timeout, cache warmth or bytes actually fetched from a warm/cold database.
 
@@ -565,11 +569,11 @@ Gas is a portable work rule, not a promise of a fixed number of milliseconds, by
 
 **C30.** A sealed child or component completion is a **calculated value**, not a separately committed document. All affected state, output, protected markers, channel lifetimes and graph identities remain tentative until the entire selected attempt succeeds. Any failure rolls back the entire attempt; public events are empty on failure. Retain admitted gas diagnostics under the stated failure policy.
 
-**Physical interruption is not a completed failure.** Memory/stack exhaustion, a configured host work cutoff, timeout/cancellation, unavailable storage or a failed worker before completion must not be translated into `GAS_LIMIT_EXCEEDED`, semantic `FAILED`, `TERMINATED` or invalid input merely because execution stopped. Unwind or abandon the tentative attempt and communicate a typed host/incomplete condition outside the canonical Outcome. The original committed state and input remain authoritative. A partial gas trace is diagnostic evidence only, not a completed receipt or terminal input disposition. Missing exact content continues to use the supported `NEEDS_RESOURCES` mechanism. If publication may already have committed, reconcile its original identity before another execution.
+**Physical interruption is not a completed failure.** Memory/stack exhaustion, a configured host work cutoff, timeout/cancellation, unavailable storage or a failed worker before completion must not be translated into `GAS_LIMIT_EXCEEDED`, semantic `FAILED`, `TERMINATED` or invalid input merely because execution stopped. Unwind or abandon the tentative attempt and communicate a typed host/incomplete condition outside the canonical Outcome. The original committed state and input remain authoritative. A partial gas total is diagnostic evidence only, not a completed receipt or terminal input disposition. Missing exact content continues to use the supported `NEEDS_RESOURCES` mechanism. If publication may already have committed, reconcile its original identity before another execution.
 
 Checkpoint settlement occurs at the end of the eligible member turn so its completed state contains the consumed-original-event checkpoint. Validate the same activation and channel generation; retire old checkpoints on generation change. Later structural edits cannot transfer these records to a replacement. Final graph verification still runs before returning APPLIED. A parent that merely receives a child batch gets no external checkpoint from that receipt.
 
-**C31.** Replay fixes the exact starting snapshot, original event, microsecond time, release, Language/BEX profiles, runtime bindings, selected exact dependency views and gas policy. It reproduces the exact resulting documents, root output occurrence order, checkpoints, status and canonical logical work/gas trace. Physical task identifiers, storage fetch order and cache statistics are not semantic trace fields.
+**C31.** Replay fixes the exact starting snapshot, original event, microsecond time, release, Language/BEX profiles, runtime bindings, selected exact dependency views and gas policy. It reproduces the exact resulting documents, root output occurrence order, checkpoints, status and canonical logical work evidence and final gas total. Physical task identifiers, storage fetch order and cache statistics are not semantic trace fields.
 
 ### 16.1 Required composition property
 
@@ -623,7 +627,7 @@ An external channel receives its exact member, input document, channel key and g
 
 The hardening edition corrects a reference defect in the source-turn commitment used by emitted occurrences. Execution certificates include invocation-wide logical work and remain bound and checked as execution evidence. Such a certificate must not rename a member's application emissions merely because a different containing root drove the same semantic turn. The semantic incoming commitment binds each ordered batch's source member, serial, completed after-view, ordered emitted occurrences and captured occurrence tickets, together with the turn's existing cause, local before-view, dependencies, seeds, phase and lifecycle. The complete certificate remains in `turnInput` for replay verification. The full certificate remains required execution evidence; its encoding is distinct from the semantic occurrence key.
 
-The local driver can complete an untouched local attempt without allocating portable token/candidate envelopes. It executes the same readiness, work-unit and finalization transitions, including every logical charge and first rejected charge. An attempt that has issued a token or accepted chunk history cannot change driver. Transport identifiers and copies are not logical work. Equivalence qualification compares outcomes, occurrence order, checkpoints, gas traces, rollback and low-budget failures.
+The local driver can complete an untouched local attempt without allocating portable token/candidate envelopes. It executes the same readiness, work-unit and finalization transitions, including every logical charge and first rejected charge. An attempt that has issued a token or accepted chunk history cannot change driver. Transport identifiers and copies are not logical work. Equivalence qualification compares outcomes, occurrence order, checkpoints, final gas totals, rollback and low-budget failures.
 
 Committed local turns retain exact handler/declaration attribution for each patch. This is protected execution evidence used by higher-layer lifecycle policies; submitted documents cannot author trusted attribution. Archive imports preserve original managed-member keys when unambiguous, so independently selected historical roots retain occurrence identity. Exact historical addresses still select their archived state, never an arbitrary newer live alias.
 
@@ -686,7 +690,7 @@ identity. Incomplete or rejected establishment must not issue a result witness.
 
 Canonical transfer tokens and value semantics are defined by the exact-value transfer accounting rules. Read,
 normalization, validation and effect tariffs still apply in their prescribed order.
-The same selected exact descendant has equal traces and rejection behavior under
+The same selected exact descendant has equal final gas and rejection behavior under
 inline, reference, mixed, cached, restored and transported representations.
 <a id="transitions"></a>
 ## Appendix A. Complete transition model
@@ -722,16 +726,16 @@ The invocation descriptor binds the exact input snapshot commitment, original ev
 | `OccurrenceTicket` | `parent`, `parentActivation`, `path`, `source`, `sourceActivation`, `generation`. |
 | `TurnInput` | `member`, `activation`, `beforeView`, `profile`, `cause`, `phase`, `turnSerial`, ordered `dependencies`, ordered `incoming`, ordered `seeds`, `lifecycle` (`{kind:NONE}` or `{kind:INITIALIZE,document:exactPreInitializationRef}`), and exact `logicalContext`. |
 | `EventOccurrence` | `sourceTurn`, zero-based `ordinal`, exact `event`, `identity`. |
-| `TurnCompletion` | `turnInput`, `afterView`, ordered `output`, `memberMetadata`, ordered `edgeChanges`, `consumedSeeds`, `retiredTickets`, `workSegment`, `identity`. |
+| `TurnCompletion` | `turnInput`, `afterView`, ordered `output`, `memberMetadata`, ordered `edgeChanges`, `consumedSeeds`, `retiredTickets`, scalar `gas`, `identity`. |
 | `RoundSeal` | exact preceding and resulting component vectors, round ordinal, ordered local completion identities, their finalized member projection, changed live bindings and identity. |
-| `UnitCompletion` | sorted `members`, exact `beforeViews` and `afterViews`, ordered per-member `turnResults`, per-member `output`, `workSegment`, `identity`. |
+| `UnitCompletion` | sorted `members`, exact `beforeViews` and `afterViews`, ordered per-member `turnResults`, per-member `output`, scalar `gas`, `identity`. |
 | `QueueItem` | `kind` LOCAL or EMBEDDED; exact `event`; LOCAL has source occurrence identity; EMBEDDED additionally has source completion and occurrence ticket. |
 | `Frame` | owned working body/metadata; immutable dependency view; local FIFO; own output; suspended handler stack; pending initialization barriers; retired routes; consumed seeds. Mutable and never exported. |
 | `ChunkToken` | attempt identity, selected unit, exact TurnInput/round descriptors, logical sequence position, expected input/output dependencies, meter/logical-proof prefix commitments; one-use token. |
 
 `beforeView`/`afterView` mean exact local content **plus** selected managed bindings/required component proof, not only a projected business object. An `incoming` row is closed: `{kind:DAG, sourceCompletion, tickets}` for an acyclic/outside-unit source, or `{kind:CYCLIC, sourceCompletion, roundSeal, tickets}` for an intra-unit source. `tickets` is the ordered receiver-ticket list. The cyclic variant carries the exact finalized source projection and is not a new external event. Seeds keep the existing member, activation, channel, generation and selected operation identity/key facts. `logicalContext` binds the canonical metering proof/manifest inventory, not physical cache residency.
 
-Compute `sourceTurn = digest(turn-input-domain, semantic TurnInput fields excluding logicalContext)`; accounting-prefix evidence must not change the identity of the same semantic local turn; `EventOccurrence.identity = digest(event-domain, {sourceTurn, ordinal, event})`. The source key is retained when rerooting an existing managed snapshot. Do not rebuild B as a fresh differently initialized root and call it the same reusable turn. A receiver observation identity binds the source occurrence identity and the full occurrence ticket. Turn-result identities bind the listed content excluding their own identity field; unit and round identities likewise bind all listed fields except their own identity field, using their respective versioned domains. Work rows inside a completion use relative ordinals; flatten them into the common attempt's canonical work order on acceptance. Snapshot record roots/revisions remain attempt-specific.
+Compute `sourceTurn = digest(turn-input-domain, semantic TurnInput fields excluding logicalContext)`; accounting-prefix evidence must not change the identity of the same semantic local turn; `EventOccurrence.identity = digest(event-domain, {sourceTurn, ordinal, event})`. The source key is retained when rerooting an existing managed snapshot. Do not rebuild B as a fresh differently initialized root and call it the same reusable turn. A receiver observation identity binds the source occurrence identity and the full occurrence ticket. Turn-result identities bind the listed content excluding their own identity field; unit and round identities likewise bind all listed fields except their own identity field, using their respective versioned domains. Gas contributions inside a completion are scalars; verify them against the captured execution and budgets on acceptance. No accepted-charge rows are serialized. Snapshot record roots/revisions remain attempt-specific.
 
 Before a closed record is admitted, reject unknown fields and invalid variants, verify content identities, validate monotonic serials and prove every referenced component/binding. `identity` fields never authenticate execution by themselves.
 
@@ -754,7 +758,7 @@ PROCESS(input, event, time):
     validate all affected owned/containing contexts and protected records
     settle topology/revision bookkeeping once for this invocation
     project only selected-root output occurrences in canonical creation order
-    return APPLIED with the complete graph, output and normalized gas ledger
+    return APPLIED with the complete graph, output and final gas total
 
 INITIALIZE(input):
     open the same isolated machine with Cause(INITIALIZE)
@@ -969,7 +973,7 @@ A unit may not seal outward while it has a pending dependency that can still sup
 
 Keep the original input snapshot immutable. APPLIED alone authorizes publication of the full attempt result. Any invalid request, patch, received completion, identity, protected state, callback or final containing constraint rolls back every tentative frame/completion/marker/output in the attempt. Deterministic gas exhaustion has its existing exact rollback and rejected-charge behavior. A physical resource/cancellation exception abandons the tentative attempt without constructing a canonical semantic failure.
 
-For GAS_LIMIT_EXCEEDED preserve admitted rows and the first rejected charge, not speculative suffix work. For NEEDS_RESOURCES preserve the original state and the defined missing-resource disposition; do not invent a completed gas receipt or a successful prefix. A physical cancellation is not a fabricated protocol gas error. Propagate a typed incomplete/host condition through every callback, Language bridge, BEX boundary, chunk driver and receiving adapter; do not let a broad exception wrapper turn it into invalid evidence or invalid input. No terminal result, input-disposition or checkpoint is issued from the unfinished attempt.
+For GAS_LIMIT_EXCEEDED preserve the admitted gas total and the first rejected charge, not speculative suffix work. For NEEDS_RESOURCES preserve the original state and the defined missing-resource disposition; do not invent a completed gas receipt or a successful prefix. A physical cancellation is not a fabricated protocol gas error. Propagate a typed incomplete/host condition through every callback, Language bridge, BEX boundary, chunk driver and receiving adapter; do not let a broad exception wrapper turn it into invalid evidence or invalid input. No terminal result, input-disposition or checkpoint is issued from the unfinished attempt.
 
 Finalization uses only sealed owned states. Substitute current verified member-local edges, run the real Language cyclic-set finalizer, retain owning-set proofs, rebuild outside references dependency-first, validate every affected context, and write invocation revision/topology generation once. No finalizer invokes business update/event handlers. Root projection records only root-origin occurrences; other completions remain internal result evidence.
 
@@ -997,7 +1001,7 @@ An acyclic subgraph may be calculated in a separate process and transported as e
 
 **Dynamic graphs:** chunk acceptance follows A08/A09. A join can invalidate a formerly independent cut. Preserve completed turns and promote the remaining work; never force a precomputed stale partition to finish as if topology had not changed. Equivalence covers identical execution of this state machine, not arbitrary regrouping that changes its semantic turns.
 
-A native implementation can use a single heap, an explicit continuation object, serialization between chunks, or verified computation reuse. It must have no visibility into another member's unsealed frame and must preserve the logical trace. Parallel wall-clock completion order is ignored.
+A native implementation can use a single heap, an explicit continuation object, serialization between chunks, or verified computation reuse. It must have no visibility into another member's unsealed frame and must preserve the logical work evidence and final gas total. Parallel wall-clock completion order is ignored.
 
 ### A12. Helper contracts and integration
 
@@ -1043,7 +1047,7 @@ Logical-work inventory is not physical cache inventory. Keep the old meter for w
 
 ### Common ledger
 
-There is one shared live ledger for the entire `process` or `initialize` attempt, maximum/default 10000000, plus optional member-local ceilings. Charge before work. Retain the defined owner field, admitted prefix, first rejected charge, tie-break, domain-integer checks and extension namespace rules in `reference/model.py` and `reference/runtime.py`.
+There is one shared live ledger for the entire `process` or `initialize` attempt, maximum/default 10000000, plus optional member-local ceilings. Charge before work. Retain configured member-local totals, the admitted total, first rejected charge, tie-break, domain-integer checks and extension namespace rules in `reference/model.py` and `reference/runtime.py`.
 
 Failed state rolls back, not admitted work. NEEDS_RESOURCES has an incompatible's no-completed-ledger disposition. Physical queue storage, network transfer, cache hits and task IDs are not tariffs. Logical input facts and validation proofs are distinct from physical caches.
 
@@ -1079,11 +1083,11 @@ For new-child initialization, source initialization work belongs to the child; r
 
 ### Normal form and cached completions
 
-The reference logical order is A01 setup, initialization units, input units, member/round order, and final projection. Every local work segment has relative ordinals, stable owner keys and an input logical-proof prefix. On chunk acceptance, validate and append that same segment in the canonical order; physical completion order is irrelevant.
+The reference logical order is A01 setup, initialization units, input units, member/round order, and final projection. Each completed unit has a scalar gas contribution and an input logical-proof commitment. On chunk acceptance, verify the same execution under the captured current budgets; physical completion order is irrelevant.
 
 A cached segment with a different logical proof inventory, dependency context, profile, seed selection or budget-prefix semantics cannot be copied unchanged. Re-execute the local kernel or derive/verify its exact normal-form work through the implementation's supported equivalent path. It is never sufficient to set gas to the cache lookup cost. A previously admitted segment cannot merge twice for the same logical chunk; distinct receiving occurrences still have their own application costs.
 
-Retain the defined rejected-charge behavior: stop before the first work item that exceeds shared or owner-local remaining gas, return its exact rejected charge, and expose no state/output. Speculative work beyond that point is physical diagnostic work only. Do not execute an unbounded speculative callback merely to discover a ledger. It must follow the declared live or verifiable work-ledger contract; the 10,000,000 shared ceiling is not reset for it. Physical interruption abandons speculation and is not a semantic rejection.
+Retain the defined rejected-charge behavior: stop before the first work item that exceeds shared or owner-local remaining gas, return its exact rejected charge, and expose no state/output. Speculative work beyond that point is physical diagnostic work only. Do not execute an unbounded speculative callback merely to discover its cost. A live callback charges the parent before work. A sealed callback enforces its captured allowance before every primitive, then merges its admitted scalar once and reproduces any first rejected charge; the 10,000,000 shared ceiling is not reset for it. Physical interruption abandons speculation and is not a semantic rejection.
 
 Consequently:
 
@@ -1101,7 +1105,7 @@ The latter contains repeated top-level setup/root projection and can be a differ
 
 ### Required gas qualification
 
-Run direct/chunk differential cases at ample gas, exact-success allowance, one unit below it, and restrictive member-local ceilings. Compare ordered rows, admitted total, first rejection, owner attribution, state and public output. Include zero-event state propagation, duplicate paths, cold storage, callbacks, cyclic rounds, initialization, late failure and a retired receipt. Generated runtime totals must come from that implemented profile; none are supplied as invented golden numbers here.
+Run direct/chunk differential cases at ample gas, exact-success allowance, one unit below it, and restrictive member-local ceilings. Compare admitted total, first rejection, configured member-local budget enforcement, state and public output. Accepted-charge row sequences are not observations. Include zero-event state propagation, duplicate paths, cold storage, callbacks, cyclic rounds, initialization, late failure and a retired receipt. Generated runtime totals must come from that implemented profile; none are supplied as invented golden numbers here.
 
 ### No unrelated protocol ceilings
 
@@ -1109,7 +1113,7 @@ The structural `limits` entries are removed from the current manifest. Preserve 
 
 A valid computation may exceed an old document, step, depth or numeric-text limit while remaining within gas. It must not hit that obsolete semantic guard. A computation whose prescribed logical work exceeds 10,000,000 still fails at the real first unaffordable charge. Neither a bigger machine nor more chunks changes that boundary.
 
-A host unable to calculate or retain a valid under-budget outcome has not established a gas failure. Report incompleteness/operational fault, preserve pending input and stable state, and retry only with valid captured semantics. Do not publish a completed ledger assembled from a partial trace or estimate missing work using CPU time.
+A host unable to calculate or retain a valid under-budget outcome has not established a gas failure. Report incompleteness/operational fault, preserve pending input and stable state, and retry only with valid captured semantics. Do not publish a completed gas result assembled from an incomplete computation or estimate missing work using CPU time.
 
 ### Metering conformance
 
@@ -1346,7 +1350,7 @@ removes accidental duplicate establishment, not actual reads or new construction
 
 ```json
 {
-  "profile": "contracts-deterministic-gas-4",
+  "profile": "contracts-deterministic-gas-6",
   "status": "Ten-million-gas edition: shared default and maximum 10000000; numerical tariffs, charge ordering and rollback are unchanged.",
   "sharedMaximum": 10000000,
   "weights": {
@@ -1419,9 +1423,203 @@ removes accidental duplicate establishment, not actual reads or new construction
 ```
 
 <a id="algorithms"></a>
-## Appendix C. Complete executable algorithms
+## Deterministic execution context and traversal (2026-10-17)
 
-The following module blocks define this edition's reference procedures. File names identify modules within the abstract reference system; they are not external normative downloads. The selected Language and BEX operations have the exact bindings in §2. The host-value module is included where used.
+This edition retains the 10,000,000 shared default and maximum, charge-before-work,
+member ceilings, admitted-prefix gas, shared-cap tie precedence and atomic rollback.
+Accepted charge histories remain excluded from canonical final-gas evidence.
+The following refinements govern this edition; historical publications remain
+unchanged and are not compatible substitutions for this specification.
+
+### Ordering domains
+
+| Domain | Required order |
+| --- | --- |
+| Language canonical objects and BlueIds | Existing unsigned UTF-16 Language order |
+| Typed enum scalar keys | Unsigned UTF-16, `Language.ordered`; outer effective group order unchanged |
+| Contracts declarations, members, channels and error scans | Unicode code points |
+| Contracts semantic pointer comparisons | Decoded-segment tuples, each segment in code-point order |
+| Stored graph edge/vector serialization keys | `(source, raw pointer)` in code-point order, as in the executable reference |
+| Private Contracts JSON object keys | Unicode code points; this is not Language canonicalization |
+| Explicit source, emission, checkpoint and batch arrays | Their prescribed sequence; never sorted after execution |
+| Runtime type-slot alias precheck | Present slots in `itemType`, `keyType`, `type`, `valueType` order |
+| Count-predicate metering | Present `minItems`, `maxItems`, `minFields`, `maxFields`, `minLength`, `maxLength` |
+
+Every traversal affecting gas, a selected error, a commitment or output sequence
+uses its specified order, independent of map insertion, process seed, locale,
+worker completion or cache state. The metered bottom-up declaration merge begins
+in raw-key code-point order and preserves its `(order, key, typeID)` comparisons.
+Enum ordering adds no physical-sort charge and preserves typed scalar keys,
+duplicate/group elimination, first effective group occurrence and primitive
+category/payload comparison stopping behavior. Source enum lists are unchanged.
+Text count comparisons remain before enum examination; List counts remain before
+item traversal. Language validation remains authoritative for exact admission.
+
+Private canonical JSON accepts null, Boolean, arbitrary exact Integer, Text,
+sequences and Text-keyed objects. It rejects floating and Decimal carriers.
+The private encoder, including streaming/digest paths, uses the executable
+`canonical` function's bytes and error rules. Language/BEX numeric and UTF-16
+identity rules are unchanged.
+
+### Complete invocation identity
+
+Successful preparation freezes verified logical admission context against the
+original receiver before child installation, allocations or local turns. The
+private projection is keyed by exact binding identity and contains only the
+binding verifier's closed semantic result. Verifiers must reject unrecognized
+fields and must exclude signatures, credentials, local capability tokens,
+physical cache state and other proof-encoding details. Arbitrary submitted
+evidence is never made authoritative by hashing it.
+
+The ordinary `contracts.invocation/2` record is closed over `input`, `event`,
+`timestamp`, `gas`, `release`, and `admissions`. The receiving
+`contracts.receiving/2` record is closed over `input`, `mode`, `sources`, `policy`,
+and `admissions`; mode is exactly HISTORICAL or LIVE. Sources retain the supplied
+validated descriptor sequence. HISTORICAL has empty admissions. The original
+snapshot commits the exact active runtime profile. Both records are sealed after
+admission verification and before invocation-derived allocations.
+
+Before verification succeeds, validation and metering failures use a distinct
+`contracts.attempt/2` or `contracts.receiving-attempt/2` identity committing the
+same selected inputs but no purported verified admissions. The failure outcome
+and receipt commit the diagnostic and admitted gas prefix. The attempt identity
+is not a claim that unverified evidence has semantic authority. Preparation keeps
+its existing charged preflight order. The public process interface remains the
+three-input document/event/timestamp interface.
+
+### Terminal receiving
+
+After the required original-input validation, admission and seed checks, LIVE
+rejects an already terminated root with the direct PROCESS terminal disposition;
+it does not install later child results. HISTORICAL may perform exact seedless
+structural adoption for finite previously frozen host obligations. Active
+receivers retain historical callbacks. Structural installation into a silent
+terminated member of an actual live cyclic unit remains permitted and does not
+reopen that member's external handlers.
+
+### Exact active profiles
+
+Runtime availability does not activate execution. The selected active binding
+sequence is fixed before initialization and must exactly match snapshots,
+received source completions and chunks. No implicit additive promotion is
+defined. New binding authors order validated type IDs by ASCII bytes and tariff
+counter names by Unicode code points, preserving specified header/body/peer
+field sequences and rejecting duplicates. This normalization is not execution
+work. Retained binding arrays are never normalized during restore.
+
+
+### Dispatch role and native integration
+
+
+### E1. Role, ownership and binding
+
+Contracts defines the `dispatch-policy` role and the hook below. The concrete Document Dispatch Policy type is a subtype of the selected Contracts/Compute and carries this specification as its governing rules. Runtimes select its exact published type and rules IDs.
+
+Select the binding before document initialization. Preserve the concrete role's current non-inherited exact type support, no header/peer fields, `body_fields` sequence `expr, do, constants, functions, entry, definition`, live meter mode and `dispatchPolicyCheck` price 1 in this edition. The namespace is `documentDispatchV1`; tariff is the ordered vector `[["dispatchPolicyCheck", 1]]`. Binding type_id and semantics_id are respectively the published policy type and this rules Text.
+
+The concrete policy remains a subtype of `Contracts/Compute` and is admitted as an exact top-level `/contracts` `dispatch-policy` declaration. Arbitrary subtype inheritance or nested executable roles do not acquire this policy behavior.
+
+### E2. Delivery hook and immutable context
+
+Run the gate after existing liveness checks, native work-occurrence recording/charging and channel-existence checking, before any handler-candidate matching for that delivery. The local document includes completed child results required by the schedule. There is no new implicit parent lookup.
+
+Use the ordinary Compute context plus a runtime-owned closed object `{kind, channel, operation}`. `kind` is one of EXTERNAL, TRIGGERED, EMBEDDED, UPDATE, INITIALIZATION, TERMINATION; `channel` is the selected exact local key; `operation` is the natively selected operation or null. Never derive native kind from payload strings. Original processing event, current payload, current declaration, explicit timestamp, call, scope and no-prior-step-results follow existing Compute rules; preserve initialization's absence semantics.
+
+### E3. Order, purity and errors
+
+If no policies exist, no extra policy sorting pass or charge occurs. Otherwise, freeze the local declaration map, execute the metered Contracts sort over **all** declarations, then filter policies. Evaluate every policy in that order. Charge its check before evaluation. Require no staged document changes, events or termination effects. Require a closed result `{allowed: Boolean, reason?: Text}`, without coercion.
+
+A valid false does not skip later policies. A BEX failure, gas interruption or malformed result interrupts via its proper error path. Preserve the validation precedence: evaluation/interruption; effect rejection; record shape; Boolean field; optional Text reason. Current matching codes are `EFFECTFUL_DISPATCH_POLICY`, `INVALID_RECORD`, `INVALID_DISPATCH_DECISION` and `INVALID_DISPATCH_REASON`. If all policies allow, ordinary handler scheduling performs its separate prescribed sorting pass. Physical reuse must not remove logical gas.
+
+### E4. Denial and checkpoint
+
+A valid denial skips handlers for that delivery. It does not cancel independent child progress or all other deliveries. A denied external seed is consumed/checkpointed **if the enclosing attempt commits**. Later access restoration does not replay it; a caller submits a new occurrence to retry. Thus Contracts may return APPLIED while the requested business operation is denied. A later error/exhaustion rolls back the enclosing tentative attempt's checkpoint/state, while previously sealed independent source results survive.
+
+Missing resources are incomplete work, not a false policy result. Pre-Contracts authority rejection is also distinct and must not invent a successful native checkpoint.
+
+### E5. Committed evidence and reporting
+
+Add `dispatchDecisions` to the local-completion schema. It is present if and only if at least one policy decision was validated in that completed local turn; otherwise it is omitted. Its order is native delivery order, then canonical policy order. Each row contains:
+
+`delivery`, `policy`, `declaration`, `channel`, `kind`, `operation`, `allowed`, `reason`.
+
+`delivery` references the existing `contracts.work/completion-1` occurrence identity; it is not a second event wrapper. `declaration` is the policy declaration's exact BlueId. `operation` is Text or explicit null. Normalize absent `reason` to empty Text for allow and `DISPATCH_REJECTED` for deny. Validate field types and closed records. Only validated decisions in a completed local result enter this successful-completion sequence; failure evidence follows the selected existing failed-attempt schema and never fabricates a completed decision.
+
+Bind this field through every completion, chunk, source-receiving, export/restore and receipt verifier. Detached decision rows do not grant authority.
+
+Each `delivery` must identify a work occurrence in the same local turn/member. `channel` and `kind` must match that occurrence; `operation` must match native selection; `declaration` must match the selected policy. Reject missing, duplicated, reordered or mismatched decisions. Record-shape checking and hashing alone do not establish this correspondence.
+
+Coordination derives per-delivery rejection information from these rows. Preserve one row per delivery/policy, including operation-less raw external events. For a requested operation's aggregate report, a denial on its addressed delivery produces the standardized disposition code `DISPATCH_REJECTED`. Authored reasons such as `DOCUMENT_ACCESS_UNAVAILABLE` remain in the rejected decision details in canonical order; they do not replace that code or the native Contracts `APPLIED` status. Unrelated allowed child/delivery work remains represented as committed. For raw events or mixed deliveries, per-delivery evidence is authoritative and aggregate labels must preserve partial allowed progress. For an addressed operation report `DISPATCH_REJECTED` if any decision on its addressed delivery denies. For a raw or mixed input retain ordered per-delivery decisions and report `PARTIAL` when allowed work and denied work coexist; an aggregate does not erase committed progress.
+
+### E6. Activation remains authored
+
+Keep Timeline Access as a provider-controlled document; update both permission lists before its ordinary `Coordination/Timeline Access Updated` event. Activation uses the existing Embedded Node Channel and completed child state. Recovery requires the true native EMBEDDED path and the authored access-control channel/instance checks. Direct approvals, amendments and business requests remain non-executing while required access is lost; preserve approvals and channel history. Do not add the removed Embedded State Channel/EMBEDDED_UPDATE mechanism or native business-state hooks.
+
+
+
+### Constructor reference prerequisite order (2026-10-17 correction 2)
+
+A metered Language constructor callback MUST NOT expose host-set iteration as
+logical gas order. Runtime normalization constructs inline type and specification
+slots first in the already prescribed input-key order and passes their established
+exact references to Language. During each resulting node construction, collect
+all reference-only `remember` occurrences; before establishing the next node,
+pay their unchanged direct identity prerequisites in exact BlueId ASCII order.
+Preserve occurrence multiplicity. Flush any remainder before the constructor
+returns. Sorting this inventory adds no gas. Node construction and validation
+remain in their existing order, with charge-before-work and atomic rollback.
+The same rule applies while synthesizing a multi-contribution captured recipe.
+It does not alter Language identity, admission, refinement or output values.
+
+This corrects a further observable ordering defect in the first deterministic
+candidate: normalization of a Dictionary with Integer `valueType` completed with
+the same total gas but, with budget 245, failed at admitted gas 245 for seed 0 and
+234 for seed 7. The original candidate and failed observations remain evidence.
+The four-slot runtime alias check retains its separate explicit slot order.
+
+
+### Effective document reads and staged overlays (2026-10-17 correction 3)
+
+Direct document reads, selected exact subviews and ordinary BEX member/item
+access MUST use the same effective collection interface. The presence of
+`$resultValue` elsewhere in a Compute program MUST NOT change an unrelated
+`$document` observation. In particular, a non-core `type` member is a captured
+effective reference view, not an ordinary object whose sole member is `blueId`.
+Its Blue output remains the finite exact reference. Contracts, labels and
+ordinary members use their existing effective visibility; hidden core metadata
+does not become an enumerated business field. Scalars use BEX scalar semantics.
+
+Charge `objectMemberRead` once before each attempted exact object member access,
+including a missing member and the special type/contracts/label members. Charge
+`listItemRead` once for a selected in-bounds exact list item. BEX validates index
+syntax and bounds before selecting an item; an invalid or out-of-range index
+does not charge an item access. Preserve BEX value-pointer parsing, including
+both empty and slash root paths, non-NFC field spellings and arbitrary-length
+index text. Contracts graph/semantic pointer validation remains a different
+boundary. Split reads retain the same invocation manifest inventory and the
+same per-access tariffs; they cannot bypass special-member charges. These are
+intentional logical-count and effective-projection corrections, not only a
+physical optimization. Prices, maximum budget and rollback remain unchanged.
+
+Every selected exact subview, and every saved Compute document-read callback,
+retains its captured resolver together with the invocation logical ledger.
+Opening through that ledger uses the captured source, never a later refreshed
+processor resolver. A staged overlay copies only changed ancestors; untouched
+exact children keep that captured context. Missing evidence propagates as the
+existing resource outcome. Finite wire views and exact-transfer accounting are
+not effective document views and remain unchanged.
+
+Staged authored BEX dictionaries are not exact host capabilities. The existing
+document overlay pointer interface can interpret a one-field `blueId` dictionary
+when continuing through it, using the captured resolver and the same logical
+ledger. A terminal such dictionary, or its explicitly requested `blueId` field,
+remains authored data; generic BEX access to that dictionary remains ordinary
+BEX access. The direct/split equivalence above applies to exact effective views,
+not to an assertion that arbitrary staged dictionaries have already undergone
+Language normalization or admission. No trusted provenance is inferred from
+reference-shaped authored data.
+
+## Appendix C. Complete executable algorithms
 
 ### `src/blue_contracts/reference/__init__.py`
 
@@ -1859,7 +2057,7 @@ class Attempt:
         wire=committed('chunk-result',dict(token=token.identity,
             outcome=outcome.observations() if outcome is not None else None,
             snapshot=run.state.wire(),events=run.events,work=run.work,changes=run.changes,
-            checkpoints=run.writes,gas=run.meter.used,gasTrace=run.meter.trace,rejected=run.meter.rejected,
+            checkpoints=run.writes,gas=run.meter.used,rejected=run.meter.rejected,
             turns=run.turns,rounds=run.rounds,units=run.units,logicalPrefix=run.logical_commitment()))
         result=ChunkResult(wire)
         # Store a separate immutable wire copy. Mutating a returned object cannot
@@ -1870,9 +2068,9 @@ class Attempt:
     def accept_chunk(self,token,completion):
         require(not self._finished and self.outcome is None, 'ATTEMPT_FINISHED')
         descriptor=token.descriptor if isinstance(token,ChunkToken) else closed(token,{'format','token','input','history'})['token']
-        require(self._token is not None and descriptor==self._token._descriptor, 'STALE_CHUNK_TOKEN')
+        require(self._token is not None and canonical(descriptor)==canonical(self._token._descriptor), 'STALE_CHUNK_TOKEN')
         wire=completion.to_data() if isinstance(completion,ChunkResult) else deepcopy(completion)
-        closed(wire,{'identity','token','outcome','snapshot','events','work','changes','checkpoints','gas','gasTrace','rejected','turns','rounds','units','logicalPrefix'})
+        closed(wire,{'identity','token','outcome','snapshot','events','work','changes','checkpoints','gas','rejected','turns','rounds','units','logicalPrefix'})
         require(wire['token']==self._token.identity, 'CHUNK_INPUT_MISMATCH')
         require(committed('chunk-result',{k:v for k,v in wire.items() if k!='identity'})==wire,'INVALID_CHUNK_COMMITMENT')
         candidate=self._candidates.get(wire['identity'])
@@ -2041,6 +2239,7 @@ class Frame:
     consumed: list = field(default_factory=list)
     writer: dict | None = None
     writes: list = field(default_factory=list)
+    dispatch_decisions: list = field(default_factory=list)
 
 
 @dataclass
@@ -2181,7 +2380,7 @@ class CompletionMachine:
         return bool(phase.pending[key] or key in phase.initialization or phase.seeds.get(key))
 
     def run_unit(self, phase, members):
-        start = len(self.meter.trace)
+        start = self.meter.used
         before = vector(self.state, members)
         turn_start = len(self.turns)
         while True:
@@ -2249,7 +2448,7 @@ class CompletionMachine:
         self.units.append(committed('unit-result', {
             'members': list(identity), 'beforeViews': before, 'afterViews': vector(self.state, members),
             'turnResults': [t['identity'] for t in self.turns[turn_start:]], 'output': output,
-            'workSegment': self.relative_segment(start)}))
+            'gas': self.meter.used-start}))
 
     def route_batch(self, phase, batch, members, *, internal):
         grouped = defaultdict(list)
@@ -2272,9 +2471,6 @@ class CompletionMachine:
                 phase.done.discard(next((tuple(sorted(g)) for g in phase.groups if parent in g), (parent,)))
             else:
                 phase.outside.append(selected)
-
-    def relative_segment(self, start):
-        return [{**row, 'ordinal': i} for i, row in enumerate(self.meter.trace[start:])]
 
     def install_inputs(self, key, incoming):
         from .model import segments
@@ -2318,7 +2514,7 @@ class CompletionMachine:
         self.activation=deepcopy(self.activation)
         self.state = sealed.copy()
         self.graph = self.fork_graph(self.state)
-        start = len(self.meter.trace)
+        start = self.meter.used
         work_start = len(self.work)
         changes_start = len(self.changes)
         serial = self.serials[key]
@@ -2382,7 +2578,8 @@ class CompletionMachine:
                 consumedSeeds=[asdict(s) for s in self.frame.consumed],
                 writes=deepcopy(self.frame.writes),
                 retiredTickets=[t.wire() for b in incoming for t in b.tickets if not self.ticket_live(t)],
-                workSegment=self.relative_segment(start)))
+                gas=self.meter.used-start,
+                **({'dispatchDecisions':deepcopy(self.frame.dispatch_decisions)} if self.frame.dispatch_decisions else {})))
             self.turns.append(completion)
             new = set(self.state.documents) - set(sealed.documents)
             owned = new | {key}
@@ -2399,7 +2596,7 @@ class CompletionMachine:
         logical = self.graph.logical
         # These keys are already exact identities/recipes, never cache addresses.
         return digest('contracts.logical-prefix/completion-1', {
-            'gas': self.meter.trace, 'work': self.work,
+            'gas': self.meter.commitment(), 'work': self.work,
             'manifests': sorted(logical.manifests),
             'established': sorted(logical.established,key=canonical),
             'proofs': sorted(logical.proofs,key=canonical),
@@ -2589,6 +2786,47 @@ def resolve_definition(attempt,key,step):
             visit(child);out[field]=blue.bex_data(child)
             require(type(out[field]) is dict,'INVALID_COMPUTE_DEFINITION',field=field)
     return out
+```
+
+### `src/blue_contracts/reference/dispatch.py`
+
+```python
+"""Pure per-delivery policy hook; policy decisions are authored in BEX."""
+from .model import closed, require
+from .runtime import RuntimeMeter
+
+
+def admit(run, member, channel, payload, kind, operation, call, declarations, delivery):
+    if not any(d['_role'] == 'extension_dispatch_policy' for d in declarations.values()):
+        return True
+    allowed = True
+    # Sorting all declarations is charged even though only policies are evaluated.
+    for key, header in run.ordered(declarations):
+        if header['_role'] != 'extension_dispatch_policy':
+            continue
+        policy = run.reg.declaration(header['_recipe'])
+        meter = RuntimeMeter(run.meter, policy['_extension'].binding, member)
+        meter.charge('dispatchPolicyCheck')
+        meter.merge()
+        definition = run.compute_definition(member, policy)
+        program = run.program(policy)
+        overlay = {**program, 'functions': {**(definition or {}).get('functions', {}),
+                                           **policy.get('functions', {})}}
+        context = run.context(member, payload, policy, {}, call, overlay_program=overlay)
+        context.bindings['dispatch'] = {'kind': kind, 'channel': channel, 'operation': operation}
+        result = run.engine.bex.execute(program, context, gas=run.meter,
+                                        entry=policy.get('entry'), definition=definition)
+        require(not result.changeset and not result.events, 'EFFECTFUL_DISPATCH_POLICY')
+        decision = closed(result.value, {'allowed'}, {'reason'})
+        require(type(decision['allowed']) is bool, 'INVALID_DISPATCH_DECISION')
+        require('reason' not in decision or type(decision['reason']) is str, 'INVALID_DISPATCH_REASON')
+        accept = decision['allowed']
+        allowed = allowed and accept
+        run.frame.dispatch_decisions.append(dict(
+            delivery=delivery, policy=key, declaration=run.blue.identity(run.blue.exact(policy['_recipe'])),
+            channel=channel, kind=kind, operation=operation, allowed=accept,
+            reason=decision.get('reason', '' if accept else 'DISPATCH_REJECTED')))
+    return allowed
 ```
 
 ### `src/blue_contracts/reference/generalization.py`
@@ -3029,6 +3267,7 @@ from collections.abc import Mapping, Sequence
 from blue_host import HostIncomplete, HOST_FAILURES, incomplete, host_boundary
 from algorithms import blue as L
 from blue_language import Language
+from blue_bex.values import segments as bex_segments, index as bex_index, BexError
 from blue_bex.values import UNDEFINED,blue_value,HostValue,pointer_get,kind
 from .model import ContractError,NeedResources,require,segments,LIMITS
 
@@ -3081,7 +3320,7 @@ class ExactValue(HostValue):
 
     def _head(self):
         if self._logical:
-            for part in self._recipe.parts:self._logical.open(part)
+            for part in self._recipe.parts:self._logical.open(part,self._blue)
         return self._blue.head(self._recipe)
 
     def _child(self, key):
@@ -3106,15 +3345,14 @@ class ExactObject(ExactValue, Mapping):
     def __len__(self): return sum(1 for _ in self)
     def __getitem__(self, key):
         h = self._head()
-        if key == 'type' and h.type_id and h.type_id not in L.CORE_NAME:return {'blueId': h.type_id}
-        if key == 'contracts' and h.contracts is not None:
-            return self._blue.view(self._blue.child(self._recipe,key), logical=self._logical,depth=self._depth+1)
-        if key in ('name', 'description'):
-            n = self._blue.open(self._blue.exact(self._recipe))
-            if n.has(key):return n.get(key)
-        if key not in h.fields:raise KeyError(key)
-        result = self._child(key)
-        if result is UNDEFINED:raise KeyError(key)
+        if self._logical:self._logical.meter.contracts('objectMemberRead')
+        # The effective collection inventory is shared by all BEX access forms.
+        visible = key in h.fields or (key == 'contracts' and h.contracts is not None) or (
+            key == 'type' and h.type_id and h.type_id not in L.CORE_NAME) or (
+            key in ('name','description') and key in h.labels)
+        if not visible:raise KeyError(key)
+        result = self._blue.view(self._blue.child(self._recipe,key),logical=self._logical,depth=self._depth+1)
+        if result is UNDEFINED and key not in ('contracts','type','name','description'):raise KeyError(key)
         return result
 
 
@@ -3123,8 +3361,11 @@ class ExactList(ExactValue, Sequence):
     def __len__(self): return len(self._head().items)
     def __getitem__(self, index):
         if isinstance(index, slice):return [self[i] for i in range(*index.indices(len(self)))]
-        if not 0 <= index < len(self):raise IndexError(index)
-        return self._child(index)
+        if type(index) is not int:raise TypeError('List index must be an integer')
+        h = self._head()
+        if not 0 <= index < len(h.items):raise IndexError(index)
+        if self._logical:self._logical.meter.contracts('listItemRead')
+        return self._blue.view(self._blue.child(self._recipe,index),logical=self._logical,depth=self._depth+1)
 
 class WireObject(HostValue, Mapping):
     """A finite exact output manifest; references stay one-field objects."""
@@ -3336,7 +3577,7 @@ class Bridge:
         r = r if isinstance(r, L.Recipe) else L.recipe(r)
         captured = copy(self)  # Capture resolver/context, not a future refresh.
         if logical:
-            for part in r.parts:logical.open(part)
+            for part in r.parts:logical.open(part,captured)
         h = captured.head(r)
         if h.value is not L.ABSENT:return h.value
         if h.items is not None:return ExactList(captured, r, logical,depth)
@@ -3360,15 +3601,19 @@ class Bridge:
     def read(self,node,path,view='canonical'):
         require(view in ('canonical','resolved'),'INVALID_VIEW');r=self.select(node,path)
         return self.project(r) if r is not None else UNDEFINED
-    def read_bex(self,value,path):
-        if isinstance(value, HostValue):return pointer_get(value,path)
-        at=value
-        for k in segments('' if path=='/' else path):
-            if isinstance(at,dict) and set(at)=={'blueId'}:at=self.view(L.Ref(at['blueId']))
+    def read_bex(self,value,path,*,logical=None):
+        # Plain overlay containers retain their exact children. Each such child
+        # supplies its own captured resolver and the same invocation ledger.
+        at=value;source=self
+        for k in bex_segments(path):
+            if isinstance(at,ExactValue):source=at._blue;logical=at._logical
+            if isinstance(at,dict) and set(at)=={'blueId'} and k!='blueId':
+                at=source.view(L.Ref(at['blueId']),logical=logical)
             if kind(at)=='object':at=at.get(k,UNDEFINED)
             elif kind(at)=='list':
-                if not k.isdigit() or k!='0' and k.startswith('0'):return UNDEFINED
-                i=int(k);at=at[i] if i<len(at) else UNDEFINED
+                try:i=bex_index(k,len(at))
+                except BexError:return UNDEFINED
+                at=at[i]
             else:return UNDEFINED
         return deepcopy(at)
     def matches(self,value,pattern,*,logical=None):
@@ -3518,7 +3763,8 @@ def canonical(value):
         from decimal import Decimal
         return str(Decimal(value)).encode('ascii')
     if type(value) is str:
-        value.encode('utf-8');return json.dumps(value,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+        try:return json.dumps(value,ensure_ascii=False,separators=(',',':')).encode('utf-8')
+        except UnicodeEncodeError:raise ContractError('INVALID_RECORD') from None
     if type(value) in (list,tuple):return b'['+b','.join(canonical(v) for v in value)+b']'
     require(type(value) is dict and all(type(k) is str for k in value),'INVALID_RECORD')
     return b'{'+b','.join(canonical(k)+b':'+canonical(value[k]) for k in sorted(value))+b'}'
@@ -3580,7 +3826,7 @@ class Snapshot:
     def identity(self):return digest('contracts.snapshot/completion-1',self.wire())
 class Meter:
     def __init__(self,limit=DEFAULT_LIMIT,local_limits=None,known_members=None):
-        integer(limit,0,DEFAULT_LIMIT);self.limit=limit;self.used=0;self.trace=[];self.rejected=None;self.owner='';self.schedule=dict(BEX_GAS)
+        integer(limit,0,DEFAULT_LIMIT);self.limit=limit;self.used=0;self.rejected=None;self.owner='';self.schedule=dict(BEX_GAS)
         require(local_limits is None or type(local_limits) is dict,'INVALID_LOCAL_LIMITS')
         self.local_limits=dict(local_limits or {});self.local_used={};self.runtime_schedules={}
         for member,ceiling in self.local_limits.items():
@@ -3590,14 +3836,23 @@ class Meter:
     def debit(self,namespace,counter,units,amount):
         if self.rejected is not None:raise GasExhausted(self.rejected['counter'])
         integer(units,maximum=None);integer(amount,maximum=None)
-        row=dict(ordinal=len(self.trace),namespace=namespace,counter=counter,units=units,amount=amount,owner=self.owner)
         shared=self.limit-self.used;local=self.local_limits[self.owner]-self.local_used.get(self.owner,0) if self.owner in self.local_limits else None
         if amount>shared or local is not None and amount>local:
             local_first=local is not None and local<shared
-            self.rejected=dict(row,remaining=local if local_first else shared,cap='LOCAL' if local_first else 'SHARED',sharedRemaining=shared,localRemaining=local)
+            self.rejected=dict(namespace=namespace,counter=counter,units=units,amount=amount,owner=self.owner,remaining=local if local_first else shared,cap='LOCAL' if local_first else 'SHARED',sharedRemaining=shared,localRemaining=local)
             raise GasExhausted(counter)
-        self.trace.append(row);self.used+=amount
-        if self.owner:self.local_used[self.owner]=self.local_used.get(self.owner,0)+amount
+        self.used+=amount
+        if self.owner in self.local_limits:self.local_used[self.owner]=self.local_used.get(self.owner,0)+amount
+    @property
+    def trace(self):
+        # Compatibility with the BEX host interface; no accepted-charge records.
+        return ()
+    def commitment(self):return dict(used=self.used,localUsed=dict(sorted(self.local_used.items())))
+    def merge_admitted(self,amount):
+        integer(amount,maximum=None)
+        require(amount<=self.limit-self.used and (self.owner not in self.local_limits or amount<=self.local_limits[self.owner]-self.local_used.get(self.owner,0)), 'RUNTIME_GAS_ALLOWANCE_CHANGED')
+        self.used+=amount
+        if self.owner in self.local_limits:self.local_used[self.owner]=self.local_used.get(self.owner,0)+amount
     def charge(self,counter,units=1,*,amount=None):self.debit('bex',counter,units,self.schedule[counter]*units if amount is None else amount)
     def contracts(self,counter,units=1):
         integer(units,maximum=None)
@@ -3614,7 +3869,6 @@ class Outcome:
     changes:list=field(default_factory=list)
     checkpoints:list=field(default_factory=list)
     gas:int=0
-    gas_trace:list=field(default_factory=list)
     rejected:Any=None
     diagnostic:Any=None
     completions:list=field(default_factory=list)
@@ -3633,7 +3887,7 @@ class Outcome:
         yield self.gas
     @property
     def commits(self):return self.status=='APPLIED'
-    def observations(self):return dict(status=self.status,input=self.input_identity,output=self.snapshot.identity,invocation=self.invocation,publicEvents=self.public_events,events=self.event_trace,work=self.work_trace,changes=self.changes,checkpoints=self.checkpoints,gas=self.gas,gasTrace=self.gas_trace,rejected=self.rejected,diagnostic=self.diagnostic,completions=self.completions,rounds=self.rounds,units=self.units)
+    def observations(self):return dict(status=self.status,input=self.input_identity,output=self.snapshot.identity,invocation=self.invocation,publicEvents=self.public_events,events=self.event_trace,work=self.work_trace,changes=self.changes,checkpoints=self.checkpoints,gas=self.gas,rejected=self.rejected,diagnostic=self.diagnostic,completions=self.completions,rounds=self.rounds,units=self.units)
     @property
     def receipt(self):return digest('contracts.result/completion-1',self.observations())
 def trampoline(generator):
@@ -3942,7 +4196,7 @@ class Run(CompletionMachine):
         self.admission_evidence=deepcopy(admission_evidence or {});self.external_admissions={}
         self.admission=admission;self.meter=Meter(gas_limit,local_limits,state.documents)
         self.views=engine.archive.bindings()
-        self.invocation=digest('contracts.invocation/completion-1',dict(input=state.identity,event=self.event_id,
+        self.invocation=digest('contracts.attempt/2',dict(input=state.identity,event=self.event_id,
             timestamp=timestamp,gas=self.meter.policy(),release=engine.registry.specification))
         self.graph=Graph(self.state,self.reg,engine.archive.restrict(self.views),self.meter,self.invocation)
         if self.event_id:self.graph.logical.carried_roots.add(self.event_id)
@@ -3951,6 +4205,19 @@ class Run(CompletionMachine):
         self.settlements=[];self.effect_count=0
         self.opened=set();self.headers=set();self.activation={k:0 for k in state.documents}
         self.setup_completion();self.graph.changes=self.changes
+    def seal_invocation(self):
+        """Bind verified logical context before any invocation-derived work."""
+        from .model import canonical
+        canonical(self.external_admissions)
+        if getattr(self, 'receiving', False):
+            self.invocation=digest('contracts.receiving/2',dict(input=self.input.identity,
+                mode=self.receiving_mode,sources=self.receiving_sources,
+                policy=self.meter.policy(),admissions=deepcopy(self.external_admissions)))
+        else:
+            self.invocation=digest('contracts.invocation/2',dict(input=self.input.identity,
+                event=self.event_id,timestamp=self.timestamp,gas=self.meter.policy(),
+                release=self.reg.specification,admissions=deepcopy(self.external_admissions)))
+        self.graph.cause=self.invocation
     def runtime_node(self,value,**kwargs):
         if self.frame is not None:self.meter.owner=self.frame.key
         return self.blue.node(value,logical=self.graph.logical,**kwargs)
@@ -3962,7 +4229,7 @@ class Run(CompletionMachine):
         # An immutable cause token, NOT an external ordering relation.
         return self.event_id
     def fail_result(self,status,diagnostic):
-        return Outcome(status,self.input.copy(),self.input.identity,self.invocation,event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),gas=self.meter.used,gas_trace=deepcopy(self.meter.trace),rejected=deepcopy(self.meter.rejected),diagnostic=diagnostic)
+        return Outcome(status,self.input.copy(),self.input.identity,self.invocation,event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),gas=self.meter.used,rejected=deepcopy(self.meter.rejected),diagnostic=diagnostic)
     def attempt(self):
         from .chunks import Attempt
         attempt=Attempt(self)
@@ -3987,8 +4254,10 @@ class Run(CompletionMachine):
         if not self.admission:
             from .runtime import prepare_admissions
             prepare_admissions(self)
+            self.seal_invocation()
             self.call,self.call_record=recognize_call(self.reg,self.event)
             self.seeds=select_seeds(self)
+        else:self.seal_invocation()
         self.meter.owner=''
         if self.graph.terminated(self.state.root):return self.fail_result('TERMINATED',None)
         self.phase=self.new_phase('INITIALIZE')
@@ -4006,7 +4275,7 @@ class Run(CompletionMachine):
         for event in self.events:
             if event['document']==self.state.root:
                 self.meter.owner=self.state.root;self.meter.contracts('rootEventRecorded');self.public.append(deepcopy(event))
-        result=Outcome('APPLIED',self.state,self.input.identity,self.invocation,public_events=deepcopy(self.public),event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),changes=deepcopy(self.changes),checkpoints=deepcopy(self.writes),gas=self.meter.used,gas_trace=deepcopy(self.meter.trace),completions=deepcopy(self.turns),rounds=deepcopy(self.rounds),units=deepcopy(self.units))
+        result=Outcome('APPLIED',self.state,self.input.identity,self.invocation,public_events=deepcopy(self.public),event_trace=deepcopy(self.events),work_trace=deepcopy(self.work),changes=deepcopy(self.changes),checkpoints=deepcopy(self.writes),gas=self.meter.used,completions=deepcopy(self.turns),rounds=deepcopy(self.rounds),units=deepcopy(self.units))
         self.blue.retain([d.body for _,d in sorted(self.state.documents.items())]);self.engine.archive.add(self.state)
         self.engine._completion_store.remember(self.input,result,self.event_id,self.timestamp)
         return result
@@ -4040,12 +4309,14 @@ class Run(CompletionMachine):
             if type(value) is dict:return '$resultValue' in value or any(overlays(x) for k,x in value.items() if k!='$literal')
             return False
         body=self.state.documents[key].body
+        from copy import copy
+        captured=copy(self.blue)
         view=self.blue.view(body,logical=self.graph.logical) if overlays(self.program(contract) if overlay_program is None else overlay_program) else body
         event=event_observation(self.reg,payload,logical=self.graph.logical)
         binding={'processingEvent':event_observation(self.reg,self.event,logical=self.graph.logical) if self.event is not None else UNDEFINED,
                  'timestamp':self.timestamp if self.timestamp is not None else UNDEFINED,
                  'call':event_observation(self.reg,call,logical=self.graph.logical) if call is not None else UNDEFINED}
-        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,'' if p=='/' else p) if isinstance(d,(L.Node,L.Ref)) else self.blue.read_bex(d,p),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
+        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,p,source=captured) if isinstance(d,(L.Node,L.Ref)) else captured.read_bex(d,p,logical=self.graph.logical),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
     def evaluate(self,key,payload,contract,steps,expr,call=None):
         self.meter.owner=key;result=self.engine.bex.execute({'expr':expr},self.context(key,payload,contract,steps,call),gas=self.meter);require(not result.changeset and not result.events,'EFFECTFUL_EXPRESSION');return result.value
     def work_record(self,key,channel,payload,kind):
@@ -4082,6 +4353,8 @@ class Run(CompletionMachine):
     def dispatch_local(self,key,channel,payload,kind,operation=None,allow_terminating=False,call=None):
         if not self.live(key) and not (allow_terminating and key in self.terminating):return
         self.work_record(key,channel,payload,kind);cs=self.reg.contracts(self.state.documents[key].body);require(channel in cs,'MISSING_HANDLER_CHANNEL');frozen=[]
+        from .dispatch import admit
+        if not admit(self,key,channel,payload,kind,operation,call,cs,self.work[-1]['identity']):return
         for hkey,h in self.ordered(cs):
             if h['_role'] not in EXECUTABLE or h['channel']!=channel:continue
             if h['_role']=='operation' and (kind!='EXTERNAL' or operation is None or hkey!=operation):continue
@@ -4269,7 +4542,7 @@ from dataclasses import dataclass
 from secrets import token_hex
 from blue_host import HostIncomplete, HOST_FAILURES, incomplete, host_boundary
 from algorithms import blue as L
-from .model import require, digest
+from .model import require, digest, canonical
 from .completion import Batch, vector
 from .graph import Graph
 
@@ -4298,7 +4571,7 @@ class CompletionStore:
 
     def capture(self, outcome, members):
         record = self._outcomes.get(outcome.receipt)
-        require(record is not None and record[1].observations() == outcome.observations(),
+        require(record is not None and canonical(record[1].observations()) == canonical(outcome.observations()),
                 'UNESTABLISHED_SOURCE_COMPLETION')
         before, result, event, timestamp = record
         members = frozenset(members)
@@ -4352,7 +4625,7 @@ def _begin_receiving(processor, snapshot, completions, *, live=False, evidence=N
     for record in records:
         require(not owners.intersection(record['members']), 'OVERLAPPING_SOURCE_COMPLETIONS')
         owners.update(record['members'])
-        require(record['before'].release == snapshot.release and record['before'].runtimes == snapshot.runtimes,
+        require(record['before'].release == snapshot.release and canonical(record['before'].runtimes) == canonical(snapshot.runtimes),
                 'INCOMPATIBLE_SOURCE_RUNTIME')
     require(snapshot.root not in owners, 'CYCLIC_RECEIVING_REQUIRES_ATOMIC_INVOCATION')
 
@@ -4369,8 +4642,13 @@ def _begin_receiving(processor, snapshot, completions, *, live=False, evidence=N
                 from .runtime import prepare_admissions
                 from .channels import recognize_call, select_seeds
                 prepare_admissions(self)
+                self.seal_invocation()
                 self.call, self.call_record = recognize_call(self.reg, self.event)
                 self.seeds = tuple(s for s in select_seeds(self) if s.document not in owners)
+                self.meter.owner = ''
+                if self.graph.terminated(self.state.root):
+                    return self.fail_result('TERMINATED', None)
+            else:self.seal_invocation()
             before_routes = {k: self.capture_routes(k) for k in owners}
             carried = {}
             for record in records:
@@ -4439,9 +4717,11 @@ def _begin_receiving(processor, snapshot, completions, *, live=False, evidence=N
                        processor.gas_limit, admission=event is None, local_limits=processor.local_limits,
                        admission_evidence=evidence)
     run.receiving = True
-    run.invocation = digest('contracts.receiving/1', dict(input=snapshot.identity,
-        sources=[r['descriptor']['identity'] for r in records], policy=run.meter.policy()))
-    run.graph.invocation = run.invocation
+    run.receiving_mode = 'LIVE' if live else 'HISTORICAL'
+    run.receiving_sources = [r['descriptor']['identity'] for r in records]
+    run.invocation = digest('contracts.receiving-attempt/2', dict(input=snapshot.identity,
+        mode=run.receiving_mode,sources=run.receiving_sources,policy=run.meter.policy()))
+    run.graph.cause = run.invocation
     return Attempt(run)
 ```
 
@@ -4482,7 +4762,7 @@ class Registry:
         from .runtime import Runtime
         self.blue.certify(L.Ref(binding.type_id),'definition');self.blue.certify(L.Ref(binding.semantics_id))
         require(binding.type_id not in self.by_id,'STANDARD_RUNTIME_REBIND')
-        parent={'external-channel':'Channel','processor-channel':'Channel','handler':'Handler','marker':'Marker','step':'Contract'}[binding.role]
+        parent={'external-channel':'Channel','processor-channel':'Channel','handler':'Handler','marker':'Marker','step':'Contract','dispatch-policy':'Compute'}[binding.role]
         require(self.types[parent] in L.ancestry(binding.type_id,self.blue.context),'INVALID_RUNTIME_CATEGORY',category=parent)
         previous=self.extensions.get(binding.type_id)
         if previous is not None:
@@ -4566,7 +4846,7 @@ class Registry:
         for k in sorted(ch.fields):
             token(k);r=L.child_recipe(ch,k);role=self.role(r)
             if k in MARKERS:require(role==MARKERS[k],'INVALID_PROCESSOR_STATE',key=k);continue
-            require(role not in set(MARKERS.values()),'MISPLACED_PROCESSOR_STATE',key=k);d=self.declaration(r,demand=False);require(d['_role'] in EXTERNAL|INTERNAL|EXECUTABLE|{'embedding','generalization','extension_marker','compute_definition'},'INVALID_CONTRACT_ROLE',role=d['_role'])
+            require(role not in set(MARKERS.values()),'MISPLACED_PROCESSOR_STATE',key=k);d=self.declaration(r,demand=False);require(d['_role'] in EXTERNAL|INTERNAL|EXECUTABLE|{'embedding','generalization','extension_marker','compute_definition','extension_dispatch_policy'},'INVALID_CONTRACT_ROLE',role=d['_role'])
             if d['_role']=='embedding':require(k=='embedded','EMBEDDING_KEY')
             if d['_role']=='generalization':require(k=='generalization','GENERALIZATION_KEY');self.policy(body)
             result[k]=d
@@ -4663,16 +4943,17 @@ class RuntimeBinding:
     def __post_init__(self):
         L.final_id(self.type_id);L.final_id(self.semantics_id);token(self.namespace)
         require(self.namespace not in ('bex','contracts'),'RESERVED_GAS_NAMESPACE')
-        require(self.role in ('external-channel','processor-channel','handler','marker','step'),'INVALID_RUNTIME_ROLE')
+        require(self.role in ('external-channel','processor-channel','handler','marker','step','dispatch-policy'),'INVALID_RUNTIME_ROLE')
         require(type(self.inherits_to_subtypes) is bool,'INVALID_RUNTIME_BINDING')
         require(self.meter_mode in ('live','ledger'),'INVALID_RUNTIME_METER_MODE')
         for value in (self.header_fields,self.body_fields,self.tariff,self.peer_fields):require(type(value) is tuple,'MUTABLE_RUNTIME_BINDING')
         fields=self.header_fields+self.body_fields
         require(len(fields)==len(set(fields)),'AMBIGUOUS_RUNTIME_FIELDS')
         for name in fields:token(name);require(not name.startswith('_') and name not in ('type','specification','name','description','order'),'INVALID_RUNTIME_FIELD')
-        require(set(self.peer_fields)<=set(self.header_fields),'INVALID_PEER_FIELDS')
+        require(len(set(self.peer_fields)) == len(self.peer_fields) and set(self.peer_fields)<=set(self.header_fields),'INVALID_PEER_FIELDS')
         require(len(dict(self.tariff))==len(self.tariff),'DUPLICATE_RUNTIME_COUNTER')
         for name,weight in self.tariff:token(name);integer(weight)
+        object.__setattr__(self, 'tariff', tuple(sorted(self.tariff)))
 
     def wire(self):
         def lists(value):
@@ -4686,14 +4967,14 @@ class RuntimeMeter:
     """A runtime cannot change ownership, tariffs, or the parent allowance."""
     def __init__(self,parent,binding,owner):
         self.__parent=parent;self.__binding=binding;self.__owner=owner
-        self.__start=parent.used;self.__rows=[];self.__rejected=None;self.__finished=False;self.__merged=False
+        self.__start=parent.used;self.__used=0;self.__rejected=None;self.__finished=False;self.__merged=False
         shared=parent.limit-parent.used
         local=parent.local_limits.get(owner,parent.limit)-parent.local_used.get(owner,0)
         self.__allowance=min(shared,local) if owner in parent.local_limits else shared
 
     @property
     def remaining(self):
-        return self.__allowance-sum(row[2] for row in self.__rows)
+        return self.__allowance-self.__used
 
     def charge(self,counter,units=1):
         require(not self.__finished and self.__rejected is None,'CLOSED_RUNTIME_LEDGER')
@@ -4703,7 +4984,7 @@ class RuntimeMeter:
             self.__parent.owner=self.__owner;self.__parent.debit(self.__binding.namespace,counter,units,amount)
         elif amount>self.remaining:
             self.__rejected=(counter,units,amount);raise GasExhausted(counter)
-        self.__rows.append((counter,units,amount))
+        self.__used+=amount
 
     def finish(self):
         require(self.__binding.meter_mode=='ledger','DOUBLE_GAS_DEBIT')
@@ -4715,7 +4996,7 @@ class RuntimeMeter:
         require(failed or returned is self and self.__finished,'INVALID_RUNTIME_LEDGER')
         require(self.__parent.used==self.__start,'RUNTIME_LEDGER_ALLOWANCE_CHANGED')
         self.__parent.owner=self.__owner
-        for counter,units,amount in self.__rows:self.__parent.debit(self.__binding.namespace,counter,units,amount)
+        self.__parent.merge_admitted(self.__used)
         if self.__rejected:
             counter,units,amount=self.__rejected
             self.__parent.debit(self.__binding.namespace,counter,units,amount)
@@ -4740,7 +5021,7 @@ class Runtime:
     """An installed implementation is trusted deterministic code, not a sandbox."""
     def __init__(self,binding,implementation):
         self.binding=binding;self.implementation=implementation
-        self.role={'external-channel':'extension_external','processor-channel':'extension_channel','handler':'extension_handler','marker':'extension_marker','step':'extension_step'}[binding.role]
+        self.role={'external-channel':'extension_external','processor-channel':'extension_channel','handler':'extension_handler','marker':'extension_marker','step':'extension_step','dispatch-policy':'extension_dispatch_policy'}[binding.role]
         if binding.role in ('handler','step'):require(callable(getattr(implementation,'execute',None)),'MISSING_RUNTIME_EXECUTOR')
         if binding.role=='external-channel':
             require(callable(getattr(implementation,'accept',None)),'MISSING_RUNTIME_CHANNEL_FUNCTION',function='accept')
@@ -4849,7 +5130,10 @@ def prepare_admissions(run):
             verified = runtime.implementation.verify_admission(context)
             require(type(verified) is dict, 'INVALID_VERIFIED_ADMISSION')
             # Retain a private data copy; accept_external freezes each read.
-            result[binding] = data_copy(verified)
+            projection = data_copy(verified)
+            from .model import canonical
+            canonical(projection)
+            result[binding] = projection
         except ContractError:
             raise
         except HOST_FAILURES as exc:raise incomplete(exc) from exc
@@ -5024,6 +5308,31 @@ class LogicalWork:
         self.exact_values={}
         self.partition=None
 
+    def construction_context(self,blue):
+        """Schedule constructor reference prerequisites independently of sets.
+
+        Normalized type/metadata slots are exact references. Language may visit
+        those references in any physical order; their identity prerequisites are
+        paid in exact-ID order before the resulting node is established. Keep
+        every occurrence, including duplicate references to the same identity.
+        """
+        from copy import copy
+        context=copy(blue.context);pending=[]
+        def flush():
+            references=sorted(pending,key=lambda ref:ref.id);pending.clear()
+            for ref in references:self.establish(ref)
+        def remember(node):
+            if isinstance(node,L.Ref):
+                pending.append(node);return node
+            flush()
+            identity=self.establish(node)
+            if isinstance(node,L.Node):
+                context.bodies[identity]=node
+                blue.note_identity(node,identity)
+            return node
+        context.remember=remember
+        return context,flush
+
     def exact(self,recipe,blue):
         """Captured exact content; prepay synthesis of multi-part recipes.
 
@@ -5035,15 +5344,10 @@ class LogicalWork:
         from copy import copy
         key=recipe.key()
         if key not in self.exact_values:
-            context=copy(blue.context)
-            def remember(node):
-                identity=self.establish(node)
-                if isinstance(node,L.Node):
-                    context.bodies[identity]=node
-                    blue.note_identity(node,identity)
-                return node
-            context.remember=remember
-            try:node=L.recipe_exact_value(recipe,context)
+            context,flush=self.construction_context(blue)
+            try:
+                node=L.recipe_exact_value(recipe,context)
+                flush()
             except L.Failure as error:blue.translate(error)
             # Carry the prepaid identity explicitly. Native continuation copies
             # can change handles; a physical cache must not decide whether this
@@ -5053,11 +5357,12 @@ class LogicalWork:
         if isinstance(node,L.Node):blue.note_identity(node,identity)
         return node
 
-    def open(self,node):
-        identity=self.blue.identity(node)
+    def open(self,node,source=None):
+        source=self.blue if source is None else source
+        identity=source.identity(node)
         if identity not in self.manifests:
             self.meter.contracts('nodeManifestOpened');self.manifests.add(identity)
-        return self.blue.open(node)
+        return source.open(node)
 
     def compare(self,left,right):
         self.meter.contracts('scalarComparison')
@@ -5107,18 +5412,9 @@ class LogicalWork:
             if parent is L.ABSENT:break
             self.meter.contracts('typeEdgeFollowed');node=parent
 
-    def read(self,node,path):
-        from .model import segments,require,LIMITS
-        r=L.recipe(node)
-        depth=0
-        for name in segments(path):
-            depth+=1
-            for part in r.parts:self.open(part)
-            head=self.blue.head(r)
-            self.meter.contracts('listItemRead' if head.items is not None else 'objectMemberRead')
-            r=self.blue.child(r,name)
-            if r is None:break
-        return self.blue.view(r,logical=self,depth=depth)
+    def read(self,node,path,*,source=None):
+        source=self.blue if source is None else source
+        return source.read_bex(source.view(node,logical=self),path,logical=self)
 
     def establish(self,node,previous=None,*,token=None,scope=None):
         # Input witnesses come from admission/opening, never a resolver cache.
@@ -5233,16 +5529,7 @@ class LogicalWork:
         from copy import copy
         from blue_bex.values import HostValue,kind,UNDEFINED
         from .language import ExactValue
-        context=copy(self.blue.context)
-        def remember(node):
-            identity=self.establish(node)
-            if isinstance(node,L.Node):
-                context.bodies[identity]=node
-                # Constructed evidence is now explicit, after the successful
-                # charge prefix. Every raw occurrence still pays normalization.
-                self.blue.note_identity(node,identity)
-            return node
-        context.remember=remember
+        context,flush=self.construction_context(self.blue)
         def literal(value):
             if type(value) is str:self.meter.contracts('identityInputTextBlock',(len(value)+63)//64)
             elif type(value) is int:
@@ -5275,15 +5562,27 @@ class LogicalWork:
                         raw[key]=[build(item) for item in part]
                     else:raw[key]=None if part is None else build(part)
                 # Preserve runtime rejection of string aliases in type slots.
-                for key in L.TYPES & set(raw):
-                    if type(value[key]) is str:
+                for key in ('itemType', 'keyType', 'type', 'valueType'):
+                    if key in raw and type(value[key]) is str:
                         from .model import require
                         require(False,'UNRESOLVED_RUNTIME_TYPE',alias=value[key])
             elif kind(value)=='list':
                 self.meter.contracts('identityInputMember',len(value))
                 raw={'items':[build(item) for item in value]}
             else:raw=self.blue.normalize_input(literal(value),aliases=False)
-            return L.normalize(raw,context,'exact')
+            # Each inline slot was constructed by build() above. Carry its
+            # already established token into Language's slot normalization, so
+            # the callback inventory contains references in every presentation.
+            if isinstance(raw,dict):
+                for key in L.ordered((L.TYPES|L.REFERENCE_METADATA)&set(raw)):
+                    part=raw[key]
+                    if isinstance(part,L.Node):
+                        identity=self.blue.known_identity(part)
+                        from .model import require
+                        require(identity is not None,'MISSING_CONSTRUCTION_EVIDENCE')
+                        raw[key]=L.Ref(identity)
+            result=L.normalize(raw,context,'exact');flush()
+            return result
         try:
             node=build(value)
             if certify:
@@ -5325,10 +5624,11 @@ class LogicalWork:
                             self.meter.contracts('integerLimbOperation',limbs)
                 elif type(value) is str and constraints.counts:
                     self.meter.contracts('textBlockExamined',(len(value)+63)//64)
-                    for count in constraints.counts.values():self.compare(len(value),count)
+                    for name in ('minItems', 'maxItems', 'minFields', 'maxFields', 'minLength', 'maxLength'):
+                        if name in constraints.counts:self.compare(len(value),constraints.counts[name])
                 if constraints.enum is not None:
                     for group in constraints.enum:
-                        for alternative in group:
+                        for alternative in L.ordered(group):
                             self.meter.contracts('validationMemberExamined')
                             _,core,other=constraints.enum_values[alternative]
                             if type(other) is type(value) and self.compare(value,other)==0:break
@@ -5339,7 +5639,8 @@ class LogicalWork:
                 if h.value_type or h.key_type:self.meter.contracts('validationMemberExamined')
                 visit(child,before,seen)
             if h.items is not None:
-                for count in constraints.counts.values():self.compare(len(h.items),count)
+                for name in ('minItems', 'maxItems', 'minFields', 'maxFields', 'minLength', 'maxLength'):
+                    if name in constraints.counts:self.compare(len(h.items),constraints.counts[name])
                 for i in range(len(h.items)):
                     child=L.child_recipe(h,i);before=L.child_recipe(prior,i) if prior and prior.items is not None and i<len(prior.items) else None
                     if before is not None and child.key()==before.key() and not h.constraints.unique:continue
@@ -5399,24 +5700,30 @@ def host_boundary(fn):
 
 ### Source inventory
 
-| Module | SHA-256 of supplied UTF-8 file |
-|---|---|
-| `src/blue_contracts/reference/__init__.py` | `78bed996244ac5fab47a02c2455614e69b920a4268f0a7fda241a54702b34bef` |
-| `src/blue_contracts/reference/catalogue.py` | `51e75dfa01394a8b2493292d2dfc4c79c3b2031c8035a85882b284126c7585df` |
-| `src/blue_contracts/reference/channels.py` | `1af7e3f1ba921fe0c4adac9d60f0b26e7b0e5c106d8c58fd3a801c3c0310160c` |
-| `src/blue_contracts/reference/chunks.py` | `d1b3c588fb98c0ebaf5b18e2105384c3a38037dba58f2406228d994ad2e3af4e` |
-| `src/blue_contracts/reference/completion.py` | `c46ac5fb09b69ba71d5284f47aed55251acff7aa958e8f1ee2f65d102ec3bd63` |
-| `src/blue_contracts/reference/compute.py` | `147caf84e70bebb5e3dec2bd3f5d437a25b85e172d3d12e1b4c3725f79fa76ba` |
-| `src/blue_contracts/reference/generalization.py` | `1f24b86271755ae5f1b5132c31de85d12d05d2a19c7c4b5d493201b953dff887` |
-| `src/blue_contracts/reference/graph.py` | `106b07e478bf77e2314b28044e0338429958ac58397db83f142ae0d5d8247b17` |
-| `src/blue_contracts/reference/language.py` | `2ae90402ede1299c0cd43c770406e0572ea8b68a384ce0d4bc01734da4b2f889` |
-| `src/blue_contracts/reference/model.py` | `3ad2eead8b944e6c11d3c09684fc108142fda3e0c86dfae18728c3447953ca5e` |
-| `src/blue_contracts/reference/policy.py` | `2423e9d280e20db1d08d8d6c42a8a8e4ab8e53d5f335866a27dd0eb7f2433121` |
-| `src/blue_contracts/reference/processor.py` | `8999ff7375c7af79ab09f76d3dc07394357dcf61dcbfab8659548634ad339655` |
-| `src/blue_contracts/reference/receiving.py` | `f5d56b66afd83cc0128883018b412282145238f6a956e4077bb530996039c7ff` |
-| `src/blue_contracts/reference/registry.py` | `93a3b8bad491d80782778e8032798f4671ee2a996f39694d44baa2f700bced6a` |
-| `src/blue_contracts/reference/runtime.py` | `0b33f51fb2d99a01d1867ac24767b4158139de9165eef0f93f86750bf24b9196` |
-| `src/blue_contracts/reference/storage.py` | `eae5dc318c226628d2a68a37175b10232846ed2611b1a8db4a007bbd6266458f` |
-| `src/blue_contracts/reference/work.py` | `bdff38e23e770ce1cd47d99535cd668c59865c301f97b5622bc5c0812e64ff5f` |
-| `src/blue_host/__init__.py` | `ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607` |
-
+```json
+{
+  "format": "blue-source-binding/1",
+  "edition": "2026-10-17-deterministic-3",
+  "modules": {
+    "src/blue_contracts/reference/__init__.py": "78bed996244ac5fab47a02c2455614e69b920a4268f0a7fda241a54702b34bef",
+    "src/blue_contracts/reference/catalogue.py": "51e75dfa01394a8b2493292d2dfc4c79c3b2031c8035a85882b284126c7585df",
+    "src/blue_contracts/reference/channels.py": "1af7e3f1ba921fe0c4adac9d60f0b26e7b0e5c106d8c58fd3a801c3c0310160c",
+    "src/blue_contracts/reference/chunks.py": "f691f8f6ec8abf25f2b6544bd8d4af332cccd7282ab0b5cf437f172bf8d8edfe",
+    "src/blue_contracts/reference/completion.py": "f599cf15dffe1a578c648c049934d3c153f88fa752d6447b866d6351b16490fd",
+    "src/blue_contracts/reference/compute.py": "147caf84e70bebb5e3dec2bd3f5d437a25b85e172d3d12e1b4c3725f79fa76ba",
+    "src/blue_contracts/reference/dispatch.py": "335aa5cfc43808368028f3bd7da40996b0ffdc9c91fef1af1df195af560088db",
+    "src/blue_contracts/reference/generalization.py": "1f24b86271755ae5f1b5132c31de85d12d05d2a19c7c4b5d493201b953dff887",
+    "src/blue_contracts/reference/graph.py": "106b07e478bf77e2314b28044e0338429958ac58397db83f142ae0d5d8247b17",
+    "src/blue_contracts/reference/language.py": "ecc0a111b3f6b2f679c32660bbe83ebb2a54040a61f261e82b29d5a81ec90cd4",
+    "src/blue_contracts/reference/model.py": "2f6c15c43c5a89fe6cbf41764c9f4fb417f0fb04fc309e8447337e5a08d4ea71",
+    "src/blue_contracts/reference/policy.py": "2423e9d280e20db1d08d8d6c42a8a8e4ab8e53d5f335866a27dd0eb7f2433121",
+    "src/blue_contracts/reference/processor.py": "44c6b1545f2a5b37dd037863b11c0d6373a3769b74957b28861de335bb6fb600",
+    "src/blue_contracts/reference/receiving.py": "723d489a97632eae0b0a5880613341727d6f93fc2042c30215a7668355d5ab27",
+    "src/blue_contracts/reference/registry.py": "e5f66ac022cd5ed54e203fd4d03eea6145aef7eaab5595ddeeb9c038124f8fd8",
+    "src/blue_contracts/reference/runtime.py": "8cc8305082cb347d792d9f3f3e4d773440772a119d869144e699e8ef0e19047f",
+    "src/blue_contracts/reference/storage.py": "eae5dc318c226628d2a68a37175b10232846ed2611b1a8db4a007bbd6266458f",
+    "src/blue_contracts/reference/work.py": "734074d174baa62601c3dc75001e9ae151363881fc472ec4a1467fe22e830ff2",
+    "src/blue_host/__init__.py": "ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607"
+  }
+}
+```

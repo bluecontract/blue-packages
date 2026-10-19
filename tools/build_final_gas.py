@@ -91,6 +91,7 @@ def build(package, check=False):
                             'BuildPaymentFamily', str(ROOT), '__index_only__'], check=True)
             import sys
             subprocess.run([sys.executable,str(ROOT/'tools/sync_catalogues.py')],check=True)
+            subprocess.run([sys.executable,str(ROOT/'tools/build_runtime_catalogues.py')],check=True)
         if check:
             def files(folder):
                 return {p.relative_to(folder).as_posix():p.read_bytes() for p in folder.rglob('*') if p.is_file()}

@@ -112,3 +112,11 @@ Run Core's `scripts/import-independent-processes.py --source <blue-packages>` to
 copy a closed, integrity-checked package selection for the generic native tests.
 Its `--verify` mode checks the retained fixture bytes. The implementation ledger and
 ignored reports in the Core worktree distinguish passing evidence from pending work.
+
+
+Identity-sensitive channel and contract reconciliation compares exact Blue
+identities (`$nodeBlueId`), including authored declarations and captured effective
+views. Existing identical declarations are accepted and unchanged contracts are
+not rewritten. Absent contracts are installed; different exact declarations keep
+the existing conflict behavior. Pending activation channels may be refreshed and
+replaced by their admitted transport. This does not change BEX structural equality.

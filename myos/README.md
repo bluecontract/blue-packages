@@ -4,4 +4,10 @@ MyOS Party specializes Party with myosAccountId. MyOS Customer Payment requires 
 
 The package emits adapter requests. It does not call a bank, move real funds, or implement a checkout website.
 
+Customer payment setup binds `requestCustomerFunding` to the selected payer
+channel (`parameters.payer`, default `customer`), matching the instruction's
+`paymentTerms.payerChannel`. It does not invent a separate `payer` participant.
+The instruction type leaves this channel as a required Text slot; setup supplies
+its value before the instruction is initialized.
+
 Unpublished candidate. Authored Blue/BEX definitions are authoritative. See ../docs/payment-family.md for the tested package selection and integration boundaries.

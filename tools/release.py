@@ -81,6 +81,14 @@ def check_archive(root, row):
         require(dependency['packageBlueId'] in closure,
                 'Missing embedded dependency: ' + row['name'] + '/' + prefix)
     package_root = path.parent.parent
+    # A root release descriptor describes the current archive, never a retained edition.
+    if row['name'] in ('blue-bex', 'blue-contracts'):
+        metadata = json.loads((package_root / 'release.json').read_text())
+        require(metadata['packageBlueId'] == manifest['packageBlueId']
+                and metadata['protocolBlueId'] == manifest['protocol']
+                and metadata['archiveSha256'] == digest(data)
+                and metadata['version'] == manifest['version'],
+                'Current release descriptor differs: ' + row['name'])
     lock = json.loads((package_root / 'blue-package.lock.json').read_text())
     for prefix, dependency in lock.get('imports', {}).items():
         dep_path = package_root / dependency['path']

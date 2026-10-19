@@ -86,3 +86,18 @@ canonical ordering and durable rejection of requests during suspension. It does
 not drop a history dependency merely because access is temporarily unavailable.
 Recovery still comes only from embedded access updates; it neither replays
 rejected business requests nor repeats first-activation startup.
+
+
+Child preparation compares an existing participant channel with the mapped
+parent transport by exact Blue identity (`$nodeBlueId`). A serialized authored
+dictionary and a captured effective view of the same channel are accepted.
+A different exact channel still rejects with `CHILD_CHANNEL_CONFLICT` before
+installation; this does not permit channel substitution or relax party mapping.
+
+
+Identity-sensitive channel and contract reconciliation compares exact Blue
+identities (`$nodeBlueId`), including authored declarations and captured effective
+views. Existing identical declarations are accepted and unchanged contracts are
+not rewritten. Absent contracts are installed; different exact declarations keep
+the existing conflict behavior. Pending activation channels may be refreshed and
+replaced by their admitted transport. This does not change BEX structural equality.

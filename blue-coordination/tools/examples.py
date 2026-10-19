@@ -75,7 +75,10 @@ def inline_response(e, envelope):
     return wire(e, result)
 
 
-def generate():
+def generate(output=None):
+    output = publisher.ROOT if output is None else __import__('pathlib').Path(output)
+    (output/'examples').mkdir(parents=True,exist_ok=True)
+    (output/'docs').mkdir(parents=True,exist_ok=True)
     e = Exact()
     definitions = []
     text_field = {'type':'Text','schema':{'required':True,'minLength':1}}
@@ -142,7 +145,7 @@ def generate():
         'expected':{'firstEntry':e.identity(first),'secondEntry':e.identity(second),'controlTimeline':e.identity(control),
             'access':e.identity(access),'beforeUpdate':e.identity(before),'afterUpdate':e.identity(after),
             'completeBefore':now,'keys':[key,other], 'executionStatus':execution.outcomes[-1].status}}
-    (publisher.ROOT/'examples/protocol.json').write_text(json.dumps(out,indent=2)+'\n')
+    (output/'examples/protocol.json').write_text(json.dumps(out,indent=2)+'\n')
     reverse={v:k for k,v in e.language.aliases.items()}
     reverse.update({v:k for k,v in e.language.aliases.items() if k.startswith('Contracts/')})
     reverse.update({v:k for k,v in e.aliases.items()})
@@ -300,7 +303,7 @@ At or after the boundary, new entries remain possible. A later poll uses afterEn
 with the last known entry. A limit=0 query obtains only the checkpoint and makes no
 claim that the caller already possesses its contents.
 '''
-    (publisher.ROOT/'docs/examples.md').write_text(text)
+    (output/'docs/examples.md').write_text(text)
     print('Generated ACME access example:',len(cases),'exchanges, native',out['expected']['executionStatus'])
 
 

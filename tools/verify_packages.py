@@ -15,17 +15,18 @@ def verify_authoring_overrides(directory, package):
     """Only the exact sources embedded in the new specification may live here."""
     folder=directory/'reference'
     if not folder.exists():return
-    expected={
-        'blue-bex': {'reference/gas.py','reference/runtime.py'},
-        'blue-contracts': {'reference/model.py','reference/processor.py','reference/GAS_MANIFEST.json','reference/chunks.py','reference/completion.py','reference/runtime.py'},
-    }
     name=package.manifest['name']
-    assert name in expected, 'Unexpected embedded reference tree: '+str(directory)
-    actual={p.relative_to(directory).as_posix() for p in folder.rglob('*') if p.is_file()}
-    assert actual==expected[name], 'Unexpected authoring override files'
     source=json.loads(package.files['docs/sources.json'])
-    declared={**source.get('overrides',{}), **source.get('resourceOverrides',{})}
-    assert set(declared.values())==actual, 'Unbound authoring override'
+    if name=='blue-contracts':
+        declared={original:'reference/'+Path(original).name for original in source['modules']
+                  if original.startswith('src/blue_contracts/reference/')}
+        declared['gas-manifest']='reference/GAS_MANIFEST.json'
+    elif name=='blue-bex':
+        declared=source['overrides']
+    else: raise AssertionError('Unexpected embedded reference tree: '+str(directory))
+    actual={p.relative_to(directory).as_posix() for p in folder.rglob('*')
+            if p.is_file() and '__pycache__' not in p.parts}
+    assert set(declared.values())==actual, 'Unbound authoring source'
     import yaml
     rules=yaml.safe_load((directory/'blue-package.yaml').read_text())['protocol']['rules']
     spec=package.files[rules].decode()
@@ -47,7 +48,9 @@ def main():
     inventory=json.loads((ROOT/'SHARED-PACKAGES.json').read_text())
     from blue_packages.reader import read_package
     selected=PackageStore(ROOT)
-    assert {r['name']:r for r in inventory['packages']} == selected._entries, 'Consumer/shared selection differs'
+    expected={r['name']:(r['packageBlueId'],r['archiveSha256']) for r in inventory['packages']}
+    actual={r['name']:(r['package'],'sha256:'+r['sha256']) for r in selected.mounts.values()}
+    assert expected==actual, 'Consumer/shared selection differs'
     # This reader checks data integrity only. Current native approval is qualified
     # independently by the Java runtime's CanonicalPackagesTest.
     checked=[]

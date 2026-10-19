@@ -59,6 +59,7 @@ class Frame:
     consumed: list = field(default_factory=list)
     writer: dict | None = None
     writes: list = field(default_factory=list)
+    dispatch_decisions: list = field(default_factory=list)
 
 
 @dataclass
@@ -397,7 +398,8 @@ class CompletionMachine:
                 consumedSeeds=[asdict(s) for s in self.frame.consumed],
                 writes=deepcopy(self.frame.writes),
                 retiredTickets=[t.wire() for b in incoming for t in b.tickets if not self.ticket_live(t)],
-                gas=self.meter.used-start))
+                gas=self.meter.used-start,
+                **({'dispatchDecisions':deepcopy(self.frame.dispatch_decisions)} if self.frame.dispatch_decisions else {})))
             self.turns.append(completion)
             new = set(self.state.documents) - set(sealed.documents)
             owned = new | {key}

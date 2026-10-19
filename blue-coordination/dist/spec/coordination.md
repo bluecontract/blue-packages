@@ -1,7 +1,7 @@
 # Coordination: timelines and timestamped inputs to Contracts
 
-Version 0.2.0-rc.2. Exact Blue types select the protocol semantics.
-Status: selected Coordination specification for the standalone timeline provider.
+Version 1.0.0-deterministic.1. Exact Blue types select the protocol semantics.
+Status: implementation candidate for providers, verifiers, feeders and executing hosts.
 
 ## 1. Purpose: supplying timestamped inputs to Contracts
 
@@ -50,7 +50,7 @@ execution, cycles, gas, rollback and completed execution records. Coordination
 neither duplicates those algorithms nor changes its three-input processing API.
 It establishes which original entry and historical context may be offered next.
 
-Provider, evidence-verifier and feeder conformance are separate claims. Loading
+Provider, evidence-verifier, feeder and executing-host conformance are separate claims. Loading
 these types does not install a runtime. AWS services, polling intervals, databases,
 publication workflows and owner login mechanisms are deployment choices. Business
 participant clauses, delegated operations and timers need their own adopted rules.
@@ -59,7 +59,7 @@ Every conforming provider implements the baseline in sections 2–9 and 11, incl
 Timeline Access and the combined signed read operation. Section 4.2's
 owner-ingest creation/append interface and section 10's
 committed update-stream interface are optional extensions. Section 12 defines
-feeder obligations; section 13 defines package use and validation. See the
+feeder obligations; section 13 defines package use and validation. Sections 14–16 define execution history, conditional publication and role-specific qualification. See the
 [worked examples](../docs/examples.md) for a timeline, entries, and a complete
 signed HTTP exchange using these types.
 
@@ -960,3 +960,269 @@ identity; Contracts defines execution. No alternative cycle or execution algorit
 is introduced here.
 
 This edition selects the exact 10M gas prerequisites. Previously published content retains its original semantics.
+
+## 14. Execution history and frozen obligations
+
+### 14.1 Authority and identity
+
+This chapter belongs to the same Coordination publication as sections 1–13.
+There is one Coordination namespace and one selected rules identity. It adds no
+second execution protocol or alternate provider signature format. In particular,
+the provider's `blue.coordination.guarantee\n` domain, provider key selection,
+entry bounds, full ordering key and strict completeness rules remain unchanged.
+An older signed object cannot be relabelled as an object of this edition.
+
+Executing hosts MUST select the exact Contracts edition required by this
+publication. Contracts owns initialization, local turns, admission, receiving,
+event occurrences, work order, gas and atomic rollback. A Coordination host
+MUST NOT reconstruct those results with its own business-state mutations.
+Repository availability is separate from executable role registration. Every
+snapshot, source completion and restored invocation MUST have the exact selected
+active binding sequence. A superset of available implementations is not permission
+to promote a snapshot. Timer roles are optional capabilities outside the non-timer
+profile. Ordinary supplied timestamps and ordering remain mandatory.
+
+`Document Epoch` identifies a stable result by original document identity, exact
+current document, epoch and History Position. Epoch zero is the first committed
+initialization result. `History Position` additionally identifies each retained
+processing or receiving transition by its monotonically increasing position,
+immediate predecessor, stable flag and Processing Receipt. Position zero has no
+predecessor; every later position names exactly the preceding committed position
+of that owner. A catch-up position may retain the last stable epoch. No counter
+alone proves ancestry, completeness or commitment. Exact operands may be unvalued
+Blue definitions: protocol presence is checked as exact content, not truthiness.
+
+`Processing Receipt` retains the original Contracts receipt commitment and exact
+before/after projections, source receipts, member results and ordered emitted
+occurrences. INITIALIZE has no external cause; PROCESS retains the original entry
+and its timestamp; APPLY retains the ordered source receipts and attachment
+obligation being discharged. It MUST NOT claim a second execution of the source's
+operation. `Member Result` describes only that owned member. Equal event values
+retain distinct `Emitted Occurrence` ordinals and native occurrence identities.
+The full Contracts evidence, including Dispatch decisions when present, is retained
+without removing fields or sorting output lists. A summary is not a substitute.
+
+### 14.2 Independent owners and receiver prefixes
+
+The publication policy is `independent-owner-prefix/1`. An acyclic source may
+commit once its own applicable inputs and dependencies are ready. A waiting or
+failed consumer MUST NOT invalidate, roll back or prevent an independently sealed
+source result. The consumer records its obligation to that result. Consumers of
+that consumer wait for its missing prefix, not for an invented global barrier.
+Publication order among independent owners is physical; each owner's logical
+input/result order and each receiver's required prefix are invariant.
+
+A receiver applies source results in the order prescribed by Contracts receiving,
+from contiguous established source history and exact activation lifetimes. It
+MUST NOT skip an earlier required source result in favor of a later visible result.
+An entry can be supplied only when every applicable source has the strictly
+sufficient coverage required by section 12, including all members of the full-key
+tie. A checkpoint at timestamp T does not imply completeness beyond T. An empty
+poll, a worker's READY status, or an absence of notifications proves nothing.
+
+Actual strongly connected owning components use the Contracts atomic cyclic unit.
+Their local rounds, preceding-round views, shared/member gas limits and publication
+are atomic. No host commits a strict subset of such a unit. A terminated member
+inside a live cyclic unit may receive silent structural updates as allowed by
+Contracts; that is not autonomous execution of a terminated root. Discovering or
+joining a historical cycle without sufficient exact ownership/history evidence
+fails explicitly; a current-view SCC helper does not establish that support.
+
+### 14.3 Attachments, catch-up and historical authority
+
+An Attachment binds consumer occurrence, decoded path, generation, exact source
+operand, source initialization, selected source timeline and source History Position.
+It freezes its activation entry or initialization cause and finite target goal.
+Removing and recreating the same path produces a new lifetime. An old obligation
+cannot be reassigned to the new lifetime. Shared acquisition never merges distinct
+occurrences or their delivery identities.
+
+An already initialized source requires its relevant history from the established
+initial position through the frozen goal. Catch-up verifies every predecessor,
+before/after relation, selected runtime, source receipt and required timeline
+coverage. The receiver installs child state before exposing its corresponding
+emissions to handlers. Child initialization may cause the subsequent receiving
+work specified by Contracts; the host does not synthesize an extra external seed.
+An exact operand and a latest snapshot with the same business fields are not
+interchangeable evidence.
+
+Historical authority and admission use the original receiving before-state at the
+selected full-key position, including the appropriate authority/access histories.
+Later grants, revocations, topology or document versions cannot retroactively
+authorize an earlier input. A source's successful independent result survives a
+receiver's authority denial or application failure. The receiver retains the exact
+obligation and last stable result for retry. A rebase freezes the ordered affected
+source scopes and target positions; it cannot silently skip a gap, mix epochs or
+replace frozen views with ambient latest state. Unknown delegation is rejected;
+Mandates is an optional separately selected protocol, not a dependency of this one.
+
+### 14.4 Terminal closure
+
+Once the root is terminated, direct PROCESS-equivalent LIVE receiving is rejected
+as specified by Contracts. Finite HISTORICAL receiving obligations already frozen
+before terminal closure may still be discharged without external seeds. The host
+MUST NOT create a new rebase or attachment goal merely because a child later
+advances, nor keep chasing an unfrozen latest child position.
+
+Closure requires positive evidence: the exact terminal head equals its last stable
+document and position; a committed stable history row seals that same document,
+position and sequence number; and no frozen attachment or rebase goals remain.
+This sealed prefix, rather than worker state or a terminal Boolean alone, permits
+the terminal owner to satisfy later dependency readiness checks. Missing or
+contradictory evidence waits or fails explicitly. Subscriptions may then be retired
+without losing frozen work. The parent-terminal-at-20/child-at-30 case retains the
+same parent epoch, position and stable document when these conditions hold.
+
+### 14.5 Input dispositions and Dispatch
+
+Hosts retain a disposition for each exact original entry and each applicable
+receiving channel lifetime. Nonmatching/addressed-elsewhere input is INAPPLICABLE;
+it is not a fabricated Contracts invocation. Eligible input carries its verified
+admission projection into Contracts. Missing history/content is WAITING; an
+established read-access deficit is PENDING_ACCESS. Malformed input, contradictory
+evidence and deterministic execution failure remain distinguishable.
+
+Dispatch policy decisions come only from the selected Contracts completion. A
+validated denial is reported with standard code `DISPATCH_REJECTED`; authored
+reason strings and allow/deny rows remain in ordered details with their native
+delivery identity. An empty or arbitrary authored reason cannot replace this code.
+For one delivery any false decision denies its handler work; all valid policies
+still run. An addressed operation whose delivery is denied reports
+`DISPATCH_REJECTED`. Raw or mixed inputs with both allowed and denied deliveries
+report `PARTIAL`, retaining every delivery's disposition and allowed progress,
+including deliveries without policy rows. Each denied delivery still carries
+`DISPATCH_REJECTED`; an aggregate never changes the native Contracts status.
+Raw external events follow these same rules; no Operation Request is required.
+The enclosing Contracts status can remain APPLIED and retain child/native progress.
+External denial is consumed only on enclosing commit. Later execution error or gas
+exhaustion rolls back the whole tentative Contracts attempt, including tentative
+checkpoint/child installations, but not independent source commits.
+
+### 14.6 Exact native channel binding and admission commitment
+
+The executing profile registers the exported Timeline Channel type against this
+Coordination rules identity. Its binding is `role: external-channel`,
+`header_fields: [timeline, actor]`, `body_fields: []`,
+`namespace: coordinationTimeline`, `tariff: [[accept, 1]]`,
+`inherits_to_subtypes: false`, `peer_fields: []`, `meter_mode: live`.
+The profile also preselects the published Dispatch binding when policies may be
+authored later. Merely mounting another package does not add an executable role.
+
+Public Timeline Channel uses the same rules identity and `external-channel` role,
+with `header_fields: [provider, url]`, `body_fields: []`,
+`namespace: coordinationPublicTimeline`, `tariff: [[accept, 1]]`,
+`inherits_to_subtypes: false`, `peer_fields: []`, and `meter_mode: live`.
+Its source is the exact Signed Timeline with that provider and URL and
+`publicRead: true`; it accepts authenticated entries without a holder-actor filter.
+It confers no additional write or business permission. Both exact native channel
+bindings are selected before initialization in the non-timer executing profile.
+
+Timeline admission first authenticates exact ranges and verifies history against
+the original receiver. The closed returned record contains `snapshot`, `entry`,
+`timestamp`, `runtime`, `decisions`, `assessments`, and `operationAudience`.
+The first three values identify that original snapshot and entry/time; `runtime`
+is the complete selected binding record. A decision key is the compact JSON array
+`[member, document, channel, generation]`; its value is a Boolean. Assessments
+are ordered by member then channel in Contracts code-point order and each has
+exactly `member`, `document`, `channel`, `generation`, `disposition`, and `reason`.
+`operationAudience` maps each participating member to its addressed Boolean.
+All validated assessments, including negative decisions, enter the Contracts
+canonical admission commitment. Credentials, signatures, transport pages and
+local cache/capability identifiers do not. The supplied range evidence alone is
+not an authority decision. A missing host history verifier fails explicitly.
+
+The optional Timeline Entry `onBehalfOf` operand is an exact authenticated claim.
+It grants no authority by itself. Interpreting it requires a separately selected
+authority protocol and its historical evidence; unsupported claims are rejected.
+Coordination does not require Mandates or define a competing Authority type.
+
+## 15. Portable executing-host obligations
+
+### 15.1 Conditional publication and fencing
+
+A host binds each attempted publication to its exact input head, owner set,
+selected runtime, relevant source-set revision, frozen goals and dependency
+positions. Immediately before commit it MUST establish that these still match.
+An ownership token/fence must exclude an expired or superseded worker from
+publishing. A changed read set causes retry from a coherent view, not merging
+tentative results. For an actual cyclic unit the condition covers the whole unit.
+No particular SQL schema, lock algorithm, journal or machine allocation is required.
+
+One atomic durable publication contains all owned result heads, history rows,
+receipts, input dispositions/checkpoints, outstanding goals, dependency changes
+and output work needed to recover the next step. No observer may see a result
+head whose required evidence or history predecessor is absent. An interrupted
+attempt before publication exposes none of its tentative effects.
+
+Notifications are hints. The durable obligation/outbox is authoritative. Delivery
+can be retried; occurrence identity is the deduplication key, never message-content
+equality. Receipt publication and durable output intent are atomic. Acknowledgment
+cannot precede successful delivery. Restart reconstructs undispatched output and
+unfulfilled receiver obligations without rerunning committed business operations.
+Conditional retries must neither duplicate committed occurrences nor lose them.
+
+### 15.2 Storage, admission and restart
+
+Publicly uploaded content and replay proofs are untrusted. Verify exact content,
+provider signatures, contiguous ranges, completion/profile commitments and all
+logical context before granting an in-process capability. A locally protected
+completion reader may rely on its own authenticated atomic publication provenance;
+an arbitrary hash, read-model flag or caller-supplied JSON is never such provenance.
+Every protected read still verifies the exact requested history/runtime association.
+
+A Processing Proof contains sufficient actual initial content, source ranges,
+history positions, authority positions, assessments and Contracts evidence to
+replay its target. Its container or self-reported receipt does not establish
+authority. Unsupported portable receiving, historical cycle joining, restart or
+migration paths fail explicitly rather than accepting a weaker projection.
+
+Source acquisition may retain verified pages privately under one exact checkpoint;
+public completeness advances only after the complete authenticated chain to its
+selected anchor has been verified. Replacement checkpoints cannot splice partial
+chains. Durable stores preserve input positions, contiguous history, frozen goals,
+outbox and selected profile across restart. A store claiming only process-local
+durability must state that limitation and must not advertise crash recovery.
+
+The host keeps account/tenant storage keys, credentials and private signing keys
+outside Blue business content. Reads, subscriptions, capability caches, protected
+history lookups and retry work are scoped to their authorized account. Knowing
+a BlueId or another account's public handle does not authorize private content.
+Sharing immutable public verification results is permitted only when this does not
+cross access boundaries or change semantic outcomes. Timeline read access and
+authority to invoke business operations remain separate.
+
+### 15.3 Operational incompleteness and retained editions
+
+The selected Contracts maximum/default is 10,000,000. Hosts preserve charge-before-
+work, member budgets, admitted-prefix gas, first rejection and atomic rollback.
+Physical cache state, cancellation, resource exhaustion or a missing dependency
+does not become a successful semantic result. A host interruption retains the last
+stable state and exact pending input as HOST_INCOMPLETE; retry uses the same logical
+policy. It does not publish a partial gas receipt or silently raise the budget.
+
+Every saved context carries its exact edition/profile. Reopening it selects that
+edition or reports explicit unsupported history. New-context defaults cannot
+rewrite old context identities. Migration, if implemented, is a separate explicit
+operation with its own evidence; installing another runtime is not migration.
+Old provider and execution archives remain immutable and are not aliases for this
+publication.
+
+## 16. Conformance claims
+
+A provider qualifies the signature, append/seal/access, range and optional stream
+interfaces it actually implements. An evidence verifier qualifies exact identities,
+signatures, continuity, full-key ordering and strict completeness. A feeder qualifies
+historical source selection, access/authority context, original-entry identity and
+per-input dispositions. An executing host additionally qualifies sections 14–15
+under its declared storage and ownership model. Passing one role does not establish
+another. In-memory, SQLite, journal and remote durability claims are separate.
+
+Qualification compares typed full results: state/graph, ordered events, native work,
+checkpoints, completions, dispositions, selected runtime commitments, final gas,
+first rejected charge, diagnostics and validated receipts. It includes Unicode
+ordering, simultaneous source ties, frozen attach/detach/rebase, independent source
+progress on receiver failure, real cyclic atomicity, terminal finite closure,
+crash/restart, stale-fence publication, durable output retry and account isolation.
+Warm/cold caches and alternate physical schedules must preserve those observations.
+Timer-dependent cases are explicitly outside a non-timer claim. Missing resources,
+unsupported histories and unexecuted cases are reported, never treated as passes.
