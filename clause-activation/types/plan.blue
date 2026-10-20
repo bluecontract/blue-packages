@@ -269,6 +269,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $var: p
               roster:
                 $var: roster
               runtimeDefinition:
@@ -313,6 +315,114 @@ functions:
                 channel: activationInitialized
                 steps:
                 - type: Activation/Refresh Activation
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: activationPreparationInitialized
+            val:
+              kind: channel
+              contract:
+                type: Contracts/Triggered Event Channel
+                event:
+                  type: Clauses/Clauses Initialized
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: activationPreparationInitializedSync
+            val:
+              kind: handler
+              contract:
+                type: Contracts/Sequential Workflow
+                channel: activationPreparationInitialized
+                steps:
+                - type: Contracts/Compute
+                  definition:
+                    type: Activation/Activation Functions
+                  do:
+                    $literal:
+                    - $call:
+                        function: syncPreparation
+                        args:
+                          runtimeDefinition:
+                            type: Activation/Activation Functions
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: activationPreparationAmended
+            val:
+              kind: channel
+              contract:
+                type: Contracts/Triggered Event Channel
+                event:
+                  type: Clauses/Amendment Accepted
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: activationPreparationAmendedSync
+            val:
+              kind: handler
+              contract:
+                type: Contracts/Sequential Workflow
+                channel: activationPreparationAmended
+                steps:
+                - type: Contracts/Compute
+                  definition:
+                    type: Activation/Activation Functions
+                  do:
+                    $literal:
+                    - $call:
+                        function: syncPreparation
+                        args:
+                          runtimeDefinition:
+                            type: Activation/Activation Functions
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: activationPreparationPartyChanged
+            val:
+              kind: channel
+              contract:
+                type: Contracts/Triggered Event Channel
+                event:
+                  type: Activation/Party Changed
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: activationPreparationPartyChangedSync
+            val:
+              kind: handler
+              contract:
+                type: Contracts/Sequential Workflow
+                channel: activationPreparationPartyChanged
+                steps:
+                - type: Contracts/Compute
+                  definition:
+                    type: Activation/Activation Functions
+                  do:
+                    $literal:
+                    - $call:
+                        function: syncPreparation
+                        args:
+                          runtimeDefinition:
+                            type: Activation/Activation Functions
     - $forEach:
         item: contribution
         in:
@@ -695,9 +805,14 @@ functions:
                       - $eq:
                         - $binding: dispatch/kind
                         - TRIGGERED
-                      - $eq:
-                        - $binding: dispatch/channel
-                        - activationInitialized
+                      - $includes:
+                          list:
+                          - activationInitialized
+                          - activationPreparationInitialized
+                          - activationPreparationAmended
+                          - activationPreparationPartyChanged
+                          val:
+                            $binding: dispatch/channel
                     - $and:
                       - $eq:
                         - $binding: dispatch/kind

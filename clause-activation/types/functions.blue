@@ -497,6 +497,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $pointerGet:
                   object:
@@ -515,6 +517,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $var: roster
               runtimeDefinition:
@@ -606,6 +610,7 @@ functions:
     - $return: true
   rosterContracts:
     args:
+      parameters: {}
       roster: {}
       runtimeDefinition:
         type: Contracts/Compute Definition
@@ -684,6 +689,22 @@ functions:
                                   path: /$call/function
                                   val:
                                     $var: operation
+                        - $choose:
+                            cond:
+                              $eq:
+                              - $var: operation
+                              - approve
+                            then:
+                              request:
+                                $pointerGet:
+                                  object:
+                                    $call:
+                                      function: approvalPreparation
+                                      args:
+                                        parameters:
+                                          $var: parameters
+                                  path: /request
+                            else: {}
         key: role
     - $return:
         $var: contributions
@@ -833,6 +854,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $pointerGet:
                   object:
@@ -848,6 +871,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $var: roster
               runtimeDefinition:
@@ -1743,3 +1768,271 @@ functions:
                 key: role
         key: ref
     - $return: {}
+  approvalPreparation:
+    args:
+      parameters: {}
+    do:
+    - $let:
+        name: request
+        expr:
+          revision:
+            type: Integer
+    - $let:
+        name: bindings
+        expr:
+        - requestPointer: /revision
+          documentPointer: /activation/revision
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: parameters
+                path: /negotiation/allowedPaths
+                default: []
+          - 0
+        then:
+        - $set:
+            name: request
+            expr:
+              $merge:
+              - $var: request
+              - termsRef:
+                  type: Text
+        - $set:
+            name: bindings
+            expr:
+              $listConcat:
+              - $var: bindings
+              - - requestPointer: /termsRef
+                  documentPointer: /activation/terms/ref
+    - $return:
+        request:
+          $var: request
+        metadata:
+          input: matcher
+          bindings:
+            $var: bindings
+  syncPreparation:
+    args:
+      runtimeDefinition:
+        type: Contracts/Compute Definition
+    do:
+    - $let:
+        name: metadata
+        expr:
+          $choose:
+            cond:
+              $exists:
+                $document: /operationPreparation
+            then:
+              $document: /operationPreparation
+            else:
+              version: 1
+              operations: {}
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: metadata
+              kind: object
+        message: INVALID_OPERATION_PREPARATION
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: metadata
+              path: /version
+          - 1
+        message: UNSUPPORTED_OPERATION_PREPARATION_VERSION
+    - $let:
+        name: entries
+        expr:
+          $pointerGet:
+            object:
+              $var: metadata
+            path: /operations
+            default: {}
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: entries
+              kind: object
+        message: INVALID_OPERATION_PREPARATION
+    - $let:
+        name: owned
+        expr:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /preparationOperations
+            default: {}
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: owned
+              kind: object
+        message: INVALID_ACTIVATION_PREPARATION_OWNERSHIP
+    - $forEach:
+        item: previous
+        key: key
+        in:
+          $var: owned
+        do:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: entries
+                  path:
+                    $concat:
+                    - /
+                    - $var: key
+              - $var: previous
+            message: OPERATION_PREPARATION_OWNERSHIP_CONFLICT
+        - $set:
+            name: entries
+            expr:
+              $pointerSet:
+                object:
+                  $var: entries
+                path:
+                  $concat:
+                  - /
+                  - $var: key
+                op: remove
+    - $let:
+        name: next
+        expr: {}
+    - $let:
+        name: expectedContracts
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              parameters:
+                $document: /clauses/activation/parameters
+              roster:
+                $document: /activation/parties
+              runtimeDefinition:
+                $var: runtimeDefinition
+    - $forEach:
+        item: party
+        key: role
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /parties
+            default: {}
+        do:
+        - $let:
+            name: key
+            expr:
+              $concat:
+              - approve_
+              - $var: role
+        - $failIf:
+            cond:
+              $ne:
+              - $nodeBlueId:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: key
+              - $nodeBlueId:
+                  $pointerGet:
+                    object:
+                      $var: expectedContracts
+                    path:
+                      $concat:
+                      - /
+                      - $var: key
+                      - /contract
+            message: ACTIVATION_PREPARATION_DECLARATION_CONFLICT
+        - $let:
+            name: entry
+            expr:
+              $pointerGet:
+                object:
+                  $call:
+                    function: approvalPreparation
+                    args:
+                      parameters:
+                        $document: /clauses/activation/parameters
+                path: /metadata
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $pointerGet:
+                    object:
+                      $var: entries
+                    path:
+                      $concat:
+                      - /
+                      - $var: key
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: entries
+                    path:
+                      $concat:
+                      - /
+                      - $var: key
+                - $var: entry
+            message: OPERATION_PREPARATION_OWNERSHIP_CONFLICT
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: entries
+                    path:
+                      $concat:
+                      - /
+                      - $var: key
+            then:
+            - $set:
+                name: next
+                expr:
+                  $objectSet:
+                    object:
+                      $var: next
+                    key:
+                      $var: key
+                    val:
+                      $var: entry
+        - $set:
+            name: entries
+            expr:
+              $objectSet:
+                object:
+                  $var: entries
+                key:
+                  $var: key
+                val:
+                  $var: entry
+    - $appendChange:
+        op: add
+        path: /operationPreparation
+        val:
+          $merge:
+          - $var: metadata
+          - operations:
+              $var: entries
+    - $appendChange:
+        op: add
+        path: /activation/preparationOperations
+        val:
+          $var: next
+    - $return: true
