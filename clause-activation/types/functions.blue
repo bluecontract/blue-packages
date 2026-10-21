@@ -1611,12 +1611,27 @@ functions:
                             - $var: role
                             - /contracts/checkpoint/entries/provider/event
                       then:
-                        $nodeBlueId:
-                          $document:
-                            $concat:
-                            - /timelineAccess/
-                            - $var: role
-                            - /contracts/checkpoint/entries/provider/event
+                        $choose:
+                          cond:
+                            $exists:
+                              $document:
+                                $concat:
+                                - /timelineAccess/
+                                - $var: role
+                                - /contracts/checkpoint/entries/provider/event/entryId
+                          then:
+                            $document:
+                              $concat:
+                              - /timelineAccess/
+                              - $var: role
+                              - /contracts/checkpoint/entries/provider/event/entryId
+                          else:
+                            $nodeBlueId:
+                              $document:
+                                $concat:
+                                - /timelineAccess/
+                                - $var: role
+                                - /contracts/checkpoint/entries/provider/event
                       else: ''
             - $set:
                 name: requests
