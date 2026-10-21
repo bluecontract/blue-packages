@@ -786,3 +786,155 @@ functions:
               path: /termsRef
         message: STORED_TERMS_IDENTITY_MISMATCH
     - $return: true
+  proposeChangesPublic:
+    args:
+      input:
+        type: Activation/Terms Proposal Input
+        proposalId:
+          type: Text
+          description: User-supplied unique identifier for this proposal.
+        baseTermsRef:
+          type: Text
+          description: Current activation.terms.ref. A changed publication requires a new review.
+        changes:
+          type: List
+          itemType: Activation/Term Change
+          description: Nonempty list of user-selected term changes.
+          schema:
+            minItems: 1
+    do:
+    - $return:
+        $call:
+          function: proposeChanges
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $pointerSet:
+                    object:
+                      $var: input
+                    path: /type
+                    op: remove
+                path: /changes
+                val:
+                  $map:
+                    item: change
+                    in:
+                      $pointerGet:
+                        object:
+                          $var: input
+                        path: /changes
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: change
+                        path: /type
+                        op: remove
+  proposeAndActivatePublic:
+    args:
+      input:
+        type: Activation/Terms Proposal Input
+        proposalId:
+          type: Text
+          description: User-supplied unique identifier for this proposal.
+        baseTermsRef:
+          type: Text
+          description: Current activation.terms.ref. A changed publication requires a new review.
+        changes:
+          type: List
+          itemType: Activation/Term Change
+          description: Nonempty list of user-selected term changes.
+          schema:
+            minItems: 1
+    do:
+    - $return:
+        $call:
+          function: proposeAndActivate
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $pointerSet:
+                    object:
+                      $var: input
+                    path: /type
+                    op: remove
+                path: /changes
+                val:
+                  $map:
+                    item: change
+                    in:
+                      $pointerGet:
+                        object:
+                          $var: input
+                        path: /changes
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: change
+                        path: /type
+                        op: remove
+  activatePublic:
+    args:
+      input:
+        type: Activation/Terms Selection Input
+        termsRef:
+          type: Text
+          description: Current activation.terms.ref or the explicitly selected proposal termsRef. Match
+            proposalId only for proposed terms.
+    do:
+    - $return:
+        $call:
+          function: activate
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  withdrawAcceptancePublic:
+    args:
+      input:
+        type: Activation/Terms Selection Input
+        termsRef:
+          type: Text
+          description: Current activation.terms.ref or the explicitly selected proposal termsRef. Match
+            proposalId only for proposed terms.
+    do:
+    - $return:
+        $call:
+          function: withdrawAcceptance
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  withdrawProposalPublic:
+    args:
+      input:
+        proposalId:
+          type: Text
+          description: Identifier of the proposal the user selected to withdraw or reject.
+    do:
+    - $return:
+        $call:
+          function: withdrawProposal
+          args:
+            input:
+              $var: input
+  rejectProposalPublic:
+    args:
+      input:
+        proposalId:
+          type: Text
+          description: Identifier of the proposal the user selected to withdraw or reject.
+    do:
+    - $return:
+        $call:
+          function: rejectProposal
+          args:
+            input:
+              $var: input

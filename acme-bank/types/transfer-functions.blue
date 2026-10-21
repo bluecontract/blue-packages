@@ -33,7 +33,18 @@ functions:
         $var: id
   request:
     args:
-      input: {}
+      input:
+        description: Request the transfer using amounts and currency already stored in paymentTerms. Only
+          requestId is supplied.
+        schema:
+          maxFields: 1
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
     do:
     - $forEach:
         item: inputKey
@@ -310,3 +321,100 @@ functions:
             $var: reference
     - $return:
         outcome: acceptedNew
+  confirmPublic:
+    args:
+      input:
+        description: Confirm the requested bank transfer. Amount and currency must exactly match paymentTerms.
+        schema:
+          maxFields: 4
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
+        reference:
+          type: Text
+          description: Bank reference for this transfer outcome. Reuse the existing reference when retrying
+            the same recorded outcome.
+          schema:
+            minLength: 1
+            maxLength: 256
+        amountMinor:
+          type: Integer
+          description: Exact paymentTerms.amountMinor for the confirmed transfer.
+        currency:
+          type: Text
+          description: Exact paymentTerms.currency for the confirmed transfer.
+    do:
+    - $return:
+        $call:
+          function: record
+          args:
+            input:
+              $var: input
+            status: completed
+  unknownPublic:
+    args:
+      input:
+        description: Report an unknown outcome for the current bankTransfer.requestId. Amount and currency
+          may be omitted.
+        type: ACME/Bank Transfer Outcome Input
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
+        reference:
+          type: Text
+          description: Bank reference for this transfer outcome. Reuse the existing reference when retrying
+            the same recorded outcome.
+          schema:
+            minLength: 1
+            maxLength: 256
+    do:
+    - $return:
+        $call:
+          function: record
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+            status: unknown
+  declinePublic:
+    args:
+      input:
+        description: Decline the current bankTransfer.requestId. Amount and currency may be omitted.
+        type: ACME/Bank Transfer Outcome Input
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
+        reference:
+          type: Text
+          description: Bank reference for this transfer outcome. Reuse the existing reference when retrying
+            the same recorded outcome.
+          schema:
+            minLength: 1
+            maxLength: 256
+    do:
+    - $return:
+        $call:
+          function: record
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+            status: declined

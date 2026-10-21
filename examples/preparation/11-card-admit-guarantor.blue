@@ -32,6 +32,8 @@ clauses:
         setReady:
           'on': workflow
           party: customer
+          request:
+            description: Set the configured ready state. No request fields are required.
   instruction:
     type: Attachments/Payment Preparation Clause
     parameters:
@@ -74,8 +76,19 @@ clauses:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
       obtain: provide
       suppliedBy: seller
       admissionClause: partyChanges
@@ -86,14 +99,43 @@ clauses:
         prepareDocument:
           'on': workflow
           party: customer
+          request:
+            type: Attachments/Attachment Preparation Input
+            requestId:
+              type: Text
+              schema:
+                minLength: 1
+              description: User-provided unique request key. Must satisfy configured party-key syntax.
+          params:
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
       provide:
         provideDocument:
           'on': workflow
           party: seller
+          request:
+            inResponseTo:
+              type: Text
+              description: Request identifier of the active preparation.
+            requirementRef:
+              type: Text
+              description: Document Blue ID in the current preparation request.
+            document:
+              description: Existing initialized document publication supplied by Blue ID. Execution validates
+                the prepared source, configured policy and parties.
+              contracts:
+                initialized:
+                  document: {}
       resume:
         resumeDocument:
           'on': workflow
           party: seller
+          request:
+            description: Resume preparation from its current document state; no request fields are required.
   partyChanges:
     type: Amendments/Amendments Clause
     parameters:
@@ -112,10 +154,18 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            proposalId:
+              type: Text
+              description: Identifier of the pending amendment selected for approval.
         approveSeller:
           'on': workflow
           party: seller
           params:
             $object:
               $var: trigger
+          request:
+            proposalId:
+              type: Text
+              description: Identifier of the pending amendment selected for approval.
 termsEditable: true

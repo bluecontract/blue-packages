@@ -368,11 +368,41 @@ functions:
                               key: $call
                               val:
                                 function:
-                                  $var: fn
+                                  $choose:
+                                    cond:
+                                      $eq:
+                                      - $var: fn
+                                      - prepare
+                                    then: preparePublic
+                                    else:
+                                      $var: fn
                                 args:
                                   $literal:
                                     input:
                                       $binding: call/request
+                    - $get:
+                        object:
+                          $literal:
+                            prepare:
+                              requestFrom:
+                                definition:
+                                  type: Attachments/Attachment Functions
+                                function: preparePublic
+                                argument: input
+                            attach:
+                              requestFrom:
+                                definition:
+                                  type: Attachments/Attachment Functions
+                                function: attach
+                                argument: input
+                            create:
+                              requestFrom:
+                                definition:
+                                  type: Attachments/Attachment Functions
+                                function: create
+                                argument: input
+                        key:
+                          $var: fn
     - $if:
         cond:
           $hasKey:
@@ -582,6 +612,12 @@ functions:
                               $literal:
                                 input:
                                   $binding: call/request
+                - $literal:
+                    requestFrom:
+                      definition:
+                        type: Attachments/Attachment Access Functions
+                      function: addAuthority
+                      argument: input
     - $let:
         name: registerOperation
         expr:
@@ -606,11 +642,17 @@ functions:
                     object: {}
                     key: $call
                     val:
-                      function: registerAccess
+                      function: registerAccessPublic
                       args:
                         $literal:
                           input:
                             $binding: call/request
+          - $literal:
+              requestFrom:
+                definition:
+                  type: Attachments/Attachment Access Functions
+                function: registerAccessPublic
+                argument: input
     - $set:
         name: registerOperation
         expr:

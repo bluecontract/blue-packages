@@ -1,39 +1,29 @@
-# Generated approval inputs
+# Generated Activation operation inputs
 
-Activation `0.8.0-preview.2` publishes the input contract for each dynamically
-generated approval operation. The exact dispatch key and executor are unchanged.
-The request always requires Integer `revision`. If the candidate clause enables
-negotiation with a nonempty `negotiation.allowedPaths`, it also requires Text
-`termsRef`, matching the executor's existing checks. Non-negotiable approvals do
-not gain this extra input.
+The current `0.8.0-preview.3` candidate publishes standard native `request`
+matchers for generated Activation operations. A shared authoring helper resolves
+explicit library/function/argument links; dynamic generation copies those same
+input definitions. Dispatch keys and authorized channels retain their native
+identities.
 
-`approvalPreparation` builds both the request matcher and version 1
-`operationPreparation.operations` entry from the same authoring parameters.
-Planning passes the candidate configuration; runtime roster regeneration passes
-the installed clause configuration. The technical bindings read
-`/activation/revision` and, when required, `/activation/terms/ref`. The latter is
-the existing canonical reference stored by `initializeTerms` and updated by the
-negotiation lifecycle. Preparation does not calculate replacement terms or
-invent a business decision.
+Approval requires Integer `revision`. Negotiable approval additionally requires
+Text `termsRef`. Descriptions identify the relevant authorized document state;
+neither Core nor Business fills these fields during prepare or Confirm.
+Party replacement does not gain a revision field. Negotiation operations publish
+their actual proposal, terms-selection and change inputs, including inherited
+optional fields and explicit native list representation.
 
-Synchronization follows clause initialization, accepted amendments and party
-changes. The existing initialization refresh remains in place. The document
-dispatch policy permits the three generated internal triggered channels while
-inactive, alongside its existing initialization channel; this does not authorize
-external operation calls or bypass access checks for business actions.
+Public adapters remove only their declared typed envelopes during native execution
+before calling existing internal functions. They do not change the reviewed request
+bytes sent by Business. Raw internal callers retain their existing interfaces.
 
-`activation.preparationOperations` records owned metadata. Synchronization
-checks the complete generated operation's canonical identity, preserves unrelated
-entries, removes only unchanged owned entries and rejects conflicts. An
-identical preexisting foreign entry is retained without claiming ownership.
-Revision and terms-reference changes do not require rewriting a binding pointer.
+The prior document-level `operationPreparation` entries, automatic bindings,
+metadata ownership ledger and synchronization workflows have been removed from
+newly generated documents. Existing immutable historical publications remain
+unchanged; this change performs no automatic migration or history rewrite.
 
-Existing immutable `0.8.0-preview.1` publications and documents remain unchanged.
-They do not acquire a matcher or metadata retroactively. This edition introduces
-no automatic clause replacement, migration or history rewrite. The prior
-`0.7.0-preview.1.finalgas.2` compatibility fix is a separate package family.
-
-The new dependency closure contains Activation, Documents, Payment, Shipping,
-Inspection, Attachments, ACME, ManualPayments and MyOS. Only Activation authored
-BEX changes; other packages receive new versions and dependency identities.
-All remain unpublished candidates until an independently authorized release.
+See [operation-input-coverage.md](operation-input-coverage.md) for the complete
+34-package baseline and the additional explicit definition-read support protocol,
+and [operation-input-qualification.md](operation-input-qualification.md) for native
+qualification and byte-for-byte reproducibility. Package builds remain local
+unpublished candidates until a separately authorized release.

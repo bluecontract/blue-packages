@@ -110,7 +110,13 @@ functions:
         outcome: acceptedNew
   confirmFunding:
     args:
-      input: {}
+      input:
+        description: Identify the existing customer funding session.
+        sessionId:
+          type: Text
+          description: Identifier of the existing customer funding session.
+          schema:
+            minLength: 1
     do:
     - $failIf:
         cond:
@@ -162,7 +168,13 @@ functions:
         outcome: acceptedNew
   requestFunding:
     args:
-      input: {}
+      input:
+        description: Identify the existing customer funding session.
+        sessionId:
+          type: Text
+          description: Identifier of the existing customer funding session.
+          schema:
+            minLength: 1
     do:
     - $failIf:
         cond:
@@ -220,3 +232,25 @@ functions:
             $document: /paymentTerms/currency
     - $return:
         outcome: acceptedNew
+  provideSessionPublic:
+    args:
+      input:
+        type: MyOS/Customer Session Input
+        description: Provide a customer funding session for the accepted payment instruction. Omit expiresAt
+          to use the execution-time expiry default.
+        sessionId:
+          type: Text
+          description: Identifier of the customer funding session.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: provideSession
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

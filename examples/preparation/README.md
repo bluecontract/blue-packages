@@ -161,3 +161,25 @@ behavior; the third uses real signed timelines, SQLite and read grants.
 
 The fixture records the package's exact Blue ID, archive digest, source base
 revision and source file hashes. It does not alter Core's production catalogue.
+
+## Reviewed native operation inputs
+
+Each external connection declares its actual request matcher separately from its
+`params` mapping. Named preparation inputs retain their native type on the wire;
+the public source entry or the authored `params` mapping removes that type when
+forwarding to the existing internal function. The preparation planner invokes the
+raw `begin` action, so each typed external `begin` binding explicitly removes its
+root `/type`; it does not fabricate an optional authority party. Configured
+no-input bindings retain an explicit matcher.
+
+A matcher declaring native `List` requires a native list value, for example
+`{type: List, itemType: <exact item type reference>, items: [...]}`. A plain array
+is a different native value and remains valid for a positional array matcher.
+The form must construct this representation before review; Core and Confirm do
+not silently coerce it. Existing Timeline Access references retain their original
+nominal type. Initialization, provider authority and history remain executor
+checks; matching the public input is not proof of successful registration.
+
+`13-current-payment-document.blue` uses the current `Payment/Payment Clause`
+(`Documents/Document Base`) and its `prepare`/`resume` actions. It is distinct from
+legacy payment examples using `start` and financial bindings on their host.

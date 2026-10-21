@@ -526,6 +526,12 @@ functions:
                                   args:
                                     input:
                                       $binding: call/request
+                    - $literal:
+                        requestFrom:
+                          definition:
+                            type: Amendments/Amendments Functions
+                          function: approve
+                          argument: input
         - $set:
             name: plan
             expr:
@@ -556,10 +562,16 @@ functions:
                             $literal:
                             - $return:
                                 $call:
-                                  function: rebaseAdmission
+                                  function: rebaseAdmissionPublic
                                   args:
                                     input:
                                       $binding: call/request
+                    - $literal:
+                        requestFrom:
+                          definition:
+                            type: Documents/Admission Functions
+                          function: rebaseAdmissionPublic
+                          argument: input
     - $return:
         $var: plan
   planDocumentAccess:
@@ -601,7 +613,6 @@ functions:
                     - type: Contracts/Sequential Workflow Operation
                     - channel:
                         $var: role
-                      request: {}
                       steps:
                       - $merge:
                         - type: Contracts/Compute
@@ -610,7 +621,7 @@ functions:
                           do:
                             $literal:
                             - $call:
-                                function: registerDocumentAccess
+                                function: registerDocumentAccessPublic
                                 args:
                                   input:
                                     $merge:
@@ -624,6 +635,12 @@ functions:
                               $const: clauseKey
                             bindings: {}
                       - type: Activation/Refresh Activation
+                    - $literal:
+                        requestFrom:
+                          definition:
+                            type: Documents/Document Access Functions
+                          function: registerDocumentAccessPublic
+                          argument: input
         key: role
     - $let:
         name: embedded
@@ -664,7 +681,6 @@ functions:
               $var: embedded
     - $return:
         $var: result
-
   planSourceValidators:
     args:
       base: {}

@@ -632,8 +632,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         confirmSatisfaction:
           'on': workflow
@@ -662,13 +673,27 @@ clauses:
               - type: Events/Event
               - kind: Customer Satisfaction
                 satisfied: true
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
       requestRefund:
         refund:
           'on': workflow
           party: seller
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
   satisfaction:
     type: Features/Feature Clause
     parameters:
@@ -863,6 +888,9 @@ clauses:
           params:
             requestId: payout-auth
             amountMinor: 750
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
       requestCapture:
         capturePayout:
           'on': workflow
@@ -870,6 +898,9 @@ clauses:
           params:
             requestId: payout-capture
             amountMinor: 750
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
 orders: {}
 orderTemplate:
   name: Service order
@@ -901,8 +932,19 @@ orderTemplate:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
         requestCapture:
           confirmSatisfaction:
             'on': workflow
@@ -924,13 +966,27 @@ orderTemplate:
                 $merge:
                 - type: Events/Event
                 - kind: Delivery Accepted
+            request:
+              description: This configured operation uses its declared request identifier and amount;
+                no input fields.
         requestRefund:
           refund:
             'on': workflow
             party: seller
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
 ```
 
 Walkthrough: [`02-reseller-ledger.case.yaml`](../examples/apps/02-reseller-ledger.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -1016,8 +1072,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         accepted:
           in: agreement
@@ -1060,8 +1127,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         accepted:
           in: agreement
@@ -1192,8 +1270,19 @@ hotelTemplate:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
         requestCapture:
           confirmSatisfaction:
             'on': workflow
@@ -1215,13 +1304,27 @@ hotelTemplate:
                 $merge:
                 - type: Events/Event
                 - kind: Delivery Accepted
+            request:
+              description: This configured operation uses its declared request identifier and amount;
+                no input fields.
         requestRefund:
           refund:
             'on': workflow
             party: hotel
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
 restaurantTemplate:
   name: Dinner reservation
   type: Orders/Order with Clauses
@@ -1253,8 +1356,19 @@ restaurantTemplate:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
         requestCapture:
           confirmSatisfaction:
             'on': workflow
@@ -1276,13 +1390,27 @@ restaurantTemplate:
                 $merge:
                 - type: Events/Event
                 - kind: Delivery Accepted
+            request:
+              description: This configured operation uses its declared request identifier and amount;
+                no input fields.
         requestRefund:
           refund:
             'on': workflow
             party: restaurant
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
 ```
 
 Walkthrough: [`04-bundle-order.case.yaml`](../examples/apps/04-bundle-order.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -1369,8 +1497,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         checkIn:
           in: agreement
@@ -1698,8 +1837,19 @@ periodTemplate:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
         requestCapture:
           confirmSatisfaction:
             'on': workflow
@@ -1721,13 +1871,27 @@ periodTemplate:
                 $merge:
                 - type: Events/Event
                 - kind: Delivery Accepted
+            request:
+              description: This configured operation uses its declared request identifier and amount;
+                no input fields.
         requestRefund:
           refund:
             'on': workflow
             party: seller
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
 lifecycle: Active
 canTerminate: true
 trial: Offered
@@ -1803,6 +1967,20 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+            type: Amendments/Amendment Input
+            expectedRevision:
+              type: Integer
+              description: Current amendment revision from authorized state.
+            path:
+              type: Text
+              description: Configured path of the terms being amended.
+            replacement:
+              description: User-selected replacement value for those terms.
       approve:
         guestApprove:
           'on': workflow
@@ -1810,14 +1988,24 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
         hostApprove:
           'on': workflow
           party: host
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
   payment:
-    type: Payment/Payment Clause
+    type: Payment/Legacy Payment Clause
     parameters:
       payer: guest
       payee: host
@@ -2118,8 +2306,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         settle:
           'on': workflow
@@ -2127,6 +2326,9 @@ clauses:
           params:
             requestId: net-1
             amountMinor: 3000
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
       amount: /net/amountMinor
   hotel:
     type: Documents/Documents Clause
@@ -2723,6 +2925,20 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            unitPriceMinor:
+              type: Integer
+              description: User-selected unit price in minor units.
+              schema:
+                minimum: 0
+                maximum: 1000000000
+            quantity:
+              type: Integer
+              description: User-selected item quantity.
+              schema:
+                minimum: 1
+                maximum: 1000
 ```
 
 Walkthrough: [`15-product.case.yaml`](../examples/apps/15-product.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -2765,6 +2981,18 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            key:
+              type: Text
+              description: User-selected ledger obligation or reservation key.
+              schema:
+                minLength: 1
+            amountMinor:
+              type: Integer
+              description: Exact amount in minor units.
+              schema:
+                minimum: 0
       reserve:
         reserve:
           'on': workflow
@@ -2772,6 +3000,18 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            key:
+              type: Text
+              description: User-selected ledger obligation or reservation key.
+              schema:
+                minLength: 1
+            amountMinor:
+              type: Integer
+              description: Exact amount in minor units.
+              schema:
+                minimum: 1
       settle:
         settle:
           'on': workflow
@@ -2779,6 +3019,13 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            key:
+              type: Text
+              description: User-selected ledger obligation or reservation key.
+              schema:
+                minLength: 1
 ```
 
 Walkthrough: [`16-ledger.case.yaml`](../examples/apps/16-ledger.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -2891,6 +3138,20 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+            type: Amendments/Amendment Input
+            expectedRevision:
+              type: Integer
+              description: Current amendment revision from authorized state.
+            path:
+              type: Text
+              description: Configured path of the terms being amended.
+            replacement:
+              description: User-selected replacement value for those terms.
       approve:
         guestApprove:
           'on': workflow
@@ -2898,12 +3159,22 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
         hostApprove:
           'on': workflow
           party: host
           params:
             $object:
               $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
 ```
 
 Walkthrough: [`18-amendments.case.yaml`](../examples/apps/18-amendments.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -3025,6 +3296,12 @@ clauses:
               $var:
                 name: trigger
                 path: /reason
+          request:
+            description: Reviewed public input for this configured operation.
+            type: State/Transition Input
+            to:
+              type: Text
+              description: Selected allowed transition target from current state and configuration.
 ```
 
 Walkthrough: [`20-status-branch.case.yaml`](../examples/apps/20-status-branch.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -3088,8 +3365,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         confirmSatisfaction:
           'on': workflow
@@ -3112,13 +3400,27 @@ clauses:
               - type: Events/Event
               - kind: Customer Satisfaction
                 satisfied: true
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
       requestRefund:
         refund:
           'on': workflow
           party: seller
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
   satisfaction:
     type: Features/Feature Clause
     parameters:
@@ -3210,8 +3512,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         confirmSatisfaction:
           'on': workflow
@@ -3234,13 +3547,27 @@ clauses:
               - type: Events/Event
               - kind: Customer Satisfaction
                 satisfied: true
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
       requestRefund:
         refund:
           'on': workflow
           party: seller
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
   satisfaction:
     type: Features/Feature Clause
     parameters:
@@ -3321,8 +3648,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         confirmSatisfaction:
           'on': workflow
@@ -3345,13 +3683,27 @@ clauses:
               - type: Events/Event
               - kind: Customer Satisfaction
                 satisfied: true
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
       requestRefund:
         refund:
           'on': workflow
           party: seller
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
   satisfaction:
     type: Features/Feature Clause
     parameters:
@@ -3435,8 +3787,19 @@ clauses:
           'on': workflow
           party: customer
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
       requestCapture:
         confirmSatisfaction:
           'on': workflow
@@ -3459,13 +3822,27 @@ clauses:
               - type: Events/Event
               - kind: Customer Satisfaction
                 satisfied: true
+          request:
+            description: This configured operation uses its declared request identifier and amount; no
+              input fields.
       requestRefund:
         refund:
           'on': workflow
           party: seller
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Input for this configured financial request. Amount may be supplied by the configured
+              action defaults.
+            requestId:
+              type: Text
+              description: Unique identifier for this requested financial action.
   satisfaction:
     type: Features/Feature Clause
     parameters:
@@ -3527,6 +3904,11 @@ shippingTemplate:
         requestShipment:
           bookShipment:
             'on': workflow
+            request:
+              description: Parameters supplied by the user for this shipping request.
+              requestId:
+                type: Text
+                description: Unique identifier for this shipping request.
             party: seller
             params:
               $object:
@@ -3534,6 +3916,11 @@ shippingTemplate:
         requestCancellation:
           cancelShipment:
             'on': workflow
+            request:
+              description: Parameters supplied by the user for this shipping request.
+              requestId:
+                type: Text
+                description: Unique identifier for this shipping request.
             party: seller
             params:
               $object:
@@ -3541,6 +3928,14 @@ shippingTemplate:
         requestAddressChange:
           changeAddress:
             'on': workflow
+            request:
+              description: Parameters supplied by the user for this shipping request.
+              requestId:
+                type: Text
+                description: Unique identifier for this shipping request.
+              address:
+                type: Text
+                description: New delivery address requested by the user.
             party: seller
             params:
               $object:
@@ -3846,97 +4241,237 @@ clauses:
         requestSecureFunds:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestCapture:
         requestCompletePayment:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestRefund:
         requestReverseAfterCompletion:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestVoid:
         requestCancelBeforeCompletion:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPayeeAssignment:
         requestPayeeAssignment:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            payeeRef:
+              description: Required business value explicitly selected by the user.
+              type: Text
       requestTransactionDetailsUpdate:
         requestTransactionDetailsUpdate:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            transactionDetails:
+              description: Required business value explicitly selected by the user.
       requestFinalAmountResolution:
         requestFinalAmountResolution:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            finalAmount:
+              description: Required business value explicitly selected by the user.
+              type: Integer
       requestPaymentCompletionLock:
         requestPaymentCompletionLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentCompletionUnlock:
         requestPaymentCompletionUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentReversalLock:
         requestPaymentReversalLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentReversalUnlock:
         requestPaymentReversalUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestTransactionDetailsUpdateLock:
         requestTransactionDetailsUpdateLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestTransactionDetailsUpdateUnlock:
         requestTransactionDetailsUpdateUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       approveRecipient:
         approveRecipient:
           'on': workflow
           party: seller
+          request:
+            description: Approve the recipient recorded in this document; no input fields.
 ```
 
 Walkthrough: [`27-payment-protocol.case.yaml`](../examples/apps/27-payment-protocol.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -4049,97 +4584,237 @@ clauses:
         requestSecureFunds:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestCapture:
         requestCompletePayment:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestRefund:
         requestReverseAfterCompletion:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestVoid:
         requestCancelBeforeCompletion:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPayeeAssignment:
         requestPayeeAssignment:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            payeeRef:
+              description: Required business value explicitly selected by the user.
+              type: Text
       requestTransactionDetailsUpdate:
         requestTransactionDetailsUpdate:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            transactionDetails:
+              description: Required business value explicitly selected by the user.
       requestFinalAmountResolution:
         requestFinalAmountResolution:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            finalAmount:
+              description: Required business value explicitly selected by the user.
+              type: Integer
       requestPaymentCompletionLock:
         requestPaymentCompletionLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentCompletionUnlock:
         requestPaymentCompletionUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentReversalLock:
         requestPaymentReversalLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentReversalUnlock:
         requestPaymentReversalUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestTransactionDetailsUpdateLock:
         requestTransactionDetailsUpdateLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestTransactionDetailsUpdateUnlock:
         requestTransactionDetailsUpdateUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       approveRecipient:
         approveRecipient:
           'on': workflow
           party: seller
+          request:
+            description: Approve the recipient recorded in this document; no input fields.
 ```
 
 Walkthrough: [`28-payment-controls.case.yaml`](../examples/apps/28-payment-controls.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -4266,97 +4941,237 @@ clauses:
         requestSecureFunds:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestCapture:
         requestCompletePayment:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestRefund:
         requestReverseAfterCompletion:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestVoid:
         requestCancelBeforeCompletion:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPayeeAssignment:
         requestPayeeAssignment:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            payeeRef:
+              description: Required business value explicitly selected by the user.
+              type: Text
       requestTransactionDetailsUpdate:
         requestTransactionDetailsUpdate:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            transactionDetails:
+              description: Required business value explicitly selected by the user.
       requestFinalAmountResolution:
         requestFinalAmountResolution:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
+            finalAmount:
+              description: Required business value explicitly selected by the user.
+              type: Integer
       requestPaymentCompletionLock:
         requestPaymentCompletionLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentCompletionUnlock:
         requestPaymentCompletionUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentReversalLock:
         requestPaymentReversalLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestPaymentReversalUnlock:
         requestPaymentReversalUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestTransactionDetailsUpdateLock:
         requestTransactionDetailsUpdateLock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       requestTransactionDetailsUpdateUnlock:
         requestTransactionDetailsUpdateUnlock:
           'on': workflow
           params:
-            $object:
-              $var: trigger
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
           party: customer
+          request:
+            type: PaymentInstruction/Payment Request Input
+            description: Parameters supplied by the user for this payment request.
+            requestId:
+              type: Text
+              description: Unique identifier selected for this request.
       approveRecipient:
         approveRecipient:
           'on': workflow
           party: seller
+          request:
+            description: Approve the recipient recorded in this document; no input fields.
 ```
 
 Walkthrough: [`29-payment-rejection.case.yaml`](../examples/apps/29-payment-rejection.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.

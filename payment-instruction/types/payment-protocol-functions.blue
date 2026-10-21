@@ -97,7 +97,13 @@ functions:
     args:
       action:
         type: Text
-      input: {}
+      input:
+        description: Mapped internal request. Public workflows declare their external shape explicitly because defaults and mappings can supply business values.
+        requestId:
+          type: Text
+          description: Unique request identifier, selected by the user or explicitly supplied by the configured mapping.
+          schema:
+            minLength: 1
     do:
     - $call:
         function: requireReservationMethod
@@ -868,3 +874,287 @@ functions:
             outcome: failed
             input:
               $var: input
+  acceptPublic:
+    args:
+      approved:
+        type: Boolean
+      input:
+        description: Accept the instruction. An empty object is valid. Optional reason may be supplied
+          as text; no business decision is inferred.
+    do:
+    - $return:
+        $call:
+          function: accept
+          args:
+            approved:
+              $var: approved
+            input:
+              $var: input
+  rejectPublic:
+    args:
+      approved:
+        type: Boolean
+      input:
+        reason:
+          type: Text
+          description: User explanation for rejecting this payment instruction.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: accept
+          args:
+            approved:
+              $var: approved
+            input:
+              $var: input
+  initiatePublic:
+    args:
+      transactionId:
+        type: Text
+      input:
+        type: PaymentInstruction/Transaction Initiation Input
+        transactionId:
+          type: Text
+          description: Guarantor transaction identifier. Must not contain / or ~.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: initiate
+          args:
+            transactionId:
+              $var: transactionId
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  recordInitiationFailurePublic:
+    args:
+      input:
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+        reason:
+          type: Text
+          description: User explanation for the initiation failure.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: recordInitiationFailure
+          args:
+            input:
+              $var: input
+  recordOutcomeSuccessPublic:
+    args:
+      action:
+        type: Text
+      outcome:
+        type: Text
+      input:
+        type: PaymentInstruction/Payment Outcome Input
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: recordOutcome
+          args:
+            action:
+              $var: action
+            outcome:
+              $var: outcome
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  recordOutcomeFailurePublic:
+    args:
+      action:
+        type: Text
+      outcome:
+        type: Text
+      input:
+        type: PaymentInstruction/Payment Outcome Input
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+        reason:
+          type: Text
+          description: Required user explanation for the declined, failed or unknown outcome.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: recordOutcome
+          args:
+            action:
+              $var: action
+            outcome:
+              $var: outcome
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  decideControlSuccessPublic:
+    args:
+      action:
+        type: Text
+      outcome:
+        type: Text
+      input:
+        type: PaymentInstruction/Payment Control Input
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: decideControl
+          args:
+            action:
+              $var: action
+            outcome:
+              $var: outcome
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  decideControlFailurePublic:
+    args:
+      action:
+        type: Text
+      outcome:
+        type: Text
+      input:
+        type: PaymentInstruction/Payment Control Input
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+        reason:
+          type: Text
+          description: Required user explanation for the declined, failed or unknown outcome.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: decideControl
+          args:
+            action:
+              $var: action
+            outcome:
+              $var: outcome
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  failPaymentCompletionLockChangeResponsePublic:
+    args:
+      input:
+        type: PaymentInstruction/Payment Control Input
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+        reason:
+          type: Text
+          description: Required user explanation for this failure.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: failPaymentCompletionLockChangeResponse
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  failPaymentReversalLockChangeResponsePublic:
+    args:
+      input:
+        type: PaymentInstruction/Payment Control Input
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+        reason:
+          type: Text
+          description: Required user explanation for this failure.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: failPaymentReversalLockChangeResponse
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  failTransactionDetailsUpdateLockChangeResponsePublic:
+    args:
+      input:
+        type: PaymentInstruction/Payment Control Input
+        requestId:
+          type: Text
+          description: Identifier of the recorded pending request in payment.requests or payment.controlRequests
+            for this response. Use the matching current request; ask when ambiguous.
+          schema:
+            minLength: 1
+        reason:
+          type: Text
+          description: Required user explanation for this failure.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: failTransactionDetailsUpdateLockChangeResponse
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

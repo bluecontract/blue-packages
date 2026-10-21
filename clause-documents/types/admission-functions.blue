@@ -367,11 +367,21 @@ functions:
                 roster:
                   $merge:
                   - $document: /activation/parties
-                  - $var: {name: item, path: /admissionToken/parties}
+                  - $var:
+                      name: item
+                      path: /admissionToken/parties
                 readers:
-                  $pointerGet: {object: {$document: /activation}, path: /readers, default: {}}
+                  $pointerGet:
+                    object:
+                      $document: /activation
+                    path: /readers
+                    default: {}
                 accessPaths:
-                  $pointerGet: {object: {$document: /activation}, path: /accessPaths, default: []}
+                  $pointerGet:
+                    object:
+                      $document: /activation
+                    path: /accessPaths
+                    default: []
         then:
         - $return: false
     - $forEach:
@@ -474,6 +484,12 @@ functions:
                             args:
                               input:
                                 $binding: call/request
+              - $literal:
+                  requestFrom:
+                    definition:
+                      type: Documents/Admission Consent Functions
+                    function: recordConsent
+                    argument: input
         - $if:
             cond:
               $exists:
@@ -1299,3 +1315,22 @@ functions:
           parties: {$var: parties}
           documents: {$var: documents}
     - $return: {$var: documents}
+
+  rebaseAdmissionPublic:
+    args:
+      input:
+        type: Documents/Admission Rebase Input
+        admissionRef:
+          type: Text
+          description: Reference of the admission currently requiring reapproval.
+    do:
+    - $return:
+        $call:
+          function: rebaseAdmission
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
