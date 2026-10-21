@@ -83,12 +83,11 @@ class LogicalWork:
         if isinstance(node,L.Node):blue.note_identity(node,identity)
         return node
 
-    def open(self,node,source=None):
-        source=self.blue if source is None else source
-        identity=source.identity(node)
+    def open(self,node):
+        identity=self.blue.identity(node)
         if identity not in self.manifests:
             self.meter.contracts('nodeManifestOpened');self.manifests.add(identity)
-        return source.open(node)
+        return self.blue.open(node)
 
     def compare(self,left,right):
         self.meter.contracts('scalarComparison')
@@ -138,9 +137,18 @@ class LogicalWork:
             if parent is L.ABSENT:break
             self.meter.contracts('typeEdgeFollowed');node=parent
 
-    def read(self,node,path,*,source=None):
-        source=self.blue if source is None else source
-        return source.read_bex(source.view(node,logical=self),path,logical=self)
+    def read(self,node,path):
+        from .model import segments,require,LIMITS
+        r=L.recipe(node)
+        depth=0
+        for name in segments(path):
+            depth+=1
+            for part in r.parts:self.open(part)
+            head=self.blue.head(r)
+            self.meter.contracts('listItemRead' if head.items is not None else 'objectMemberRead')
+            r=self.blue.child(r,name)
+            if r is None:break
+        return self.blue.view(r,logical=self,depth=depth)
 
     def establish(self,node,previous=None,*,token=None,scope=None):
         # Input witnesses come from admission/opening, never a resolver cache.

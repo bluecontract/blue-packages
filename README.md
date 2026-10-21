@@ -4,7 +4,7 @@ One current package set lives at the repository root. `PACKAGE-SOURCES.json` sel
 
 Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [executable examples](examples/apps). They use Activation and clauses throughout. Raw contracts are implementation details of reusable packages. The Payment clause exposes requests; guarantor operations belong to the Payment Instruction.
 
-The foundations are Language, BEX, Contracts (immutable deterministic edition 3, 10,000,000 maximum), canonical Coordination, Time data and Mandates. The selected execution profile excludes timer roles. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
+The foundations are Language, BEX, Contracts (immutable deterministic edition 4, 10,000,000 maximum), canonical Coordination, Time data and Mandates. The selected execution profile excludes timer roles. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 
 ## Build and verify
 

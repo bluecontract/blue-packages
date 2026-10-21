@@ -23,10 +23,10 @@ def outputs():
     publication = prose + amendment + '\n## Appendix C. Complete executable algorithms\n\n'
     for name, body in modules.items():
         publication += f'### `{name}`\n\n```python\n{body}```\n\n'
-    manifest = {'format': 'blue-source-binding/1', 'edition': '2026-10-17-deterministic-3',
+    manifest = {'format': 'blue-source-binding/1', 'edition': '2026-10-19-deterministic-4',
                 'modules': {name: hashlib.sha256(body.encode()).hexdigest() for name, body in modules.items()}}
     publication += '### Source inventory\n\n```json\n' + json.dumps(manifest, indent=2) + '\n```\n'
-    return {'spec/contracts-deterministic-3.md': publication, 'SPECIFICATION.md': publication,
+    return {'spec/contracts-deterministic-4.md': publication, 'SPECIFICATION.md': publication,
             'docs/sources.json': json.dumps(manifest, indent=2) + '\n'}
 
 

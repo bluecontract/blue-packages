@@ -26,9 +26,7 @@ engine context; a different set on restart is rejected. The loader checks the pi
 Coordination and Contracts semantics. Downloaded data cannot install native code or
 register itself as a trusted authority implementation.
 
-The existing Coordination-bundled legacy Mandate implementation is left unchanged
-for its old IDs. Supporting it does not imply support for the new package. This
-preview is additive; it does not pretend to migrate existing histories.
+Historical bindings are evidence only. No automatic migration or old runtime is supported.
 
 ## Responsibilities
 
@@ -38,7 +36,7 @@ preview is additive; it does not pretend to migrate existing histories.
 | BEX | Deterministic workflow and predicate evaluation |
 | Contracts | Local operations, managed-child delivery, staged writes/events, unchanged gas ceiling |
 | Mandates data | Protected lifecycle workflows, typed grants/messages, optional evidence gate |
-| Native Coordination Mandates support | Package recognition, participants, protected write evidence, historical authority and grant matching |
+| Native Coordination Mandates support | Package recognition, participants, protected write evidence, protected lifecycle and scope validation |
 | Timeline Provider | Authenticate appends, timestamp, preserve/prove history and completeness |
 | MyOS / external executor | Credentials, effect dispatch, execution permission, idempotency, outcome publication |
 
@@ -47,31 +45,12 @@ The target's Contracts processor does not fetch a Mandate as an ad hoc network
 check. Coordination establishes eligibility from evidence before handing the
 original attributed input to the ordinary target operation.
 
-## Authorization algorithm
+## Direct input eligibility
 
-For a candidate K, first establish source authentication, completeness, document
-lineage, source generation and targeting. The operation identifies the effective
-holder channel. A direct holder call retains ordinary authority. A delegated call
-requires the exact supported authority wrapper, matching represented holder and
-actual delegate, a concrete holder target channel, and a concrete target source
-channel for the actual delegate and Timeline.
-
-Resolve the original Mandate lineage and its complete historical state strictly
-before the full ordering key K. Use all required earlier scope/provider/managed-child
-history, not the latest head or the worker's current wall clock. Check owner approval,
-Active state, protected program identity and one complete grant. Apply the target's
-own delegation policy and ordinary operation validation. Preserve the actual agent
-in the original entry and receipts.
-
-The agent's Timeline used for this target can differ from its Timeline in the
-Mandate; actor identity must match, and each document must admit its own actual
-source. Composite/All effective channels are not supported for delegation in this
-package version. Co-approval, re-delegation and automatic migration are not implied.
-
-Missing evidence waits. A completed mismatch denies. A completed non-Boolean
-predicate value is not truthy authority and is treated as a failed grant condition.
-Interpreter failures and resource inability retain explicit error/incomplete
-classification; this package does not turn missing facts into negative evidence.
+The actual actor and declared Timeline establish direct eligibility. Mandates
+approval does not substitute a represented actor or add another input source.
+Delegated entry claims are rejected; no grant matching or historical authority
+path runs during target input selection.
 
 ## Protected publication
 
@@ -89,25 +68,18 @@ still pass validation before becoming current authority.
 
 ## Scheduling and independent targets
 
-This extension preserves `independent-owner-prefix/1`. It does not restore an
-all-ancestor execution barrier. An Order independently publishes its exact completed
-result. The Mandate consumes the required historical successor. Its reaction may
-remove the permission that authorized the triggering action, but that change cannot
-retroactively make that action unauthorized. Later calls need their own correct
-pre-action authority prefix.
-
-The examples use an independently surviving Order with a verified managed occurrence
-inside the Mandate. Ending the Mandate does not stop the original Order owner. An
-out-of-stage direct holder action ends the delegation, not the valid Order transition.
+Mandates observe declared managed-child completions through ordinary Contracts
+rules. They do not add authority sources to target documents. Independent owners
+retain their own publication boundaries and survive observer termination.
 
 ## Resource and production boundaries
 
-Contracts keeps the 100,000 maximum. Native preparation, scope validation, history
+Contracts keeps the 10,000,000 maximum. Native preparation, scope validation, history
 proofs and authority predicates also consume host resources; aggregate user budgeting
 and a full CPU/memory metering audit are not implemented here. Admission must be
 resource controlled by the host, without fabricating semantic outcomes on exhaustion.
 
 The local SQLite checks exercise the bundled store only. They are not a new AWS or
 PostgreSQL design and do not establish a cross-document transaction requirement.
-No Java implementation, remote-provider proof exchange, full crash-injection matrix,
+No remote-provider proof exchange, full crash-injection matrix,
 production credential gateway or distributed security certification is claimed.

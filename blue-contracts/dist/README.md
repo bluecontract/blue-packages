@@ -1,7 +1,7 @@
 # Blue Contracts
 
 This directory contains the single current Contracts package. Its canonical
-rules are `spec/contracts-deterministic-3.md`, generated from `reference/`,
+rules are `spec/contracts-deterministic-4.md`, generated from `reference/`,
 `reference-host.py` and the prose inputs by
 `python ../tools/build_deterministic_reference.py`. `SPECIFICATION.md` is an
 identical reading copy, checked by that builder. `docs/sources.json` binds every

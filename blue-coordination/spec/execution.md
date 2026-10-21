@@ -19,25 +19,27 @@ active binding sequence. A superset of available implementations is not permissi
 to promote a snapshot. Timer roles are optional capabilities outside the non-timer
 profile. Ordinary supplied timestamps and ordering remain mandatory.
 
-`Document Epoch` identifies a stable result by original document identity, exact
-current document, epoch and History Position. Epoch zero is the first committed
-initialization result. `History Position` additionally identifies each retained
-processing or receiving transition by its monotonically increasing position,
-immediate predecessor, stable flag and Processing Receipt. Position zero has no
-predecessor; every later position names exactly the preceding committed position
-of that owner. A catch-up position may retain the last stable epoch. No counter
-alone proves ancestry, completeness or commitment. Exact operands may be unvalued
-Blue definitions: protocol presence is checked as exact content, not truthiness.
+A stable result is identified by the original document identity, exact current
+document, epoch and committed history position. Epoch zero is the first committed
+initialization result. Hosts retain each processing or receiving transition with
+its monotonically increasing position, immediate predecessor, stable flag and
+original Contracts completion evidence. Position zero has no predecessor; every
+later position names the preceding committed position of that owner. A catch-up
+position may retain the last stable epoch. No counter alone proves ancestry,
+completeness or commitment. Exact operands may be unvalued Blue definitions.
 
-`Processing Receipt` retains the original Contracts receipt commitment and exact
-before/after projections, source receipts, member results and ordered emitted
-occurrences. INITIALIZE has no external cause; PROCESS retains the original entry
-and its timestamp; APPLY retains the ordered source receipts and attachment
-obligation being discharged. It MUST NOT claim a second execution of the source's
-operation. `Member Result` describes only that owned member. Equal event values
-retain distinct `Emitted Occurrence` ordinals and native occurrence identities.
-The full Contracts evidence, including Dispatch decisions when present, is retained
-without removing fields or sorting output lists. A summary is not a substitute.
+Hosts retain the original Contracts receipt commitment and exact before/after
+projections, source completions, member results and ordered emitted occurrences.
+Initialization has no external cause; processing retains the original entry and
+timestamp; receiving retains the ordered source completions and attachment
+obligation being discharged. Receiving MUST NOT claim a second execution of the
+source's operation. Equal event values retain distinct native occurrence
+identities. The full Contracts evidence, including Dispatch decisions when
+present, is retained without removing fields or sorting output lists.
+
+These are evidence and history obligations, not additional exported Blue types.
+The host's storage records are private implementation details. They do not add
+execution semantics or replace the Contracts completion and its verification.
 
 ### 14.2 Independent owners and receiver prefixes
 
@@ -67,8 +69,8 @@ fails explicitly; a current-view SCC helper does not establish that support.
 
 ### 14.3 Attachments, catch-up and historical authority
 
-An Attachment binds consumer occurrence, decoded path, generation, exact source
-operand, source initialization, selected source timeline and source History Position.
+An attachment lifetime binds consumer occurrence, decoded path, generation, exact source
+operand, source initialization, selected source timeline and source history position.
 It freezes its activation entry or initialization cause and finite target goal.
 Removing and recreating the same path produces a new lifetime. An old obligation
 cannot be reassigned to the new lifetime. Shared acquisition never merges distinct
@@ -90,8 +92,9 @@ authorize an earlier input. A source's successful independent result survives a
 receiver's authority denial or application failure. The receiver retains the exact
 obligation and last stable result for retry. A rebase freezes the ordered affected
 source scopes and target positions; it cannot silently skip a gap, mix epochs or
-replace frozen views with ambient latest state. Unknown delegation is rejected;
-Mandates is an optional separately selected protocol, not a dependency of this one.
+replace frozen views with ambient latest state. This edition supplies authenticated direct source participation only. Delegated
+entry claims are unsupported. Mandates remains a separately selected document
+protocol; its presence does not enable a delegated-entry transport.
 
 ### 14.4 Terminal closure
 
@@ -167,8 +170,3 @@ All validated assessments, including negative decisions, enter the Contracts
 canonical admission commitment. Credentials, signatures, transport pages and
 local cache/capability identifiers do not. The supplied range evidence alone is
 not an authority decision. A missing host history verifier fails explicitly.
-
-The optional Timeline Entry `onBehalfOf` operand is an exact authenticated claim.
-It grants no authority by itself. Interpreting it requires a separately selected
-authority protocol and its historical evidence; unsupported claims are rejected.
-Coordination does not require Mandates or define a competing Authority type.

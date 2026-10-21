@@ -1,20 +1,13 @@
 # Blue Mandates
 
-Owner-approved operation delegation is a separate package. Its lifecycle and
-scope transitions are ordinary Contracts/BEX workflows. A runtime must explicitly
-support its native authority protocol before those claims grant any permission.
+Mandates documents retain protected owner approval, scope changes, termination
+and typed evidence workflows. Contracts/BEX executes the authored workflows;
+explicit native Mandates registration validates participants and protected writes.
+Python and Java select the exact current package through their Mandates capability.
 
-`Mandate` has an authority holder and an authorized actor. `Operation Mandate`
-adds a scope of permitted target operations; `Qualification Mandate` adds
-correlated evidence requests. A holder must approve the exact document version.
-The approved program and designated lifecycle writers are protected by the host.
+Delegated Timeline calls are unsupported. An Active Mandate does not grant its
+participant access to another document's holder-owned channel. Direct operations
+and ordinary managed-child observation remain available.
 
-Mandates owns its Event, Message, Request, Response and Authority base types.
-Coordination supplies authenticated actors, signed timelines and channels.
-Agreement and Payment packages do not implicitly enable delegation.
-
-The current package is an unpublished Core Java integration candidate. Current
-Python native support is not claimed. See `spec/mandates.md` for the normative
-rules and `../docs/consolidation.md` for compatibility and validation scope.
-Build from `types/*.blue` using `../tools/build-payment-family.sh Mandates`;
-then regenerate consumer catalogues using `../tools/sync_catalogues.py`.
+See `spec/mandates.md` for the complete current contract. Prior delegation examples
+and their results are historical evidence, not supported current behavior.

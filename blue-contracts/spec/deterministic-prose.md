@@ -1,6 +1,6 @@
 # Blue Contracts 1.0
 
-**Edition:** `blue-contracts/2026-10-12-final-gas-1`  
+**Edition:** `blue-contracts/2026-10-19-deterministic-4`  
 **Normative form:** one complete specification with executable algorithm appendices
 
 ## Abstract

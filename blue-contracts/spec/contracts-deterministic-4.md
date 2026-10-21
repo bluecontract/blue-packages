@@ -1,6 +1,6 @@
 # Blue Contracts 1.0
 
-**Edition:** `blue-contracts/2026-10-12-final-gas-1`  
+**Edition:** `blue-contracts/2026-10-19-deterministic-4`  
 **Normative form:** one complete specification with executable algorithm appendices
 
 ## Abstract
@@ -1576,48 +1576,6 @@ candidate: normalization of a Dictionary with Integer `valueType` completed with
 the same total gas but, with budget 245, failed at admitted gas 245 for seed 0 and
 234 for seed 7. The original candidate and failed observations remain evidence.
 The four-slot runtime alias check retains its separate explicit slot order.
-
-
-### Effective document reads and staged overlays (2026-10-17 correction 3)
-
-Direct document reads, selected exact subviews and ordinary BEX member/item
-access MUST use the same effective collection interface. The presence of
-`$resultValue` elsewhere in a Compute program MUST NOT change an unrelated
-`$document` observation. In particular, a non-core `type` member is a captured
-effective reference view, not an ordinary object whose sole member is `blueId`.
-Its Blue output remains the finite exact reference. Contracts, labels and
-ordinary members use their existing effective visibility; hidden core metadata
-does not become an enumerated business field. Scalars use BEX scalar semantics.
-
-Charge `objectMemberRead` once before each attempted exact object member access,
-including a missing member and the special type/contracts/label members. Charge
-`listItemRead` once for a selected in-bounds exact list item. BEX validates index
-syntax and bounds before selecting an item; an invalid or out-of-range index
-does not charge an item access. Preserve BEX value-pointer parsing, including
-both empty and slash root paths, non-NFC field spellings and arbitrary-length
-index text. Contracts graph/semantic pointer validation remains a different
-boundary. Split reads retain the same invocation manifest inventory and the
-same per-access tariffs; they cannot bypass special-member charges. These are
-intentional logical-count and effective-projection corrections, not only a
-physical optimization. Prices, maximum budget and rollback remain unchanged.
-
-Every selected exact subview, and every saved Compute document-read callback,
-retains its captured resolver together with the invocation logical ledger.
-Opening through that ledger uses the captured source, never a later refreshed
-processor resolver. A staged overlay copies only changed ancestors; untouched
-exact children keep that captured context. Missing evidence propagates as the
-existing resource outcome. Finite wire views and exact-transfer accounting are
-not effective document views and remain unchanged.
-
-Staged authored BEX dictionaries are not exact host capabilities. The existing
-document overlay pointer interface can interpret a one-field `blueId` dictionary
-when continuing through it, using the captured resolver and the same logical
-ledger. A terminal such dictionary, or its explicitly requested `blueId` field,
-remains authored data; generic BEX access to that dictionary remains ordinary
-BEX access. The direct/split equivalence above applies to exact effective views,
-not to an assertion that arbitrary staged dictionaries have already undergone
-Language normalization or admission. No trusted provenance is inferred from
-reference-shaped authored data.
 
 ## Appendix C. Complete executable algorithms
 
@@ -3267,7 +3225,6 @@ from collections.abc import Mapping, Sequence
 from blue_host import HostIncomplete, HOST_FAILURES, incomplete, host_boundary
 from algorithms import blue as L
 from blue_language import Language
-from blue_bex.values import segments as bex_segments, index as bex_index, BexError
 from blue_bex.values import UNDEFINED,blue_value,HostValue,pointer_get,kind
 from .model import ContractError,NeedResources,require,segments,LIMITS
 
@@ -3320,7 +3277,7 @@ class ExactValue(HostValue):
 
     def _head(self):
         if self._logical:
-            for part in self._recipe.parts:self._logical.open(part,self._blue)
+            for part in self._recipe.parts:self._logical.open(part)
         return self._blue.head(self._recipe)
 
     def _child(self, key):
@@ -3345,14 +3302,15 @@ class ExactObject(ExactValue, Mapping):
     def __len__(self): return sum(1 for _ in self)
     def __getitem__(self, key):
         h = self._head()
-        if self._logical:self._logical.meter.contracts('objectMemberRead')
-        # The effective collection inventory is shared by all BEX access forms.
-        visible = key in h.fields or (key == 'contracts' and h.contracts is not None) or (
-            key == 'type' and h.type_id and h.type_id not in L.CORE_NAME) or (
-            key in ('name','description') and key in h.labels)
-        if not visible:raise KeyError(key)
-        result = self._blue.view(self._blue.child(self._recipe,key),logical=self._logical,depth=self._depth+1)
-        if result is UNDEFINED and key not in ('contracts','type','name','description'):raise KeyError(key)
+        if key == 'type' and h.type_id and h.type_id not in L.CORE_NAME:return {'blueId': h.type_id}
+        if key == 'contracts' and h.contracts is not None:
+            return self._blue.view(self._blue.child(self._recipe,key), logical=self._logical,depth=self._depth+1)
+        if key in ('name', 'description'):
+            n = self._blue.open(self._blue.exact(self._recipe))
+            if n.has(key):return n.get(key)
+        if key not in h.fields:raise KeyError(key)
+        result = self._child(key)
+        if result is UNDEFINED:raise KeyError(key)
         return result
 
 
@@ -3361,11 +3319,8 @@ class ExactList(ExactValue, Sequence):
     def __len__(self): return len(self._head().items)
     def __getitem__(self, index):
         if isinstance(index, slice):return [self[i] for i in range(*index.indices(len(self)))]
-        if type(index) is not int:raise TypeError('List index must be an integer')
-        h = self._head()
-        if not 0 <= index < len(h.items):raise IndexError(index)
-        if self._logical:self._logical.meter.contracts('listItemRead')
-        return self._blue.view(self._blue.child(self._recipe,index),logical=self._logical,depth=self._depth+1)
+        if not 0 <= index < len(self):raise IndexError(index)
+        return self._child(index)
 
 class WireObject(HostValue, Mapping):
     """A finite exact output manifest; references stay one-field objects."""
@@ -3577,7 +3532,7 @@ class Bridge:
         r = r if isinstance(r, L.Recipe) else L.recipe(r)
         captured = copy(self)  # Capture resolver/context, not a future refresh.
         if logical:
-            for part in r.parts:logical.open(part,captured)
+            for part in r.parts:logical.open(part)
         h = captured.head(r)
         if h.value is not L.ABSENT:return h.value
         if h.items is not None:return ExactList(captured, r, logical,depth)
@@ -3601,19 +3556,15 @@ class Bridge:
     def read(self,node,path,view='canonical'):
         require(view in ('canonical','resolved'),'INVALID_VIEW');r=self.select(node,path)
         return self.project(r) if r is not None else UNDEFINED
-    def read_bex(self,value,path,*,logical=None):
-        # Plain overlay containers retain their exact children. Each such child
-        # supplies its own captured resolver and the same invocation ledger.
-        at=value;source=self
-        for k in bex_segments(path):
-            if isinstance(at,ExactValue):source=at._blue;logical=at._logical
-            if isinstance(at,dict) and set(at)=={'blueId'} and k!='blueId':
-                at=source.view(L.Ref(at['blueId']),logical=logical)
+    def read_bex(self,value,path):
+        if isinstance(value, HostValue):return pointer_get(value,path)
+        at=value
+        for k in segments('' if path=='/' else path):
+            if isinstance(at,dict) and set(at)=={'blueId'}:at=self.view(L.Ref(at['blueId']))
             if kind(at)=='object':at=at.get(k,UNDEFINED)
             elif kind(at)=='list':
-                try:i=bex_index(k,len(at))
-                except BexError:return UNDEFINED
-                at=at[i]
+                if not k.isdigit() or k!='0' and k.startswith('0'):return UNDEFINED
+                i=int(k);at=at[i] if i<len(at) else UNDEFINED
             else:return UNDEFINED
         return deepcopy(at)
     def matches(self,value,pattern,*,logical=None):
@@ -4309,14 +4260,12 @@ class Run(CompletionMachine):
             if type(value) is dict:return '$resultValue' in value or any(overlays(x) for k,x in value.items() if k!='$literal')
             return False
         body=self.state.documents[key].body
-        from copy import copy
-        captured=copy(self.blue)
         view=self.blue.view(body,logical=self.graph.logical) if overlays(self.program(contract) if overlay_program is None else overlay_program) else body
         event=event_observation(self.reg,payload,logical=self.graph.logical)
         binding={'processingEvent':event_observation(self.reg,self.event,logical=self.graph.logical) if self.event is not None else UNDEFINED,
                  'timestamp':self.timestamp if self.timestamp is not None else UNDEFINED,
                  'call':event_observation(self.reg,call,logical=self.graph.logical) if call is not None else UNDEFINED}
-        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,p,source=captured) if isinstance(d,(L.Node,L.Ref)) else captured.read_bex(d,p,logical=self.graph.logical),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
+        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,'' if p=='/' else p) if isinstance(d,(L.Node,L.Ref)) else self.blue.read_bex(d,p),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
     def evaluate(self,key,payload,contract,steps,expr,call=None):
         self.meter.owner=key;result=self.engine.bex.execute({'expr':expr},self.context(key,payload,contract,steps,call),gas=self.meter);require(not result.changeset and not result.events,'EFFECTFUL_EXPRESSION');return result.value
     def work_record(self,key,channel,payload,kind):
@@ -5357,12 +5306,11 @@ class LogicalWork:
         if isinstance(node,L.Node):blue.note_identity(node,identity)
         return node
 
-    def open(self,node,source=None):
-        source=self.blue if source is None else source
-        identity=source.identity(node)
+    def open(self,node):
+        identity=self.blue.identity(node)
         if identity not in self.manifests:
             self.meter.contracts('nodeManifestOpened');self.manifests.add(identity)
-        return source.open(node)
+        return self.blue.open(node)
 
     def compare(self,left,right):
         self.meter.contracts('scalarComparison')
@@ -5412,9 +5360,18 @@ class LogicalWork:
             if parent is L.ABSENT:break
             self.meter.contracts('typeEdgeFollowed');node=parent
 
-    def read(self,node,path,*,source=None):
-        source=self.blue if source is None else source
-        return source.read_bex(source.view(node,logical=self),path,logical=self)
+    def read(self,node,path):
+        from .model import segments,require,LIMITS
+        r=L.recipe(node)
+        depth=0
+        for name in segments(path):
+            depth+=1
+            for part in r.parts:self.open(part)
+            head=self.blue.head(r)
+            self.meter.contracts('listItemRead' if head.items is not None else 'objectMemberRead')
+            r=self.blue.child(r,name)
+            if r is None:break
+        return self.blue.view(r,logical=self,depth=depth)
 
     def establish(self,node,previous=None,*,token=None,scope=None):
         # Input witnesses come from admission/opening, never a resolver cache.
@@ -5703,7 +5660,7 @@ def host_boundary(fn):
 ```json
 {
   "format": "blue-source-binding/1",
-  "edition": "2026-10-17-deterministic-3",
+  "edition": "2026-10-19-deterministic-4",
   "modules": {
     "src/blue_contracts/reference/__init__.py": "78bed996244ac5fab47a02c2455614e69b920a4268f0a7fda241a54702b34bef",
     "src/blue_contracts/reference/catalogue.py": "51e75dfa01394a8b2493292d2dfc4c79c3b2031c8035a85882b284126c7585df",
@@ -5714,15 +5671,15 @@ def host_boundary(fn):
     "src/blue_contracts/reference/dispatch.py": "335aa5cfc43808368028f3bd7da40996b0ffdc9c91fef1af1df195af560088db",
     "src/blue_contracts/reference/generalization.py": "1f24b86271755ae5f1b5132c31de85d12d05d2a19c7c4b5d493201b953dff887",
     "src/blue_contracts/reference/graph.py": "106b07e478bf77e2314b28044e0338429958ac58397db83f142ae0d5d8247b17",
-    "src/blue_contracts/reference/language.py": "ecc0a111b3f6b2f679c32660bbe83ebb2a54040a61f261e82b29d5a81ec90cd4",
+    "src/blue_contracts/reference/language.py": "2ae90402ede1299c0cd43c770406e0572ea8b68a384ce0d4bc01734da4b2f889",
     "src/blue_contracts/reference/model.py": "2f6c15c43c5a89fe6cbf41764c9f4fb417f0fb04fc309e8447337e5a08d4ea71",
     "src/blue_contracts/reference/policy.py": "2423e9d280e20db1d08d8d6c42a8a8e4ab8e53d5f335866a27dd0eb7f2433121",
-    "src/blue_contracts/reference/processor.py": "44c6b1545f2a5b37dd037863b11c0d6373a3769b74957b28861de335bb6fb600",
+    "src/blue_contracts/reference/processor.py": "bc8d976df149ea6adf5f41c6de8a4b3f314c110cb9d593e73ab636544058c23e",
     "src/blue_contracts/reference/receiving.py": "723d489a97632eae0b0a5880613341727d6f93fc2042c30215a7668355d5ab27",
     "src/blue_contracts/reference/registry.py": "e5f66ac022cd5ed54e203fd4d03eea6145aef7eaab5595ddeeb9c038124f8fd8",
     "src/blue_contracts/reference/runtime.py": "8cc8305082cb347d792d9f3f3e4d773440772a119d869144e699e8ef0e19047f",
     "src/blue_contracts/reference/storage.py": "eae5dc318c226628d2a68a37175b10232846ed2611b1a8db4a007bbd6266458f",
-    "src/blue_contracts/reference/work.py": "734074d174baa62601c3dc75001e9ae151363881fc472ec4a1467fe22e830ff2",
+    "src/blue_contracts/reference/work.py": "447e8f4a38ea6f3aee272f896f9235639f2509ccbdb412bcea36eba1e7db6c92",
     "src/blue_host/__init__.py": "ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607"
   }
 }

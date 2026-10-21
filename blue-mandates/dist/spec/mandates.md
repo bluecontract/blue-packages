@@ -2,61 +2,33 @@
 
 Protocol name: `owner-approved-operation-authority/1`  
 Package namespace: `Mandates`  
-Release status: Core Java integration preview, 8 October 2026
+Release status: scope-reduced unpublished candidate, 19 October 2026
 
 ## 1. Scope and layer boundary
 
-A Mandate is a separately processed Blue document. A holder approves a complete
-program which lets a different actor exercise specified holder-owned operations.
-The current `scope` is authoritative only together with genuine initialization,
-holder approval, protected execution history, and a complete historical prefix.
-It is not a bearer token and its BlueId alone proves no authority.
+This edition supports Mandates documents: participant configuration, protected
+owner approval, scope updates, termination and typed evidence workflows. These
+workflows execute through Contracts/BEX and the explicitly installed native
+Mandates validator. Loading definitions alone does not register execution roles.
 
-This is a Coordination extension, not just a collection of Contracts workflows.
-The lifecycle, scope transitions, and business messages execute with ordinary
-Contracts/BEX. Coordination supplies actor and Timeline evidence, historical
-selection, supported-protocol checks, protected lifecycle verification, grant
-matching, and eligibility for the effective target channel. The target then
-runs its ordinary operation against the original attributed Timeline Entry.
-Contracts does not fetch Mandates or make external network calls.
-
-A processor MUST explicitly support this exact Mandates package and its protocol
-semantics. Loading its definitions for inspection is not support. Each Mandate
-includes a `Mandates/Authority Protocol` contract marker whose native runtime is
-installed only by an explicit supported-package selection. An unsupported marker,
-authority wrapper, package, or predicate fails closed; it MUST NOT be interpreted
-as an unrestricted direct operation. No package-specific client SDK is required.
+Delegated Timeline input is outside this edition. A Mandate, an authority wrapper,
+or Active status does not authorize another actor to use a holder's operation
+channel. Coordination accepts only the declared direct Timeline sources. There is
+no delegated-entry transport field, authority-source subscription or historical
+authorization path. Unsupported entry fields fail before execution.
 
 The package depends on the exact Coordination import. Its protocol descriptor
 requires that import's protocol; Contracts, BEX and Language are selected by that
-pinned dependency graph. Explicit authoring imports are not transitive namespace
-mounts. Agreement packages do not need to depend on every business target type.
+pinned dependency graph. No existing instance is rebound to these new identities.
 
-## 2. Two essential participants
+## 2. Participants
 
-Every Mandate has two concrete Timeline Channels:
-
-* `authorityHolderChannel`: the actor granting authority it actually controls.
-* `authorizedActorChannel`: the distinct actor receiving the delegation.
-
-Both channels require admitted Timeline and Actor bindings. The two actors MUST
-be distinct in this package. No mandatory guarantor is introduced. A provider may
-host and authenticate both histories without being a guarantor or business party.
-Additional co-approval requirements need an explicitly implemented policy; merely
-adding a guarantor channel does not impose one.
-
-A delegated target MUST also contain a concrete Timeline Channel matching the
-actual submitting agent's actor and Timeline, as well as the holder-owned target
-Timeline Channel. Merely including the agent grants no right to invoke holder
-operations. The grant selects the holder's channel, not the agent's channel.
-This release grants operations on concrete Timeline Channels, not aggregate
-Composite/All channels. Direct calls retain ordinary Coordination semantics.
-
-The Mandate's agent Timeline and the target's agent Timeline need not be identical:
-the actor must be the same, and each actual source must be authenticated and
-admitted in the appropriate document. This matches examples in the supplied guides
-which use separate per-document Timelines. The Mandate's own input histories still
-have to be complete before a delegated action is authorized.
+Every Mandate has two concrete Timeline Channels: `authorityHolderChannel` and
+`authorizedActorChannel`. Both require admitted Timeline and Actor bindings;
+the actors must be distinct. They describe the protected document participants.
+The holder approves and terminates its own Mandate through direct operations.
+The authorized actor can use only operations on its own declared channel; its
+presence and the Mandate's scope do not grant target-channel access.
 
 ## 3. Exported model
 
@@ -81,8 +53,8 @@ Blue pattern) and `function`. Each supplied condition applies; an omitted option
 condition adds no restriction. Explicit empty patterns are permitted as wildcards.
 
 `Mandate Authority` extends `Mandates/Authority` and refers to the original
-pre-initialization Mandate through `mandate`. Its inherited `actor` is the represented
-holder. The Timeline Entry's actor remains the actual submitting agent.
+pre-initialization Mandate through `mandate`. Its inherited `actor` describes the represented
+holder as data. No Timeline Entry field accepts this wrapper in this edition.
 
 `Status` is the value vocabulary Pending, Active, Terminated. The packaged native
 identities, not friendly names, identify these definitions.
@@ -181,7 +153,7 @@ for the holder to review; a structural type match is not an external security au
 
 A fresh initialized Mandate is Pending. Initialization resets supplied status and
 approval/termination timestamps; it cannot import fabricated approval history.
-Its actual pre-initialization identity becomes the stable delegation reference.
+Its actual pre-initialization identity is the stable document reference.
 
 `approveMandate` belongs to `authorityHolderChannel`, accepts `{}`, and requires
 `requireExactDocumentVersion: true` with the exact reviewed pending head. The
@@ -229,100 +201,25 @@ An event named Approved, a copied Request, or a forged scope notification does n
 establish a legitimate source occurrence or change authorization. Authority is
 verified against the protected source history, not inferred from event naming.
 
-## 6. Delegated input and exact historical authorization
+## 6. Direct input only
 
-The normal wire shape is:
-
-```yaml
-type: Coordination/Timeline Entry
-actor: {blueId: ACTUAL_AGENT}
-timeline: {blueId: ADMITTED_AGENT_TIMELINE}
-timestamp: 200
-onBehalfOf:
-  type: Mandates/Mandate Authority
-  actor: {blueId: HOLDER}
-  mandate: {blueId: MANDATE_INITIAL}
-message:
-  type: Contracts/Operation Request
-  channel: ownerChannel
-  operation: increment
-  document: {blueId: REVIEWED_TARGET_STATE}
-  requireExactDocumentVersion: true
-  request: {amount: 2}
-```
-
-The symbolic capitalized references above explain field roles only; runnable
-examples calculate real identities. The signed provider establishes the entry's
-actor, Timeline, timestamp and predecessor. Writing those fields in YAML is not
-authentication. The provider does not interpret grants or approve business actions.
-
-For candidate full key K = (timestamp, source Timeline tie-break, entry tie-break):
-
-1. Verify source evidence and required prefix completeness, then normal targeting
-   and channel-generation/newness rules.
-2. Use direct holder authority when the actual source is the holder's channel.
-   An agent's participant channel does not directly authorize the holder channel.
-3. Otherwise recognize the exact supported Mandate Authority, bind the represented
-   holder to the actual target channel owner, and verify the agent's target channel.
-4. Resolve the original Mandate's actual owned history strictly before K. Apply all
-   required earlier child completions, scope changes and revocations, or WAIT.
-   Do not substitute latest or an unverified cached Active state.
-5. Establish protected owner approval, Active status, unchanged program/participant
-   bindings, and one complete grant matching target lineage, channel, operation,
-   document conditions and actual request conditions.
-6. Apply target delegation/actor policy and normal exact-version/request validation.
-   Supply the original eligible entry to the target operation, without replacing
-   the real actor with the holder.
-
-All restrictions within a grant are conjunctive. Different grants and different
-Mandates are alternative authority paths; checks cannot be mixed across them.
-A valid broad independent Mandate is not narrowed by the existence of another one.
-Universal business restrictions belong to the target's operation or provider policy.
-
-The document predicate receives `$document` = historical processed Mandate and
-`$binding: targetDocument` = actual target before the candidate action. The request
-predicate receives `$document` = that Mandate and `$binding: request` = the actual
-operation payload. There is no caller-selected substitute target/request to validate.
-
-A missing prefix or required history is WAITING, not permission and not proof of
-ineligibility. Once evidence is sufficient, a mismatching complete grant denies the
-call. Existing Coordination terminal input handling prevents deterministic rejected
-inputs from blocking later valid inputs. Host inability is not semantic rejection.
-
-A completed non-Boolean predicate value is a failed grant check, never Python
-truthiness and never an authorization. It does not block later direct owner calls.
-Interpreter errors remain fail-closed diagnostics, and unavailable required evidence
-retains its separate waiting/incomplete classification.
+Inputs retain the actual actor, declared Timeline, timestamp, predecessor and
+ordinary message. Only direct source/channel eligibility applies. Approval or
+revocation of a Mandate does not alter another document's input eligibility.
+Grant predicates may be compiled, validated and inspected as document data;
+there is no delegated target action for them to authorize in this edition.
 
 ## 7. Scope that follows independently processed work
 
-A static grant may allow repeated calls while its conditions hold. It is not a
-single-use token. The target must enforce one-time business transitions and
-consumption. A cumulative allowance shared across targets requires an authoritative
-budget/consumption process, not a predicate over two stale independent counters.
-
 An approved workflow may replace scope after a holder acknowledgment, an accepted
-provider Response, or a verified managed child's completed event. The same original
-Mandate reference is used before and after those changes. Plain embedded JSON or a
-blueId reference alone is not a live, verified managed dependency.
-
-The target action is authorized from pre-action history. Its completed result can
-then change or remove the permission that authorized it. That change does not
-retroactively invalidate the triggering action. A later call must wait for all
-actual earlier authority dependencies, not use stale scope while receiving lags.
+provider Response, or a verified managed child's completed event. Scope changes
+are document outcomes and do not add source subscriptions to other documents.
 
 Independent owners retain the selected `independent-owner-prefix/1` scheduling
-policy. Do not reintroduce an all-ancestor wave barrier. The example uses separate Embedded Node Channels with typed event filters;
-those filters match the original emitted event, while the handler receives the
-normal embedded-delivery wrapper. A target may publish its
-completion independently; its Mandate observes that exact historical result in
-order. Missing prerequisite history blocks the consumer that needs it.
-
-An owner's legitimate direct action must not be vetoed merely because the agent's
-Mandate expected a different stage. A connected concrete program can terminate an
-out-of-stage delegation while preserving the valid target transition. Targets and
-integration sources must survive termination of an observing Mandate when they
-have remaining obligations or outstanding external work.
+policy. A source publishes independently; its Mandate observer consumes that exact
+historical result in order. Missing prerequisite history blocks that observer.
+Terminating an observing Mandate does not terminate an independent target owner.
+Ordinary Contracts operation guards remain authoritative for target transitions.
 
 ## 8. Proper Request / Response evidence gating
 
@@ -403,20 +300,18 @@ A Mandate may follow an accessible integration as a verified managed dependency,
 or receive an explicitly trusted and privacy-limited outcome projection. A projection
 which is not answering a new Request is an Event, not a fabricated Response. Its
 source claims alone are not cryptographic verification: the named publication
-service must establish the source occurrence, original delegated entry, exact job,
+service must establish the source occurrence, original attributed entry, exact job,
 accepted response, originating Mandate and permitted disclosure before publishing.
 
 Agent call authority is distinct from connector/service authority to use credentials,
-spend money, access inputs and publish results. This package implements operation
-delegation and a provider-evidence preset; it does not implement a Document Responder
+spend money, access inputs and publish results. This package implements protected Mandate documents
+and a provider-evidence preset; it does not implement a Document Responder
 Mandate or a connector dispatch authorization engine. Those need an explicitly
 supported aligned protocol, not an alias for Operation Grant.
 
-Revoking a Mandate changes future delegated eligibility. It does not undo committed
-business actions or magically cancel/reverse an external effect. Queued dispatch,
-cancellation and post-revocation reconciliation follow an explicitly selected service
-policy. Do not re-evaluate a historical accepted call against later ordinary scope
-cleanup and label it retroactively unauthorized.
+Terminating a Mandate ends its document workflows and clears scope. It does not
+undo committed business actions or cancel external effects. Connector execution,
+cancellation and reconciliation require a separately selected service policy.
 
 Addressing is not confidentiality. Secrets and private prompts stay outside public
 Blue values; permitted projection happens before Timeline append. Missing private
@@ -425,9 +320,8 @@ source access means wait or use an explicitly trusted projection, never infer tr
 ## 10. Versioning and implementation boundary
 
 This package does not mutate or relabel the old Coordination-bundled Mandate IDs.
-It publishes new native definitions and a new protocol requirement. The existing
-bundled implementation remains a legacy baseline; support for that baseline is not
-support for this package. The new package requires explicit selection by exact
+It publishes new native definitions and a new protocol requirement. Historical
+implementations remain evidence only and are not supported runtime selections. The new package requires explicit selection by exact
 Package BlueId and a matching native implementation binding. The selected package
 set is stored in the engine context; restart with a different set is rejected.
 
@@ -454,17 +348,16 @@ bridges and cross-provider deployment are outside this artifact's executed scope
 A conforming implementation must demonstrate package/type admission, rejection
 without explicit support, exact-context restart binding, fresh Pending initialization,
 exact direct owner approval, rejection of fabricated activation/writer/program changes,
-complete grant matching without cross-grant union, target/agent participant checks,
-static and functional restrictions, invalid/impure predicate rejection, strict
-historical ordering including revocation, missing-history waiting, and preservation
-of the actual actor and original initial reference.
+participant and scope validation, invalid/impure predicate rejection, rejection
+of delegated entry claims, and preservation of the actual actor and original
+initial reference.
 
 It must also demonstrate typed emitted lifecycle messages, scope changes, genuine
 Request/Response ancestry and exact inResponseTo correlation, provider-channel
 restriction, false/unknown/error outcomes, duplicate/stale callbacks, termination,
 managed child-driven scope progression, target survival and unchanged business
-operation guards. The verification report distinguishes executed tests, selected
-legacy regression tests and unimplemented external deployment requirements.
+operation guards. The verification report distinguishes executed tests, retained
+document workflow regressions and unimplemented external deployment requirements.
 
 Passing the included tests is not a security certification, a legal enforceability
 claim, Java parity, exhaustive distributed crash testing, or a production benchmark.
@@ -503,4 +396,4 @@ Mandates defines its own Event, Message, Request, Response and Authority base ty
 Coordination provides authenticated actors, signed timelines and timeline channels;
 it does not own application messages or delegation policy. This revision retains
 the owner-approved protected program and exact-review rules above. Historical
-Mandates identities remain separate immutable protocols for replay.
+Mandates identities remain immutable evidence; current runtimes do not replay them.

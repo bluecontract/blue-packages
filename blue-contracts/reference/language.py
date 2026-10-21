@@ -6,7 +6,6 @@ from collections.abc import Mapping, Sequence
 from blue_host import HostIncomplete, HOST_FAILURES, incomplete, host_boundary
 from algorithms import blue as L
 from blue_language import Language
-from blue_bex.values import segments as bex_segments, index as bex_index, BexError
 from blue_bex.values import UNDEFINED,blue_value,HostValue,pointer_get,kind
 from .model import ContractError,NeedResources,require,segments,LIMITS
 
@@ -59,7 +58,7 @@ class ExactValue(HostValue):
 
     def _head(self):
         if self._logical:
-            for part in self._recipe.parts:self._logical.open(part,self._blue)
+            for part in self._recipe.parts:self._logical.open(part)
         return self._blue.head(self._recipe)
 
     def _child(self, key):
@@ -84,14 +83,15 @@ class ExactObject(ExactValue, Mapping):
     def __len__(self): return sum(1 for _ in self)
     def __getitem__(self, key):
         h = self._head()
-        if self._logical:self._logical.meter.contracts('objectMemberRead')
-        # The effective collection inventory is shared by all BEX access forms.
-        visible = key in h.fields or (key == 'contracts' and h.contracts is not None) or (
-            key == 'type' and h.type_id and h.type_id not in L.CORE_NAME) or (
-            key in ('name','description') and key in h.labels)
-        if not visible:raise KeyError(key)
-        result = self._blue.view(self._blue.child(self._recipe,key),logical=self._logical,depth=self._depth+1)
-        if result is UNDEFINED and key not in ('contracts','type','name','description'):raise KeyError(key)
+        if key == 'type' and h.type_id and h.type_id not in L.CORE_NAME:return {'blueId': h.type_id}
+        if key == 'contracts' and h.contracts is not None:
+            return self._blue.view(self._blue.child(self._recipe,key), logical=self._logical,depth=self._depth+1)
+        if key in ('name', 'description'):
+            n = self._blue.open(self._blue.exact(self._recipe))
+            if n.has(key):return n.get(key)
+        if key not in h.fields:raise KeyError(key)
+        result = self._child(key)
+        if result is UNDEFINED:raise KeyError(key)
         return result
 
 
@@ -100,11 +100,8 @@ class ExactList(ExactValue, Sequence):
     def __len__(self): return len(self._head().items)
     def __getitem__(self, index):
         if isinstance(index, slice):return [self[i] for i in range(*index.indices(len(self)))]
-        if type(index) is not int:raise TypeError('List index must be an integer')
-        h = self._head()
-        if not 0 <= index < len(h.items):raise IndexError(index)
-        if self._logical:self._logical.meter.contracts('listItemRead')
-        return self._blue.view(self._blue.child(self._recipe,index),logical=self._logical,depth=self._depth+1)
+        if not 0 <= index < len(self):raise IndexError(index)
+        return self._child(index)
 
 class WireObject(HostValue, Mapping):
     """A finite exact output manifest; references stay one-field objects."""
@@ -316,7 +313,7 @@ class Bridge:
         r = r if isinstance(r, L.Recipe) else L.recipe(r)
         captured = copy(self)  # Capture resolver/context, not a future refresh.
         if logical:
-            for part in r.parts:logical.open(part,captured)
+            for part in r.parts:logical.open(part)
         h = captured.head(r)
         if h.value is not L.ABSENT:return h.value
         if h.items is not None:return ExactList(captured, r, logical,depth)
@@ -340,19 +337,15 @@ class Bridge:
     def read(self,node,path,view='canonical'):
         require(view in ('canonical','resolved'),'INVALID_VIEW');r=self.select(node,path)
         return self.project(r) if r is not None else UNDEFINED
-    def read_bex(self,value,path,*,logical=None):
-        # Plain overlay containers retain their exact children. Each such child
-        # supplies its own captured resolver and the same invocation ledger.
-        at=value;source=self
-        for k in bex_segments(path):
-            if isinstance(at,ExactValue):source=at._blue;logical=at._logical
-            if isinstance(at,dict) and set(at)=={'blueId'} and k!='blueId':
-                at=source.view(L.Ref(at['blueId']),logical=logical)
+    def read_bex(self,value,path):
+        if isinstance(value, HostValue):return pointer_get(value,path)
+        at=value
+        for k in segments('' if path=='/' else path):
+            if isinstance(at,dict) and set(at)=={'blueId'}:at=self.view(L.Ref(at['blueId']))
             if kind(at)=='object':at=at.get(k,UNDEFINED)
             elif kind(at)=='list':
-                try:i=bex_index(k,len(at))
-                except BexError:return UNDEFINED
-                at=at[i]
+                if not k.isdigit() or k!='0' and k.startswith('0'):return UNDEFINED
+                i=int(k);at=at[i] if i<len(at) else UNDEFINED
             else:return UNDEFINED
         return deepcopy(at)
     def matches(self,value,pattern,*,logical=None):

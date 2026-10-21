@@ -32,7 +32,7 @@ completion reader may rely on its own authenticated atomic publication provenanc
 an arbitrary hash, read-model flag or caller-supplied JSON is never such provenance.
 Every protected read still verifies the exact requested history/runtime association.
 
-A Processing Proof contains sufficient actual initial content, source ranges,
+Replay evidence contains sufficient actual initial content, source ranges,
 history positions, authority positions, assessments and Contracts evidence to
 replay its target. Its container or self-reported receipt does not establish
 authority. Unsupported portable receiving, historical cycle joining, restart or

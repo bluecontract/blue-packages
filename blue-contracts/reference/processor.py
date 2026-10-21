@@ -292,14 +292,12 @@ class Run(CompletionMachine):
             if type(value) is dict:return '$resultValue' in value or any(overlays(x) for k,x in value.items() if k!='$literal')
             return False
         body=self.state.documents[key].body
-        from copy import copy
-        captured=copy(self.blue)
         view=self.blue.view(body,logical=self.graph.logical) if overlays(self.program(contract) if overlay_program is None else overlay_program) else body
         event=event_observation(self.reg,payload,logical=self.graph.logical)
         binding={'processingEvent':event_observation(self.reg,self.event,logical=self.graph.logical) if self.event is not None else UNDEFINED,
                  'timestamp':self.timestamp if self.timestamp is not None else UNDEFINED,
                  'call':event_observation(self.reg,call,logical=self.graph.logical) if call is not None else UNDEFINED}
-        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,p,source=captured) if isinstance(d,(L.Node,L.Ref)) else captured.read_bex(d,p,logical=self.graph.logical),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
+        return Context(document=view,resolved_document=deepcopy(view),event=event,current_contract={k:(self.blue.view(v,logical=self.graph.logical) if k=='definition' else deepcopy(v)) for k,v in contract.items() if not k.startswith('_')},steps=steps,bindings=binding,scope='/',read_document=lambda p,v,d:self.graph.logical.read(d,'' if p=='/' else p) if isinstance(d,(L.Node,L.Ref)) else self.blue.read_bex(d,p),matcher=self.runtime_matches,node_blue_id=self.graph.logical.node_blue_id)
     def evaluate(self,key,payload,contract,steps,expr,call=None):
         self.meter.owner=key;result=self.engine.bex.execute({'expr':expr},self.context(key,payload,contract,steps,call),gas=self.meter);require(not result.changeset and not result.events,'EFFECTFUL_EXPRESSION');return result.value
     def work_record(self,key,channel,payload,kind):

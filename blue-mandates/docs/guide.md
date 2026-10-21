@@ -1,5 +1,8 @@
 # Using Mandates
 
+This guide describes protected documents. Scope records are data; delegated
+Timeline calls are unavailable in the current edition.
+
 ## 1. Start with two different actors
 
 The holder controls an operation channel in a target document. The agent has its
@@ -8,15 +11,15 @@ rights. A separate Mandate contains `authorityHolderChannel` and
 `authorizedActorChannel`; both must have real authenticated Timeline/Actor bindings.
 The two actors are distinct. Their per-document Timelines can differ.
 
-An Order or Agreement controls the business transition. The Mandate controls when
-the agent may exercise the holder's existing operation. It cannot create rights the
+An Order or Agreement controls the business transition. The Mandate records an owner-reviewed scope. It does not authorize
+the agent to exercise the holder's operation in this edition. It cannot create rights the
 holder lacks or override a target that forbids delegation.
 
 ## 2. Approve the whole program
 
 ```
 Created and initialized       Pending        No delegated operation is usable
-Holder approveMandate({})     Active         Current matching scope is usable
+Holder approveMandate({})     Active         Current scope is recorded
 Holder terminateMandate(...)  Terminated     No future use; no reactivation
 ```
 
@@ -81,31 +84,11 @@ Several grants are alternatives. `scope: {}` means none. Future grants in
 them in scope. One Mandate can cover multiple targets and multiple operations.
 It does not automatically make a permission single-use or provide a shared budget.
 
-## 4. The call remains an ordinary operation
+## 4. Direct operations
 
-```
-Signed Timeline Entry
-  actor: actual agent
-  onBehalfOf:
-    type: Mandates/Mandate Authority
-    actor: represented holder
-    mandate: original pre-initialization Mandate reference
-  message:
-    type: Contracts/Operation Request
-    channel: owner's target channel
-    operation: ordinary target operation
-    request: ordinary business payload
-```
-
-The same original Mandate reference works throughout its lifecycle. Coordination
-selects its actual processed state strictly before the call's canonical full order
-key. Later approval does not authorize an earlier call. Later revocation does not
-invalidate an earlier valid call. Required missing history causes waiting, not use
-of the latest conveniently available Active state.
-
-The target receives the original entry. The real actor is not overwritten with the
-holder. The provider authenticates the append and history; it does not decide the
-business grant. The receiving Coordination implementation establishes eligibility.
+Use an ordinary Operation Request on the actual actor's declared channel.
+The current edition has no delegated Timeline entry field. Approving the Mandate
+changes its own lifecycle state but does not enable cross-channel calls.
 
 ## 5. Typed Request/Response gate
 
@@ -163,35 +146,12 @@ This preset deliberately uses a closed exact Response shape. Unknown extra envel
 fields/subtypes do not pass its whole-response identity check. A separate protocol
 must define extensibility rather than silently accepting it.
 
-## 6. Four executed example paths
+## 6. Historical examples
 
-`python examples/run_examples.py` writes full traces to `evidence/examples.json`.
-The local provider response is test evidence, not proof of real external execution.
-
-**Static counter.** The holder approves a grant for +2. +3 is denied. +2 succeeds.
-The holder terminates the Mandate. Another delegated +2 is denied; the holder can
-still act directly. This is repeatable bounded permission, not a one-use token.
-
-**Manual Order progression.** Initial scope permits approval. The agent approves the
-Order. The holder invokes `acknowledgeOrderApproval`, replacing scope with release.
-The agent releases standard fulfilment. A premature acknowledgment cannot override
-the Order's own phase guard, although it can stall the agent's progression.
-
-**Provider-gated counter.** Scope is empty after owner approval. The agent opens the
-fixed check, the provider records Unknown, and the counter remains unavailable. A
-later positive Response for the same execution installs the +2 grant. The agent
-then increments the actual counter.
-
-**Connected, provider-gated Order.** A positive evidence Response enables approval.
-The real independently processed Order emits Approved. The Mandate observes that
-verified child occurrence and replaces approval scope with release scope. The agent
-releases. The Order emits Released; the Mandate clears its scope and terminates.
-The Order's independent source survives.
-
-The connected example filters the original typed event at its Embedded Node Channel;
-its workflow receives the embedded-delivery wrapper. It does not trust root-level
-events that merely look like Order Approved. A valid direct holder approval outside
-the delegation's expected stage ends that delegation rather than vetoing the Order.
+The earlier static, manual-order, provider-gated and connected delegation examples
+are preserved in `provenance/incoming-examples/`. Their cross-channel calls are
+unsupported by the current edition. Approval, evidence and scope progression can
+still execute as document workflows with direct participant operations.
 
 ## 7. Integrations fit beside this package
 

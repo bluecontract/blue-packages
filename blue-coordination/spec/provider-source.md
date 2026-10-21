@@ -1,6 +1,6 @@
 # Coordination: timelines and timestamped inputs to Contracts
 
-Version 1.0.0-deterministic.1. Exact Blue types select the protocol semantics.
+Version 1.0.0-deterministic.2. Exact Blue types select the protocol semantics.
 Status: implementation candidate for providers, verifiers, feeders and executing hosts.
 
 ## 1. Purpose: supplying timestamped inputs to Contracts

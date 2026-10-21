@@ -1,6 +1,6 @@
 # Coordination: timelines and timestamped inputs to Contracts
 
-`blue-coordination` **0.2.0-access-events.1** defines how timelines supply verified,
+`blue-coordination` **1.0.0-deterministic.2** defines how timelines supply verified,
 ordered and complete inputs to Contracts. Providers preserve history and access
 evidence; feeders establish the next original event and its timestamp.
 
