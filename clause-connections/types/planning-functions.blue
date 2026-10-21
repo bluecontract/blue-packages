@@ -281,6 +281,13 @@ functions:
                 name: clause
                 path: /bindings
     - $let:
+        name: actionsPath
+        expr:
+          $concat:
+          - /clauseRuntime/work/candidate/
+          - $const: clauseKey
+          - /type/actions
+    - $let:
         name: actions
         expr:
           $document:
@@ -298,6 +305,13 @@ functions:
               - /type/configurableActions
           - true
         then:
+        - $set:
+            name: actionsPath
+            expr:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - $const: clauseKey
+              - /parameters/actions
         - $set:
             name: actions
             expr:
@@ -872,31 +886,52 @@ functions:
                     name: handler
                     expr:
                       type: Contracts/Sequential Workflow Operation
+                - $let:
+                    name: requestPath
+                    expr:
+                      $choose:
+                        cond:
+                          $and:
+                          - $eq:
+                            - $var: connectionName
+                            - _automatic
+                          - $exists:
+                              $var:
+                                name: action
+                                path: /automatic
+                        then:
+                          $concat:
+                          - $var: actionsPath
+                          - /
+                          - $var: actionName
+                          - /automatic/request
+                        else:
+                          $concat:
+                          - /clauseRuntime/work/candidate/
+                          - $const: clauseKey
+                          - $choose:
+                              cond:
+                                $exists:
+                                  $document:
+                                    path:
+                                      $concat:
+                                      - /clauseRuntime/work/candidate/
+                                      - $const: clauseKey
+                                      - /bindings/
+                                      - $var: actionName
+                                    view: definition
+                              then: /bindings/
+                              else: /type/defaultBindings/
+                          - $var: actionName
+                          - /
+                          - $var: connectionName
+                          - /request
                 - $if:
                     cond:
                       $exists:
                         $document:
                           path:
-                            $concat:
-                            - /clauseRuntime/work/candidate/
-                            - $const: clauseKey
-                            - $choose:
-                                cond:
-                                  $exists:
-                                    $document:
-                                      path:
-                                        $concat:
-                                        - /clauseRuntime/work/candidate/
-                                        - $const: clauseKey
-                                        - /bindings/
-                                        - $var: actionName
-                                      view: definition
-                                then: /bindings/
-                                else: /type/defaultBindings/
-                            - $var: actionName
-                            - /
-                            - $var: connectionName
-                            - /request
+                            $var: requestPath
                           view: definition
                     then:
                     - $set:
@@ -907,26 +942,7 @@ functions:
                           - request:
                               $document:
                                 path:
-                                  $concat:
-                                  - /clauseRuntime/work/candidate/
-                                  - $const: clauseKey
-                                  - $choose:
-                                      cond:
-                                        $exists:
-                                          $document:
-                                            path:
-                                              $concat:
-                                              - /clauseRuntime/work/candidate/
-                                              - $const: clauseKey
-                                              - /bindings/
-                                              - $var: actionName
-                                            view: definition
-                                      then: /bindings/
-                                      else: /type/defaultBindings/
-                                  - $var: actionName
-                                  - /
-                                  - $var: connectionName
-                                  - /request
+                                  $var: requestPath
                                 view: definition
                 - $if:
                     cond:

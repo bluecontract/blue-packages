@@ -58,12 +58,17 @@ public final class OperationInputConformance {
           m("args",m("input",m("revision",m("type","Integer","description","Current document revision"))),
               "do",List.of(m("$return",true))),"respond",m("args",m("input",m("requestId",m("type","Text")),"kind",m("type","Text")),"do",List.of(m("$return",true)))));
       @SuppressWarnings("unchecked") var functions=(Map<String,Object>)library.get("functions");
+      functions.put("businessField",m("args",m("input",m("requestFrom",m("type","Text"))),
+          "do",List.of(m("$return",m("$var","input")))));
+      var ordinaryLinkData=m("requestFrom",m("definition",m(),
+          "function","approve","argument","input"));
+      functions.put("businessData",m("args",m(),"do",List.of(m("$return",m("$literal",ordinaryLinkData)))));
       functions.put("optional",m("args",m("input",m("type","Fixture/Optional Input","requestId",m("type","Text"))),"do",List.of(m("$return",true))));
       functions.put("generate",m("args",m(),"do",List.of(m("$return",m("$literal",m(
           "type","Contracts/Sequential Workflow Operation","channel","owner","steps",List.of(),
-          "requestFrom",m("definition",m("type","Fixture/Library"),"function","approve","argument","input")))))));
+          "$blue:requestFrom",m("definition",m("type","Fixture/Library"),"function","approve","argument","input")))))));
       var operation=m("name","Fixture","contracts",m("differentPublicName",m("type","Contracts/Sequential Workflow Operation",
-          "channel","owner","requestFrom",m("definition",m("type","Fixture/Library"),"function","approve","argument","input"),
+          "channel","owner","$blue:requestFrom",m("definition",m("type","Fixture/Library"),"function","approve","argument","input"),
           "steps",List.of())));
       var externalLibrary=m("name","External library","type","Contracts/Compute Definition","functions",m("approve",
           m("args",m("input",m("proposalId",m("type","Text"))),"do",List.of(m("$return",true)))));
@@ -79,13 +84,13 @@ public final class OperationInputConformance {
       Files.writeString(fixture.resolve("optional.blue"),WireData.write(m("name","Optional Input","reason",m("type","Text","description","Optional explanation"))));
       @SuppressWarnings("unchecked") var contracts=(Map<String,Object>)operation.get("contracts");
       contracts.put("otherApprove",m("type","Contracts/Sequential Workflow Operation","channel","owner",
-          "requestFrom",m("definition",m("type","Fixture/Inherited"),"function","approve","argument","input"),"steps",List.of()));
+          "$blue:requestFrom",m("definition",m("type","Fixture/Inherited"),"function","approve","argument","input"),"steps",List.of()));
       contracts.put("explicitAdapter",m("type","Contracts/Sequential Workflow Operation","channel","owner","request",m(),
-          "requestFrom",m("definition",m("type","Fixture/Library"),"function","approve","argument","input"),"steps",List.of()));
+          "$blue:requestFrom",m("definition",m("type","Fixture/Library"),"function","approve","argument","input"),"steps",List.of()));
       for(String name:List.of("confirm","decline"))contracts.put(name,m("type","Contracts/Sequential Workflow Operation","channel","owner",
-          "requestFrom",m("definition",m("type","Fixture/Library"),"function","respond","argument","input"),"steps",List.of()));
+          "$blue:requestFrom",m("definition",m("type","Fixture/Library"),"function","respond","argument","input"),"steps",List.of()));
       contracts.put("optionalAction",m("type","Contracts/Sequential Workflow Operation","channel","owner",
-          "requestFrom",m("definition",m("type","Fixture/Library"),"function","optional","argument","input"),"steps",List.of()));
+          "$blue:requestFrom",m("definition",m("type","Fixture/Library"),"function","optional","argument","input"),"steps",List.of()));
       Files.writeString(fixture.resolve("library.blue"),WireData.write(library));
       Files.writeString(fixture.resolve("operation.blue"),WireData.write(operation));
       Files.writeString(fixture.resolve("README.md"),"# Native input fixture\n");
@@ -102,7 +107,7 @@ public final class OperationInputConformance {
         var document=new Exact.Ref(pkg.exportId("Fixture"));
         var request=values.select(document,"/contracts/differentPublicName/request");
         require(request!=null,"Builder must publish requestFrom function input as contract.request");
-        require(values.select(document,"/contracts/differentPublicName/requestFrom")==null,"Authoring marker must not be published");
+        require(values.select(document,"/contracts/differentPublicName/$blue:requestFrom")==null,"Authoring marker must not be published");
         require(values.matches(m("revision",3),request),"Published matcher accepts valid public input");
         require(!values.matches(m(),request),"Published matcher requires revision");
         var other=values.select(document,"/contracts/otherApprove/request");
@@ -123,11 +128,17 @@ public final class OperationInputConformance {
         var program=bex.compile(m("do",List.of(m("$return",m("$call",m("function","generate","args",m()))))),libraryData,null);
         var context=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m(),"/",null,
             (actual,pattern)->values.matches(values.source(actual),values.source(pattern,"definition")),null);
+        var businessMatcher=values.select(new Exact.Ref(pkg.exportId("Library")),"/functions/businessField/args/input");
+        require(values.matches(m("requestFrom","customer text"),businessMatcher),"Ordinary requestFrom business field must survive publication");
+        require(!values.matches(m(),businessMatcher),"Ordinary requestFrom business field remains required");
+        var dataProgram=bex.compile(m("do",List.of(m("$return",m("$call",m("function","businessData","args",m()))))),libraryData,null);
+        require(ordinaryLinkData.equals(bex.execute(dataProgram,context,100000).value()),
+            "BEX literal data named requestFrom must survive, even with former instruction shape");
         @SuppressWarnings("unchecked") var generated=(Map<String,Object>)bex.execute(program,context,100000).value();
-        require(!generated.containsKey("requestFrom")&&generated.containsKey("request"),"Native generator must return only the standard request matcher");
+        require(!generated.containsKey("$blue:requestFrom")&&generated.containsKey("request"),"Native generator must return only the standard request matcher");
         require(values.matches(m("revision",4),generated.get("request")),"Generated request accepts its declared input");
       }
-      contracts.put("invalidAdapter",m("request",m(),"requestFrom",m("definition",m("type","Fixture/Library"),
+      contracts.put("invalidAdapter",m("request",m(),"$blue:requestFrom",m("definition",m("type","Fixture/Library"),
           "function","missingFunction","argument","input")));
       Files.writeString(fixture.resolve("operation.blue"),WireData.write(operation));
       boolean rejected=false;

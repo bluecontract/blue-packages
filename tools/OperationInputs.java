@@ -4,6 +4,8 @@ import java.util.*;
 /** Authoring-only explicit input links. Native Language owns inheritance and exact type resolution. */
 public final class OperationInputs {
   private OperationInputs() {}
+  // Reserved package-authoring namespace; ordinary requestFrom is always user data.
+  private static final String LINK = "$blue:requestFrom";
 
   static Map<String,Object> publish(String namespace,Map<String,Object> definitions,Map<String,BluePackage> imports) {
     if(!containsLink(definitions))return definitions;
@@ -49,7 +51,7 @@ public final class OperationInputs {
     if(!(value instanceof Map<?,?> map))return value;
     var result=new LinkedHashMap<String,Object>();
     map.forEach((key,child)-> {
-      if(key.equals("requestFrom")&&child instanceof Map<?,?> link&&link.get("definition") instanceof Map<?,?> definition
+      if(key.equals(LINK)&&child instanceof Map<?,?> link&&link.get("definition") instanceof Map<?,?> definition
           &&alias.equals(definition.get("type")))return;
       result.put(key.toString(),withoutSelfLinks(child,alias));
     });return result;
@@ -59,11 +61,11 @@ public final class OperationInputs {
     if(value instanceof List<?> list)return list.stream().map(OperationInputs::withoutLinks).toList();
     if(!(value instanceof Map<?,?> map))return value;
     var result=new LinkedHashMap<String,Object>();
-    map.forEach((key,child)->{if(!key.equals("requestFrom"))result.put(key.toString(),withoutLinks(child));});return result;
+    map.forEach((key,child)->{if(!key.equals(LINK))result.put(key.toString(),withoutLinks(child));});return result;
   }
 
   private static boolean containsLink(Object value) {
-    if(value instanceof Map<?,?> map)return map.containsKey("requestFrom")||map.values().stream().anyMatch(OperationInputs::containsLink);
+    if(value instanceof Map<?,?> map)return map.containsKey(LINK)||map.values().stream().anyMatch(OperationInputs::containsLink);
     return value instanceof List<?> list&&list.stream().anyMatch(OperationInputs::containsLink);
   }
 
@@ -73,9 +75,9 @@ public final class OperationInputs {
     }
     if(!(value instanceof Map<?,?> map))return value;
     var result=new LinkedHashMap<String,Object>();
-    map.forEach((k,v)->{if(!k.equals("requestFrom"))result.put(k.toString(),transform(v,blue,path+"/"+k));});
-    if(map.containsKey("requestFrom")) {
-      Object request=resolve(map.get("requestFrom"),blue,path+"/requestFrom");
+    map.forEach((k,v)->{if(!k.equals(LINK))result.put(k.toString(),transform(v,blue,path+"/"+k));});
+    if(map.containsKey(LINK)) {
+      Object request=resolve(map.get(LINK),blue,path+"/"+LINK);
       // Resolve every explicit link, even when an authored public adapter retains its own matcher.
       if(!result.containsKey("request"))result.put("request",request);
     }

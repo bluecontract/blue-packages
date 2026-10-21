@@ -24,27 +24,27 @@ Baseline: source `e1114704825b29e4ca584f6000b6a9a8ae345b51`, Core `150f45b4cfef3
 | `blue-agreements` | 0.8.0-preview.1 → 0.8.0-preview.1 | A10 shared/inherited types: `types/`; concrete public operations belong to implementing clauses | INHERITED |
 | `blue-orders` | 0.8.0-preview.1 → 0.8.0-preview.1 | A10 shared/inherited types: `types/`; concrete public operations belong to implementing clauses | INHERITED |
 | `blue-documents` | 0.8.0-preview.1 → 0.8.0-preview.1 | A10 shared/inherited types: `types/`; concrete public operations belong to implementing clauses | INHERITED |
-| `clause-connections` | 0.8.0-preview.1 → 0.8.0-preview.3 | Explicit configured workflow input: `types/planning-functions.blue`: exact definition read with explicit action binding precedence over defaultBindings; no action-name/default inference | CHANGED |
-| `clause-commerce` | 0.8.0-preview.1 → 0.8.0-preview.3 | A9 quote: `types/functions.blue`, `product-clause.blue`: bounded unitPriceMinor/quantity, currency from configuration | CHANGED |
-| `clause-amendments` | 0.8.0-preview.1 → 0.8.0-preview.3 | A9 propose / approve: `types/functions.blue`, `amendment-input.blue`, `clause.blue`: public typed optional preservePending; raw internal entry preserved | CHANGED |
-| `clause-activation` | 0.8.0-preview.2 → 0.8.0-preview.3 | A1 eight generated operations: `types/functions.blue`, `negotiation.blue`, `plan.blue`: requestFrom entries and explicit native public adapters; no preparation metadata | CHANGED |
-| `payment-instruction` | 0.8.0-preview.1 → 0.8.0-preview.3 | A7 all36 responses and14 reusable requests: `types/payment-instruction.blue`, `payment-protocol-functions.blue`, `payment-action-definitions.blue`; configured examples27/28/29 explicit public requests | CHANGED |
-| `clause-documents` | 0.8.0-preview.2 → 0.8.0-preview.3 | A2 admission/access/source/preparation: `types/admission-functions.blue`, `source-functions.blue`, `preparation-functions.blue`, `preparation-plan.blue`; original raw internal callers preserved | CHANGED |
-| `clause-payment` | 0.8.0-preview.2 → 0.8.0-preview.3 | A2/A7 inherited Documents and request actions: `types/process-clause.blue`, `conditional-base.blue`: configured amount defaults do not become mandatory public input | INHERITED / REBUILT |
-| `clause-state-machine` | 0.8.0-preview.1 → 0.8.0-preview.3 | A9 transition: `types/functions.blue`, `transition-input.blue`, `clause.blue`: to required; reason optional; allowed targets from configuration | CHANGED |
-| `clause-features` | 0.8.0-preview.1 → 0.8.0-preview.3 | A10 configured actions: `types/clause.blue`: operation input belongs to supplied action/workflow configuration, not a universal family schema | INHERITED / REBUILT |
+| `clause-connections` | 0.8.0-preview.1 → 0.8.0-preview.4 | Explicit configured workflow input: `types/planning-functions.blue`: exact definition read with explicit action binding precedence over defaultBindings; no action-name/default inference | CHANGED |
+| `clause-commerce` | 0.8.0-preview.1 → 0.8.0-preview.4 | A9 quote: `types/functions.blue`, `product-clause.blue`: bounded unitPriceMinor/quantity, currency from configuration | CHANGED |
+| `clause-amendments` | 0.8.0-preview.1 → 0.8.0-preview.4 | A9 propose / approve: `types/functions.blue`, `amendment-input.blue`, `clause.blue`: public typed optional preservePending; raw internal entry preserved | CHANGED |
+| `clause-activation` | 0.8.0-preview.2 → 0.8.0-preview.4 | A1 eight generated operations: `types/functions.blue`, `negotiation.blue`, `plan.blue`: $blue:requestFrom entries and explicit native public adapters; no preparation metadata | CHANGED |
+| `payment-instruction` | 0.8.0-preview.1 → 0.8.0-preview.4 | A7 all36 responses and14 reusable requests: `types/payment-instruction.blue`, `payment-protocol-functions.blue`, `payment-action-definitions.blue`; configured examples27/28/29 explicit public requests | CHANGED |
+| `clause-documents` | 0.8.0-preview.2 → 0.8.0-preview.4 | A2 admission/access/source/preparation: `types/admission-functions.blue`, `source-functions.blue`, `preparation-functions.blue`, `preparation-plan.blue`; original raw internal callers preserved | CHANGED |
+| `clause-payment` | 0.8.0-preview.2 → 0.8.0-preview.4 | A2/A7 inherited Documents and request actions: `types/process-clause.blue`, `conditional-base.blue`: configured amount defaults do not become mandatory public input | INHERITED / REBUILT |
+| `clause-state-machine` | 0.8.0-preview.1 → 0.8.0-preview.4 | A9 transition: `types/functions.blue`, `transition-input.blue`, `clause.blue`: to required; reason optional; allowed targets from configuration | CHANGED |
+| `clause-features` | 0.8.0-preview.1 → 0.8.0-preview.4 | A10 configured actions: `types/clause.blue`: operation input belongs to supplied action/workflow configuration, not a universal family schema | INHERITED / REBUILT |
 | `blue-money` | 0.7.0-preview.1.finalgas.1 → 0.7.0-preview.1.finalgas.1 | A10 shared/inherited types: `types/`; concrete public operations belong to implementing clauses | INHERITED |
-| `clause-balance` | 0.8.0-preview.1 → 0.8.0-preview.3 | A9 setTarget / reserve / settle: `types/functions.blue`: key; nonnegative target, positive reservation; no amount required for settle | CHANGED |
-| `clause-termination` | 0.8.0-preview.1 → 0.8.0-preview.3 | A10 lifecycle actions: `types/clause.blue`, `functions.blue`: configured request/finish use lifecycle state; no missing fields inferred solely from empty matcher | EXCEPTION / REBUILT |
-| `clause-inspection` | 0.8.0-preview.2 → 0.8.0-preview.3 | A2 inherited preparation: `types/clause.blue`, `preparation-functions.blue`: shared Documents inputs, configuration-specific fields | INHERITED / REBUILT |
-| `clause-schedule` | 0.8.0-preview.1 → 0.8.0-preview.3 | A10 configured lifecycle actions: `types/clause.blue`, `functions.blue`: start configuration/state controls generated child input | INHERITED / REBUILT |
-| `myos` | 0.8.0-preview.2 → 0.8.0-preview.3 | A6 three session/funding operations: `types/customer-instruction.blue`, `customer-session-functions.blue`: sessionId; optional expiresAt only for provideSession; no invented amount/currency | CHANGED |
-| `acme-bank` | 0.8.0-preview.2 → 0.8.0-preview.3 | A4 four transfer operations: `types/transfer-contract.blue`, `transfer-functions.blue`: requestId/reference; conditional amountMinor/currency; no required reason | CHANGED |
-| `manual-payments` | 0.8.0-preview.2 → 0.8.0-preview.3 | A5 one instruction + four receipt operations: `types/instruction.blue`, `receipt-instruction.blue`: preserve distinct extra-field and length rules | CHANGED |
-| `shipping-instruction` | 0.8.0-preview.2 → 0.8.0-preview.3 | A8 nine responses + three reusable requests: `types/functions.blue`, `instruction.blue`, `request-actions.blue`: requestId; address only for change-address; optional trackingId/reason | CHANGED |
-| `clause-representation` | 0.8.0-preview.1 → 0.8.0-preview.3 | A10 configured delegation: `types/clause.blue`: public shape depends on explicit configured delegation workflow; no independent static operation declaration | INHERITED / REBUILT |
-| `clause-attachments` | 0.8.0-preview.2 → 0.8.0-preview.3 | A3 attach/authority/access/preparation: `types/*functions.blue`, `*plan.blue`: initialized document references, native typed public Access lists, explicit configured matcher preservation and roster parameters | CHANGED |
-| `blue-tasks` | 0.1.0-preview.3.access-events.1 → 0.1.0-preview.4.access-events.1 | A10 late assignment: `types/work-clause.blue`: reportSuccess request assigned from reportRequest after construction; no Task executor exposed to chat | EXCEPTION / REBUILT |
+| `clause-balance` | 0.8.0-preview.1 → 0.8.0-preview.4 | A9 setTarget / reserve / settle: `types/functions.blue`: key; nonnegative target, positive reservation; no amount required for settle | CHANGED |
+| `clause-termination` | 0.8.0-preview.1 → 0.8.0-preview.4 | A10 lifecycle actions: `types/clause.blue`, `functions.blue`: configured request/finish use lifecycle state; no missing fields inferred solely from empty matcher | EXCEPTION / REBUILT |
+| `clause-inspection` | 0.8.0-preview.2 → 0.8.0-preview.4 | A2 inherited preparation: `types/clause.blue`, `preparation-functions.blue`: shared Documents inputs, configuration-specific fields | INHERITED / REBUILT |
+| `clause-schedule` | 0.8.0-preview.1 → 0.8.0-preview.4 | A10 configured lifecycle actions: `types/clause.blue`, `functions.blue`: start configuration/state controls generated child input | INHERITED / REBUILT |
+| `myos` | 0.8.0-preview.2 → 0.8.0-preview.4 | A6 three session/funding operations: `types/customer-instruction.blue`, `customer-session-functions.blue`: sessionId; optional expiresAt only for provideSession; no invented amount/currency | CHANGED |
+| `acme-bank` | 0.8.0-preview.2 → 0.8.0-preview.4 | A4 four transfer operations: `types/transfer-contract.blue`, `transfer-functions.blue`: requestId/reference; conditional amountMinor/currency; no required reason | CHANGED |
+| `manual-payments` | 0.8.0-preview.2 → 0.8.0-preview.4 | A5 one instruction + four receipt operations: `types/instruction.blue`, `receipt-instruction.blue`: preserve distinct extra-field and length rules | CHANGED |
+| `shipping-instruction` | 0.8.0-preview.2 → 0.8.0-preview.4 | A8 nine responses + three reusable requests: `types/functions.blue`, `instruction.blue`, `request-actions.blue`: requestId; address only for change-address; optional trackingId/reason | CHANGED |
+| `clause-representation` | 0.8.0-preview.1 → 0.8.0-preview.4 | A10 configured delegation: `types/clause.blue`: public shape depends on explicit configured delegation workflow; no independent static operation declaration | INHERITED / REBUILT |
+| `clause-attachments` | 0.8.0-preview.2 → 0.8.0-preview.4 | A3 attach/authority/access/preparation: `types/*functions.blue`, `*plan.blue`: initialized document references, native typed public Access lists, explicit configured matcher preservation and roster parameters | CHANGED |
+| `blue-tasks` | 0.1.0-preview.3.access-events.1 → 0.1.0-preview.5.access-events.1 | A10 late assignment: `types/work-clause.blue`: reportSuccess request assigned from reportRequest after construction; no Task executor exposed to chat | EXCEPTION / REBUILT |
 
 ## Explicit additional capability
 
@@ -52,7 +52,7 @@ Baseline: source `e1114704825b29e4ca584f6000b6a9a8ae345b51`, Core `150f45b4cfef3
 
 ## Current static publication mappings
 
-Each row below is extracted from the actual authored declaration. An explicit request remains authoritative; every requestFrom link is resolved and validated by the same helper in both builders.
+Each row below is extracted from the actual authored declaration. An explicit request remains authoritative; every reserved $blue:requestFrom link is resolved and validated by the same helper in both builders.
 
 | Family / operation | Authored source | Explicit input entry |
 |---|---|---|
@@ -149,4 +149,43 @@ Evidence files are under ignored `reports/operation-input/`; source and catalogu
 
 The first DefinitionRead draft incorrectly claimed a native null/absent distinction. Its intermediate build was deliberately stopped with exit143. It was not qualified. The corrected rules require canonical Language admission, and the complete dependency closure is rebuilt with corrected IDs. Transport-level request omission, literal null and {} handling remains a separate API concern.
 
-See [operation-input-qualification.md](operation-input-qualification.md) for maintained suite instructions and native List representation. The source build, native A1–A10 qualification, reproducibility and repository checks listed above are complete and PASS. Cross-repository HTTP/Confirm integration, the current 49 real-model scenarios and UI qualification remain separate required gates and have not yet run against this final imported candidate. No local build is an external publication or deployment.
+See [operation-input-qualification.md](operation-input-qualification.md) for maintained suite instructions and native List representation. The source build, native A1–A10 qualification, reproducibility and repository checks listed above passed for the retained pre-review candidate at source `36415672609aef7d5b7b5080bad25925e0d1e7ed`; they are not a claim that the review-correction candidate reran that entire suite. Cross-repository HTTP/Confirm integration, the current 49 real-model scenarios and UI qualification remain separate required gates and have not yet run against this final imported candidate. No local build is an external publication or deployment.
+
+
+## Review correction candidate
+
+P2 corrects exact connection request provenance for automatic workflows declared
+in type actions or configurable parameter actions. P4 reserves `$blue:requestFrom`
+for publication instructions and preserves ordinary `requestFrom` schema/data.
+The 19 dependent `0.8.0` packages move from preview.3 to preview.4; Tasks moves
+from `0.1.0-preview.4.access-events.1` to preview.5.access-events.1. Contracts,
+Language and DefinitionRead protocol identities do not change. Previous source
+commits and preexisting Core exact archives retain the earlier publications.
+
+Regression evidence and final candidate qualification are recorded separately in
+`reports/operation-input/review-p2-red`, `review-p4-red`, `review-p4-green` and
+`review-corrections`. The native helper regressions pass in both maintained
+builders. An isolated ACME rebuild before the version bump compared its complete
+distribution and lock byte-for-byte: the marker-only migration was neutral.
+Cross-repository Core import, HTTP, model and UI evidence remains separately owned.
+
+
+The review-correction candidate catalogue is
+`807fc8b540c38576a2d9f5f3ceec12d77c681796bbb363201df3915f16f9fd88` (SHA-256).
+Its bounded qualification is complete:
+
+| Review gate | Evidence | Result |
+|---|---|---|
+| P4 ordinary business field and BEX data in both builders | `review-p4-green/report.json` | PASS |
+| P2 installed type/configured automatic and named `_automatic` requests, exact override semantics and native effects | `review-corrections/automatic-active/report.json` | PASS |
+| Shipping default/override requests and effects; Activation effects; Documents generated connections | Corresponding three cases in `review-corrections/native/report.json` | PASS |
+| Exact 20-package closure build, 15 unchanged identities, 35-package archive checks | `review-corrections/build-final.log`, `archive-check.json`, `verification.json` | PASS |
+| Connections deterministic distribution/lock rebuild; catalogue synchronization; 13 publishing/order unit tests; diff check | `review-corrections/verification.json` | PASS |
+
+The first P2 effect fixture installed the matcher successfully but omitted actual
+owner approval; execution correctly left the inactive document unchanged. The
+final fixture performs `approve_owner`, asserts activation, then verifies the
+operation effect. The earlier failed report is retained and is not counted as a
+pass. No package semantic change was made to bypass activation. The full native
+suite and cross-repository HTTP/model/UI suites were not rerun solely for these
+review corrections.

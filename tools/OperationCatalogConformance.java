@@ -141,12 +141,56 @@ public final class OperationCatalogConformance {
       }
     }
   }
+  static void automaticConnections(Path root)throws Exception {
+    var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    for(boolean configured:List.of(false,true)) for(boolean automatic:List.of(true,false)) {
+      var channel=m("type","Contracts/External Channel","event",m("source","owner"));
+      var action=m("automatic",m("on","workflow","party","owner","request",m("text",m("type","Text")),
+          "params",m("$object",m("$var","trigger"))),
+          "do",List.of(m("$appendChange",m("op","replace","path","/result","val",m("$var",m("name","params","path","/text"))))));
+      var type=m("type","Connections/Connected Clause");
+      var clause=m("type",type,"bindings",m("record",m(
+          "explicitEmpty",m("on","workflow","party","owner","request",m()),
+          "explicitAbsent",m("on","workflow","party","owner"))));
+      if(!automatic) {
+        Object connection=action.remove("automatic");
+        @SuppressWarnings("unchecked") var named=(Map<String,Object>)((Map<?,?>)clause.get("bindings")).get("record");
+        named.put("_automatic",connection);
+      }
+      if(configured){type.put("configurableActions",true);clause.put("parameters",m("actions",m("record",action)));}
+      else type.put("actions",m("record",action));
+      var source=m("name","Automatic workflow input provenance","type","Agreements/Agreement with Clauses","result","before",
+          "contracts",m("owner",channel),"clauses",m("activation",m("type","Activation/Activation Clause",
+          "parameters",m("parties",m("owner",m("type","Parties/Party","lead",m("channel",channel),"readerKeys",List.of("reader-owner"))))),
+          "record",clause));
+      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1());var blue=packages.language()) {
+        var processor=runtime.processor(blue);var initial=processor.initialize(source);
+        require(initial.status().equals("APPLIED"),"Automatic initialization "+initial.status());
+        var declarations=processor.execution().declarations(new Exact.Ref(initial.document().blueId()));
+        require(declarations.get("explicitEmpty").containsKey("request"),"Explicit empty connection request must survive");
+        require(!declarations.get("explicitAbsent").containsKey("request"),"Named connection must not borrow the automatic action matcher");
+        var declaration=declarations.get("_automatic");
+        require(declaration!=null&&declaration.containsKey("request"),"Automatic workflow must retain request from "+(configured?"parameters/actions":"type/actions"));
+        var values=processor.execution().values();var matcher=values.source(declaration.get("request"),"definition");
+        require(!values.matches(values.source(m("text",7)),matcher),"Automatic input must reject wrong type");
+        var approved=processor.process(initial.document(),event(initial.document(),"owner","approve_owner",
+            m("revision",processor.read(initial.document(),"/activation/revision"))),1);
+        require(approved.status().equals("APPLIED")&&Boolean.TRUE.equals(processor.read(approved.document(),"/activation/active")),
+            "Fixture owner approval must activate the document");
+        var result=processor.process(approved.document(),event(approved.document(),"owner","_automatic",m("text","after")),2);
+        require(result.status().equals("APPLIED"),"Automatic operation "+result.status());
+        require("after".equals(processor.read(result.document(),"/result")),"Automatic workflow must execute its reviewed input: configured="+configured+", automatic="+automatic+", actual="+processor.read(result.document(),"/result")+", events="+result.receipt());
+      }
+    }
+    System.out.println("PASS installed type/configured automatic workflow request and native effect");
+  }
   static Object event(Contracts.Document document,String channel,String operation,Object request) {
     return m("source",channel,"operation",m("type","Contracts/Operation Request","channel",channel,
         "operation",operation,"document",m("blueId",document.blueId()),"requireExactDocumentVersion",true,"request",request));
   }
   public static void main(String[] args)throws Exception {
-    if(args.length>1&&args[1].equals("shipping"))shipping(Path.of(args[0]));
+    if(args.length>1&&args[1].equals("automatic"))automaticConnections(Path.of(args[0]));
+    else if(args.length>1&&args[1].equals("shipping"))shipping(Path.of(args[0]));
     else activation(Path.of(args[0]),args.length>1&&args[1].equals("activation-complete"));
   }
 }

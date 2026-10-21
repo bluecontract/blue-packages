@@ -48,7 +48,14 @@ Do not run source publication concurrently with native tests reading the catalog
 
 Standard operation `request` definitions and their descriptions are now published
 from explicit library/function/argument links by the shared authoring helper.
-`requestFrom` is removed during publication. Dynamic generators copy those same
+`$blue:requestFrom` is a reserved package-authoring instruction and is removed
+before native publication. Its value must contain exactly `definition`, `function`
+and `argument`. It is resolved and validated even beside an explicit `request`;
+that explicit request remains authoritative. The reserved namespace applies to
+source templates as well as operation declarations. Ordinary `requestFrom` keys
+are business schema or BEX data, including objects shaped like a former link;
+they are never interpreted, removed or rewritten. Existing authoring links must
+use the reserved spelling; there is no heuristic compatibility fallback. Dynamic generators copy those same
 native definitions; explicitly mapped public workflows retain their own input
 shape instead of guessing that an action argument equals the external request.
 
@@ -74,3 +81,17 @@ matchers such as `[T]`. The form constructs the appropriate representation befor
 review. Prepare and Confirm must not coerce one representation into the other.
 Public Access-operation adapters preserve the original internal raw-array caller
 ABI while declaring their external typed-list input explicitly.
+
+## Review corrections
+
+Connections retain the exact selected request provenance: named connections use
+an explicit action binding or its inherited default, while `_automatic` uses the
+selected type action or configured parameter action. No action-level fallback
+supplies a matcher to an unrelated named connection. The `connections-automatic`
+case initializes both action sources, checks the installed matcher, preserves an
+explicit empty matcher and a genuinely absent matcher, then executes the generated
+operation and asserts its native effect.
+
+Both `helper-final` and `helper-payment` additionally qualify an ordinary required
+`requestFrom` business field and execute BEX literal data with the former link
+shape unchanged, alongside valid and invalid reserved authoring instructions.
