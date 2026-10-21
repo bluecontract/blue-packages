@@ -20,6 +20,7 @@ CASES = {
     'helper-final': ('OperationInputConformance', 'final'),
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
     'activation-effects': ('ActivationExecutionConformance',),
+    'source-binding': ('SourceBindingConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),

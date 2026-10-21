@@ -95,3 +95,16 @@ operation and asserts its native effect.
 Both `helper-final` and `helper-payment` additionally qualify an ordinary required
 `requestFrom` business field and execute BEX literal data with the former link
 shape unchanged, alongside valid and invalid reserved authoring instructions.
+
+
+The `source-binding` case initializes actual independent source and receiving
+documents, approves their owner, then executes the generated binding workflow.
+It covers typed reference, typed path, both supplied fields, inherited concrete
+sourcePath, missing/uninitialized-source rejection and legacy raw reference/path inputs. The clause's internal adapter
+removes only the nominal input root type before reading defaults, so inherited
+abstract optional fields do not become supplied values. It retains the exact
+source publication and does not mutate the test input object. This native gate does
+not establish HTTP transport byte preservation. Document-reference prose belongs
+on the enclosing input: adding a child description can decorate an otherwise
+unchanged referenced document and change its effective native identity. The
+initialized-document constraint remains on the document field.
