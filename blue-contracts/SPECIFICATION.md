@@ -1,6 +1,6 @@
-# Blue Contracts 1.0
+# Blue Contracts 1.0 — Activation Replay Edition
 
-**Edition:** `blue-contracts/2026-10-12-final-gas-1`  
+**Edition:** `blue-contracts/2026-10-21-activation-replay-1`
 **Normative form:** one complete specification with executable algorithm appendices
 
 ## Abstract
@@ -219,7 +219,7 @@ event:
   blueId: <exactOriginalExternalEvent>
 ```
 
-The angle-bracket value is descriptive notation, not an admitted BlueId. Runnable conformance fixtures must use actual admitted identities. A checkpoint row has exactly `timestamp` and `event`; `event` is a pure exact reference. An absent checkpoint is not synthesized before successful consumption. A checkpoint with no entries may be omitted. Internal notifications do not obtain external checkpoints.
+The angle-bracket value is descriptive notation, not an admitted BlueId. Runnable conformance fixtures must use actual admitted identities. A checkpoint row has exactly `timestamp` and `event`. For a verified Coordination timeline entry, `event` is an identifying record with exactly `entryId: Text`. This scalar identity is not a Language reference and do not certify the transitive content of the entry. The entry and its Timeline source evidence remain unchanged and retained by exact identity. The portable snapshot envelope may carry an `eventProofs` dictionary mapping entry identities to source-proof identities, outside the snapshot and document commitments. Exact retained content includes the proof records; a live engine may use source proofs from its existing durable journal. Portable import installs this evidence mapping before snapshot validation. Invocation transport may carry `{entryId, proofId}` outside logical document state. Before accepting or restoring such a row, the installed Coordination proof verifier MUST verify that the source proof covers the original entry with the matching timestamp and order, and MUST verify its signed header, predecessor and operation/message binding. Missing proof records or required operands yield NEEDS_RESOURCES; an invalid proof is rejected. An absent proof verifier is a configuration error (MISSING_EVENT_PROOF_VERIFIER), and an absent entry-to-proof association is rejected (MISSING_EVENT_PROOF). Other external events retain a pure exact reference in `event`. Prior Contracts editions continue to use pure exact references for all checkpoints. An absent checkpoint is not synthesized before successful consumption. A checkpoint with no entries may be omitted. Internal notifications do not obtain external checkpoints.
 
 Generalization Rule has required `path: Text`, required `mode` equal to `reject` or `nearest-valid-ancestor`, and optional `mustRemainSubtypeOf: {blueId: exactTypeDefinition}`. The policy's own definition and inherited effective identity are protected from ordinary patches.
 
@@ -5430,3 +5430,10 @@ def host_boundary(fn):
   "src/blue_host/__init__.py": "ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607"
 }
 ```
+
+
+### Verified Coordination operand scope
+
+For a source-verified Coordination event in this edition, reading the operation header or computing `$nodeBlueId` of its document/request operand preserves the exact identity without opening that operand. Accessing operand contents, invoking the selected operation, or materializing the operand as a Language value requires full validation of the required operand. This scope does not change Language strict validation and does not apply to unverified events or prior editions.
+
+All nondeferred request fields, the request type and specification, and containing schema constraints remain strictly validated. Ordinary non-operation messages remain fully validated. Recognized signed Timeline Entries require an installed proof verifier and verified source evidence; they MUST NOT fall back to generic reference checkpoints when either is unavailable.

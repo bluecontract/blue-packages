@@ -998,14 +998,6 @@ functions:
         $merge:
         - {$var: state}
         - channelsInstalled: {$var: ready}
-        - $choose:
-            cond:
-              $and:
-              - {$var: ready}
-              - {$exists: {$binding: timestamp}}
-            then:
-              channelsAdmittedAfter: {$binding: timestamp}
-            else: {}
   commitState:
     args:
       state: {}
@@ -1619,12 +1611,27 @@ functions:
                             - $var: role
                             - /contracts/checkpoint/entries/provider/event
                       then:
-                        $nodeBlueId:
-                          $document:
-                            $concat:
-                            - /timelineAccess/
-                            - $var: role
-                            - /contracts/checkpoint/entries/provider/event
+                        $choose:
+                          cond:
+                            $exists:
+                              $document:
+                                $concat:
+                                - /timelineAccess/
+                                - $var: role
+                                - /contracts/checkpoint/entries/provider/event/entryId
+                          then:
+                            $document:
+                              $concat:
+                              - /timelineAccess/
+                              - $var: role
+                              - /contracts/checkpoint/entries/provider/event/entryId
+                          else:
+                            $nodeBlueId:
+                              $document:
+                                $concat:
+                                - /timelineAccess/
+                                - $var: role
+                                - /contracts/checkpoint/entries/provider/event
                       else: ''
             - $set:
                 name: requests

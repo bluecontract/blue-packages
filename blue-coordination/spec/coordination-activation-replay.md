@@ -960,3 +960,14 @@ identity; Contracts defines execution. No alternative cycle or execution algorit
 is introduced here.
 
 This edition selects the exact 10M gas prerequisites. Previously published content retains its original semantics.
+
+
+## Activation replay edition — normative amendments
+
+This edition supersedes only the rules explicitly amended below. Retained editions keep their original semantics and exact identities.
+
+**Q06 amendment.** After resolving all earlier required receiver, child, attachment and rebase work, exact operations are candidates only for matching members of the exact attempt input graph or established prior own versions. Prior own versions retain stale rejection. An unknown exact target absent from that graph has no operation audience in this receiver and channel lifetime; independent ordinary observers are still evaluated. Unknown nonexact targets wait. Own-version recognition is bounded at the input order: versions established in the future cannot change an earlier disposition.
+
+**Q13 amendment.** A genuine raw child absent from the prior committed graph retains its publication-order birth cursor but creates independent bounded channel-lifetime rebase goals covering history up to and including the original birth cause. These durable goals record the inclusive cutoff. Only its newly born lifetimes receive that history, including the birth cause once through normal admission and observer processing; the parent creation is never executed again. Rebase goals for existing or reactivated lifetimes retain a strictly exclusive cutoff. Historical outcomes publish at the birth boundary.
+
+**Q17 amendment.** Signed entries retain their original identity. For timeline entries, the new Contracts checkpoint event identity is `{entryId: Text}` identifying the original immutable entry. Source-prefix proof identities are retained separately in durable journal evidence or a portable `eventProofs` mapping outside document/snapshot commitments; differing valid provider frontiers must not change document identity. Verification and restore recheck signed chain, completeness, timestamp and operation/message binding. Header validation certifies required protocol operands and never claims full target or request certification; operands required by an observer, authorization or execution are fully certified before use. Missing required evidence remains waiting. Inclusive birth consumption retains the original signed entry identity, timestamp, proof and checkpoint semantics, never a synthetic replacement; processing the same history independently must yield the same exact child state. Old editions retain strict closure semantics.
