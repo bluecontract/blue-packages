@@ -65,12 +65,12 @@ wrong timeline or wrong provider cannot satisfy it. When ready, Activation
 replaces the empty ports with the declared timeline channels together. Required
 commercial approvals still apply: access readiness alone does not accept terms.
 An immediate document becomes active; a consent-based document waits for its
-configured approvals. Business requests published before admission are not
-queued for execution when the channels appear. Activation records the verified
-access-event timestamp in `channelsAdmittedAfter`; newly exposed external
-entries at or before that boundary are denied. A fresh request must have a later
-provider timestamp. This uses the native timestamp binding, never a timestamp
-claimed in the request payload.
+configured approvals. Once channels are installed, previously unprocessed entries
+are evaluated under the normal operation, access, actor, authority and consent
+rules. Admission does not record a timestamp boundary or reject a request solely
+because it predates admission. Native timeline ordering uses the verified provider
+timestamp, never a timestamp claimed in the request payload. Requests already
+resolved as denied remain denied; granting access does not retry them.
 
 An approved later `Party Addition Requested` uses the same full-roster access
 check, including the proposed party and its mandatory access documents. While
