@@ -1,0 +1,38 @@
+name: Semantic cards check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semantic-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r tools/semantic-requirements.txt
+      - name: Test discovery, reuse and publication boundaries
+        run: python -m unittest discover -s tools -p 'test_semantic*.py' -v
+      - name: Discover every selected clause and validate committed cards
+        run: python tools/semantic_cards.py check
+      - name: Report automation configuration
+        env:
+          GENERATION_ENABLED: ${{ vars.SEMANTICS_GENERATION_ENABLED }}
+          PUBLICATION_ENABLED: ${{ vars.SEMANTICS_PUBLICATION_ENABLED }}
+        run: |
+          echo "Generation enabled: ${GENERATION_ENABLED:-false}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Publication enabled: ${PUBLICATION_ENABLED:-false}" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 storage and GitHub OIDC roles for public Blue semantic cards
+
+Parameters:
+  EnvName:
+    Type: String
+    Default: dev
+    AllowedPattern: '[a-z0-9]+(-[a-z0-9]+)*'
+    MaxLength: 36
+  CreateGitHubOIDCProvider:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Set true only if this AWS account has no token.actions.githubusercontent.com provider yet.
+
+Conditions:
+  NeedsGitHubOIDCProvider:
+    Fn::Equals: [{Ref: CreateGitHubOIDCProvider}, 'true']
+
+Resources:
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Condition: NeedsGitHubOIDCProvider
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList: [sts.amazonaws.com]
+  SemanticCardsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName:
+        Fn::Sub: blue-semantic-cards-${EnvName}
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+  SemanticCardsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: SemanticCardsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - Fn::GetAtt: [SemanticCardsBucket, Arn]
+              - Fn::Sub: '${SemanticCardsBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+  SemanticCardsReadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: blue-semantic-cards-${EnvName}-read
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated:
+                Fn::If:
+                  - NeedsGitHubOIDCProvider
+                  - Ref: GitHubOIDCProvider
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                # Exact immutable subject verified through the repository's OIDC API.
+                token.actions.githubusercontent.com:sub: repo:bluecontract@93829250/blue-packages@1391542341:ref:refs/heads/main
+      Policies:
+        - PolicyName: ReadSemanticCards
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource:
+                  Fn::GetAtt: [SemanticCardsBucket, Arn]
+              - Effect: Allow
+                Action: s3:GetObject
+                Resource:
+                  Fn::Sub: '${SemanticCardsBucket.Arn}/*.json'
+  SemanticCardsPublishRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: blue-semantic-cards-${EnvName}-publish
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated:
+                Fn::If:
+                  - NeedsGitHubOIDCProvider
+                  - Ref: GitHubOIDCProvider
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: repo:bluecontract@93829250/blue-packages@1391542341:environment:semantics-publish
+      Policies:
+        - PolicyName: PublishSemanticCards
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource:
+                  Fn::GetAtt: [SemanticCardsBucket, Arn]
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource:
+                  Fn::Sub: '${SemanticCardsBucket.Arn}/*.json'
+
+Outputs:
+  BucketName:
+    Value:
+      Ref: SemanticCardsBucket
+  GitHubVariables:
+    Description: Copy these five values into repository Actions Variables; these are not secrets.
+    Value:
+      Fn::Sub: |
+        SEMANTICS_BUCKET=${SemanticCardsBucket}
+        SEMANTICS_AWS_REGION=${AWS::Region}
+        SEMANTICS_AWS_ACCOUNT_ID=${AWS::AccountId}
+        SEMANTICS_READ_ROLE_ARN=${SemanticCardsReadRole.Arn}
+        SEMANTICS_PUBLISH_ROLE_ARN=${SemanticCardsPublishRole.Arn}
