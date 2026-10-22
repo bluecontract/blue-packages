@@ -800,11 +800,27 @@ functions:
                       - $eq:
                         - $binding: dispatch/kind
                         - EXTERNAL
-                      - $includes:
-                          list:
-                            $const: preOperations
-                          val:
-                            $binding: dispatch/operation
+                      - $or:
+                        - $includes:
+                            list:
+                              $const: preOperations
+                            val:
+                              $binding: dispatch/operation
+                        # Parties admitted after initialization need the same
+                        # approval/update routes as the original party leads.
+                        - $and:
+                          - $hasKey:
+                              object:
+                                $pointerGet:
+                                  object: {$var: s}
+                                  path: /parties
+                                  default: {}
+                              key: {$binding: dispatch/channel}
+                          - $includes:
+                              list:
+                              - $concat: [approve_, {$binding: dispatch/channel}]
+                              - $concat: [updateParty_, {$binding: dispatch/channel}]
+                              val: {$binding: dispatch/operation}
                     - $and:
                       - $ne:
                         - $binding: dispatch/kind

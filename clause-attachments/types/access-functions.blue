@@ -196,6 +196,13 @@ functions:
     - $let:
         name: accessIndex
         expr: 0
+    - $let:
+        name: registeredChannels
+        expr:
+          $pointerGet:
+            object: {$document: /activation}
+            path: /registeredAccessChannels
+            default: []
     - $forEach:
         item: access
         in:
@@ -217,10 +224,19 @@ functions:
               - /contracts/
               - $var: channel
             val:
-              $pointerGet:
-                object:
-                  $var: access
-                path: /contracts/provider
+              $merge:
+              - type: Contracts/Embedded Node Channel
+              - sourcePath:
+                  $concat:
+                  - $var: basePath
+                  - /
+                  - $text: {$var: accessIndex}
+        - $set:
+            name: registeredChannels
+            expr:
+              $listConcat:
+              - $var: registeredChannels
+              - - $var: channel
         - $appendChange:
             op: add
             path:
@@ -241,6 +257,10 @@ functions:
               $add:
               - $var: accessIndex
               - 1
+    - $appendChange:
+        op: add
+        path: /activation/registeredAccessChannels
+        val: {$var: registeredChannels}
     - $appendChange:
         op: add
         path: /activation/accessPaths
