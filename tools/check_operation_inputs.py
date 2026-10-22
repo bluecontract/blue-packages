@@ -21,6 +21,7 @@ CASES = {
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
     'activation-effects': ('ActivationExecutionConformance',),
     'source-binding': ('SourceBindingConformance',),
+    'document-provision': ('ProvisionInputConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
