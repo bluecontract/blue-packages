@@ -46,6 +46,31 @@ supported retained transport continue to use its original exact types. Other
 exports retain their explicit authored schemas; their presence is not a claim
 that an arbitrary mixed-edition envelope satisfies those schemas.
 
+For source Timeline Entry authentication only, this edition additionally recognizes
+a message whose effective native type is exactly retained Contracts Operation
+Request `9S9SguGydMZ662LgRVxMGF7t56ZrzovQZhEa7PgmyM6L`. Recognition uses that
+retained native request parser and its contextual obligations; missing required
+records remain NEEDS. A recognized malformed request remains an operation role
+for framing checks. `operation` must identify the same exact message, and must
+be absent for unrecognized messages. All signature, chain, actor, source and
+exact marker equality checks remain mandatory. This adds no derived retained
+request types, execution bindings, authorization, or target-history evidence.
+Receiver operation dispatch remains governed solely by its selected Contracts
+runtime.
+
+For source Timeline Entry authentication only, this edition additionally accepts
+a source whose effective native type is exactly one of the retained API Call
+Source `Ar86NuDZNdQ9RStJSE5wvyhDkinb3icpRi2AvPKjrwT7`, Browser Session Source
+`4s6SVr6botstV9Z9EM6PTEYy54zajPJrPgmMco7j7aY6`, or Document Request Source
+`3SBQLsXSn9y3ZAYcWkceVqks5fng7bzcTQARcJZd4dte`. The original contextual Source
+occurrence and its exact declared native field constraints must validate;
+malformed values fail and unavailable required records remain NEEDS. Signed
+source identity and provenance are not rewritten. This does not recognize derived
+retained Source types, equate execution types, or grant source-policy,
+document-occurrence, delegation or Authority evidence. Receiver Source policy
+remains governed by its selected runtime; existing `onBehalfOf` and Authority
+checks are unchanged.
+
 ## 1. Inputs and evidence boundaries
 
 An input has its original signed Timeline entry and full canonical order

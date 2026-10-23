@@ -15,7 +15,9 @@ class DecreasingHistoryReferenceTests(unittest.TestCase):
         import hashlib
         import json
         from pathlib import Path
-        vector = json.loads(Path(__file__).with_name('decreasing-vector.json').read_text())
         source = Path(__file__).resolve().parents[2] / 'tools/decreasing_history_reference.py'
-        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), vector['referenceSourceSha256'])
-        self.assertEqual(prerequisite_order(**vector['input']), vector['expected'])
+        for name in ('decreasing-vector.json', 'source-transport-decreasing-vector.json'):
+            with self.subTest(vector=name):
+                vector = json.loads(Path(__file__).with_name(name).read_text())
+                self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), vector['referenceSourceSha256'])
+                self.assertEqual(prerequisite_order(**vector['input']), vector['expected'])

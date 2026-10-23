@@ -16,8 +16,10 @@ class SccReferenceTests(unittest.TestCase):
         import hashlib
         import json
         from pathlib import Path
-        vector = json.loads(Path(__file__).with_name('scc-vector.json').read_text())
         source = Path(__file__).resolve().parents[2] / 'tools/scc_reference.py'
-        self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), vector['referenceSourceSha256'])
-        for row in vector['vectors']:
-            self.assertEqual(components(**row['input']), row['expected'])
+        for name in ('scc-vector.json', 'source-transport-scc-vector.json'):
+            with self.subTest(vector=name):
+                vector = json.loads(Path(__file__).with_name(name).read_text())
+                self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(), vector['referenceSourceSha256'])
+                for row in vector['vectors']:
+                    self.assertEqual(components(**row['input']), row['expected'])
