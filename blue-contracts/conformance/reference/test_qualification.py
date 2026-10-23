@@ -14,7 +14,10 @@ class QualificationBindingTests(unittest.TestCase):
                 'blue-contracts': 'blue-contracts/dist/package.bluepkg',
                 'blue-coordination': 'blue-coordination/conformance/reference/retained/coordination-receiver-relative.8.bluepkg',
             }),
-            ('qualification-source-transport.json', None),
+            ('qualification-source-transport.json', {
+                'blue-contracts': 'blue-contracts/dist/package.bluepkg',
+                'blue-coordination': 'blue-coordination/conformance/reference/retained/coordination-receiver-relative.10.bluepkg',
+            }),
         )
         for profile_name, retained in profiles:
             with self.subTest(profile=profile_name):
@@ -31,11 +34,12 @@ class QualificationBindingTests(unittest.TestCase):
                     self.assertEqual(hashlib.sha256(archive.read_bytes()).hexdigest(), expected['archiveSha256'])
                     if retained is None:
                         self.assertEqual(manifest, json.loads((root / name / 'dist/package.json').read_text()))
-        retained_archive = root / profiles[0][1]['blue-coordination']
-        provenance = json.loads(retained_archive.with_suffix('.provenance.json').read_text())
-        self.assertEqual(provenance['archive'], retained_archive.name)
-        self.assertEqual(provenance['size'], retained_archive.stat().st_size)
-        self.assertEqual(provenance['archiveSha256'], hashlib.sha256(retained_archive.read_bytes()).hexdigest())
+        for _, retained in profiles:
+            retained_archive = root / retained['blue-coordination']
+            provenance = json.loads(retained_archive.with_suffix('.provenance.json').read_text())
+            self.assertEqual(provenance['archive'], retained_archive.name)
+            self.assertEqual(provenance['size'], retained_archive.stat().st_size)
+            self.assertEqual(provenance['archiveSha256'], hashlib.sha256(retained_archive.read_bytes()).hexdigest())
         contracts = root / 'blue-contracts'
         self.assertEqual((contracts / 'conformance/reference/coverage.json').read_bytes(),
                          (contracts / 'dist/conformance/reference/coverage.json').read_bytes())

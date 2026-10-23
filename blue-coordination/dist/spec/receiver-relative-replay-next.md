@@ -245,6 +245,83 @@ Conformance additionally covers shared L1/L2 state, nested decreasing scan bound
 exact-current/stale and nonexact-original targeting, original-time grant/revoke,
 full-K ties and persisted restart between installation and historical delivery.
 
+### Discovery of additional authority sources for an existing lifetime
+
+When authenticated mandate/source discovery adds a source timeline to an existing receiver channel lifetime, complete source-expansion catch-up before later ordinary receiver input. This is neither channel recreation nor raw INITIAL replay. Keep the existing member/channel/generation and original input identities.
+
+Freeze the expansion scan bound A at the receiver's committed original-input frontier when the new source is admitted to its source set. Examine entries of the newly added source strictly before A. Freeze causal visibility V at the exact receiver anchor history's effective order, taking the maximum with any inherited active continuation visibility. Discovery wall-clock time and a later mandate's original event time are not substitute bounds. Later entries use ordinary receiver processing.
+
+Each added source owns an independent examined full-K cursor within its unchanged lifetime. Existing source cursors are preserved. Schedule the minimum eligible original full K across outstanding source slices and channel-activation work; advance only slices actually examined. Multiple slices for one lifetime do not authorize multiple executions of the same entry. Terminal progress remains bound to the exact lifetime and original entry, separately from successful Contracts completions. New discovery must not inherit a cursor from another source or reset a channel generation.
+
+Persist an append-only expansion anchor binding the exact established receiver receipt/position, member/channel/generation, added exact source identities and previous continuation identity. Repeated expansions at the same receiver receipt must not overwrite earlier anchors or reuse their examined progress. Expanding an already active continuation preserves its proven causal publication chain and existing slice cursors. Do not fabricate a Contracts receipt or use the current head without the anchored chain as proof.
+
+PRE for each catch-up turn is the exact receiver invocation prestate established by that contiguous causal chain, including earlier scheduled applicable turns and receiving results. Operation target classification and receiver declarations use that proved prestate. Source signatures, completeness, mandate/grant/revocation and authorization are still evaluated at the original entry K. A grant discovered or approved later never retroactively authorizes K. Missing required evidence remains durable WAIT; terminal denial or non-match advances only the examined slice and cannot permanently block a later otherwise eligible receiver operation.
+
+Cold recovery reconstructs the same anchor, source slices and causal prefix. All existing source authenticity, contextual validation, receiving, lifetime and completion checks remain mandatory. This source-expansion rule belongs only to the newly published exact edition; retained editions keep their prior interpretation.
+
+#### Source-expansion reference procedure
+
+Inputs are authenticated existing source/authority discovery, an established native receiver position, its exact channel lifetime metadata, and existing continuation state. This algorithm does not replace validation of those premises or original-K authority.
+
+```
+expand(receiver, newlyRequiredSources, establishedPosition, continuation):
+  A := receiver.committedOriginalInputFrontier
+  if A is absent: ordinary initial-source discovery applies; no past expansion interval
+  V := max(establishedPosition.effectiveOrder, inheritedContinuationVisibility)
+  anchor := { receiver/member, position, receipt, A, V,
+              sorted exact added sources, exact affected lifetime triplets,
+              previousContinuationIdentity }
+  id := canonicalIdentity(anchor)
+  append anchor to the causal continuation; never overwrite an earlier anchor
+  for each affected lifetime and added source:
+    add slice { id=canonicalIdentity(id,lifetime,source), lifetime, source,
+                anchor=id, cutoff=A, visibility=V, examined=null }
+  preserve every existing slice and examined cursor
+  persist source subscription, anchor and slices atomically
+
+next(receiverContinuation):
+  require authentic source-prefix coverage through each applicable slice bound
+  find each slice's earliest entry with examined < fullK < cutoff
+  choose minimum fullK across source slices and pending channel-activation work
+  selected := all applicable slices containing this exact entry
+  derive exact receiver PRE from the contiguous anchored causal publication chain
+  classify target/receiver declarations against PRE
+  verify signatures/source and authority against original fullK (not A or V)
+  if a required premise is unavailable:
+    persist ordinary durable WAIT; do not advance slices or invent a completion
+  else:
+    invoke each eligible lifetime at most once for this exact entry
+    record actual successful completion OR terminal denial/non-match
+    advance only selected slices to fullK
+    append the exact transition/terminal evidence to the same causal chain
+    remove a finished slice only when its authenticated prefix proves exhaustion
+  persist atomically; repeat until catch-up obligations finish
+  ordinary processing can then consider entries at/after the frozen frontier
+```
+
+An expansion during an active continuation appends to that existing chain; it cannot replace previous goals or inherit another source's cursor. A new continuation after a completed one has a storage identity including the previous continuation identity, so two expansions at the same receipt remain distinct. Lifetime identity and terminal deduplication remain `(member,channel,generation,entry)`; slice identity is additional examined-progress scope, not a new channel generation or new execution authority.
+
+The existing INITIAL inclusive frontier and channel ACTIVATION strict frontier retain their distinct rules. Source expansion is separate examined progress; it must not reset or substitute either existing cursor. Cold recovery verifies the same persisted anchor/chain and reconstructs outstanding slices rather than starting a new scan.
+
+#### Expansion during INITIAL
+
+The INITIAL examined frontier and source-expansion examined frontiers are independent. A source-expansion candidate below an already examined INITIAL cursor does not lower, reset, or advance that cursor. Its original K remains the authorization time. Its V includes the inherited INITIAL visibility, so execution observes the exact established causal receiver state anchored by the existing continuation.
+
+For an expansion transition while INITIAL is pending:
+
+```
+retain initial.examined and every initial source cursor
+validate expansion anchor and selected slices against the established causal chain
+on APPLIED: append the actual receipt/state transition to that causal chain
+on DENIED/NO_MATCH: append authenticated terminal evidence without a completion
+advance only the expansion slices that examined this entry
+record a phase-labelled causal link in INITIAL's continuation to the verified
+  expansion transition; this link changes causal state, not INITIAL examined K
+resume INITIAL from its unchanged examined frontier using the linked causal state
+```
+
+A causal link is not an INITIAL input, cannot satisfy an unexamined INITIAL candidate, and cannot bypass validation of the referenced expansion anchor, receipt or terminal decision. Recovery verifies both the link and the referenced transition. Scheduling compares pending candidates by full K; duplicate delivery remains scoped to the same lifetime and entry. No phase may turn another phase's cursor into proof that an unseen source prefix was examined.
+
 ### Existing source and occurrence attachment
 
 An established source retains its original birth, identity and source history.

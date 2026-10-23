@@ -15,6 +15,6 @@ if __name__ == '__main__':
         'vectorExecution': 'PASS' if result.wasSuccessful() else 'FAIL',
         'editionQualification': 'NOT_VERIFIED',
         'coverage': {'q06_classification': 'MODEL_ONLY', 'q13_scan_bounds': 'MODEL_ONLY', 'q13_attachment_generations': 'MODEL_ONLY',
-                     'source_authentication': 'NOT_VERIFIED', 'receiving_and_restart': 'NOT_VERIFIED',
+                     'source_expansion_scheduling': 'MODEL_ONLY', 'source_authentication': 'NOT_VERIFIED', 'receiving_and_restart': 'NOT_VERIFIED',
                      'dependency_worklist_dispositions': 'MODEL_ONLY', 'causal_history_and_cycles': 'NOT_VERIFIED', 'java_paired_vectors': 'NOT_VERIFIED'}}, indent=2))
     raise SystemExit(0 if result.wasSuccessful() else 1)
