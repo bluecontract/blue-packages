@@ -63,11 +63,13 @@ public final class BuildPaymentFamily {
         continue;
       }
       var builder=BluePackage.builder(cfg.get("name").toString(),cfg.get("version").toString()).namespace(ns);
+      var importedPackages=new LinkedHashMap<String,BluePackage>();
       var locks=new TreeMap<String,Object>();
       for(var entry:map(cfg.get("imports")).entrySet()) {
         String relative=map(entry.getValue()).get("path").toString();Path path=source.resolve(relative).normalize();
         if(!path.startsWith(root)) throw new IllegalArgumentException("Dependency outside blue-packages: "+path);
         var pkg=open(path);builder.importPackage(entry.getKey(),pkg);
+        importedPackages.put(entry.getKey(),pkg);
         if(entry.getKey().equals(cfg.get("language"))) builder.language(entry.getKey(),pkg);
         var pin=Map.of("path",relative,"packageBlueId",pkg.blueId(),"archiveSha256",sha(path),"name",pkg.name(),"version",pkg.version());
         locks.put(entry.getKey(),pin);
@@ -80,8 +82,9 @@ public final class BuildPaymentFamily {
         var requirements=new TreeMap<String,String>();map(protocol.get("requires")).forEach((k,v)->requirements.put(k,v.toString()));
         builder.protocol(new ProtocolDefinition(protocol.get("name").toString(),protocol.get("status").toString(),new ProtocolDefinition.Asset(path,rules,sha(source.resolve(path))),null,null,requirements));
       }
-      var definitions=new LinkedHashMap<String,Object>();
+      Map<String,Object> definitions=new LinkedHashMap<>();
       for(Object e:list(cfg.get("exports"))) {var export=map(e);definitions.put(export.get("name").toString(),read(source.resolve(export.get("path").toString())));}
+      definitions=OperationInputs.publish(ns,definitions,importedPackages);
       var ordered=new LinkedHashSet<String>();for(String name:definitions.keySet()) order(name,ns+"/",definitions,ordered,new HashSet<>());
       for(String name:ordered) {
         if(cfg.containsKey("protocol") && !map(definitions.get(name)).containsKey("specification")) throw new IllegalArgumentException("Native source needs explicit rules reference: "+name);

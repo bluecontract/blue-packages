@@ -1932,3 +1932,100 @@ functions:
             outcome: duplicate
     - $return:
         outcome: acceptedNew
+  preparePublic:
+    args:
+      input:
+        type: Documents/Preparation Input
+        description: Prepare or start a document using the configured cardinality, bindings and template; missing
+          fields are constrained by that configuration.
+    do:
+    - $let:
+        name: raw
+        expr:
+          $pointerSet:
+            object:
+              $var: input
+            path: /type
+            op: remove
+    - $let:
+        name: checked
+        expr:
+          $call:
+            function: checkPreparation
+            args:
+              input:
+                $var: raw
+    - $return:
+        $call:
+          function: sharedPrepare
+          args:
+            input:
+              $var: raw
+            checked:
+              $var: checked
+  providePublic:
+    args:
+      input:
+        type: Documents/Provision Input
+        inResponseTo:
+          type: Text
+          description: Request identifier of the current preparation.
+        requirementRef:
+          type: Text
+          description: Exact requirement reference from the current provision request.
+        document:
+          description: Existing initialized document publication, supplied as a Blue ID reference. Execution checks
+            its type, source, terms, parties and configured requirements.
+          contracts:
+            initialized:
+              document: {}
+    do:
+    - $let:
+        name: checked
+        expr:
+          $call:
+            function: checkProvision
+            args:
+              input:
+                $pointerSet:
+                  object:
+                    $var: input
+                  path: /type
+                  op: remove
+    - $return:
+        $call:
+          function: sharedProvide
+          args:
+            checked:
+              $var: checked
+  cancelPublic:
+    args:
+      input:
+        type: Documents/Cancellation Input
+    do:
+    - $return:
+        $call:
+          function: sharedCancel
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  prepareKeyedPublic:
+    args:
+      input:
+        type: Documents/Preparation Input
+        key:
+          type: Text
+          schema:
+            minLength: 1
+          description: Explicit key of the entry to prepare in the configured collection.
+    do:
+    - $return:
+        $call:
+          function: preparePublic
+          args:
+            input:
+              $var: input

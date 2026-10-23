@@ -1,4 +1,3 @@
-# Executable preparation candidate. Participant transports are supplied at bootstrap.
 name: Course enrollment starts payment
 type: Agreements/Agreement with Clauses
 x: 0
@@ -36,6 +35,8 @@ clauses:
         setReady:
           'on': workflow
           party: customer
+          request:
+            description: Set the configured ready state. No request fields are required.
   instruction:
     type: Attachments/Payment Preparation Clause
     parameters:
@@ -63,15 +64,37 @@ clauses:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the configured
+                action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
         requestAuthorize:
           authorize:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the configured
+                action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
       obtain: create
       suppliedBy: customer
     bindings:
@@ -92,10 +115,25 @@ clauses:
         provideDocument:
           'on': workflow
           party: customer
+          request:
+            inResponseTo:
+              type: Text
+              description: Request identifier of the active preparation.
+            requirementRef:
+              type: Text
+              description: Document Blue ID in the current preparation request.
+            document:
+              description: Existing initialized document publication supplied by Blue ID. Execution validates the
+                prepared source, configured policy and parties.
+              contracts:
+                initialized:
+                  document: {}
       resume:
         resumeDocument:
           'on': workflow
           party: customer
+          request:
+            description: Resume preparation from its current document state; no request fields are required.
   purchase:
     type: Features/Feature Clause
     parameters:
@@ -117,3 +155,9 @@ clauses:
           params:
             $object:
               $var: trigger
+          request:
+            requestId:
+              type: Text
+              schema:
+                minLength: 1
+              description: Unique purchase request key propagated to the preparation event.

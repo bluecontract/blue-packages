@@ -161,7 +161,19 @@ functions:
         outcome: acceptedNew
   provide:
     args:
-      input: {}
+      input:
+        inResponseTo:
+          type: Text
+          description: Request identifier of the active preparation.
+        requirementRef:
+          type: Text
+          description: Document Blue ID in the current preparation request.
+        document:
+          description: Existing initialized document publication supplied by Blue ID. Execution validates the prepared
+            source, configured policy and parties.
+          contracts:
+            initialized:
+              document: {}
     do:
     - $call:
         function: requireInvocation
@@ -278,7 +290,8 @@ functions:
         outcome: acceptedNew
   resume:
     args:
-      input: {}
+      input:
+        description: Resume current preparation from document state; no request fields are required.
     do:
     - $if:
         cond:
@@ -887,3 +900,23 @@ functions:
               path: /policy/relationship
     - $return:
         outcome: acceptedNew
+  beginPublic:
+    args:
+      input:
+        type: Attachments/Attachment Preparation Input
+        requestId:
+          type: Text
+          schema:
+            minLength: 1
+          description: User-provided unique request key. Must satisfy configured party-key syntax.
+    do:
+    - $return:
+        $call:
+          function: begin
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

@@ -89,7 +89,7 @@ def build(package, check=False):
         classes = work / 'classes'
         classes.mkdir()
         subprocess.run([javac, '-cp', classpath, '-d', str(classes),
-                        str(ROOT/'tools/BuildPaymentFamily.java'), str(ROOT/'tools/BuildFinalGas.java')], check=True)
+                        str(ROOT/'tools/OperationInputs.java'), str(ROOT/'tools/BuildPaymentFamily.java'), str(ROOT/'tools/BuildFinalGas.java')], check=True)
         selected = ROOT
         if check:
             selected = work / 'packages'

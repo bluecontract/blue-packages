@@ -709,3 +709,84 @@ functions:
                   path: /reason
                   default: ''
     - $return: true
+  respondPublic:
+    args:
+      outcome:
+        type: Text
+      input:
+        type: Shipping/Shipping Response Input
+        requestId:
+          type: Text
+          description: Identifier of the pending shipment request in shipment.requests. Use the request
+            for the selected response; ask when more than one matches.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: respond
+          args:
+            outcome:
+              $var: outcome
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+  requestShipment:
+    args:
+      input:
+        description: Public input for the book shipping request.
+        requestId:
+          type: Text
+          description: Unique identifier selected for this shipping request.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: request
+          args:
+            action: book
+            input:
+              $var: input
+  requestCancellation:
+    args:
+      input:
+        description: Public input for the cancel shipping request.
+        requestId:
+          type: Text
+          description: Unique identifier selected for this shipping request.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: request
+          args:
+            action: cancel
+            input:
+              $var: input
+  requestAddressChange:
+    args:
+      input:
+        description: Public input for the address shipping request.
+        requestId:
+          type: Text
+          description: Unique identifier selected for this shipping request.
+          schema:
+            minLength: 1
+        address:
+          type: Text
+          description: New delivery address selected by the user.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: request
+          args:
+            action: address
+            input:
+              $var: input

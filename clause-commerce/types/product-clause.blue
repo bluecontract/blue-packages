@@ -7,68 +7,12 @@ actions:
   quote:
     do:
     - $let:
-        name: price
+        name: quoteResult
         expr:
-          $var:
-            name: params
-            path: /unitPriceMinor
-    - $let:
-        name: quantity
-        expr:
-          $var:
-            name: params
-            path: /quantity
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $var: price
-                kind: integer
-            - $gte:
-              - $var: price
-              - 0
-            - $lte:
-              - $var: price
-              - 1000000000
-            - $isKind:
-                val:
-                  $var: quantity
-                kind: integer
-            - $gt:
-              - $var: quantity
-              - 0
-            - $lte:
-              - $var: quantity
-              - 1000
-        message: Invalid product quote
-    - $appendChange:
-        op: replace
-        path:
-          $const:
-            name: bindings
-            path: /product
-        val:
-          unitPriceMinor:
-            $var: price
-          quantity:
-            $var: quantity
-          totalMinor:
-            $multiply:
-            - $var: price
-            - $var: quantity
-          currency:
-            $const:
-              name: parameters
-              path: /currency
-    - $appendEvent:
-        $merge:
-        - type: Commerce/Domain Event
-        - kind: Product Quoted
-          clause:
-            $const: clauseKey
-          totalMinor:
-            $multiply:
-            - $var: price
-            - $var: quantity
+          $call:
+            function: quote
+            args:
+              input:
+                $var: params
+actionDefinition:
+  type: Commerce/Product Functions

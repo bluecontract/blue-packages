@@ -16,10 +16,12 @@ public final class BuildFinalGas {
       throw new IllegalArgumentException("This builder only replaces explicitly unpublished candidates");
     var builder=BluePackage.builder(c.get("name").toString(),c.get("version").toString()).namespace(c.get("namespace").toString());
     var locks=new TreeMap<String,Object>();
+    var importedPackages=new LinkedHashMap<String,BluePackage>();
     for (var e:map(c.get("imports")).entrySet()) {
       String rel=map(e.getValue()).get("path").toString();Path path=p.resolve(rel).normalize();
       if(!path.startsWith(root)) throw new IllegalArgumentException("Dependency escapes source root");
       var dep=BluePackage.open(path);builder.importPackage(e.getKey(),dep);
+      importedPackages.put(e.getKey(),dep);
       if(e.getKey().equals(c.get("language"))) builder.language(e.getKey(),dep);
       locks.put(e.getKey(),Map.of("path",rel,"packageBlueId",dep.blueId(),"archiveSha256",sha(path),"name",dep.name(),"version",dep.version()));
     }
@@ -30,8 +32,9 @@ public final class BuildFinalGas {
       var requires=new TreeMap<String,String>();map(protocol.getOrDefault("requires",Map.of())).forEach((k,v)->requires.put(k,v.toString()));
       builder.protocol(new ProtocolDefinition(protocol.get("name").toString(),protocol.get("status").toString(),new ProtocolDefinition.Asset(rules,Files.readString(p.resolve(rules)),sha(p.resolve(rules))),null,null,requires));
     }
-    var definitions=new LinkedHashMap<String,Object>();
+    Map<String,Object> definitions=new LinkedHashMap<>();
     for(Object v:list(c.get("exports"))) {var e=map(v);definitions.put(e.get("name").toString(),read(p.resolve(e.get("path").toString())));}
+    definitions=OperationInputs.publish(c.get("namespace").toString(),definitions,importedPackages);
     var ordered=new LinkedHashSet<String>();for(String name:definitions.keySet())BuildPaymentFamily.order(name,c.get("namespace")+"/",definitions,ordered,new HashSet<>());
     for(String name:ordered)builder.exportJson(name,WireData.write(definitions.get(name)));
     builder.documentation("README.md",Files.readString(p.resolve("README.md")));

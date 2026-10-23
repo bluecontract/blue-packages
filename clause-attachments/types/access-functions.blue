@@ -256,7 +256,13 @@ functions:
         outcome: acceptedNew
   addAuthority:
     args:
-      input: {}
+      input:
+        replacement:
+          description: Replacement authority party selected by the user. Must include its lead representative channel.
+          lead:
+            channel:
+              type: Contracts/Channel
+              description: Selected representative channel.
     do:
     - $failIf:
         cond:
@@ -454,6 +460,8 @@ functions:
                   val:
                     $nodeBlueId:
                       type: Activation/Activation Functions
+              parameters:
+                $document: /clauses/activation/parameters
     - $let:
         name: nextContracts
         expr:
@@ -469,6 +477,8 @@ functions:
                   val:
                     $nodeBlueId:
                       type: Activation/Activation Functions
+              parameters:
+                $document: /clauses/activation/parameters
     - $forEach:
         item: contribution
         in:
@@ -596,3 +606,21 @@ functions:
                 $var: s
               path: /revision
     - $return: true
+  registerAccessPublic:
+    args:
+      input:
+        documents:
+          type: List
+          itemType: Coordination/Timeline Access
+          schema:
+            minItems: 1
+            maxItems: 16
+          description: One to sixteen initialized Timeline Access document publications. Supply existing document
+            references; execution verifies initialization, authority and permitted access.
+    do:
+    - $return:
+        $call:
+          function: registerAccess
+          args:
+            input:
+              $var: input
