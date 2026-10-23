@@ -1,0 +1,59 @@
+name: Deploy semantic cards infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: AWS environment
+        type: choice
+        options: [dev, prod]
+        default: dev
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semantic-infrastructure-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    # The AWS trust policy independently requires this exact repository/main ref.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Select the explicit AWS target
+        id: target
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: python3 tools/semantic_infrastructure.py config --environment "$TARGET_ENVIRONMENT" --github-output "$GITHUB_OUTPUT"
+      - uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
+        with:
+          aws-region: ${{ steps.target.outputs.region }}
+          role-to-assume: ${{ steps.target.outputs.deployment_role_arn }}
+          allowed-account-ids: ${{ steps.target.outputs.account_id }}
+          role-session-name: semantic-infra-${{ inputs.environment }}-${{ github.run_id }}
+          role-duration-seconds: 1800
+      - name: Create or update only the selected semantic-card stack
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.environment }}
+        run: python3 tools/semantic_infrastructure.py deploy --environment "$TARGET_ENVIRONMENT" --output build/semantic-infrastructure
+      - name: Preserve deployment receipt and per-environment configuration
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: semantic-infrastructure-${{ inputs.environment }}-${{ github.run_id }}
+          path: build/semantic-infrastructure/
+          if-no-files-found: warn
+          retention-days: 30
+
+# This workflow deploys infrastructure only. It does not invoke a model, publish
+# cards, or change repository-wide generation/publication variables.

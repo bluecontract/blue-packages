@@ -1,0 +1,246 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Administrator-installed IAM delegation for one semantic-card environment
+
+# Install this separately from the application stack using an administrator.
+# The existing GitHub OIDC provider must already exist in the target account.
+# The delegated role cannot edit this stack, its roles, or these boundaries.
+Parameters:
+  EnvName:
+    Type: String
+    AllowedValues: [dev, prod]
+    Description: Explicit target; install a separate bootstrap in each environment account.
+
+Resources:
+  ReadPermissionsBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName:
+        Fn::Sub: blue-semantic-cards-${EnvName}-read-boundary
+      Description: Maximum permissions of the semantic-card reader, including resource-policy grants.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ListTargetBucket
+            Effect: Allow
+            Action: s3:ListBucket
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}
+          - Sid: ReadJsonCards
+            Effect: Allow
+            Action: s3:GetObject
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}/*.json
+          # Explicit denies also constrain a resource policy granting a role session.
+          - Sid: DenyOtherActions
+            Effect: Deny
+            NotAction: [s3:ListBucket, s3:GetObject]
+            Resource: '*'
+          - Sid: DenyOtherResources
+            Effect: Deny
+            Action: '*'
+            NotResource:
+              - Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}
+              - Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}/*.json
+
+  PublishPermissionsBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName:
+        Fn::Sub: blue-semantic-cards-${EnvName}-publish-boundary
+      Description: Maximum permissions of the semantic-card publisher; no deletion or IAM access.
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: ListTargetBucket
+            Effect: Allow
+            Action: s3:ListBucket
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}
+          - Sid: ReadAndPublishJsonCards
+            Effect: Allow
+            Action: [s3:GetObject, s3:PutObject]
+            Resource:
+              Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}/*.json
+          - Sid: DenyOtherActions
+            Effect: Deny
+            NotAction: [s3:ListBucket, s3:GetObject, s3:PutObject]
+            Resource: '*'
+          - Sid: DenyOtherResources
+            Effect: Deny
+            Action: '*'
+            NotResource:
+              - Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}
+              - Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}/*.json
+
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: blue-semantic-cards-${EnvName}-cloudformation
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ManageSemanticCardInfrastructure
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ConfigureOnlyTargetBucket
+                Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:GetBucketLocation
+                  - s3:ListBucket
+                  - s3:GetBucketVersioning
+                  - s3:PutBucketVersioning
+                  - s3:GetEncryptionConfiguration
+                  - s3:PutEncryptionConfiguration
+                  - s3:GetBucketOwnershipControls
+                  - s3:PutBucketOwnershipControls
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:GetBucketPolicy
+                  - s3:PutBucketPolicy
+                  - s3:DeleteBucketPolicy
+                  - s3:GetBucketTagging
+                  - s3:PutBucketTagging
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:s3:::blue-semantic-cards-${EnvName}
+              - Sid: WriteReaderPoliciesOnlyWithReaderBoundary
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/blue-semantic-cards-${EnvName}-read
+                Condition:
+                  ArnEquals:
+                    iam:PermissionsBoundary:
+                      Ref: ReadPermissionsBoundary
+              - Sid: WritePublisherPoliciesOnlyWithPublisherBoundary
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePermissionsBoundary
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/blue-semantic-cards-${EnvName}-publish
+                Condition:
+                  ArnEquals:
+                    iam:PermissionsBoundary:
+                      Ref: PublishPermissionsBoundary
+              - Sid: ReadAndMaintainOnlyApplicationRoles
+                Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:GetRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRoleTags
+                  - iam:UpdateRole
+                  - iam:UpdateRoleDescription
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:DeleteRole
+                Resource:
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/blue-semantic-cards-${EnvName}-read
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/blue-semantic-cards-${EnvName}-publish
+              - Sid: NeverRemoveApplicationBoundaries
+                Effect: Deny
+                Action: iam:DeleteRolePermissionsBoundary
+                Resource:
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/blue-semantic-cards-${EnvName}-read
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/blue-semantic-cards-${EnvName}-publish
+
+  GitHubDeploymentRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::Sub: blue-semantic-cards-${EnvName}-github-deploy
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated:
+                Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: repo:bluecontract@93829250/blue-packages@1391542341:ref:refs/heads/main
+      Policies:
+        - PolicyName: DeployOnlySemanticCardStack
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadTargetStackForDeploy
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:DescribeStackEvents
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/blue-semantic-cards-${EnvName}/*
+              - Sid: CreateTargetChangeSetUsingExecutionRole
+                Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/blue-semantic-cards-${EnvName}/*
+                Condition:
+                  ArnEquals:
+                    cloudformation:RoleArn:
+                      Fn::GetAtt: [CloudFormationExecutionRole, Arn]
+                  StringLike:
+                    cloudformation:ChangeSetName: awscli-cloudformation-package-deploy-*
+              # These APIs authorize the stack ARN, not a changeSet ARN. The CLI
+              # passes a generated change-set ARN after CreateChangeSet succeeds.
+              # RoleArn is not supported by Describe/Execute/DeleteChangeSet.
+              - Sid: UseOnlyTargetCliChangeSets
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/blue-semantic-cards-${EnvName}/*
+                Condition:
+                  StringLike:
+                    cloudformation:ChangeSetName:
+                      - awscli-cloudformation-package-deploy-*
+                      - Fn::Sub: arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:changeSet/awscli-cloudformation-package-deploy-*/*
+              - Sid: TagOnlyTargetStack
+                Effect: Allow
+                Action: [cloudformation:TagResource, cloudformation:UntagResource]
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/blue-semantic-cards-${EnvName}/*
+              - Sid: PassOnlyExecutionRoleToCloudFormation
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  Fn::GetAtt: [CloudFormationExecutionRole, Arn]
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: cloudformation.amazonaws.com
+
+Outputs:
+  DeploymentRoleArn:
+    Value:
+      Fn::GetAtt: [GitHubDeploymentRole, Arn]
+  CloudFormationExecutionRoleArn:
+    Value:
+      Fn::GetAtt: [CloudFormationExecutionRole, Arn]
+  ReadRolePermissionsBoundaryArn:
+    Value:
+      Ref: ReadPermissionsBoundary
+  PublishRolePermissionsBoundaryArn:
+    Value:
+      Ref: PublishPermissionsBoundary
