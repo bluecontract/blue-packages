@@ -269,6 +269,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $var: p
               roster:
                 $var: roster
               runtimeDefinition:
@@ -304,7 +306,6 @@ functions:
                       $call:
                         function: requestPartyAddition
                         args: {}
-                # A separate Compute sees the installed access documents and request.
                 - type: Activation/Refresh Activation
             activationInitializedRefresh:
               kind: handler
@@ -375,15 +376,18 @@ functions:
         name: contributions
         expr:
           $objectSet:
-            object: {$var: contributions}
+            object:
+              $var: contributions
             key: embedded
             val:
               kind: embedding
               contract:
                 $merge:
                 - type: Contracts/Process Embedded
-                - paths: {$var: paths}
-                  collectionPaths: [/partyAccess]
+                - paths:
+                    $var: paths
+                  collectionPaths:
+                  - /partyAccess
     - $let:
         name: index
         expr: 0
@@ -638,7 +642,9 @@ functions:
                             path: /$call/function
                             op: set
                             val:
-                              $var: operation
+                              $concat:
+                              - $var: operation
+                              - Public
                 - $let:
                     name: operationContract
                     expr:
@@ -652,6 +658,47 @@ functions:
                           $var: role
                         steps:
                         - $var: step
+                      - $get:
+                          object:
+                            $literal:
+                              proposeChanges:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: proposeChangesPublic
+                                  argument: input
+                              proposeAndActivate:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: proposeAndActivatePublic
+                                  argument: input
+                              activate:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: activatePublic
+                                  argument: input
+                              withdrawProposal:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: withdrawProposalPublic
+                                  argument: input
+                              rejectProposal:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: rejectProposalPublic
+                                  argument: input
+                              withdrawAcceptance:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: withdrawAcceptancePublic
+                                  argument: input
+                          key:
+                            $var: operation
                 - $set:
                     name: contributions
                     expr:
@@ -695,9 +742,11 @@ functions:
                       - $eq:
                         - $binding: dispatch/kind
                         - TRIGGERED
-                      - $eq:
-                        - $binding: dispatch/channel
-                        - activationInitialized
+                      - $includes:
+                          list:
+                          - activationInitialized
+                          val:
+                            $binding: dispatch/channel
                     - $and:
                       - $eq:
                         - $binding: dispatch/kind
@@ -732,11 +781,20 @@ functions:
               - $if:
                   cond:
                     $and:
-                    - {$eq: [{$binding: dispatch/kind}, EXTERNAL]}
-                    - {$exists: {$pointerGet: {object: {$var: s}, path: /channelsAdmittedAfter}}}
+                    - $eq:
+                      - $binding: dispatch/kind
+                      - EXTERNAL
+                    - $exists:
+                        $pointerGet:
+                          object:
+                            $var: s
+                          path: /channelsAdmittedAfter
                     - $lte:
-                      - {$binding: timestamp}
-                      - {$pointerGet: {object: {$var: s}, path: /channelsAdmittedAfter}}
+                      - $binding: timestamp
+                      - $pointerGet:
+                          object:
+                            $var: s
+                          path: /channelsAdmittedAfter
                   then:
                   - $return:
                       allowed: false
@@ -744,7 +802,11 @@ functions:
               - $if:
                   cond:
                     $ne:
-                    - {$pointerGet: {object: {$var: s}, path: /accessReady, default: false}}
+                    - $pointerGet:
+                        object:
+                          $var: s
+                        path: /accessReady
+                        default: false
                     - true
                   then:
                   - $return:

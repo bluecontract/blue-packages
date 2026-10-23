@@ -1,4 +1,3 @@
-# Executable preparation candidate. Participant transports are supplied at bootstrap.
 name: Deposit and final balance are separate obligations
 type: Agreements/Agreement with Clauses
 x: 0
@@ -36,6 +35,8 @@ clauses:
         setReady:
           'on': workflow
           party: customer
+          request:
+            description: Set the configured ready state. No request fields are required.
   deposit:
     type: Attachments/Payment Preparation Clause
     parameters:
@@ -63,15 +64,37 @@ clauses:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
         requestAuthorize:
           authorize:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
       obtain: create
       suppliedBy: customer
     bindings:
@@ -81,10 +104,26 @@ clauses:
         prepareDeposit:
           'on': workflow
           party: customer
+          request:
+            type: Attachments/Attachment Preparation Input
+            requestId:
+              type: Text
+              schema:
+                minLength: 1
+              description: User-provided unique request key. Must satisfy configured party-key syntax.
+          params:
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
       resume:
         resumeDeposit:
           'on': workflow
           party: customer
+          request:
+            description: Resume preparation from its current document state; no request fields are required.
   balance:
     type: Attachments/Payment Preparation Clause
     parameters:
@@ -112,15 +151,37 @@ clauses:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
         requestAuthorize:
           authorize:
             'on': workflow
             party: customer
             params:
-              $object:
-                $var: trigger
+              $pointerSet:
+                object:
+                  $object:
+                    $var: trigger
+                path: /type
+                op: remove
+            request:
+              type: PaymentInstruction/Payment Request Input
+              description: Input for this configured financial request. Amount may be supplied by the
+                configured action defaults.
+              requestId:
+                type: Text
+                description: Unique identifier for this requested financial action.
       obtain: create
       suppliedBy: customer
     bindings:
@@ -130,7 +191,23 @@ clauses:
         prepareBalance:
           'on': workflow
           party: customer
+          request:
+            type: Attachments/Attachment Preparation Input
+            requestId:
+              type: Text
+              schema:
+                minLength: 1
+              description: User-provided unique request key. Must satisfy configured party-key syntax.
+          params:
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
       resume:
         resumeBalance:
           'on': workflow
           party: customer
+          request:
+            description: Resume preparation from its current document state; no request fields are required.

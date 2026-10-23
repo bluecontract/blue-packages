@@ -6,5 +6,5 @@ java_cmd=java
 javac_cmd=javac
 if [[ -n "${JAVA_HOME:-}" ]]; then java_cmd="$JAVA_HOME/bin/java"; javac_cmd="$JAVA_HOME/bin/javac"; fi
 mkdir -p "$root/build/payment-family-classes"
-"$javac_cmd" -cp "$BLUE_JAVA_CLASSPATH" -d "$root/build/payment-family-classes" "$root/tools/BuildPaymentFamily.java"
+"$javac_cmd" -cp "$BLUE_JAVA_CLASSPATH" -d "$root/build/payment-family-classes" "$root/tools/OperationInputs.java" "$root/tools/BuildPaymentFamily.java"
 exec "$java_cmd" -Xmx1500m -cp "$root/build/payment-family-classes:$BLUE_JAVA_CLASSPATH" BuildPaymentFamily "$root" "$@"

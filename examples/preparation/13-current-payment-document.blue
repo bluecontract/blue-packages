@@ -1,0 +1,97 @@
+name: Prepare a current independent Payment Instruction
+type: Agreements/Agreement with Clauses
+x: 0
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+        guarantor:
+          type: Parties/Party
+          displayName: Payment institution
+      required: []
+      allowNewParties: true
+  status:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        setReady:
+          do:
+          - $appendChange:
+              op: replace
+              path: /x
+              val: 1
+    bindings:
+      setReady:
+        setReady:
+          'on': workflow
+          party: customer
+          request:
+            description: Set the configured ready state. No request fields are required.
+  instruction:
+    type: Payment/Payment Clause
+    parameters:
+      obtain: create
+      suppliedBy: customer
+      template:
+        name: Payment Instruction
+        type: PaymentInstruction/Payment Instruction with Clauses
+        clauses:
+          activation:
+            type: Activation/Activation Clause
+            parameters:
+              parties:
+                customer:
+                  type: Parties/Party
+                  displayName: Customer
+                seller:
+                  type: Parties/Party
+                  displayName: Merchant
+                reviewer:
+                  type: Parties/Party
+                  displayName: Reviewer
+                guarantor:
+                  type: Parties/Party
+                  displayName: Payment institution
+              required: []
+              allowNewParties: true
+        sources: {}
+        paymentTerms:
+          currency: EUR
+          amountMinor: 200
+          limitMinor: 200
+          payerChannel: customer
+          payeeChannel: seller
+          guarantorChannel: guarantor
+          allowedPayees:
+          - seller
+          recipientApprovalRequired: false
+    bindings:
+      instruction: /instruction
+      prepare:
+        preparePayment:
+          'on': workflow
+          party: customer
+          request:
+            description: Prepare this singleton payment from explicitly configured fields and values.
+              This binding maps no request fields.
+      resume:
+        resumePayment:
+          'on': workflow
+          party: customer
+          request:
+            description: Resume the existing payment preparation. No request fields are required.
+      parties:
+        customer: customer
+        seller: seller
+        reviewer: reviewer
+        guarantor: guarantor

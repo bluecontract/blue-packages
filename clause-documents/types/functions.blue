@@ -651,8 +651,6 @@ functions:
         name: identity
         expr:
           $nodeBlueId:
-          # The native marker is sealed after initialization handlers finish.
-          # Clauses retain the same native lifecycle origin for startup factories.
           - $nodeBlueId:
               $choose:
                 cond:
@@ -925,9 +923,16 @@ functions:
                   - bindSource_
                   - $var: role
                 val:
-                  'on': workflow
-                  party:
-                    $var: role
+                  $merge:
+                  - 'on': workflow
+                    party:
+                      $var: role
+                  - $literal:
+                      $blue:requestFrom:
+                        definition:
+                          type: Documents/Source Functions
+                        function: bindSourcePublic
+                        argument: input
         key: role
     - $let:
         name: result
@@ -1000,9 +1005,16 @@ functions:
                   - registerAccess_
                   - $var: role
                 val:
-                  'on': workflow
-                  party:
-                    $var: role
+                  $merge:
+                  - 'on': workflow
+                    party:
+                      $var: role
+                  - $literal:
+                      $blue:requestFrom:
+                        definition:
+                          type: Documents/Document Access Functions
+                        function: registerDocumentAccessPublic
+                        argument: input
         key: role
     - $return:
         $pointerSet:
