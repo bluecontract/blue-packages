@@ -29,7 +29,7 @@ CASES = {
     'providers': ('ProviderInputConformance', 'all'),
     'actions': ('ActionInputConformance',),
     **{'documents-' + mode: ('DocumentInputConformance', mode)
-       for mode in ('source', 'inputs', 'consent', 'access', 'reference', 'representation', 'connection', 'preparation', 'accessGuards', 'paymentPreparation')},
+       for mode in ('source', 'inputs', 'consent', 'access', 'reference', 'representation', 'connection', 'preparation', 'accessGuards', 'paymentPreparation', 'attachmentValues', 'documentPreparationFields', 'documentPreparationValues')},
     'configured-actions': ('blue.core.CurrentOperationScenarios', '07', '15', '16', '18', '20', '25'),
 }
 

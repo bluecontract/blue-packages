@@ -266,7 +266,111 @@ public final class DocumentInputConformance {
       System.out.println("PASS native admission consent effect");
     }
   }
+  @SuppressWarnings("unchecked")
+  static void attachmentValues(Path root)throws Exception {
+    var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    for(String configuration:List.of("task","description-mapped","description-unmapped"))
+      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+        var processor=runtime.processor(packages.language());var values=processor.execution().values();
+        var source=(Map<String,Object>)CompositionPackages.yaml(root.resolve("examples/attachments/02-card-parent-state.blue"));
+        var parameters=(Map<String,Object>)((Map<String,Object>)((Map<String,Object>)source.get("clauses")).get("instruction")).get("parameters");
+        var paths=m("task","/terms/task");
+        if(configuration.equals("description-mapped"))paths.put("description","/terms/description");
+        parameters.put("fieldPaths",paths);((Map<String,Object>)parameters.get("template")).put("terms",m("task","initial"));
+        var wire=blue.core.ClauseAppsExamples.class.getDeclaredMethod("wire",Object.class);wire.setAccessible(true);wire.invoke(null,source);
+        var initial=processor.initialize(source);require(initial.status().equals("APPLIED"),"Attachment initialization: "+initial.observations());
+        String preparedId=null;
+        for(String mode:configuration.equals("task")?List.of("direct","inherited","reference","omitted"):List.of("direct")) {
+          var request=m("type","Attachments/Attachment Preparation Input","authorityParty",processor.read(initial.document(),"/activation/parties/guarantor"));
+          if(!mode.equals("omitted"))request.put("values",m("task","Sprawdź przesyłkę"));
+          if(configuration.startsWith("description"))((Map<String,Object>)request.get("values")).put("description","Customer description");
+          Object input=request;
+          if(mode.equals("inherited"))input=m("type",m("blueId",NativeRuntime.identity(values.source(request,"definition"))));
+          if(mode.equals("reference"))input=m("blueId",NativeRuntime.identity(values.source(request)));
+          String before=WireData.write(input);
+          var declaration=processor.execution().declarations(new Exact.Ref(initial.document().blueId())).get("prepare_instruction");
+          require(values.matches(values.source(input),values.source(declaration.get("request"),"definition")),"Native attachment matcher accepts "+mode);
+          var event=OperationCatalogConformance.event(initial.document(),"seller","prepare_instruction",input);
+          var result=processor.process(initial.document(),event,100);
+          if(configuration.equals("description-unmapped")) {
+            require(!result.commits(),"Unmapped business description must be rejected");
+            require(initial.document().identity().equals(result.document().identity())&&processor.emitted(result).isEmpty(),"Rejected attachment leaves state and effects unchanged");
+            boolean rejected=false;
+            try{ClauseGasProbe.diagnose(processor,initial.document(),event,100);}catch(BexError failure){rejected=failure.toString().contains("PREPARATION_UNKNOWN_FIELD");if(!rejected)throw failure;}
+            require(rejected,"Unmapped description reaches configured field guard");
+          } else {
+            if(!result.status().equals("APPLIED"))ClauseGasProbe.diagnose(processor,initial.document(),event,100);
+            require(result.status().equals("APPLIED"),"Attachment actual preparation effect: "+mode);
+            require((mode.equals("omitted")?"initial":"Sprawdź przesyłkę").equals(processor.read(result.document(),"/instructionRequest/document/terms/task")),"Exact prepared business value: "+mode);
+            require("waiting".equals(processor.read(result.document(),"/attachmentState_instruction/status")),"Attachment waiting state");
+            String id=processor.read(result.document(),"/instructionRequest/documentBlueId").toString();
+            var prepared=values.select(new Exact.Ref(result.document().blueId()),"/instructionRequest/document");
+            require(id.equals(NativeRuntime.identity(values.exact(prepared))),"Prepared exact publication reference");
+            if(configuration.equals("task")&&!mode.equals("omitted")){if(preparedId==null)preparedId=id;else require(preparedId.equals(id),"Equivalent inputs prepare the same exact source");}
+            if(configuration.equals("description-mapped"))require("Customer description".equals(processor.read(result.document(),"/instructionRequest/document/terms/description")),"Legitimate mapped description business value is retained");
+          }
+          require(before.equals(WireData.write(input)),"Attachment request unchanged: "+mode);
+          System.out.println("PASS actual attachment values "+configuration+" "+mode);
+        }
+      }
+  }
+  @SuppressWarnings("unchecked")
+  static void documentPreparationValues(Path root,String field)throws Exception {
+    var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    for(String configuration:List.of("configured","description-mapped","description-unmapped"))
+      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+        var processor=runtime.processor(packages.language());var values=processor.execution().values();
+        var channel=m("type","Contracts/External Channel","event",m("source","owner"));
+        var activation=m("type","Activation/Activation Clause","parameters",m("parties",m("owner",m("type","Parties/Party","readerKeys",List.of("reader-owner"),"lead",m("channel",channel))),"required",List.of()));
+        var terms=m("task",field.equals("values")?m("type","Text"):"initial");
+        if(field.equals("values")&&configuration.equals("description-mapped"))terms.put("customerDescription",m("type","Text"));
+        var template=m("name","Prepared work","type","DocumentsDomain/Document with Clauses","clauses",m("activation",activation),"title","initial","terms",terms);
+        var allowed=new ArrayList<>(List.of("title"));var paths=m("task","/terms/task");
+        if(configuration.equals("description-mapped")){allowed.add("description");paths.put("description","/terms/customerDescription");}
+        var mapping=m("$pointerSet",m("object",m("$var","trigger"),"path","/type","op","remove"));
+        var work=m("type","Documents/Document Clause","parameters",m("obtain","create","suppliedBy","owner","template",template,"allowedFields",allowed,"fieldPaths",paths),"bindings",m("parties",m("owner","owner"),"document","/work","prepare",m("prepareWork",m("on","workflow","party","owner","request",m("type","Documents/Preparation Input"),"params",mapping))));
+        var source=m("name","Document preparation input regression","type","Agreements/Agreement with Clauses","contracts",m("owner",channel),"clauses",m("activation",activation,"work",work));
+        var initial=processor.initialize(source);require(initial.status().equals("APPLIED"),"Documents fixture initialization: "+initial.observations());
+        String preparedId=null;
+        for(String mode:configuration.equals("configured")?List.of("direct","inherited","reference","omitted"):List.of("direct")) {
+          var request=m("type","Documents/Preparation Input");
+          if(!mode.equals("omitted"))request.put(field,m(field.equals("fields")?"title":"task","Customer work"));
+          if(configuration.startsWith("description"))((Map<String,Object>)request.get(field)).put("description","Customer description");
+          Object input=request;
+          if(mode.equals("inherited"))input=m("type",m("blueId",NativeRuntime.identity(values.source(request,"definition"))));
+          if(mode.equals("reference"))input=m("blueId",NativeRuntime.identity(values.source(request)));
+          String before=WireData.write(input);
+          var declaration=processor.execution().declarations(new Exact.Ref(initial.document().blueId())).get("prepareWork");
+          require(values.matches(values.source(input),values.source(declaration.get("request"),"definition")),"Native Documents matcher accepts "+field+" "+mode);
+          var event=OperationCatalogConformance.event(initial.document(),"owner","prepareWork",input);
+          var result=processor.process(initial.document(),event,100);
+          if(configuration.equals("description-unmapped")) {
+            require(!result.commits(),"Unmapped Documents description must be rejected: "+field);
+            require(initial.document().identity().equals(result.document().identity())&&processor.emitted(result).isEmpty(),"Rejected Documents input leaves state and effects unchanged");
+            boolean rejected=false;String expected=field.equals("fields")?"Field not allowed by document factory":"PREPARATION_UNKNOWN_VALUE";
+            try{ClauseGasProbe.diagnose(processor,initial.document(),event,100);}catch(BexError failure){rejected=failure.toString().contains(expected);if(!rejected)throw failure;}
+            require(rejected,"Unmapped Documents description reaches configured guard: "+field);
+          } else {
+            if(!result.status().equals("APPLIED"))ClauseGasProbe.diagnose(processor,initial.document(),event,100);
+            require(result.status().equals("APPLIED"),"Actual Documents preparation accepts configured "+field+" "+mode);
+            var entries=(Map<?,?>)processor.read(result.document(),"/process_work/entries");var entry=(Map<?,?>)entries.values().iterator().next();
+            String path=entry.get("itemPath")+"/prepared";
+            String valuePath=path+(field.equals("fields")?"/title":"/terms/task");
+            if(mode.equals("omitted")&&field.equals("values")) {
+              var slot=values.select(new Exact.Ref(result.document().blueId()),valuePath);
+              require(NativeRuntime.identity(values.exact(slot)).equals(NativeRuntime.identity(values.source(m("type","Text"),"definition"))),"Omitted Documents values retain the exact unfilled Text slot");
+            } else require((mode.equals("omitted")?"initial":"Customer work").equals(processor.read(result.document(),valuePath)),"Exact prepared Documents "+field+" business value: "+mode);
+            var prepared=values.select(new Exact.Ref(result.document().blueId()),path);String id=NativeRuntime.identity(values.exact(prepared));
+            require(id.equals(entry.get("requirementRef")),"Documents exact prepared requirement reference");
+            if(configuration.equals("configured")&&!mode.equals("omitted")){if(preparedId==null)preparedId=id;else require(preparedId.equals(id),"Equivalent Documents inputs prepare the same exact source");}
+            if(configuration.equals("description-mapped"))require("Customer description".equals(processor.read(result.document(),path+(field.equals("fields")?"/description":"/terms/customerDescription"))),"Legitimate Documents description business value is retained: "+field);
+          }
+          require(before.equals(WireData.write(input)),"Documents request unchanged: "+field+" "+mode);
+          System.out.println("PASS actual Documents preparation "+field+" "+configuration+" "+mode);
+        }
+      }
+  }
   public static void main(String[] args)throws Exception {
-    if(args.length>1&&args[1].equals("paymentPreparation"))paymentPreparation(Path.of(args[0]));else if(args.length>1&&args[1].equals("accessGuards"))accessGuards(Path.of(args[0]));else if(args.length>1&&args[1].equals("preparation"))preparationEffect(Path.of(args[0]));else if(args.length>1&&args[1].equals("representation"))nativeLists();else if(args.length>1&&args[1].equals("reference"))referenceExecutor(Path.of(args[0]));else if(args.length>1&&args[1].equals("consent"))consentEffect(Path.of(args[0]));else if(args.length>1&&args[1].equals("source"))sourceInputs(Path.of(args[0]));else if(args.length>1&&args[1].equals("inputs"))inputs(Path.of(args[0]));else if(args.length>1&&args[1].equals("access"))accessLibrary(Path.of(args[0]));else connectionRequests(Path.of(args[0]));
+    if(args.length>1&&args[1].equals("attachmentValues"))attachmentValues(Path.of(args[0]));else if(args.length>1&&args[1].equals("documentPreparationValues"))documentPreparationValues(Path.of(args[0]),"values");else if(args.length>1&&args[1].equals("documentPreparationFields"))documentPreparationValues(Path.of(args[0]),"fields");else if(args.length>1&&args[1].equals("paymentPreparation"))paymentPreparation(Path.of(args[0]));else if(args.length>1&&args[1].equals("accessGuards"))accessGuards(Path.of(args[0]));else if(args.length>1&&args[1].equals("preparation"))preparationEffect(Path.of(args[0]));else if(args.length>1&&args[1].equals("representation"))nativeLists();else if(args.length>1&&args[1].equals("reference"))referenceExecutor(Path.of(args[0]));else if(args.length>1&&args[1].equals("consent"))consentEffect(Path.of(args[0]));else if(args.length>1&&args[1].equals("source"))sourceInputs(Path.of(args[0]));else if(args.length>1&&args[1].equals("inputs"))inputs(Path.of(args[0]));else if(args.length>1&&args[1].equals("access"))accessLibrary(Path.of(args[0]));else connectionRequests(Path.of(args[0]));
   }
 }
