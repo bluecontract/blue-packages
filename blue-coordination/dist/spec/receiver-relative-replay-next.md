@@ -266,11 +266,7 @@ just because a DFS has encountered it before.
   only after every member's exact compatible pre-view and external prerequisites
   are established. Select the canonical representative and publish the complete
   atomic owner set. This resolves simultaneous live computation, not absent past.
-- A same-bound proof cycle with no established pre-view is not evidence that any
-  member exists or is ready. If it is only waiting for an external predecessor,
-  keep that concrete wait. If closed immutable lifecycle evidence proves mutually
-  dependent creation with no legal predecessor/initialization, reject that
-  inconsistent history with `INVALID_CAUSAL_HISTORY`; do not manufacture a member or spin until success. This error requires a closed proof of contradiction, not merely an unresolved SCC or unavailable predecessor.
+- A same-bound proof cycle with no established pre-view is not evidence that any member exists or is ready. Retain the concrete resource/history wait until genuine prerequisites establish every required pre-view. Reject malformed lifecycle records through their applicable native validation rules. This edition specifies no closed-contradiction witness for impossible-before-initialization cycles; do not infer one from an unresolved SCC, missing predecessor or repeated worklist key. Never manufacture a member or return success because a dependency was visited before.
 
 No arbitrary new iteration ceiling is part of this rule. Native deterministic
 work/gas limits still apply to actual execution. The implementation must retain a
@@ -366,18 +362,13 @@ expected outcomes. Missing/cached variants use identical admitted logical input.
 | Decreasing history | A@30 -> B@20 -> A@10 with established K5 prefix: resolves, including after cold reopen. |
 | Live SCC | Two established mutually embedded members: coherent component result and atomic publication, no recursion shortcut. |
 | Missing cycle predecessor | Same-bound dependency component with one missing external predecessor: durable wait and automatic resume after exact evidence. |
-| Invalid birth cycle | Closed lifecycle evidence requires each of two unestablished members to precede the other's initialization: `INVALID_CAUSAL_HISTORY`, no invented stable member. |
-| Unproven birth cycle | Same apparent cycle but missing one lifecycle predecessor/witness: WAIT, never `INVALID_CAUSAL_HISTORY`; adding the witness may prove consistency or contradiction. |
+| Malformed initialization receipt | An INITIALIZE Processing Receipt carrying an event, sourceReceipts or attachment is rejected as `INVALID_RECEIPT_KIND` by normal receipt validation. No local completion, initialized member or stable result is established from that claimed receipt. |
+| Unestablished dependency component | A repeated same-bound dependency component without every required established pre-view remains WAIT. Missing lifecycle history or a predecessor is not proof of contradiction. Supplying genuine missing evidence resumes the same obligations; if complete compatible pre-views become established, use normal source processing or the existing live-component algorithm. No invented initialization, stable member or recursion-success shortcut. |
 | Full acceptance | Real original raw Order, separate Seller/Partner/Customer stores, Seller Agent exact-original mandate, second operation and cold reopen: full state/BlueId equality and no private Agreement acquisition. |
 
 ## 7. Publication gates and source anchors
 
-This draft selects exact mismatch-at-PRE semantics rather than claiming universal
-foreign-target detection. Implementation must expose path-scoped operation and
-observer outcomes or prove its existing admission representation can express
-section 2 without suppressing observers. The immutable inconsistent lifecycle diagnostic is `INVALID_CAUSAL_HISTORY`;
-a missing witness must remain WAIT. This distinction is mandatory even when a
-worklist encounters the same unresolved key repeatedly.
+This draft selects exact mismatch-at-PRE semantics rather than claiming universal foreign-target detection. Implementation must expose path-scoped operation and observer outcomes or prove its existing admission representation can express section 2 without suppressing observers. Malformed lifecycle evidence is rejected by its applicable native validation rule; an INITIALIZE Processing Receipt with an event, sourceReceipts or attachment is `INVALID_RECEIPT_KIND`. Missing lifecycle evidence, missing prefixes and unresolved dependency components remain WAIT, including when a worklist encounters the same unresolved key repeatedly. This edition does not define a separate `INVALID_CAUSAL_HISTORY` result for impossible creation cycles: no accepted closed-contradiction witness is specified. Neither absence nor repetition establishes a contradiction, a completion or readiness.
 
 Required design checks before reference implementation: bounded child-only
 catch-up/receiving without parent reseeding; initialized child equality without

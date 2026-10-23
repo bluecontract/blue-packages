@@ -84,16 +84,15 @@ class HistoryPremise:
     dependencies: tuple = ()  # (HistoryKey, exact expected source version)
     prefix_complete: bool = True
     pre_view_established: bool = True
-    closed_impossible_creation: bool = False
 
 
 def settle_dependencies(root, facts):
     """§4 worklist over authenticated immutable local-journal premises.
 
-    Authentication and derivation of `closed_impossible_creation` are NOT done
-    here. A missing witness is always WAIT; the flag may only summarize a closed
-    lifecycle contradiction proved by the actual verifier. COMPONENT_READY is
-    permission to run the existing component algorithm, never its result.
+    Premises summarize verified histories; they do not authenticate evidence.
+    Missing witnesses and unestablished pre-views remain WAIT. Malformed native
+    receipts are rejected by their validator before becoming premises here.
+    COMPONENT_READY permits the existing component algorithm, never its result.
     """
     from types import SimpleNamespace
     from blue_contracts.reference.graph import components
@@ -120,8 +119,6 @@ def settle_dependencies(root, facts):
     for group in components(checked, edges):
         cyclic = len(group) > 1 or any(edge.source == group[0] == edge.target for edge in edges)
         if cyclic:
-            if all(checked[key].closed_impossible_creation for key in group) and not any(checked[key].pre_view_established for key in group):
-                return {'status': 'INVALID_CAUSAL_HISTORY', 'obligations': group}
             if not all(checked[key].pre_view_established for key in group):
                 return {'status': 'WAIT', 'obligations': group}
             return {'status': 'COMPONENT_READY', 'obligations': group}

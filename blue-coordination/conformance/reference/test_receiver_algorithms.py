@@ -59,9 +59,6 @@ class DependencyTests(unittest.TestCase):
         facts = {a: P('a', ((b, 'b'),), pre_view_established=False),
                  b: P('b', ((a, 'a'),), pre_view_established=False)}
         self.assertEqual(settle_dependencies(a, facts)['status'], 'WAIT')
-        proved = {a: P('a', ((b, 'b'),), pre_view_established=False, closed_impossible_creation=True),
-                  b: P('b', ((a, 'a'),), pre_view_established=False, closed_impossible_creation=True)}
-        self.assertEqual(settle_dependencies(a, proved)['status'], 'INVALID_CAUSAL_HISTORY')
         live = {a: P('a', ((b, 'b'),)), b: P('b', ((a, 'a'),))}
         self.assertEqual(settle_dependencies(a, live)['status'], 'COMPONENT_READY')
         conflicting = {a: P('a', ((b, 'b'),)), b: P('b', ((a, 'wrong-version'),))}

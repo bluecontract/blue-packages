@@ -10,8 +10,8 @@ The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,00
 
 The current source candidate includes Contracts `1.0.0-demand-scoped.3`
 (`Cj2SnbMNz9VkQg9Dc7hzEoy7GdBUYqTfzh1XCKu5ANSr`) and Coordination
-`0.3.0-receiver-relative.7`
-(`JAw1DrMJHg78MBBZ9bm7CAcpWKS4pDeyznbiegTDDitD`). `PACKAGES.json`
+`0.3.0-receiver-relative.8`
+(`5NC7oK5Qi6RcxhtBgZsh6AtiJroVopKmCmx7iBc6offt`). `PACKAGES.json`
 is the authoritative dependency/archive inventory. These are new identities;
 prior immutable publications remain unchanged. Native package construction and
 archive/dependency integrity passed; final host integration and whole-edition
