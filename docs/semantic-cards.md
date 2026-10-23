@@ -181,6 +181,12 @@ document semantics remain in their existing account scope.
 
 ## Enable automation
 
+For scoped infrastructure creation and updates from GitHub, see
+[Semantic card infrastructure deployment](semantic-infrastructure.md). It adds
+separate DEV/PROD deployment roles and a manual workflow around this same template.
+The following steps remain the administrator-driven setup for the card pipeline;
+deploying infrastructure does not itself enable generation or switch its target.
+
 `semantics/template.yaml` defines the bucket as `blue-semantic-cards-${EnvName}`.
 It enables versioning, encryption and private access, requires HTTPS, and retains
 the bucket when deleting or replacing the stack. It also creates separate GitHub
