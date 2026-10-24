@@ -22,9 +22,9 @@ public final class SourceBindingConformance {
   }
   public static void main(String[] args)throws Exception {
     var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.demandScopedEdition().withDefinitionReadV1())) {
       var p=runtime.processor(blue);var values=p.execution().values();
-      var original=p.initialize(agreement("Existing independent source"));require(original.status().equals("APPLIED"),"Source init");
+      var original=p.initialize(agreement("Existing independent source"));require(original.status().equals("APPLIED"),"Source init: "+OperationInputConformance.initializationDiagnostic(p,original));
       var source=p.process(original.document(),event(original.document(),"approve_owner",m("revision",p.read(original.document(),"/activation/revision"))),1);
       require(Boolean.TRUE.equals(p.read(source.document(),"/activation/active")),"Source active");
       p.execution().chooseHistory(source.document().blueId(),p.execution().snapshot(source.document()));

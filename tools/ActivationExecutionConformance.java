@@ -16,9 +16,9 @@ public final class ActivationExecutionConformance {
         "contracts",m("owner",channel),"clauses",m("activation",m("type","Activation/Activation Clause","parameters",m(
           "parties",m("owner",m("type","Parties/Party","lead",m("channel",channel),"readerKeys",List.of("reader-owner"))),
           "required",List.of("owner"),"negotiation",m("allowedPaths",List.of("/price"))))));
-      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      try(var runtime=new AuthoringRuntime(RuntimeBindings.demandScopedEdition().withDefinitionReadV1())) {
         var processor=runtime.processor(packages.language());var initialized=processor.initialize(source);
-        require(initialized.status().equals("APPLIED"),"Initialize "+action+": "+initialized.status());
+        require(initialized.status().equals("APPLIED"),"Initialize "+action+": "+OperationInputConformance.initializationDiagnostic(processor,initialized));
         var document=initialized.document();long time=1;
         if(action.equals("updateParty")) {
           var request=m("type","Activation/Party Update Input","replacement",m("lead",m("channel",channel),"displayName","Changed owner"));

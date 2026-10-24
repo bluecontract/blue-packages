@@ -1,0 +1,232 @@
+{
+  "format": "demand-transaction-reference/1",
+  "authorityBoundary": "Finite fixture transaction transitions only. Native Language owns exact identities and contextual validation. Native Contracts owns completion registration, original-input/units, cryptographic/capability authority and receipts. Owner labels map to actual distinct processor instances; serialized descriptors never confer authority. No general BEX interpretation or whole-runtime equivalence claimed.",
+  "referenceSourceSha256": "4e6d2b45e3c4038096dc4e0b3a8c903808f97704c44beba2f3492d23b59902f2",
+  "vectors": [
+    {
+      "id": "required-missing",
+      "input": {
+        "kind": "invocation",
+        "initial": 1,
+        "steps": [
+          {
+            "op": "add",
+            "value": 1
+          },
+          {
+            "op": "read",
+            "resource": "payload"
+          }
+        ],
+        "resourceValue": 9,
+        "available": {},
+        "sourceOwner": "local",
+        "receiverOwner": "local"
+      },
+      "expected": {
+        "status": "NEEDS_RESOURCES",
+        "value": 1,
+        "stateChanged": false,
+        "archivePublished": false,
+        "completionPublished": false,
+        "captureAllowed": false,
+        "receiveStatus": "NOT_ATTEMPTED",
+        "receiverValue": 1,
+        "receiverUnchanged": true
+      }
+    },
+    {
+      "id": "required-supplied",
+      "input": {
+        "kind": "invocation",
+        "initial": 1,
+        "steps": [
+          {
+            "op": "add",
+            "value": 1
+          },
+          {
+            "op": "read",
+            "resource": "payload"
+          }
+        ],
+        "resourceValue": 9,
+        "available": {
+          "payload": 9
+        },
+        "sourceOwner": "local",
+        "receiverOwner": "local"
+      },
+      "expected": {
+        "status": "APPLIED",
+        "value": 9,
+        "stateChanged": true,
+        "archivePublished": true,
+        "completionPublished": true,
+        "captureAllowed": true,
+        "receiveStatus": "APPLIED",
+        "receiverValue": 9,
+        "receiverUnchanged": false
+      }
+    },
+    {
+      "id": "foreign-receiver",
+      "input": {
+        "kind": "invocation",
+        "initial": 1,
+        "steps": [
+          {
+            "op": "add",
+            "value": 1
+          },
+          {
+            "op": "read",
+            "resource": "payload"
+          }
+        ],
+        "resourceValue": 9,
+        "available": {
+          "payload": 9
+        },
+        "sourceOwner": "local",
+        "receiverOwner": "foreign"
+      },
+      "expected": {
+        "status": "APPLIED",
+        "value": 9,
+        "stateChanged": true,
+        "archivePublished": true,
+        "completionPublished": true,
+        "captureAllowed": true,
+        "receiveStatus": "REJECTED",
+        "receiverValue": 1,
+        "receiverUnchanged": true
+      }
+    },
+    {
+      "id": "tightened-5-False",
+      "input": {
+        "kind": "mutation",
+        "x": 5,
+        "minimumBefore": 0,
+        "minimumAfter": 10,
+        "reference": false
+      },
+      "expected": {
+        "status": "FAILED",
+        "x": 5,
+        "y": 0,
+        "stateChanged": false
+      }
+    },
+    {
+      "id": "tightened-5-True",
+      "input": {
+        "kind": "mutation",
+        "x": 5,
+        "minimumBefore": 0,
+        "minimumAfter": 10,
+        "reference": true
+      },
+      "expected": {
+        "status": "FAILED",
+        "x": 5,
+        "y": 0,
+        "stateChanged": false
+      }
+    },
+    {
+      "id": "tightened-10-False",
+      "input": {
+        "kind": "mutation",
+        "x": 10,
+        "minimumBefore": 0,
+        "minimumAfter": 10,
+        "reference": false
+      },
+      "expected": {
+        "status": "APPLIED",
+        "x": 10,
+        "y": 1,
+        "stateChanged": true
+      }
+    },
+    {
+      "id": "tightened-10-True",
+      "input": {
+        "kind": "mutation",
+        "x": 10,
+        "minimumBefore": 0,
+        "minimumAfter": 10,
+        "reference": true
+      },
+      "expected": {
+        "status": "APPLIED",
+        "x": 10,
+        "y": 1,
+        "stateChanged": true
+      }
+    },
+    {
+      "id": "portable-contracts-deterministic-gas-4",
+      "input": {
+        "kind": "portable",
+        "initial": 3,
+        "profile": "contracts-deterministic-gas-4",
+        "unusedResourceValue": 77
+      },
+      "expected": {
+        "imported": true,
+        "contextPublished": true,
+        "archivePublished": true,
+        "completionPublished": false
+      }
+    },
+    {
+      "id": "portable-invalid-profile",
+      "input": {
+        "kind": "portable",
+        "initial": 3,
+        "profile": "invalid-profile",
+        "unusedResourceValue": 77
+      },
+      "expected": {
+        "imported": false,
+        "contextPublished": false,
+        "archivePublished": false,
+        "completionPublished": false
+      }
+    },
+    {
+      "id": "failed-candidate-preserves-latest-publication",
+      "input": {
+        "kind": "interleaved-failure",
+        "initial": 1,
+        "candidateSteps": [
+          {
+            "op": "add",
+            "value": 2
+          },
+          {
+            "op": "read",
+            "resource": "payload"
+          }
+        ],
+        "available": {},
+        "foreignInitial": 17,
+        "foreignAdd": 3,
+        "unavailableValue": 29
+      },
+      "expected": {
+        "candidateStatus": "NEEDS_RESOURCES",
+        "candidateValue": 1,
+        "foreignValue": 20,
+        "foreignRetained": true,
+        "sharedEvidenceUnchanged": true,
+        "archiveUnchanged": true,
+        "completionsUnchanged": true,
+        "candidateCaptureAllowed": false
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check pinned bytes or prepare a deterministic bundle and GitHub Release assets.
 
-Uses only the standard library. Semantic Blue validation is a separate command:
+Uses PyYAML for authored package configuration. Semantic Blue validation is a separate command:
 tools/verify_packages.py with the installed Blue Python implementation.
 """
 import argparse
@@ -54,7 +54,7 @@ def selections(root):
     return [dict(row, selection='current') for row in rows]
 
 
-def check_archive(root, row):
+def check_archive(root, row, *, retained=False):
     path = local(root, row['path'])
     data = path.read_bytes()
     require(digest(data) == row['archiveSha256'], 'Archive checksum differs: ' + row['name'])
@@ -72,7 +72,15 @@ def check_archive(root, row):
     for name, pin in manifest['files'].items():
         require(digest(files[name]) == pin['sha256'] and len(files[name]) == pin['size'],
                 'Archive member differs: ' + row['name'] + '/' + name)
-    # Every publication retains its exact unpacked distribution for source checks.
+    if retained:
+        for dependency in manifest['imports'].values():
+            require(dependency['packageBlueId'] in manifest['semanticPackages'],
+                    'Missing embedded retained dependency')
+        return dict(row, name=manifest.get('name', row['name']), version=manifest['version'],
+                    exports=manifest['exports'], imports={key: value['packageBlueId']
+                    for key, value in manifest['imports'].items()},
+                    protocolBlueId=manifest['protocol']), data
+    # Every current publication retains its exact unpacked distribution for source checks.
     unpacked = {p.relative_to(path.parent).as_posix(): p.read_bytes()
                 for p in path.parent.rglob('*') if p.is_file()}
     require(unpacked == {**files, 'package.bluepkg': data}, 'Unpacked distribution differs: ' + row['name'])
@@ -97,12 +105,61 @@ def check_archive(root, row):
                 protocolBlueId=manifest['protocol']), data
 
 
+def retained_archives(root):
+    """Validate explicitly pinned archive inputs, never active namespace mounts."""
+    source = root / 'PACKAGE-SOURCES.json'
+    pins = json.loads(source.read_text()).get('retainedArchives', []) if source.exists() else []
+    result = {}
+    identities = set()
+    for pin in pins:
+        require(set(pin) == {'path', 'packageBlueId', 'archiveSha256'}, 'Invalid retained archive pin')
+        relative = PurePosixPath(pin['path'])
+        require(not relative.is_absolute() and '\\' not in pin['path']
+                and all(part not in ('', '.', '..') for part in pin['path'].split('/')),
+                'Path outside package home: ' + pin['path'])
+        path = local(root, pin['path']).resolve()
+        require(path not in result and pin['packageBlueId'] not in identities, 'Duplicate retained archive pin')
+        row, data = check_archive(root, dict(pin, name=pin['path'], selection='retained-data'), retained=True)
+        result[path] = (row, data)
+        identities.add(pin['packageBlueId'])
+    return result
+
+
+def retained_import(root, folder, prefix, declaration, config, retained):
+    """Return an approved retained pin, rejecting execution use and pin drift."""
+    path = (folder / declaration['path']).resolve()
+    if path not in retained:
+        return None
+    require(prefix not in config.get('executionRequires', [])
+            and prefix not in config.get('protocol', {}).get('requires', {}).values(),
+            'Retained archive cannot be an execution requirement: ' + prefix)
+    row = retained[path][0]
+    for key in ('packageBlueId', 'archiveSha256'):
+        if key in declaration:
+            require(declaration[key] == row[key], 'Retained import pin differs: ' + prefix + '/' + key)
+    return row
+
+
 def check(root=ROOT):
+    import yaml
     rows, payloads = [], {}
-    for selection in selections(root):
+    current = selections(root)
+    retained = retained_archives(root)
+    selected_ids = {r['packageBlueId'] for r in current}
+    require(not selected_ids.intersection(row['packageBlueId'] for row, _ in retained.values()),
+            'Retained archive duplicates active publication')
+    for selection in current:
         row, data = check_archive(root, selection)
-        selected_ids = {r['packageBlueId'] for r in selections(root)}
-        require(set(row['imports'].values()) <= selected_ids, 'Dependency outside current catalogue: ' + row['name'])
+        folder = root / selection['directory']
+        config = yaml.safe_load((folder / 'blue-package.yaml').read_text())
+        lock = json.loads((folder / 'blue-package.lock.json').read_text())
+        for prefix, identity in row['imports'].items():
+            pin = retained_import(root, folder, prefix, lock['imports'][prefix], config, retained)
+            if identity not in selected_ids:
+                require(pin is not None and pin['packageBlueId'] == identity,
+                        'Dependency outside current catalogue: ' + row['name'])
+                source_pin = retained_import(root, folder, prefix, config['imports'][prefix], config, retained)
+                require(source_pin == pin, 'Retained source import differs: ' + prefix)
         rows.append(row)
         payloads[row['path']] = data
     indexed = {row['path'].removesuffix('/dist/package.bluepkg'): row for row in rows}
@@ -120,6 +177,9 @@ def check(root=ROOT):
             require(hashlib.sha256(path.read_bytes()).hexdigest() == expected,
                     'Source checksum differs: ' + name + '/' + relative)
             source_files += 1
+    for row, data in retained.values():
+        rows.append(row)
+        payloads[row['path']] = data
     return dict(format='blue-package-catalog/1', packages=rows,
                 scope='Pinned archive integrity; semantic verification is separate.',
                 sourceFilesChecked=source_files), payloads
