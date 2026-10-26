@@ -83,6 +83,10 @@ def main():
     assert {'python', 'java', 'myos'} <= runs.keys()
     values = {name: json.loads(path.read_text()) for name, path in runs.items()}
     expected = values['python']
+    assert expected['selection']['profile'] == 'blue-runtime/2026-10-25-ordering-1'
+    assert expected['selection']['contractsRules'] == pins['specificationBlueId']
+    assert expected['selection']['contractsPackage'] == pins['packageBlueId']
+    assert expected['selection']['gasProfile'] == pins['gas']['profile']
     for name, value in values.items():
         error = difference(expected, value)
         assert error is None, name + ': ' + str(error)
@@ -109,7 +113,7 @@ def main():
     result = {'format': 'blue-determinism-conformance/1', 'status': 'PASS',
               'scope': 'Contracts ordering-1, exact retained Language/BEX; not a cross-runtime Coordination qualification',
               'comparison': 'Recursive JSON value/type equality; list order retained; no output fields discarded',
-              'publication': pins, 'languagePackage': manifest['language'],
+              'selection': expected['selection'], 'publication': pins, 'languagePackage': manifest['language'],
               'corpusSha256': sha(corpus.read_bytes()), 'cases': len(json.loads(corpus.read_text())['cases']),
               'runs': {name: {'file': path.name, 'sha256': sha(path.read_bytes())} for name, path in runs.items()},
               'physicalChecks': ['reused runtime after unrelated operation', 'cold serialized snapshot replay',
