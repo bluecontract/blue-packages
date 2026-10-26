@@ -73,13 +73,17 @@ For the retained 10M selection, Java and the actual vendored MyOS runtime show:
 | JSON decoding and SQLite schema | Readable; no schema migration needed |
 | Snapshot verification / journal cold resume | Rejected: `INVALID_SNAPSHOT_COMMITMENT` |
 | Saved invocation capsule | Rejected: `INVALID_CAPSULE_COMMITMENT` |
-| Retained completion receipt | Rejected: `CORRUPT_LOCAL_COMPLETION` |
+| Hash of unchanged retained receipt observations | Does not match the retained receipt hash |
+| Retained completion bound to a corrected equivalent snapshot | Rejected: `CORRUPT_LOCAL_COMPLETION` |
 | ASCII control | Full outcome, receipt and cold resume unchanged |
 
 Core's actual `accessEvents()` / FINAL_GAS default was tested separately with
 the same old-write/cold-reopen/new-read sequence. It also retains the document
 BlueId and 826-gas total, and rejects the old snapshot, capsule, receipt and
-journal resume with the same errors. Its ASCII control resumes unchanged.
+journal resume with the same errors. Its unchanged retained observations also
+hash differently; no new snapshot is involved in that independent hash check.
+Its ASCII control resumes unchanged. FINAL_GAS omits gas traces, so this check
+compares its gas total without claiming trace equality.
 The full exact native package/protocol/rules set is retained in that output.
 
 These checks establish a real compatibility failure, not merely a theoretical
