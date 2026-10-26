@@ -25,6 +25,11 @@ integration for this candidate.
 
 ## Build and verify
 
+The [unpublished BEX staged-list-preview correction](blue-bex/spec/resultvalue-preview-correction.md)
+specifies MyOS Core's structural `$resultValue` list operations and incremental
+projection costs. It leaves the selected package archives, frozen specification
+and executable reference algorithms unchanged.
+
 ```sh
 # Java 21 and a qualified Blue Java runtime classpath are required.
 BLUE_JAVA_CLASSPATH=... python3 tools/build_final_gas.py all
