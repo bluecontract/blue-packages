@@ -246,6 +246,9 @@ functions:
             function: configurationParameters
             args: {}
     - $let:
+        name: prepareFor
+        expr: {$call: {function: preparationMode, args: {}}}
+    - $let:
         name: obtain
         expr:
           $pointerGet:
@@ -331,6 +334,7 @@ functions:
             domainTerms:
               $var: domainTerms
             status: awaiting_provider
+            prepareFor: {$var: prepareFor}
             obtain:
               $var: obtain
             supplier:
@@ -544,8 +548,9 @@ functions:
           $ne:
           - $nodeBlueId:
               $call:
-                function: normalizeSlots
+                function: normalizeProvisionSource
                 args:
+                  mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                   source:
                     $var: original
                   slots:
@@ -554,8 +559,9 @@ functions:
                       path: /slots
           - $nodeBlueId:
               $call:
-                function: normalizeSlots
+                function: normalizeProvisionSource
                 args:
+                  mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                   source:
                     $var:
                       name: item
@@ -574,8 +580,9 @@ functions:
                 args:
                   policy:
                     $call:
-                      function: candidateClausePolicy
+                      function: provisionClausePolicy
                       args:
+                        mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                         candidate:
                           $var: candidate
                         slots:
@@ -588,8 +595,9 @@ functions:
                 args:
                   policy:
                     $call:
-                      function: candidateClausePolicy
+                      function: provisionClausePolicy
                       args:
+                        mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                         candidate:
                           $var:
                             name: item
@@ -608,6 +616,13 @@ functions:
             $var: candidate
           item:
             $var: item
+    - $if:
+        cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}, bootstrap]}
+        then:
+        - $call:
+            function: validateBootstrapAccess
+            args:
+              candidate: {$var: candidate}
     - $let:
         name: domainValid
         expr:
@@ -1372,6 +1387,22 @@ functions:
             function: configurationParameters
             args: {}
     - $let:
+        name: bootstrapParties
+        expr: {}
+    - $if:
+        cond: {$eq: [{$call: {function: preparationMode, args: {}}}, bootstrap]}
+        then:
+        - $set:
+            name: bootstrapParties
+            expr:
+              $call:
+                function: resolvePartyMappings
+                args:
+                  parties: {$document: /activation/parties}
+                  declarations: {$pointerGet: {object: {$call: {function: configuredTemplate, args: {}}}, path: /clauses/activation/parameters/parties}}
+                  mapping: {$pointerGet: {object: {$const: bindings}, path: /parties}}
+                  suppliedRoles: {$pointerGet: {object: {$var: parameters}, path: /suppliedParties, default: []}}
+    - $let:
         name: slots
         expr: []
     - $forEach:
@@ -1408,6 +1439,7 @@ functions:
                           default: []
                       val:
                         $var: role
+                  bootstrapPrimary: {$get: {object: {$var: bootstrapParties}, key: {$var: role}}}
                   primary:
                     $pointerGet:
                       object:
@@ -1752,15 +1784,24 @@ functions:
                       name: slot
                       path: /supplied
                 then:
-                - $call:
-                    function: requireSameMainParty
-                    args:
-                      left:
-                        $var:
-                          name: slot
-                          path: /primary
-                      right:
-                        $var: originalValue
+                - $if:
+                    cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}, bootstrap]}
+                    then:
+                    - $call:
+                        function: requireSameBootstrapParty
+                        args:
+                          expected: {$pointerGet: {object: {$var: slot}, path: /bootstrapPrimary}}
+                          actual: {$var: originalValue}
+                    else:
+                    - $call:
+                        function: requireSameMainParty
+                        args:
+                          left:
+                            $var:
+                              name: slot
+                              path: /primary
+                          right:
+                            $var: originalValue
             else:
             - $let:
                 name: currentValue

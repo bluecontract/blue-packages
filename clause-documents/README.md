@@ -43,6 +43,33 @@ retains a prepared requirement and accepts an independently initialized instance
 Provision requires its exact `inResponseTo` request ID and `requirementRef`.
 The instance's native origin and execution history are preserved.
 
+### Preparation for independent bootstrap
+
+The explicit `parameters.prepareFor: bootstrap` variant is being qualified for
+`obtain: provide`. Omit `prepareFor` to retain the existing inherited-transport
+behavior; unknown explicit values are rejected. This option does not change
+activation, approvals, source binding or readiness rules.
+
+In this variant, mapped main parties retain their reader keys and identity, but
+the prepared child does not copy their parent channels or Timeline Access
+documents. Ordinary Core bootstrap supplies fresh child channels, grants and
+the declared customer identity, including enrollment of a new reader key.
+`provide` compares the resulting native document against the frozen preparation,
+checks the mapped actors/readers and child access, then follows the existing
+activation and selection lifecycle. The mode is frozen with the preparation;
+changing configuration cannot reinterpret an outstanding request.
+
+The customer-facing form can derive its named inputs from `fieldPaths` and the
+typed fields in the template. Browsing, editing and reviewing that form does
+not call `prepare`. Actual submission starts preparation, bootstrap and provision
+under a durable caller-owned request identity. Bootstrap and delivery are host
+orchestration, not new activation behavior inside this clause.
+
+Qualification: `tools/check_operation_inputs.py --case bootstrap-preparation`
+checks native preparation and rejected inputs. The signed Core bootstrap and
+provision test is a separate gate; passing this preparation-only test does not
+prove that the complete public checkout works.
+
 `parameters.fieldPaths` maps named `prepare.values` to typed data fields in the
 child template. `parameters.suppliedParties` declares roles the supplier may fill;
 it is disjoint from the explicit role map and is not valid for local creation.
