@@ -14,10 +14,24 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def source_dependency(root, folder, prefix, declaration, config, retained, selected):
+    from release import retained_import
+    if retained_import(root, folder, prefix, declaration, config, retained) is not None:
+        return None
+    archive = (folder / declaration['path']).resolve()
+    dependency = archive.parent.parent
+    if (dependency.parent != root or archive != dependency / 'dist/package.bluepkg'
+            or dependency.name not in selected):
+        raise ValueError('Unsupported package import path: ' + declaration['path'])
+    return dependency.name
+
+
 def dependency_order(root, names):
     """Build every declared dependency first, including currently inactive exports."""
     import yaml
     root = root.resolve()
+    from release import retained_archives, retained_import
+    retained = retained_archives(root)
     selected = set(names)
     complete, active, ordered = set(), set(), []
 
@@ -31,12 +45,10 @@ def dependency_order(root, names):
             raise ValueError('Dependency is absent from the source inventory: ' + name)
         active.add(name)
         config = yaml.safe_load((folder / 'blue-package.yaml').read_text())
-        for declaration in config.get('imports', {}).values():
-            archive = (folder / declaration['path']).resolve()
-            dependency = archive.parent.parent
-            if dependency.parent != root or archive != dependency / 'dist/package.bluepkg':
-                raise ValueError('Unsupported package import path: ' + declaration['path'])
-            visit(dependency.name)
+        for prefix, declaration in config.get('imports', {}).items():
+            dependency = source_dependency(root, folder, prefix, declaration, config, retained, selected)
+            if dependency is not None:
+                visit(dependency)
         active.remove(name)
         complete.add(name)
         ordered.append(name)
@@ -52,6 +64,20 @@ def build(package, check=False):
     source = ROOT / ('blue-contracts' if all_packages else package)
     if source.parent != ROOT or not source.is_dir():
         raise ValueError('Select one package directory directly under the source root')
+    # Single-package and check builds enforce the same data-only archive pins as all builds.
+    if not all_packages:
+        import yaml
+        from release import retained_archives, retained_import
+        retained = retained_archives(ROOT)
+        config = yaml.safe_load((source / 'blue-package.yaml').read_text())
+        inventory_path = ROOT / 'PACKAGE-SOURCES.json'
+        inventory = json.loads(inventory_path.read_text()) if inventory_path.exists() else None
+        for prefix, declaration in config.get('imports', {}).items():
+            if inventory is not None:
+                selected = set(inventory.get('foundations', []) + inventory.get('packages', []))
+                source_dependency(ROOT.resolve(), source, prefix, declaration, config, retained, selected)
+            else:
+                retained_import(ROOT, source, prefix, declaration, config, retained)
     classpath = os.environ.get('BLUE_JAVA_CLASSPATH')
     if not classpath:
         raise ValueError('Set BLUE_JAVA_CLASSPATH to the qualified Java Language runtime jars')
