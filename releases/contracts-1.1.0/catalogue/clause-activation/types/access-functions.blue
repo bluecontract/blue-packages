@@ -1,0 +1,389 @@
+name: Timeline Access Functions
+type: Amendments/Amendment Proposal Functions
+description: Validate and embed native public Timeline Access histories. Permission changes remain provider-owned.
+functions:
+  validateAccessDocument:
+    args:
+      access: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $var: access
+              pattern:
+                type: Coordination/Timeline Access
+        message: TIMELINE_ACCESS_DOCUMENT_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $pointerGet:
+                  object:
+                    $var: access
+                  path: /contracts/provider
+              pattern:
+                type: Coordination/Public Timeline Channel
+        message: TIMELINE_ACCESS_PROVIDER_REQUIRED
+    - $let:
+        name: original
+        expr:
+          $pointerGet:
+            object:
+              $var: access
+            path: /contracts/initialized/document
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: original
+        message: TIMELINE_ACCESS_INITIALIZATION_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $var: access
+                path: /contracts/checkpoint/entries/provider
+        message: TIMELINE_ACCESS_HISTORY_REQUIRED
+    - $let:
+        name: expectedContracts
+        expr:
+          provider:
+            $pointerGet:
+              object:
+                $var: access
+              path: /contracts/provider
+          update:
+            type: Coordination/Update Timeline Access
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  $var: original
+                path: /contracts
+          - $nodeBlueId:
+              $var: expectedContracts
+        message: TIMELINE_ACCESS_EXECUTABLE_POLICY_MISMATCH
+    - $let:
+        name: currentContracts
+        expr:
+          $pointerGet:
+            object:
+              $var: access
+            path: /contracts
+    - $set:
+        name: currentContracts
+        expr:
+          $objectFromEntries:
+            $filter:
+              in:
+                $entries:
+                  $var: currentContracts
+              item: contractEntry
+              where:
+                $ne:
+                - $var:
+                    name: contractEntry
+                    path: /key
+                - initialized
+    - $set:
+        name: currentContracts
+        expr:
+          $objectFromEntries:
+            $filter:
+              in:
+                $entries:
+                  $var: currentContracts
+              item: contractEntry
+              where:
+                $ne:
+                - $var:
+                    name: contractEntry
+                    path: /key
+                - checkpoint
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $var: currentContracts
+          - $nodeBlueId:
+              $var: expectedContracts
+        message: TIMELINE_ACCESS_EXECUTABLE_POLICY_MISMATCH
+    - $return:
+        $nodeBlueId:
+          $var: original
+  installTimelineAccess:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: documents
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /documents
+            default: []
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $size:
+                $var: documents
+            - 0
+          - $gt:
+            - $size:
+                $var: documents
+            - 16
+        message: ACCESS_DOCUMENTS_REQUIRED
+    - $let:
+        name: basePath
+        expr:
+          $var:
+            name: input
+            path: /basePath
+    - $let:
+        name: known
+        expr:
+          $choose:
+            cond:
+              $exists:
+                $document:
+                  $var: basePath
+            then:
+              $document:
+                $var: basePath
+            else: {}
+    - $let:
+        name: addedDocuments
+        expr: {}
+    - $let:
+        name: added
+        expr: {}
+    - $let:
+        name: paths
+        expr: []
+    - $forEach:
+        item: access
+        in:
+          $var: documents
+        do:
+        - $let:
+            name: origin
+            expr:
+              $call:
+                function: validateAccessDocument
+                args:
+                  access:
+                    $var: access
+        - $if:
+            cond:
+              $not:
+                $or:
+                - $hasKey:
+                    object:
+                      $var: known
+                    key:
+                      $var: origin
+                - $hasKey:
+                    object:
+                      $var: added
+                    key:
+                      $var: origin
+            then:
+            - $set:
+                name: added
+                expr:
+                  $objectSet:
+                    object:
+                      $var: added
+                    key:
+                      $var: origin
+                    val:
+                      $objectFromEntries:
+                      - key: blueId
+                        val:
+                          $nodeBlueId:
+                            $var: access
+            - $set:
+                name: paths
+                expr:
+                  $listConcat:
+                  - $var: paths
+                  - - $concat:
+                      - $var: basePath
+                      - /
+                      - $var: origin
+            - $set:
+                name: addedDocuments
+                expr:
+                  $objectSet:
+                    object:
+                      $var: addedDocuments
+                    key:
+                      $var: origin
+                    val:
+                      $var: access
+    - $if:
+        cond:
+          $eq:
+          - $size:
+              $var: added
+          - 0
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path:
+          $var: basePath
+        val:
+          $merge:
+          - $var: known
+          - $var: added
+    - $let:
+        name: registeredChannels
+        expr:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /registeredAccessChannels
+            default: []
+    - $forEach:
+        item: access
+        in:
+          $var: addedDocuments
+        do:
+        - $let:
+            name: channel
+            expr:
+              $concat:
+              - documentAccess_
+              - $var: origin
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - /contracts/
+              - $var: channel
+            val:
+              $merge:
+              - type: Contracts/Embedded Node Channel
+              - sourcePath:
+                  $concat:
+                  - $var: basePath
+                  - /
+                  - $var: origin
+                event:
+                  type: Coordination/Timeline Access Updated
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - /contracts/
+              - $var: channel
+              - _refresh
+            val:
+              $merge:
+              - type: Contracts/Sequential Workflow
+              - channel:
+                  $var: channel
+                steps:
+                  $document: /contracts/activationInitializedRefresh/steps
+        - $set:
+            name: registeredChannels
+            expr:
+              $listConcat:
+              - $var: registeredChannels
+              - - $var: channel
+        key: origin
+    - $appendChange:
+        op: add
+        path: /activation/registeredAccessChannels
+        val:
+          $var: registeredChannels
+    - $appendChange:
+        op: add
+        path: /activation/accessPaths
+        val:
+          $listConcat:
+          - $pointerGet:
+              object:
+                $document: /activation
+              path: /accessPaths
+              default: []
+          - $var: paths
+    - $return:
+        outcome: acceptedNew
+  requirePartyAccessDocuments:
+    args:
+      parties: {}
+      documents: {}
+    do:
+    - $let:
+        name: channels
+        expr: {$call: {function: transports, args: {roster: {$var: parties}}}}
+    - $let:
+        name: groups
+        expr: {$call: {function: readerGroups, args: {roster: {$var: parties}, readers: {}}}}
+    - $forEach:
+        key: role
+        item: access
+        in: {$var: documents}
+        do:
+        - $failIf:
+            cond: {$not: {$hasKey: {object: {$var: channels}, key: {$var: role}}}}
+            message: UNEXPECTED_PARTY_TIMELINE_ACCESS
+    - $forEach:
+        key: role
+        item: channel
+        in: {$var: channels}
+        do:
+        - $if:
+            cond: {$is: {node: {$var: channel}, pattern: {type: Contracts/External Channel}}}
+            then: []
+            else:
+            - $failIf:
+                cond: {$not: {$is: {node: {$var: channel}, pattern: {type: Coordination/Timeline Channel}}}}
+                message: ACTIVATION_CHANNEL_REQUIRED
+            - $failIf:
+                cond: {$eq: [{$size: {$get: {object: {$var: groups}, key: {$var: role}}}}, 0]}
+                message: PARTY_READER_KEYS_REQUIRED
+            - $failIf:
+                cond: {$not: {$hasKey: {object: {$var: documents}, key: {$var: role}}}}
+                message: PARTY_TIMELINE_ACCESS_REQUIRED
+            - $let:
+                name: access
+                expr: {$get: {object: {$var: documents}, key: {$var: role}}}
+            - $call:
+                function: validateAccessDocument
+                args: {access: {$var: access}}
+            - $let:
+                name: matched
+                expr: false
+            - $forEach:
+                item: timeline
+                in: {$pointerGet: {object: {$var: access}, path: /allowedTimelines, default: []}}
+                do:
+                - $if:
+                    cond:
+                      $eq:
+                      - {$nodeBlueId: {$objectFromEntries: {$entries: {$var: timeline}}}}
+                      - {$nodeBlueId: {$objectFromEntries: {$entries: {$pointerGet: {object: {$var: channel}, path: /timeline}}}}}
+                    then:
+                    - $set: {name: matched, expr: true}
+            - $failIf:
+                cond:
+                  $or:
+                  - {$not: {$var: matched}}
+                  - $ne:
+                    - {$nodeBlueId: {$objectFromEntries: {$entries: {$pointerGet: {object: {$var: channel}, path: /timeline/provider}}}}}
+                    - {$nodeBlueId: {$objectFromEntries: {$entries: {$pointerGet: {object: {$var: access}, path: /contracts/provider/provider}}}}}
+                message: PARTY_TIMELINE_ACCESS_MISMATCH
+    - $return: true

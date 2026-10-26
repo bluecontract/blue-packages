@@ -1,0 +1,135 @@
+name: Shipping Clause
+type: Connections/Connected Clause
+description: Start one shipping instruction and relay its typed requests and responses. Carrier outcome operations
+  remain on the instruction.
+bindingTypes:
+  template: pointer
+  instruction: pointer
+embeds:
+- instruction
+actions:
+  start:
+    do:
+    - $let:
+        name: destination
+        expr:
+          $const:
+            name: bindings
+            path: /instruction
+    - $let:
+        name: identity
+        expr:
+          $concat:
+          - $nodeBlueId:
+              $document: /contracts/initialized/document
+          - ':'
+          - $const: clauseKey
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: destination
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $concat:
+                  - $var: destination
+                  - /instanceKey
+              - $var: identity
+            message: SHIPPING_DESTINATION_CONFLICT
+        - $set:
+            name: actionResult
+            expr:
+              outcome: duplicate
+        - $return: {}
+    - $let:
+        name: child
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /template
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $var: child
+              pattern:
+                type: Shipping/Shipping Instruction
+        message: SHIPPING_TEMPLATE_REQUIRED
+    - $failIf:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: child
+              path: /contracts/initialized
+        message: SHIPPING_TEMPLATE_ALREADY_STARTED
+    - $set:
+        name: child
+        expr:
+          $call:
+            function: activateChild
+            args:
+              child:
+                $var: child
+              roles:
+                $pointerGet:
+                  object:
+                    $const: parameters
+                  path: /parties
+                  default: []
+              readerNames:
+                $pointerGet:
+                  object:
+                    $const: parameters
+                  path: /readers
+                  default: []
+              frozen: true
+    - $appendChange:
+        op: add
+        path:
+          $var: destination
+        val:
+          $merge:
+          - $var: child
+          - instanceKey:
+              $var: identity
+    - $set:
+        name: actionResult
+        expr:
+          outcome: acceptedNew
+    resultContract: outcome-v1
+  observe:
+    automatic:
+      'on': embedded
+      pathBinding: instruction
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Events/Event
+        then:
+        - $return: {}
+    - $appendEvent:
+        $merge:
+        - type: Shipping/Shipping Event Received
+        - clause:
+            $const: clauseKey
+          event:
+            $objectSet:
+              object: {}
+              key: blueId
+              val:
+                $nodeBlueId:
+                  $event: /event
+    observation: true
+actionDefinition:
+  type: Activation/Child Activation Functions

@@ -1,0 +1,412 @@
+name: Child Activation Functions
+type: Activation/Activation Functions
+description: Prepare independently declared child parties from explicit mappings; retain legacy same-role construction
+  for existing callers.
+functions:
+  activateChild:
+    args:
+      child: {}
+      roles: []
+      readerNames: []
+      frozen:
+        type: Boolean
+    do:
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document: /activation
+        then:
+        - $return:
+            $var: child
+    - $let:
+        name: selected
+        expr:
+          $choose:
+            cond:
+              $eq:
+              - $size:
+                  $var: roles
+              - 0
+            then:
+              $keys:
+                $document: /activation/parties
+            else:
+              $var: roles
+    - $let:
+        name: roster
+        expr: {}
+    - $let:
+        name: readers
+        expr: {}
+    - $forEach:
+        item: role
+        in:
+          $var: selected
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $document: /activation/parties
+                  key:
+                    $var: role
+            message: CHILD_PARTY_NOT_IN_PARENT
+        - $set:
+            name: roster
+            expr:
+              $objectSet:
+                object:
+                  $var: roster
+                key:
+                  $var: role
+                val:
+                  $get:
+                    object:
+                      $document: /activation/parties
+                    key:
+                      $var: role
+    - $forEach:
+        item: reader
+        in:
+          $var: readerNames
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $document: /activation/readers
+                  key:
+                    $var: reader
+            message: CHILD_READER_NOT_IN_PARENT
+        - $set:
+            name: readers
+            expr:
+              $objectSet:
+                object:
+                  $var: readers
+                key:
+                  $var: reader
+                val:
+                  $get:
+                    object:
+                      $document: /activation/readers
+                    key:
+                      $var: reader
+    - $let:
+        name: access
+        expr: {}
+    - $let:
+        name: paths
+        expr: []
+    - $forEach:
+        item: path
+        in:
+          $document: /activation/accessPaths
+        do:
+        - $let:
+            name: key
+            expr:
+              $concat:
+              - grant
+              - $text:
+                  $size:
+                    $var: paths
+        - $set:
+            name: access
+            expr:
+              $objectSet:
+                object:
+                  $var: access
+                key:
+                  $var: key
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: path
+        - $set:
+            name: paths
+            expr:
+              $listConcat:
+              - $var: paths
+              - - $concat:
+                  - /timelineAccess/
+                  - $var: key
+    - $let:
+        name: result
+        expr:
+          $merge:
+          - $var: child
+          - timelineAccess:
+              $var: access
+    - $let:
+        name: params
+        expr:
+          $pointerGet:
+            object:
+              $var: child
+            path: /clauses/activation/parameters
+            default: {}
+    - $set:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: result
+            path: /clauses/activation
+            val:
+              $merge:
+              - type: Activation/Activation Clause
+              - parameters:
+                  $merge:
+                  - $var: params
+                  - parties:
+                      $var: roster
+                    readers:
+                      $var: readers
+                    accessPaths:
+                      $var: paths
+                    required:
+                      $pointerGet:
+                        object:
+                          $var: params
+                        path: /required
+                        default: []
+                    frozen:
+                      $var: frozen
+    - $forEach:
+        item: transport
+        in:
+          $call:
+            function: transports
+            args:
+              roster:
+                $var: roster
+        do:
+        - $set:
+            name: result
+            expr:
+              $pointerSet:
+                object:
+                  $var: result
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: key
+                val:
+                  $var: transport
+        key: key
+    - $return:
+        $var: result
+  prepareChild:
+    args:
+      child: {}
+      mapping: {}
+      suppliedRoles: []
+    do:
+    - $failIf:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $var: child
+              path: /contracts/initialized
+        message: CHILD_ALREADY_INITIALIZED
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  $var: child
+                path: /clauses/activation/type
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  type: Activation/Activation Clause
+                path: /type
+        message: CHILD_ACTIVATION_REQUIRED
+    - $let:
+        name: roster
+        expr:
+          $call:
+            function: resolvePartyMappings
+            args:
+              parties:
+                $document: /activation/parties
+              declarations:
+                $pointerGet:
+                  object:
+                    $var: child
+                  path: /clauses/activation/parameters/parties
+                  default: {}
+              mapping:
+                $var: mapping
+              suppliedRoles:
+                $var: suppliedRoles
+    - $let:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/activation/parameters/parties
+            val:
+              $var: roster
+    - $let:
+        name: paths
+        expr:
+          $pointerGet:
+            object:
+              $var: child
+            path: /clauses/activation/parameters/accessPaths
+            default: []
+    - $forEach:
+        item: path
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /accessPaths
+            default: []
+        do:
+        - $let:
+            name: target
+            expr:
+              $concat:
+              - /timelineAccess/configurer
+              - $text:
+                  $size:
+                    $var: paths
+        - $failIf:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: result
+                  path:
+                    $var: target
+            message: CHILD_ACCESS_PATH_CONFLICT
+        - $set:
+            name: result
+            expr:
+              $pointerSet:
+                object:
+                  $var: result
+                path:
+                  $var: target
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: path
+        - $set:
+            name: paths
+            expr:
+              $listConcat:
+              - $var: paths
+              - - $var: target
+    - $set:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: result
+            path: /clauses/activation/parameters/accessPaths
+            val:
+              $var: paths
+    - $let:
+        name: resolvedRoster
+        expr: {}
+    - $forEach:
+        item: party
+        key: role
+        in:
+          $var: roster
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: party
+                  path: /lead/channel
+            then:
+            - $set:
+                name: resolvedRoster
+                expr:
+                  $objectSet:
+                    object:
+                      $var: resolvedRoster
+                    key:
+                      $var: role
+                    val:
+                      $var: party
+    - $forEach:
+        item: transport
+        key: channelName
+        in:
+          $call:
+            function: transports
+            args:
+              roster:
+                $var: resolvedRoster
+        do:
+        - $let:
+            name: channelPath
+            expr:
+              $concat:
+              - /contracts/
+              - $var: channelName
+        - $let:
+            name: existingChannel
+            expr:
+              $pointerGet:
+                object:
+                  $var: result
+                path:
+                  $var: channelPath
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $var: existingChannel
+              - $ne:
+                - $var: existingChannel
+                - $var: transport
+            message: CHILD_CHANNEL_CONFLICT
+        - $set:
+            name: result
+            expr:
+              $pointerSet:
+                object:
+                  $var: result
+                path:
+                  $var: channelPath
+                val:
+                  $var: transport
+    - $return:
+        $var: result
+  bindChild:
+    args:
+      child: {}
+      mapping: {}
+    do:
+    - $return:
+        $call:
+          function: prepareChild
+          args:
+            child:
+              $var: child
+            mapping:
+              $var: mapping
+            suppliedRoles: []

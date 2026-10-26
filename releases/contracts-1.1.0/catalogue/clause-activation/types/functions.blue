@@ -1,0 +1,1919 @@
+name: Activation Functions
+type: Activation/Timeline Access Functions
+functions:
+  computeState:
+    args:
+      state: {}
+    do:
+    - $let:
+        name: s
+        expr:
+          $var: state
+    - $let:
+        name: accessRoster
+        expr:
+          $pointerGet:
+            object:
+              $var: s
+            path: /parties
+            default: {}
+    - $forEach:
+        item: addition
+        key: admissionRef
+        in:
+          $pointerGet:
+            object:
+              $var: s
+            path: /accessRequests
+            default: {}
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: addition
+                  path: /expectedRevision
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /revision
+            then:
+            - $set:
+                name: accessRoster
+                expr:
+                  $merge:
+                  - $var: accessRoster
+                  - $pointerGet:
+                      object:
+                        $var: addition
+                      path: /parties
+                      default: {}
+    - $let:
+        name: functional
+        expr:
+          $call:
+            function: accessValid
+            args:
+              roster:
+                $var: accessRoster
+              readers:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /readers
+                  default: {}
+              accessPaths:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /accessPaths
+                  default: []
+    - $let:
+        name: accepted
+        expr: true
+    - $forEach:
+        item: role
+        in:
+          $pointerGet:
+            object:
+              $var: s
+            path: /required
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path:
+                    $concat:
+                    - /approved/
+                    - $var: role
+                  default: false
+            then:
+            - $set:
+                name: accepted
+                expr: false
+    - $set:
+        name: accepted
+        expr:
+          $and:
+          - $var: accepted
+          - $call:
+              function: termsCurrent
+              args: {}
+    - $return:
+        $merge:
+        - $var: s
+        - functional:
+            $var: functional
+          accessReady:
+            $var: functional
+          termsAccepted:
+            $var: accepted
+          active:
+            $and:
+            - $var: functional
+            - $var: accepted
+            - $not:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /closed
+                  default: false
+          status:
+            $choose:
+              cond:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /closed
+                  default: false
+              then: CLOSED
+              else:
+                $choose:
+                  cond:
+                    $var: functional
+                  then:
+                    $choose:
+                      cond:
+                        $var: accepted
+                      then: ACTIVE
+                      else: AWAITING_ACCEPTANCE
+                  else:
+                    $choose:
+                      cond:
+                        $pointerGet:
+                          object:
+                            $var: s
+                          path: /everActivated
+                          default: false
+                      then: SUSPENDED_ACCESS
+                      else: WAITING_FOR_ACCESS
+          reason:
+            $choose:
+              cond:
+                $var: functional
+              then:
+                $choose:
+                  cond:
+                    $var: accepted
+                  then: ''
+                  else: ACCEPTANCE_REQUIRED
+              else: PARTICIPANT_ACCESS_MISSING
+  refresh:
+    args: {}
+    do:
+    - $let:
+        name: active
+        expr:
+          $call:
+            function: commitState
+            args:
+              state:
+                $call:
+                  function: initializeTerms
+                  args: {}
+    - $call:
+        function: refreshAccessRequests
+        args: {}
+    - $return:
+        $var: active
+  approve:
+    args:
+      input:
+        description: Approve this party for the currently reviewed Activation revision.
+        revision:
+          type: Integer
+          description: Current Activation revision from the document activation.revision. A changed publication
+            requires a new review.
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: EXACT_REVIEW_REQUIRED
+    - $failIf:
+        cond:
+          $and:
+          - $gt:
+            - $size:
+                $pointerGet:
+                  object:
+                    $document: /clauses/activation/parameters
+                  path: /negotiation/allowedPaths
+                  default: []
+            - 0
+          - $not:
+              $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /termsRef
+                kind: text
+        message: TERMS_REFERENCE_REQUIRED
+    - $let:
+        name: s
+        expr:
+          $document: /activation
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var:
+                  name: s
+                  path: /parties
+              key:
+                $binding: call/channel
+        message: ONLY_PARTY_LEAD_CAN_ACCEPT
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /revision
+          - $pointerGet:
+              object:
+                $var: s
+              path: /revision
+        message: STALE_TERMS_REVISION
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: accessValid
+              args:
+                roster:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /parties
+                    default: {}
+                readers:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /readers
+                    default: {}
+                accessPaths:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /accessPaths
+                    default: []
+        message: PARTICIPANT_ACCESS_MISSING
+    - $failIf:
+        cond:
+          $and:
+          - $exists:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /termsRef
+          - $ne:
+            - $pointerGet:
+                object:
+                  $var: input
+                path: /termsRef
+            - $document: /activation/terms/ref
+        message: TERMS_CHANGED
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: s
+            path:
+              $concat:
+              - /approved/
+              - $binding: call/channel
+            default: false
+        then:
+        - $return: true
+    - $set:
+        name: s
+        expr:
+          $merge:
+          - $var: s
+          - approved:
+              $objectSet:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /approved
+                    default: {}
+                key:
+                  $binding: call/channel
+                val: true
+    - $let:
+        name: activated
+        expr:
+          $call:
+            function: commitState
+            args:
+              state:
+                $var: s
+    - $if:
+        cond:
+          $eq:
+          - $var: activated
+          - true
+        then:
+        - $if:
+            cond:
+              $exists:
+                $document: /activation/negotiation/proposal/id
+            then:
+            - $appendChange:
+                op: add
+                path:
+                  $concat:
+                  - /activation/negotiation/history/
+                  - $document: /activation/negotiation/proposal/id
+                val: true
+            - $appendChange:
+                op: add
+                path:
+                  $concat:
+                  - /activation/negotiation/outcomes/
+                  - $document: /activation/negotiation/proposal/id
+                val: SUPERSEDED
+            - $appendChange:
+                op: replace
+                path: /activation/negotiation/proposal
+                val: {}
+        - $appendChange:
+            op: replace
+            path: /activation/negotiation/editable
+            val: false
+    - $appendEvent:
+        $merge:
+        - type: Activation/Terms Accepted
+        - party:
+            $binding: call/channel
+          revision:
+            $pointerGet:
+              object:
+                $var: s
+              path: /revision
+    - $return: true
+  updateParty:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: EXACT_REVIEW_REQUIRED
+    - $let:
+        name: s
+        expr:
+          $document: /activation
+    - $failIf:
+        cond:
+          $pointerGet:
+            object:
+              $var: s
+            path: /frozen
+            default: false
+        message: PARTIES_FROZEN
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var:
+                  name: s
+                  path: /parties
+              key:
+                $binding: call/channel
+        message: ONLY_PARTY_LEAD_CAN_MANAGE
+    - $let:
+        name: target
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /party
+            default:
+              $binding: call/channel
+    - $let:
+        name: adding
+        expr:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /parties
+                  default: {}
+              key:
+                $var: target
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validPartyName
+              args:
+                candidate:
+                  $var: target
+        message: INVALID_PARTY_NAME
+    - $failIf:
+        cond:
+          $and:
+          - $var: adding
+          - $not:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /allowNewParties
+                default: false
+        message: NEW_PARTIES_DISABLED
+    - $failIf:
+        cond:
+          $and:
+          - $not:
+              $var: adding
+          - $ne:
+            - $var: target
+            - $binding: call/channel
+        message: CANNOT_MANAGE_ANOTHER_PARTY
+    - $let:
+        name: party
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /replacement
+            default: {}
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /lead/channel
+        message: PARTY_LEAD_CHANNEL_REQUIRED
+    - $forEach:
+        item: rep
+        in:
+          $pointerGet:
+            object:
+              $var: party
+            path: /representatives
+            default: {}
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: validPartyName
+                  args:
+                    candidate:
+                      $var: repId
+            message: INVALID_REPRESENTATIVE_NAME
+        key: repId
+    - $let:
+        name: roster
+        expr:
+          $objectSet:
+            object:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /parties
+                default: {}
+            key:
+              $var: target
+            val:
+              $var: party
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: accessValid
+              args:
+                roster:
+                  $var: roster
+                readers:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /readers
+                    default: {}
+                accessPaths:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /accessPaths
+                    default: []
+        message: PARTICIPANT_ACCESS_MISSING
+    - $let:
+        name: previousContracts
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              parameters:
+                $document: /clauses/activation/parameters
+              roster:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /parties
+                  default: {}
+              runtimeDefinition:
+                $document:
+                  $concat:
+                  - /contracts/updateParty_
+                  - $binding: call/channel
+                  - /steps/0/definition
+    - $let:
+        name: nextContracts
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              parameters:
+                $document: /clauses/activation/parameters
+              roster:
+                $var: roster
+              runtimeDefinition:
+                $document:
+                  $concat:
+                  - /contracts/updateParty_
+                  - $binding: call/channel
+                  - /steps/0/definition
+    - $forEach:
+        item: contribution
+        key: key
+        in:
+          $var: nextContracts
+        do:
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: key
+              - $not:
+                  $hasKey:
+                    object:
+                      $var: previousContracts
+                    key:
+                      $var: key
+            message: PARTY_CONTRACT_NAME_CONFLICT
+        - $appendChange:
+            op: add
+            path:
+              $concat:
+              - /contracts/
+              - $var: key
+            val:
+              $var:
+                name: contribution
+                path: /contract
+    - $set:
+        name: s
+        expr:
+          $merge:
+          - $var: s
+          - parties:
+              $var: roster
+            approved: {}
+            revision:
+              $add:
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /revision
+                  default: 1
+              - 1
+            required:
+              $choose:
+                cond:
+                  $var: adding
+                then:
+                  $listConcat:
+                  - $pointerGet:
+                      object:
+                        $var: s
+                      path: /required
+                      default: []
+                  - - $var: target
+                else:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /required
+                    default: []
+    - $call:
+        function: commitState
+        args:
+          state:
+            $var: s
+    - $appendEvent:
+        $merge:
+        - type: Activation/Party Changed
+        - party:
+            $var: target
+          revision:
+            $pointerGet:
+              object:
+                $var: s
+              path: /revision
+    - $return: true
+  rosterContracts:
+    args:
+      parameters: {}
+      roster: {}
+      runtimeDefinition:
+        type: Contracts/Compute Definition
+    do:
+    - $let:
+        name: contributions
+        expr: {}
+    - $forEach:
+        item: channel
+        in:
+          $call:
+            function: transports
+            args:
+              roster:
+                $var: roster
+        do:
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $var: key
+                val:
+                  kind: channel
+                  contract:
+                    $var: channel
+        key: key
+    - $forEach:
+        item: party
+        in:
+          $var: roster
+        do:
+        - $forEach:
+            item: operation
+            in:
+            - approve
+            - updateParty
+            do:
+            - $let:
+                name: entry
+                expr:
+                  $choose:
+                    cond:
+                      $and:
+                      - $eq:
+                        - $var: operation
+                        - approve
+                      - $gt:
+                        - $size:
+                            $pointerGet:
+                              object:
+                                $var: parameters
+                              path: /negotiation/allowedPaths
+                              default: []
+                        - 0
+                    then: approveWithTerms
+                    else:
+                      $choose:
+                        cond:
+                          $eq:
+                          - $var: operation
+                          - updateParty
+                        then: updatePartyPublic
+                        else:
+                          $var: operation
+            - $set:
+                name: contributions
+                expr:
+                  $objectSet:
+                    object:
+                      $var: contributions
+                    key:
+                      $concat:
+                      - $var: operation
+                      - _
+                      - $var: role
+                    val:
+                      kind: handler
+                      contract:
+                        $merge:
+                        - type: Contracts/Sequential Workflow Operation
+                        - channel:
+                            $var: role
+                          steps:
+                          - $merge:
+                            - type: Contracts/Compute
+                            - definition:
+                                $var: runtimeDefinition
+                              constants:
+                                party:
+                                  $var: role
+                              do:
+                              - $pointerSet:
+                                  object:
+                                    $literal:
+                                      $call:
+                                        function: ''
+                                        args:
+                                          input:
+                                            $binding: call/request
+                                  path: /$call/function
+                                  val:
+                                    $var: entry
+                        - $get:
+                            object:
+                              $literal:
+                                approve:
+                                  $blue:requestFrom:
+                                    definition:
+                                      type: Activation/Activation Functions
+                                    function: approve
+                                    argument: input
+                                approveWithTerms:
+                                  $blue:requestFrom:
+                                    definition:
+                                      type: Activation/Activation Functions
+                                    function: approveWithTerms
+                                    argument: input
+                                updatePartyPublic:
+                                  $blue:requestFrom:
+                                    definition:
+                                      type: Activation/Activation Functions
+                                    function: updatePartyPublic
+                                    argument: input
+                            key:
+                              $var: entry
+        key: role
+    - $return:
+        $var: contributions
+  admitApprovedParties:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: s
+        expr:
+          $document: /activation
+    - $failIf:
+        cond:
+          $pointerGet:
+            object:
+              $var: s
+            path: /frozen
+            default: false
+        message: PARTIES_FROZEN
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /expectedRevision
+          - $pointerGet:
+              object:
+                $var: s
+              path: /revision
+        message: ADMISSION_STALE_REVISION
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $pointerGet:
+                object:
+                  $document: /clauses/activation/parameters
+                path: /admission/approvers
+                default: []
+          - 0
+        message: ADMISSION_POLICY_REQUIRED
+    - $let:
+        name: additions
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /parties
+            default: {}
+    - $let:
+        name: roster
+        expr:
+          $pointerGet:
+            object:
+              $var: s
+            path: /parties
+    - $forEach:
+        item: party
+        in:
+          $var: additions
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: validPartyName
+                  args:
+                    candidate:
+                      $var: role
+            message: INVALID_PARTY_NAME
+        - $call:
+            function: requireSameMainParty
+            args:
+              left:
+                $var: party
+              right:
+                $var: party
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: roster
+                key:
+                  $var: role
+            then:
+            - $call:
+                function: requireSameMainParty
+                args:
+                  left:
+                    $get:
+                      object:
+                        $var: roster
+                      key:
+                        $var: role
+                  right:
+                    $var: party
+            else:
+            - $set:
+                name: roster
+                expr:
+                  $objectSet:
+                    object:
+                      $var: roster
+                    key:
+                      $var: role
+                    val:
+                      $var: party
+        key: role
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: accessValid
+              args:
+                roster:
+                  $var: roster
+                readers:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /readers
+                    default: {}
+                accessPaths:
+                  $pointerGet:
+                    object:
+                      $var: s
+                    path: /accessPaths
+                    default: []
+        message: PARTICIPANT_ACCESS_MISSING
+    - $if:
+        cond:
+          $eq:
+          - $nodeBlueId:
+              $var: roster
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  $var: s
+                path: /parties
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: previous
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              parameters:
+                $document: /clauses/activation/parameters
+              roster:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /parties
+              runtimeDefinition:
+                $var:
+                  name: input
+                  path: /runtimeDefinition
+    - $let:
+        name: next
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              parameters:
+                $document: /clauses/activation/parameters
+              roster:
+                $var: roster
+              runtimeDefinition:
+                $var:
+                  name: input
+                  path: /runtimeDefinition
+    - $forEach:
+        item: contribution
+        in:
+          $var: next
+        do:
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: contractKey
+              - $not:
+                  $hasKey:
+                    object:
+                      $var: previous
+                    key:
+                      $var: contractKey
+            message: PARTY_CONTRACT_NAME_CONFLICT
+        key: contractKey
+    - $forEach:
+        item: kind
+        in:
+        - channel
+        - handler
+        do:
+        - $forEach:
+            item: contribution
+            in:
+              $var: next
+            do:
+            - $if:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $var: contribution
+                      path: /kind
+                  - $var: kind
+                then:
+                - $appendChange:
+                    op: add
+                    path:
+                      $concat:
+                      - /contracts/
+                      - $var: contractKey
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: contribution
+                        path: /contract
+            key: contractKey
+    - $set:
+        name: s
+        expr:
+          $merge:
+          - $var: s
+          - parties:
+              $var: roster
+            revision:
+              $add:
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /revision
+              - 1
+    - $call:
+        function: commitState
+        args:
+          state:
+            $var: s
+    - $forEach:
+        key: role
+        item: party
+        in:
+          $var: additions
+        do:
+        - $appendEvent:
+            $merge:
+            - type: Activation/Party Changed
+            - kind: Participants admitted
+              revision:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /revision
+              admissionRef:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /admissionRef
+              party:
+                $var: role
+    - $return:
+        outcome: acceptedNew
+  reconcileInitialChannels:
+    args:
+      state: {}
+    do:
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: state
+            path: /channelsInstalled
+            default: false
+        then:
+        - $return:
+            $var: state
+    - $let:
+        name: transports
+        expr:
+          $call:
+            function: transports
+            args:
+              roster:
+                $pointerGet:
+                  object:
+                    $var: state
+                  path: /parties
+                  default: {}
+    - $let:
+        name: ready
+        expr:
+          $pointerGet:
+            object:
+              $var: state
+            path: /accessReady
+            default: false
+    - $let:
+        name: pendingChannel
+        expr:
+          type: Contracts/Composite External Channels
+          channels: []
+    - $forEach:
+        item: transport
+        key: key
+        in:
+          $var: transports
+        do:
+        - $let:
+            name: path
+            expr:
+              $concat:
+              - /contracts/
+              - $var: key
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $document:
+                    $var: path
+              - $ne:
+                - $document:
+                    $var: path
+                - $var: transport
+              - $ne:
+                - $document:
+                    $var: path
+                - $var: pendingChannel
+            message: PARTY_CONTRACT_NAME_CONFLICT
+        - $appendChange:
+            op: add
+            path:
+              $var: path
+            val:
+              $choose:
+                cond:
+                  $var: ready
+                then:
+                  $var: transport
+                else:
+                  $var: pendingChannel
+    - $return:
+        $merge:
+        - $var: state
+        - channelsInstalled:
+            $var: ready
+        - $choose:
+            cond:
+              $and:
+              - $var: ready
+              - $exists:
+                  $binding: timestamp
+            then:
+              channelsAdmittedAfter:
+                $binding: timestamp
+            else: {}
+  commitState:
+    args:
+      state: {}
+    do:
+    - $let:
+        name: previous
+        expr:
+          $document: /activation
+    - $if:
+        cond:
+          $and:
+          - $exists:
+              $pointerGet:
+                object:
+                  $var: previous
+                path: /terms
+          - $or:
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: previous
+                  path: /parties
+              - $pointerGet:
+                  object:
+                    $var: state
+                  path: /parties
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: previous
+                  path: /required
+              - $pointerGet:
+                  object:
+                    $var: state
+                  path: /required
+        then:
+        - $let:
+            name: newTerms
+            expr:
+              definition:
+                $nodeBlueId:
+                  previous:
+                    $pointerGet:
+                      object:
+                        $var: previous
+                      path: /terms/definition
+                  parties:
+                    $pointerGet:
+                      object:
+                        $var: state
+                      path: /parties
+                  required:
+                    $pointerGet:
+                      object:
+                        $var: state
+                      path: /required
+              fields:
+                $pointerGet:
+                  object:
+                    $var: state
+                  path: /terms/fields
+        - $let:
+            name: negotiation
+            expr:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /negotiation
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: negotiation
+                  path: /proposal/id
+            then:
+            - $set:
+                name: negotiation
+                expr:
+                  $merge:
+                  - $var: negotiation
+                  - history:
+                      $objectSet:
+                        object:
+                          $pointerGet:
+                            object:
+                              $var: negotiation
+                            path: /history
+                        key:
+                          $pointerGet:
+                            object:
+                              $var: negotiation
+                            path: /proposal/id
+                        val: true
+                    outcomes:
+                      $objectSet:
+                        object:
+                          $pointerGet:
+                            object:
+                              $var: negotiation
+                            path: /outcomes
+                        key:
+                          $pointerGet:
+                            object:
+                              $var: negotiation
+                            path: /proposal/id
+                        val: AUTHORITY_CHANGED
+        - $set:
+            name: state
+            expr:
+              $merge:
+              - $var: state
+              - approved:
+                  $choose:
+                    cond:
+                      $gt:
+                      - $size:
+                          $pointerGet:
+                            object:
+                              $document: /clauses/activation/parameters
+                            path: /negotiation/allowedPaths
+                            default: []
+                      - 0
+                    then: {}
+                    else:
+                      $pointerGet:
+                        object:
+                          $var: state
+                        path: /approved
+                        default: {}
+                terms:
+                  $merge:
+                  - $var: newTerms
+                  - ref:
+                      $nodeBlueId:
+                        $var: newTerms
+                termsRevision:
+                  $add:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /termsRevision
+                  - 1
+                negotiation:
+                  $merge:
+                  - $var: negotiation
+                  - proposal: {}
+    - $let:
+        name: next
+        expr:
+          $call:
+            function: computeState
+            args:
+              state:
+                $var: state
+    - $set:
+        name: next
+        expr:
+          $call:
+            function: reconcileInitialChannels
+            args:
+              state:
+                $var: next
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: next
+            path: /active
+            default: false
+        then:
+        - $if:
+            cond:
+              $not:
+                $pointerGet:
+                  object:
+                    $var: previous
+                  path: /everActivated
+                  default: false
+            then:
+            - $appendEvent:
+                $merge:
+                - type: Parties/Document Activated
+                - revision:
+                    $pointerGet:
+                      object:
+                        $var: next
+                      path: /revision
+                      default: 1
+            else:
+            - $if:
+                cond:
+                  $not:
+                    $pointerGet:
+                      object:
+                        $var: previous
+                      path: /accessReady
+                      default: false
+                then:
+                - $appendEvent:
+                    $merge:
+                    - type: Parties/Document Access Restored
+                    - revision:
+                        $pointerGet:
+                          object:
+                            $var: next
+                          path: /revision
+                          default: 1
+        else:
+        - $if:
+            cond:
+              $and:
+              - $pointerGet:
+                  object:
+                    $var: previous
+                  path: /active
+                  default: false
+              - $not:
+                  $pointerGet:
+                    object:
+                      $var: next
+                    path: /accessReady
+                    default: false
+            then:
+            - $appendEvent:
+                $merge:
+                - type: Parties/Document Access Suspended
+                - revision:
+                    $pointerGet:
+                      object:
+                        $var: next
+                      path: /revision
+                      default: 1
+    - $set:
+        name: next
+        expr:
+          $merge:
+          - $var: next
+          - everActivated:
+              $or:
+              - $pointerGet:
+                  object:
+                    $var: previous
+                  path: /everActivated
+                  default: false
+              - $pointerGet:
+                  object:
+                    $var: next
+                  path: /active
+                  default: false
+    - $if:
+        cond:
+          $ne:
+          - $var: previous
+          - $var: next
+        then:
+        - $appendChange:
+            op: add
+            path: /activation
+            val:
+              $var: next
+    - $return:
+        $pointerGet:
+          object:
+            $var: next
+          path: /active
+          default: false
+  initializeTerms:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $exists:
+            $document: /activation/terms
+        then:
+        - $return:
+            $document: /activation
+    - $let:
+        name: definition
+        expr:
+          $document: /clauseRuntime/initialDocument
+    - $let:
+        name: paths
+        expr:
+          $pointerGet:
+            object:
+              $document: /clauses/activation/parameters
+            path: /negotiation/allowedPaths
+            default: []
+    - $forEach:
+        item: path
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /accessPaths
+            default: []
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: definition
+                  path:
+                    $var: path
+            then:
+            - $set:
+                name: definition
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: definition
+                    path:
+                      $var: path
+                    op: remove
+    - $forEach:
+        item: field
+        in:
+        - accessPaths
+        - readers
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: definition
+                  path:
+                    $concat:
+                    - /clauses/activation/parameters/
+                    - $var: field
+            then:
+            - $set:
+                name: definition
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: definition
+                    path:
+                      $concat:
+                      - /clauses/activation/parameters/
+                      - $var: field
+                    op: remove
+    - $forEach:
+        item: party
+        in:
+          $pointerGet:
+            object:
+              $var: definition
+            path: /clauses/activation/parameters/parties
+            default: {}
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: party
+                  path: /readerKeys
+            then:
+            - $set:
+                name: definition
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: definition
+                    path:
+                      $concat:
+                      - /clauses/activation/parameters/parties/
+                      - $var: role
+                      - /readerKeys
+                    op: remove
+        key: role
+    - $let:
+        name: fields
+        expr: {}
+    - $forEach:
+        item: path
+        in:
+          $var: paths
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $var: path
+            message: NEGOTIATION_FIELD_MISSING
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $document:
+                      $var: path
+                  kind:
+                  - text
+                  - integer
+                  - double
+                  - boolean
+            message: NEGOTIATION_REQUIRES_SCALAR_FIELD
+        - $set:
+            name: fields
+            expr:
+              $objectSet:
+                object:
+                  $var: fields
+                key:
+                  $var: path
+                val:
+                  $document:
+                    $var: path
+        - $set:
+            name: definition
+            expr:
+              $pointerSet:
+                object:
+                  $var: definition
+                path:
+                  $var: path
+                op: remove
+    - $let:
+        name: terms
+        expr:
+          definition:
+            $nodeBlueId:
+              $var: definition
+          fields:
+            $var: fields
+    - $return:
+        $merge:
+        - $document: /activation
+        - terms:
+            $merge:
+            - $var: terms
+            - ref:
+                $nodeBlueId:
+                  $var: terms
+          termsRevision: 1
+          negotiation:
+            revision: 1
+            proposal: {}
+            history: {}
+            outcomes: {}
+            editable: true
+  requestPartyAddition:
+    args: {}
+    do:
+    - $let:
+        name: input
+        expr:
+          $event: ''
+    - $let:
+        name: ref
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /admissionRef
+    - $if:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: input
+              path: /expectedRevision
+          - $document: /activation/revision
+        then:
+        - $return: {}
+    - $let:
+        name: path
+        expr:
+          $concat:
+          - /activation/accessRequests/
+          - $var: ref
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: path
+        then:
+        - $return: {}
+    - $let:
+        name: additions
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /parties
+            default: {}
+    - $let:
+        name: evidence
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /accessDocuments
+            default: {}
+    - $call:
+        function: requirePartyAccessDocuments
+        args:
+          parties:
+            $var: additions
+          documents:
+            $var: evidence
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $var: evidence
+          - 0
+        then:
+        - $call:
+            function: installTimelineAccess
+            args:
+              input:
+                documents:
+                  $map:
+                    in:
+                      $var: evidence
+                    item: access
+                    expr:
+                      $var: access
+                basePath: /partyAccess
+    - $let:
+        name: roster
+        expr:
+          $merge:
+          - $document: /activation/parties
+          - $var: additions
+    - $let:
+        name: groups
+        expr:
+          $call:
+            function: readerGroups
+            args:
+              roster:
+                $var: roster
+              readers:
+                $pointerGet:
+                  object:
+                    $document: /activation
+                  path: /readers
+                  default: {}
+    - $let:
+        name: requests
+        expr: {}
+    - $forEach:
+        item: party
+        in:
+          $document: /activation/parties
+        do:
+        - $let:
+            name: one
+            expr:
+              $objectSet:
+                object: {}
+                key:
+                  $var: role
+                val:
+                  $var: party
+        - $if:
+            cond:
+              $not:
+                $call:
+                  function: accessValid
+                  args:
+                    roster:
+                      $var: one
+                    readers:
+                      $var: groups
+                    accessPaths:
+                      $pointerGet:
+                        object:
+                          $document: /activation
+                        path: /accessPaths
+                        default: []
+            then:
+            - $let:
+                name: request
+                expr:
+                  admissionRef:
+                    $var: ref
+                  expectedRevision:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /expectedRevision
+                  itemPath:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /itemPath
+                  clauseKey:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /clauseKey
+                  party:
+                    $var: role
+                  channel:
+                    $pointerGet:
+                      object:
+                        $var: party
+                      path: /lead/channel
+                  readerGroups:
+                    $var: groups
+                  ready: false
+                  accessPath:
+                    $concat:
+                    - /timelineAccess/
+                    - $var: role
+                  expectedAccessEntry:
+                    $choose:
+                      cond:
+                        $exists:
+                          $document:
+                            $concat:
+                            - /timelineAccess/
+                            - $var: role
+                            - /contracts/checkpoint/entries/provider/event
+                      then:
+                        $nodeBlueId:
+                          $document:
+                            $concat:
+                            - /timelineAccess/
+                            - $var: role
+                            - /contracts/checkpoint/entries/provider/event
+                      else: ''
+            - $set:
+                name: requests
+                expr:
+                  $objectSet:
+                    object:
+                      $var: requests
+                    key:
+                      $var: role
+                    val:
+                      $var: request
+            - $appendEvent:
+                $merge:
+                - type: Activation/Party Access Update Requested
+                - $var: request
+        key: role
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          expectedRevision:
+            $pointerGet:
+              object:
+                $var: input
+              path: /expectedRevision
+          parties:
+            $var: additions
+          requests:
+            $var: requests
+    - $return: {}
+  refreshAccessRequests:
+    args: {}
+    do:
+    - $forEach:
+        item: addition
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /accessRequests
+            default: {}
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: addition
+                  path: /expectedRevision
+              - $document: /activation/revision
+            then:
+            - $forEach:
+                item: request
+                in:
+                  $pointerGet:
+                    object:
+                      $var: addition
+                    path: /requests
+                    default: {}
+                do:
+                - $let:
+                    name: one
+                    expr:
+                      $objectSet:
+                        object: {}
+                        key:
+                          $var: role
+                        val:
+                          $pointerGet:
+                            object:
+                              $document: /activation/parties
+                            path:
+                              $concat:
+                              - /
+                              - $var: role
+                - $let:
+                    name: ready
+                    expr:
+                      $call:
+                        function: accessValid
+                        args:
+                          roster:
+                            $var: one
+                          readers:
+                            $pointerGet:
+                              object:
+                                $var: request
+                              path: /readerGroups
+                          accessPaths:
+                            $pointerGet:
+                              object:
+                                $document: /activation
+                              path: /accessPaths
+                              default: []
+                - $if:
+                    cond:
+                      $ne:
+                      - $var: ready
+                      - $pointerGet:
+                          object:
+                            $var: request
+                          path: /ready
+                    then:
+                    - $appendChange:
+                        op: add
+                        path:
+                          $concat:
+                          - /activation/accessRequests/
+                          - $var: ref
+                          - /requests/
+                          - $var: role
+                          - /ready
+                        val:
+                          $var: ready
+                key: role
+        key: ref
+    - $return: {}
+  approveWithTerms:
+    args:
+      input:
+        description: Approve this party for the current negotiated terms and Activation revision.
+        revision:
+          type: Integer
+          description: Current Activation revision from the document activation.revision. A changed publication
+            requires a new review.
+        termsRef:
+          type: Text
+          description: The current negotiated terms reference stored in activation.terms.ref for the reviewed
+            publication.
+    do:
+    - $return:
+        $call:
+          function: approve
+          args:
+            input:
+              $var: input
+  updatePartyPublic:
+    args:
+      input:
+        type: Activation/Party Update Input
+        replacement:
+          description: Replacement party data selected by the user. Includes a lead representative channel;
+            no revision is required.
+          lead:
+            channel:
+              type: Contracts/Channel
+              description: The explicitly selected lead representative channel.
+    do:
+    - $return:
+        $call:
+          function: updateParty
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

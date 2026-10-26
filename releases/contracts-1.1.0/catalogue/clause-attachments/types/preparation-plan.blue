@@ -1,0 +1,992 @@
+name: Preparation Plan
+type: Attachments/Attachment Planning Functions
+functions:
+  plan:
+    args: {}
+    do:
+    - $let:
+        name: base
+        expr:
+          $call:
+            function: attachmentPlan
+            args: {}
+    - $let:
+        name: contributions
+        expr:
+          $var:
+            name: base
+            path: /contracts
+    - $let:
+        name: clause
+        expr:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+    - $let:
+        name: parameters
+        expr:
+          $var:
+            name: clause
+            path: /parameters
+    - $let:
+        name: constants
+        expr:
+          $pointerGet:
+            object:
+              $var: contributions
+            path:
+              $concat:
+              - /prepare_
+              - $const: clauseKey
+              - /contract/steps/0/constants
+    - $set:
+        name: constants
+        expr:
+          $merge:
+          - $var: constants
+          - obtain:
+              $pointerGet:
+                object:
+                  $var: parameters
+                path: /obtain
+                default: provide
+            admissionKey:
+              $pointerGet:
+                object:
+                  $var: parameters
+                path: /admissionClause
+                default: ''
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - create
+              - provide
+              val:
+                $var:
+                  name: constants
+                  path: /obtain
+        message: PREPARATION_INVALID_OBTAIN
+    - $forEach:
+        item: bindingPath
+        in:
+        - $var:
+            name: constants
+            path: /requestPath
+        - $var:
+            name: constants
+            path: /instructionPath
+        do:
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                - $concat:
+                  - /preparation_
+                  - $const: clauseKey
+                - $concat:
+                  - /admission_
+                  - $const: clauseKey
+                val:
+                  $var: bindingPath
+            message: PREPARATION_RESERVED_PATH
+    - $forEach:
+        item: operation
+        in:
+        - prepare
+        - attach
+        - create
+        - addAuthority
+        do:
+        - $set:
+            name: contributions
+            expr:
+              $pointerSet:
+                object:
+                  $var: contributions
+                path:
+                  $concat:
+                  - /
+                  - $var: operation
+                  - _
+                  - $const: clauseKey
+                op: remove
+    - $forEach:
+        item: action
+        in:
+        - begin
+        - provide
+        - resume
+        do:
+        - $let:
+            name: connections
+            expr:
+              $pointerGet:
+                object:
+                  $var: clause
+                path:
+                  $concat:
+                  - /bindings/
+                  - $var: action
+                default: {}
+        - $forEach:
+            item: connection
+            in:
+              $var: connections
+            do:
+            - $let:
+                name: mode
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: connection
+                    path: /on
+                    default: workflow
+            - $failIf:
+                cond:
+                  $not:
+                    $includes:
+                      list:
+                      - workflow
+                      - event
+                      val:
+                        $var: mode
+                message: PREPARATION_UNSUPPORTED_CONNECTION
+            - $failIf:
+                cond:
+                  $and:
+                  - $eq:
+                    - $var: action
+                    - provide
+                  - $ne:
+                    - $var: mode
+                    - workflow
+                message: PREPARATION_PROVISION_REQUIRES_WORKFLOW
+            - $let:
+                name: channel
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: connection
+                    path: /party
+                    default:
+                      $var:
+                        name: constants
+                        path: /actor
+            - $if:
+                cond:
+                  $eq:
+                  - $var: mode
+                  - event
+                then:
+                - $set:
+                    name: channel
+                    expr:
+                      $concat:
+                      - preparation_
+                      - $const: clauseKey
+                      - _
+                      - $var: connectionName
+                - $set:
+                    name: contributions
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: contributions
+                        key:
+                          $var: channel
+                        val:
+                          kind: channel
+                          contract:
+                            $merge:
+                            - type: Contracts/Triggered Event Channel
+                            - event:
+                                $var:
+                                  name: connection
+                                  path: /event
+            - $let:
+                name: program
+                expr:
+                - $literal:
+                    $let:
+                      name: trigger
+                      expr:
+                        $binding: call/request
+            - $if:
+                cond:
+                  $eq:
+                  - $var: mode
+                  - event
+                then:
+                - $set:
+                    name: program
+                    expr:
+                    - $literal:
+                        $let:
+                          name: trigger
+                          expr:
+                            $event: ''
+            - $set:
+                name: program
+                expr:
+                  $listConcat:
+                  - $var: program
+                  - - $pointerSet:
+                        object:
+                          $literal:
+                            $let:
+                              name: input
+                              expr: {}
+                        path: /$let/expr
+                        val:
+                          $pointerGet:
+                            object:
+                              $var: connection
+                            path: /params
+                            default:
+                              $literal:
+                                $var: trigger
+                    - $objectSet:
+                        object: {}
+                        key: $call
+                        val:
+                          function:
+                            $var: action
+                          args:
+                            $literal:
+                              input:
+                                $var: input
+            - $failIf:
+                cond:
+                  $exists:
+                    $get:
+                      object:
+                        $var: contributions
+                      key:
+                        $var: connectionName
+                message: PREPARATION_DUPLICATE_WORKFLOW
+            - $set:
+                name: contributions
+                expr:
+                  $objectSet:
+                    object:
+                      $var: contributions
+                    key:
+                      $var: connectionName
+                    val:
+                      kind: handler
+                      contract:
+                        $merge:
+                        - $choose:
+                            cond:
+                              $eq:
+                              - $var: mode
+                              - workflow
+                            then:
+                              type: Contracts/Sequential Workflow Operation
+                            else:
+                              type: Contracts/Sequential Workflow
+                        - channel:
+                            $var: channel
+                          steps:
+                          - $merge:
+                            - type: Contracts/Compute
+                            - definition:
+                                $objectSet:
+                                  object: {}
+                                  key: blueId
+                                  val:
+                                    $nodeBlueId:
+                                      type: Attachments/Preparation Functions
+                              constants:
+                                $merge:
+                                - $var: constants
+                                - automatic:
+                                    $eq:
+                                    - $var: mode
+                                    - event
+                              do:
+                                $var: program
+                        - $choose:
+                            cond:
+                              $exists:
+                                $document:
+                                  path:
+                                    $concat:
+                                    - /clauseRuntime/work/candidate/
+                                    - $const: clauseKey
+                                    - /bindings/
+                                    - $var: action
+                                    - /
+                                    - $var: connectionName
+                                    - /request
+                                  view: definition
+                            then:
+                              request:
+                                $document:
+                                  path:
+                                    $concat:
+                                    - /clauseRuntime/work/candidate/
+                                    - $const: clauseKey
+                                    - /bindings/
+                                    - $var: action
+                                    - /
+                                    - $var: connectionName
+                                    - /request
+                                  view: definition
+                            else: {}
+            key: connectionName
+    - $forEach:
+        item: watchPath
+        in:
+        - /activation
+        - $var:
+            name: constants
+            path: /instructionPath
+        do:
+        - $let:
+            name: channel
+            expr:
+              $concat:
+              - preparationResume_
+              - $const: clauseKey
+              - _
+              - $text:
+                  $var: watchIndex
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $var: channel
+                val:
+                  kind: channel
+                  contract:
+                    $merge:
+                    - type: Contracts/Document Update Channel
+                    - path:
+                        $var: watchPath
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $concat:
+                  - $var: channel
+                  - _run
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel:
+                        $var: channel
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition:
+                            $objectSet:
+                              object: {}
+                              key: blueId
+                              val:
+                                $nodeBlueId:
+                                  type: Attachments/Preparation Functions
+                          constants:
+                            $merge:
+                            - $var: constants
+                            - automatic: true
+                          do:
+                            $literal:
+                            - $call:
+                                function: resume
+                                args:
+                                  input: {}
+        index: watchIndex
+    - $forEach:
+        item: action
+        in:
+        - provide
+        - resume
+        do:
+        - $forEach:
+            item: connection
+            in:
+              $pointerGet:
+                object:
+                  $var: clause
+                path:
+                  $concat:
+                  - /bindings/
+                  - $var: action
+                default: {}
+            do:
+            - $let:
+                name: path
+                expr:
+                  $concat:
+                  - /
+                  - $var: connectionName
+                  - /contract/steps
+            - $set:
+                name: contributions
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: contributions
+                    path:
+                      $var: path
+                    val:
+                      $listConcat:
+                      - $pointerGet:
+                          object:
+                            $var: contributions
+                          path:
+                            $var: path
+                      - - $merge:
+                          - type: Contracts/Compute
+                          - definition:
+                              $objectSet:
+                                object: {}
+                                key: blueId
+                                val:
+                                  $nodeBlueId:
+                                    type: Attachments/Preparation Functions
+                            constants:
+                              $var: constants
+                            do:
+                              $literal:
+                              - $call:
+                                  function: prepareAdmission
+                                  args:
+                                    input: {}
+                        - $merge:
+                          - type: Contracts/Compute
+                          - definition:
+                              $objectSet:
+                                object: {}
+                                key: blueId
+                                val:
+                                  $nodeBlueId:
+                                    type: Amendments/Amendments Functions
+                            constants:
+                              clauseKey:
+                                $var:
+                                  name: constants
+                                  path: /admissionKey
+                              preparationKey:
+                                $const: clauseKey
+                              bindings:
+                                state:
+                                  $pointerGet:
+                                    object:
+                                      $document:
+                                        $concat:
+                                        - /clauseRuntime/work/candidate/
+                                        - $pointerGet:
+                                            object:
+                                              $var: constants
+                                            path: /admissionKey
+                                    path: /bindings/state
+                                    default: /amendments
+                                editable:
+                                  $pointerGet:
+                                    object:
+                                      $document:
+                                        $concat:
+                                        - /clauseRuntime/work/candidate/
+                                        - $pointerGet:
+                                            object:
+                                              $var: constants
+                                            path: /admissionKey
+                                    path: /bindings/editable
+                                    default: /termsEditable
+                              parameters:
+                                approvers:
+                                  $pointerGet:
+                                    object:
+                                      $document:
+                                        $concat:
+                                        - /clauseRuntime/work/candidate/
+                                        - $pointerGet:
+                                            object:
+                                              $var: constants
+                                            path: /admissionKey
+                                    path: /parameters/approvers
+                                    default: []
+                                paths:
+                                  $pointerGet:
+                                    object:
+                                      $document:
+                                        $concat:
+                                        - /clauseRuntime/work/candidate/
+                                        - $pointerGet:
+                                            object:
+                                              $var: constants
+                                            path: /admissionKey
+                                    path: /parameters/paths
+                                    default: []
+                            do:
+                              $literal:
+                              - $let:
+                                  name: p
+                                  expr:
+                                    $document:
+                                      $concat:
+                                      - /preparation_
+                                      - $const: preparationKey
+                                      - /admission
+                              - $let:
+                                  name: s
+                                  expr:
+                                    $document:
+                                      $pointerGet:
+                                        object:
+                                          $const: bindings
+                                        path: /state
+                                        default: /amendments
+                              - $if:
+                                  cond:
+                                    $and:
+                                    - $exists:
+                                        $var: p
+                                    - $not:
+                                        $eq:
+                                        - $pointerGet:
+                                            object:
+                                              $var: s
+                                            path: /history
+                                            default: {}
+                                        - true
+                                    - $includes:
+                                        list:
+                                          $pointerGet:
+                                            object:
+                                              $const: parameters
+                                            path: /approvers
+                                            default: []
+                                        val:
+                                          $binding: call/channel
+                                    - $or:
+                                      - $eq:
+                                        - $size:
+                                            $pointerGet:
+                                              object:
+                                                $var: s
+                                              path: /proposal
+                                              default: {}
+                                        - 0
+                                      - $eq:
+                                        - $pointerGet:
+                                            object:
+                                              $var: s
+                                            path: /proposal/id
+                                        - $var:
+                                            name: p
+                                            path: /proposalId
+                                    - $ne:
+                                      - $document:
+                                          $var:
+                                            name: p
+                                            path: /path
+                                      - $var:
+                                          name: p
+                                          path: /replacement
+                                  then:
+                                  - $call:
+                                      function: propose
+                                      args:
+                                        input:
+                                          $var: p
+                        - $merge:
+                          - type: Contracts/Compute
+                          - definition:
+                              $objectSet:
+                                object: {}
+                                key: blueId
+                                val:
+                                  $nodeBlueId:
+                                    type: Attachments/Preparation Admission Functions
+                            constants:
+                              $merge:
+                              - $var: constants
+                              - automatic: true
+                            do:
+                              $literal:
+                              - $call:
+                                  function: admit
+                                  args:
+                                    input: {}
+                        - $merge:
+                          - type: Contracts/Compute
+                          - definition:
+                              $objectSet:
+                                object: {}
+                                key: blueId
+                                val:
+                                  $nodeBlueId:
+                                    type: Attachments/Preparation Functions
+                            constants:
+                              $merge:
+                              - $var: constants
+                              - automatic: true
+                            do:
+                              $literal:
+                              - $call:
+                                  function: resume
+                                  args:
+                                    input: {}
+            key: connectionName
+    - $let:
+        name: admissionChannel
+        expr:
+          $concat:
+          - preparationAdmission_
+          - $const: clauseKey
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key:
+              $var: admissionChannel
+            val:
+              kind: channel
+              contract:
+                type: Contracts/Triggered Event Channel
+                event:
+                  type: Commerce/Domain Event
+                  kind: Amendment Applied
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key:
+              $concat:
+              - $var: admissionChannel
+              - _run
+            val:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow
+                - channel:
+                    $var: admissionChannel
+                  steps:
+                  - $merge:
+                    - type: Contracts/Compute
+                    - definition:
+                        $objectSet:
+                          object: {}
+                          key: blueId
+                          val:
+                            $nodeBlueId:
+                              type: Attachments/Preparation Admission Functions
+                      constants:
+                        $merge:
+                        - $var: constants
+                        - automatic: true
+                      do:
+                        $literal:
+                        - $call:
+                            function: admit
+                            args:
+                              input: {}
+                  - $merge:
+                    - type: Contracts/Compute
+                    - definition:
+                        $objectSet:
+                          object: {}
+                          key: blueId
+                          val:
+                            $nodeBlueId:
+                              type: Attachments/Preparation Functions
+                      constants:
+                        $merge:
+                        - $var: constants
+                        - automatic: true
+                      do:
+                        $literal:
+                        - $call:
+                            function: resume
+                            args:
+                              input: {}
+    - $forEach:
+        item: watchIndex
+        in:
+        - 0
+        - 1
+        do:
+        - $let:
+            name: path
+            expr:
+              $concat:
+              - /preparationResume_
+              - $const: clauseKey
+              - _
+              - $text:
+                  $var: watchIndex
+              - _run/contract/steps
+        - $set:
+            name: contributions
+            expr:
+              $pointerSet:
+                object:
+                  $var: contributions
+                path:
+                  $var: path
+                val:
+                - $merge:
+                  - type: Contracts/Compute
+                  - definition:
+                      $objectSet:
+                        object: {}
+                        key: blueId
+                        val:
+                          $nodeBlueId:
+                            type: Attachments/Preparation Admission Functions
+                    constants:
+                      $merge:
+                      - $var: constants
+                      - automatic: true
+                    do:
+                      $literal:
+                      - $call:
+                          function: admit
+                          args:
+                            input: {}
+                - $merge:
+                  - type: Contracts/Compute
+                  - definition:
+                      $objectSet:
+                        object: {}
+                        key: blueId
+                        val:
+                          $nodeBlueId:
+                            type: Attachments/Preparation Functions
+                    constants:
+                      $merge:
+                      - $var: constants
+                      - automatic: true
+                    do:
+                      $literal:
+                      - $call:
+                          function: resume
+                          args:
+                            input: {}
+    - $forEach:
+        item: connection
+        in:
+          $pointerGet:
+            object:
+              $var: clause
+            path: /bindings/begin
+            default: {}
+        do:
+        - $let:
+            name: path
+            expr:
+              $concat:
+              - /
+              - $var: connectionName
+              - /contract/steps
+        - $let:
+            name: following
+            expr:
+            - $merge:
+              - type: Contracts/Compute
+              - definition:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        type: Attachments/Preparation Functions
+                constants:
+                  $var: constants
+                do:
+                  $literal:
+                  - $call:
+                      function: prepared
+                      args:
+                        input: {}
+            - $merge:
+              - type: Contracts/Compute
+              - definition:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        type: Attachments/Preparation Functions
+                constants:
+                  $var: constants
+                do:
+                  $literal:
+                  - $call:
+                      function: createPrepared
+                      args:
+                        input: {}
+            - $merge:
+              - type: Contracts/Compute
+              - definition:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        type: Attachments/Preparation Functions
+                constants:
+                  $var: constants
+                do:
+                  $literal:
+                  - $call:
+                      function: resume
+                      args:
+                        input: {}
+        - $forEach:
+            item: followingStep
+            in:
+              $var: following
+            do:
+            - $set:
+                name: following
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: following
+                    path:
+                      $concat:
+                      - /
+                      - $text:
+                          $var: index
+                      - /constants
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: contributions
+                        path:
+                          $concat:
+                          - /
+                          - $var: connectionName
+                          - /contract/steps/0/constants
+            index: index
+        - $set:
+            name: contributions
+            expr:
+              $pointerSet:
+                object:
+                  $var: contributions
+                path:
+                  $var: path
+                val:
+                  $listConcat:
+                  - $pointerGet:
+                      object:
+                        $var: contributions
+                      path:
+                        $var: path
+                  - $var: following
+        key: connectionName
+    - $forEach:
+        item: contribution
+        in:
+          $var: contributions
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: contribution
+                  path: /kind
+              - handler
+            then:
+            - $let:
+                name: steps
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: contribution
+                    path: /contract/steps
+                    default: []
+            - $let:
+                name: tail
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: steps
+                    path:
+                      $concat:
+                      - /
+                      - $text:
+                          $subtract:
+                          - $size:
+                              $var: steps
+                          - 1
+            - $if:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $var: tail
+                      path: /do/0/$call/function
+                  - resume
+                then:
+                - $set:
+                    name: contributions
+                    expr:
+                      $pointerSet:
+                        object:
+                          $var: contributions
+                        path:
+                          $concat:
+                          - /
+                          - $var: contributionKey
+                          - /contract/steps
+                        val:
+                          $listConcat:
+                          - $var: steps
+                          - - $pointerSet:
+                                object:
+                                  $var: tail
+                                path: /do
+                                val:
+                                  $literal:
+                                  - $call:
+                                      function: settle
+                                      args:
+                                        input: {}
+        key: contributionKey
+    - $return:
+        $merge:
+        - $var: base
+        - contracts:
+            $var: contributions
+          states:
+            $merge:
+            - $var:
+                name: base
+                path: /states
+            - preparation:
+                path:
+                  $concat:
+                  - /preparation_
+                  - $const: clauseKey
+                kind: object
+                initial: {}
+              admission:
+                path:
+                  $concat:
+                  - /admission_
+                  - $const: clauseKey
+                kind: object
+                initial: {}

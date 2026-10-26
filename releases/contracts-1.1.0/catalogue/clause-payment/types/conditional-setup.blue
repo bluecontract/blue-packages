@@ -1,0 +1,796 @@
+name: Payment Setup
+type: Activation/Child Activation Functions
+description: 'One request-binding model: execute in PI by default; explicit agreement sources add a back-reference.
+  No secondary payment policy language.'
+functions:
+  validateRole:
+    args:
+      candidate:
+        type: Text
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $ne:
+              - $var: candidate
+              - ''
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: /
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: '~'
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: .
+              - 1
+        message: 'PAYMENT_ROLE: use an ordinary participant channel name'
+  buildInstruction:
+    args:
+      configOverride: {}
+      details: {}
+      methodClauses: {}
+      termsOverride: {}
+      instructionPatch: {}
+    do:
+    - $call:
+        function: requireActive
+        args:
+          channel:
+            $choose:
+              cond:
+                $eq:
+                - $const: sourceMode
+                - workflow
+              then:
+                $binding: call/channel
+              else: ''
+          workflow:
+            $eq:
+            - $const: sourceMode
+            - workflow
+    - $let:
+        name: config
+        expr:
+          $merge:
+          - payer: customer
+            payee: seller
+            guarantor: guarantor
+            amountMinor: 0
+            currency: EUR
+            recipientApprovalRequired: false
+            parties: []
+            readers: []
+            instructionClauses: {}
+          - $object:
+              $document:
+                $concat:
+                - /clauses/
+                - $const: clauseKey
+                - /parameters
+          - $var: configOverride
+    - $forEach:
+        item: key
+        in:
+          $keys:
+            $var: config
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - payer
+                  - payee
+                  - guarantor
+                  - amountMinor
+                  - currency
+                  - recipientApprovalRequired
+                  - parties
+                  - readers
+                  - instructionClauses
+                  - recipient
+                  val:
+                    $var: key
+            message: UNKNOWN_PAYMENT_PARAMETER
+    - $let:
+        name: amount
+        expr:
+          $choose:
+            cond:
+              $gt:
+              - $pointerGet:
+                  object:
+                    $var: config
+                  path: /amountMinor
+              - 0
+            then:
+              $pointerGet:
+                object:
+                  $var: config
+                path: /amountMinor
+            else:
+              $document:
+                $const:
+                  name: bindings
+                  path: /amount
+    - $let:
+        name: currency
+        expr:
+          $pointerGet:
+            object:
+              $var: config
+            path: /currency
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: amount
+                kind: integer
+            - $gt:
+              - $var: amount
+              - 0
+            - $lte:
+              - $var: amount
+              - 1000000000000
+            - $isKind:
+                val:
+                  $var: currency
+                kind: text
+            - $ne:
+              - $var: currency
+              - ''
+        message: INVALID_PAYMENT_TERMS
+    - $let:
+        name: destination
+        expr:
+          $const:
+            name: bindings
+            path: /instruction
+    - $let:
+        name: identityPath
+        expr:
+          $concat:
+          - /connectionState_
+          - $const: clauseKey
+          - /instructionIdentity
+    - $let:
+        name: identity
+        expr:
+          $choose:
+            cond:
+              $exists:
+                $document:
+                  $var: identityPath
+            then:
+              $document:
+                $var: identityPath
+            else:
+              $concat:
+              - $nodeBlueId:
+                  $document: ''
+              - ':'
+              - $const: clauseKey
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: destination
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $concat:
+                  - $var: destination
+                  - /instanceKey
+              - $var: identity
+            message: PAYMENT_DESTINATION_CONFLICT
+        - $return:
+            outcome: duplicate
+            created: false
+            path:
+              $var: destination
+    - $let:
+        name: authorBindings
+        expr:
+          $document:
+            $concat:
+            - /clauses/
+            - $const: clauseKey
+            - /bindings
+    - $let:
+        name: requestBindings
+        expr: {}
+    - $let:
+        name: needsHost
+        expr: false
+    - $forEach:
+        item: action
+        in:
+        - approveRecipient
+        - requestCapture
+        - requestRefund
+        - requestVoid
+        - requestPayeeAssignment
+        - requestTransactionDetailsUpdate
+        - requestFinalAmountResolution
+        - requestPaymentCompletionLock
+        - requestPaymentCompletionUnlock
+        - requestPaymentReversalLock
+        - requestPaymentReversalUnlock
+        - requestTransactionDetailsUpdateLock
+        - requestTransactionDetailsUpdateUnlock
+        - requestAuthorize
+        do:
+        - $let:
+            name: connections
+            expr:
+              $pointerGet:
+                object:
+                  $var: authorBindings
+                path:
+                  $concat:
+                  - /
+                  - $var: action
+                default: {}
+        - $let:
+            name: lowered
+            expr: {}
+        - $forEach:
+            item: connection
+            in:
+              $var: connections
+            do:
+            - $let:
+                name: originalScope
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: connection
+                    path: /in
+                    default: instruction
+            - $let:
+                name: result
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: connection
+                    path: /in
+                    op: remove
+            - $if:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $var: connection
+                      path: /on
+                  - timer
+                then:
+                - $forEach:
+                    item: field
+                    in:
+                    - afterEvent
+                    - cancelOn
+                    do:
+                    - $if:
+                        cond:
+                          $exists:
+                            $pointerGet:
+                              object:
+                                $var: connection
+                              path:
+                                $concat:
+                                - /
+                                - $var: field
+                        then:
+                        - $let:
+                            name: loweredSource
+                            expr:
+                              $call:
+                                function: lowerPaymentSource
+                                args:
+                                  source:
+                                    $pointerGet:
+                                      object:
+                                        $var: connection
+                                      path:
+                                        $concat:
+                                        - /
+                                        - $var: field
+                                  scope:
+                                    $var: originalScope
+                        - $set:
+                            name: needsHost
+                            expr:
+                              $or:
+                              - $var: needsHost
+                              - $pointerGet:
+                                  object:
+                                    $var: loweredSource
+                                  path: /needsHost
+                        - $set:
+                            name: result
+                            expr:
+                              $pointerSet:
+                                object:
+                                  $var: result
+                                path:
+                                  $concat:
+                                  - /
+                                  - $var: field
+                                val:
+                                  $pointerGet:
+                                    object:
+                                      $var: loweredSource
+                                    path: /source
+                else:
+                - $let:
+                    name: loweredSource
+                    expr:
+                      $call:
+                        function: lowerPaymentSource
+                        args:
+                          source:
+                            $var: connection
+                          scope:
+                            $var: originalScope
+                - $set:
+                    name: needsHost
+                    expr:
+                      $or:
+                      - $var: needsHost
+                      - $pointerGet:
+                          object:
+                            $var: loweredSource
+                          path: /needsHost
+                - $set:
+                    name: result
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: loweredSource
+                        path: /source
+            - $set:
+                name: lowered
+                expr:
+                  $objectSet:
+                    object:
+                      $var: lowered
+                    key:
+                      $var: nameKey
+                    val:
+                      $var: result
+            key: nameKey
+        - $if:
+            cond:
+              $gt:
+              - $size:
+                  $var: lowered
+              - 0
+            then:
+            - $set:
+                name: requestBindings
+                expr:
+                  $objectSet:
+                    object:
+                      $var: requestBindings
+                    key:
+                      $var: action
+                    val:
+                      $var: lowered
+    - $let:
+        name: roles
+        expr:
+        - $pointerGet:
+            object:
+              $var: config
+            path: /payer
+        - $pointerGet:
+            object:
+              $var: config
+            path: /payee
+        - $pointerGet:
+            object:
+              $var: config
+            path: /guarantor
+    - $forEach:
+        item: role
+        in:
+          $var: roles
+        do:
+        - $call:
+            function: validateRole
+            args:
+              candidate:
+                $var: role
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $concat:
+                    - /activation/parties/
+                    - $var: role
+            message: PAYMENT_PARTY_NOT_IN_ACTIVATION
+    - $let:
+        name: terms
+        expr:
+          $merge:
+          - amountMinor:
+              $var: amount
+            limitMinor:
+              $var: amount
+            currency:
+              $var: currency
+            payerChannel:
+              $pointerGet:
+                object:
+                  $var: config
+                path: /payer
+            payeeChannel:
+              $pointerGet:
+                object:
+                  $var: config
+                path: /payee
+            guarantorChannel: guarantor
+            allowedPayees:
+            - $pointerGet:
+                object:
+                  $var: config
+                path: /payee
+            recipientApprovalRequired:
+              $pointerGet:
+                object:
+                  $var: config
+                path: /recipientApprovalRequired
+            captureGate: ''
+          - $var: termsOverride
+    - $let:
+        name: child
+        expr:
+          $literal:
+            name: Payment Instruction
+            type: PaymentInstruction/Payment Instruction with Clauses
+            clauses:
+              payment:
+                type: PaymentInstruction/Payment Request Actions
+                bindings: {}
+            paymentTerms: {}
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: instructionPatch
+            key: rootType
+        then:
+        - $set:
+            name: child
+            expr:
+              $objectSet:
+                object:
+                  $var: child
+                key: type
+                val:
+                  $var:
+                    name: instructionPatch
+                    path: /rootType
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: instructionPatch
+            key: contracts
+        then:
+        - $set:
+            name: child
+            expr:
+              $objectSet:
+                object:
+                  $var: child
+                key: contracts
+                val:
+                  $var:
+                    name: instructionPatch
+                    path: /contracts
+    - $set:
+        name: child
+        expr:
+          $merge:
+          - $var: child
+          - instanceKey:
+              $var: identity
+            paymentTerms:
+              $var: terms
+            paymentDetails:
+              $var: details
+    - $set:
+        name: child
+        expr:
+          $pointerSet:
+            object:
+              $var: child
+            path: /clauses/payment/bindings
+            val:
+              $var: requestBindings
+    - $forEach:
+        item: clause
+        in:
+          $merge:
+          - $var: methodClauses
+          - $pointerGet:
+              object:
+                $var: config
+              path: /instructionClauses
+        do:
+        - $call:
+            function: validateRole
+            args:
+              candidate:
+                $var: key
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                - activation
+                - payment
+                val:
+                  $var: key
+            message: PAYMENT_CLAUSE_KEY_RESERVED
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path:
+                  $concat:
+                  - /clauses/
+                  - $var: key
+                val:
+                  $var: clause
+        key: key
+    - $set:
+        name: child
+        expr:
+          $call:
+            function: activateChild
+            args:
+              child:
+                $var: child
+              roles:
+                $pointerGet:
+                  object:
+                    $var: config
+                  path: /parties
+              readerNames:
+                $pointerGet:
+                  object:
+                    $var: config
+                  path: /readers
+              frozen: true
+    - $forEach:
+        item: role
+        in:
+          $var: roles
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: child
+                    path:
+                      $concat:
+                      - /clauses/activation/parameters/parties/
+                      - $var: role
+            message: PAYMENT_PARTY_EXCLUDED
+    - $if:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: config
+              path: /guarantor
+          - guarantor
+        then:
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path: /clauses/activation/parameters/parties/guarantor
+                val:
+                  $pointerGet:
+                    object:
+                      $var: child
+                    path:
+                      $concat:
+                      - /clauses/activation/parameters/parties/
+                      - $pointerGet:
+                          object:
+                            $var: config
+                          path: /guarantor
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path: /contracts/guarantor
+                val:
+                  $pointerGet:
+                    object:
+                      $var: child
+                    path:
+                      $concat:
+                      - /contracts/
+                      - $pointerGet:
+                          object:
+                            $var: config
+                          path: /guarantor
+    - $if:
+        cond:
+          $var: needsHost
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document: /contracts/initialized
+            message: PAYMENT_CYCLE_REQUIRES_INITIALIZED_HOST
+        - $set:
+            name: child
+            expr:
+              $pointerSet:
+                object:
+                  $var: child
+                path: /sources/order
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document: ''
+    - $appendChange:
+        op: add
+        path:
+          $var: identityPath
+        val:
+          $var: identity
+    - $appendChange:
+        op: add
+        path:
+          $var: destination
+        val:
+          $var: child
+    - $return:
+        created: true
+        outcome: acceptedNew
+        path:
+          $var: destination
+  lowerPaymentSource:
+    args:
+      source: {}
+      scope:
+        type: Text
+    do:
+    - $let:
+        name: selectedScope
+        expr:
+          $pointerGet:
+            object:
+              $var: source
+            path: /in
+            default:
+              $var: scope
+    - $let:
+        name: mode
+        expr:
+          $pointerGet:
+            object:
+              $var: source
+            path: /on
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - instruction
+              - agreement
+              val:
+                $var: selectedScope
+        message: 'PAYMENT_SCOPE: use instruction or agreement'
+    - $let:
+        name: result
+        expr:
+          $pointerSet:
+            object:
+              $var: source
+            path: /in
+            op: remove
+    - $if:
+        cond:
+          $eq:
+          - $var: selectedScope
+          - agreement
+        then:
+        - $failIf:
+            cond:
+              $eq:
+              - $var: mode
+              - workflow
+            message: 'PAYMENT_WORKFLOW: request workflows belong to the Payment Instruction'
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - event
+                  - change
+                  - embedded
+                  - collection
+                  val:
+                    $var: mode
+            message: 'PAYMENT_SOURCE: use an event, property change or embedded document from the agreement'
+        - $if:
+            cond:
+              $eq:
+              - $var: mode
+              - event
+            then:
+            - $set:
+                name: result
+                expr:
+                  $merge:
+                  - $var: result
+                  - 'on': embedded
+                    path: /sources/order
+        - $if:
+            cond:
+              $includes:
+                list:
+                - change
+                - embedded
+                - collection
+                val:
+                  $var: mode
+            then:
+            - $set:
+                name: result
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: result
+                    path: /path
+                    val:
+                      $concat:
+                      - /sources/order
+                      - $pointerGet:
+                          object:
+                            $var: source
+                          path: /path
+    - $return:
+        source:
+          $var: result
+        needsHost:
+          $eq:
+          - $var: selectedScope
+          - agreement

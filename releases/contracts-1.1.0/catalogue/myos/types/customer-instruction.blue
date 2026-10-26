@@ -1,0 +1,93 @@
+name: MyOS Customer Payment Instruction
+type: PaymentInstruction/Payment Instruction with Clauses
+description: Customer funding session operations belong to this instruction, alongside the standard guarantor
+  protocol.
+clauses:
+  customerSessionState:
+    type:
+      name: Customer Session State
+      type: Connections/Connected Clause
+      bindingTypes:
+        state: pointer
+      defaultBindings:
+        state: /customerSession
+      initialState:
+        state:
+          id: ''
+          funded: false
+          requested: false
+          expiresAt: 0
+contracts:
+  provideSession:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Session Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: provideSessionPublic
+          args:
+            input:
+              $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: MyOS/Customer Session Functions
+      function: provideSessionPublic
+      argument: input
+  confirmFunding:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Session Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: confirmFunding
+          args:
+            input:
+              $object:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: MyOS/Customer Session Functions
+      function: confirmFunding
+      argument: input
+  requestCustomerFunding:
+    type: Contracts/Sequential Workflow Operation
+    channel: payer
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Session Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: requestFunding
+          args:
+            input:
+              $object:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: MyOS/Customer Session Functions
+      function: requestFunding
+      argument: input
+paymentTerms:
+  initiationGate: /customerSession/funded

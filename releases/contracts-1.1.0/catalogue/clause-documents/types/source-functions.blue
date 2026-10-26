@@ -1,0 +1,484 @@
+name: Source Functions
+type: Documents/Document Access Functions
+description: Named dependencies bind immutable native process identities. Binding a source does not change
+  commercial approval requirements.
+functions:
+  processOrigin:
+    args:
+      document: {}
+    do:
+    - $let:
+        name: original
+        expr:
+          $pointerGet:
+            object:
+              $var: document
+            path: /contracts/initialized/document
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: original
+        message: SOURCE_INITIALIZED_PROCESS_REQUIRED
+    - $return:
+        $nodeBlueId:
+          $var: original
+  requireRosterCoverage:
+    args:
+      required: {}
+      available: {}
+    do:
+    - $forEach:
+        item: needed
+        in:
+          $var: required
+        do:
+        - $let:
+            name: matched
+            expr: false
+        - $forEach:
+            item: candidateParty
+            in:
+              $var: available
+            do:
+            - $if:
+                cond:
+                  $eq:
+                  - $nodeBlueId:
+                      $pointerGet:
+                        object:
+                          $var: needed
+                        path: /lead/channel
+                  - $nodeBlueId:
+                      $pointerGet:
+                        object:
+                          $var: candidateParty
+                        path: /lead/channel
+                then:
+                - $call:
+                    function: requireSameMainParty
+                    args:
+                      left:
+                        $var: needed
+                      right:
+                        $var: candidateParty
+                - $set:
+                    name: matched
+                    expr: true
+            key: availableRole
+        - $failIf:
+            cond:
+              $not:
+                $var: matched
+            message: SOURCE_MAIN_PARTY_MISSING
+        key: requiredRole
+    - $return: true
+  rosterCovers:
+    args:
+      required: {}
+      available: {}
+    do:
+    - $forEach:
+        item: needed
+        in:
+          $var: required
+        do:
+        - $let:
+            name: matched
+            expr: false
+        - $forEach:
+            item: candidateParty
+            in:
+              $var: available
+            do:
+            - $if:
+                cond:
+                  $eq:
+                  - $nodeBlueId:
+                      $pointerGet:
+                        object:
+                          $var: needed
+                        path: /lead/channel
+                  - $nodeBlueId:
+                      $pointerGet:
+                        object:
+                          $var: candidateParty
+                        path: /lead/channel
+                then:
+                - $let:
+                    name: keys
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: needed
+                        path: /readerKeys
+                        default: []
+                - $let:
+                    name: otherKeys
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: candidateParty
+                        path: /readerKeys
+                        default: []
+                - $let:
+                    name: keysMatch
+                    expr:
+                      $and:
+                      - $ne:
+                        - $size:
+                            $var: keys
+                        - 0
+                      - $eq:
+                        - $size:
+                            $var: keys
+                        - $size:
+                            $var: otherKeys
+                - $forEach:
+                    item: readerKey
+                    in:
+                      $var: keys
+                    do:
+                    - $if:
+                        cond:
+                          $not:
+                            $includes:
+                              list:
+                                $var: otherKeys
+                              val:
+                                $var: readerKey
+                        then:
+                        - $set:
+                            name: keysMatch
+                            expr: false
+                - $if:
+                    cond:
+                      $var: keysMatch
+                    then:
+                    - $set:
+                        name: matched
+                        expr: true
+            key: availableRole
+        - $if:
+            cond:
+              $not:
+                $var: matched
+            then:
+            - $return: false
+        key: requiredRole
+    - $return: true
+  validateSource:
+    args:
+      source: {}
+      requirement: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $call:
+              function: processOrigin
+              args:
+                document:
+                  $var: source
+          - $var:
+              name: requirement
+              path: /origin
+        message: SOURCE_IDENTITY_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: source
+              path: /activation/active
+          - true
+        message: SOURCE_INACTIVE
+    - $call:
+        function: requireRosterCoverage
+        args:
+          required:
+            $document: /activation/parties
+          available:
+            $pointerGet:
+              object:
+                $var: source
+              path: /activation/parties
+    - $return: true
+  bindSource:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: alias
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /alias
+            default: ''
+    - $let:
+        name: requirements
+        expr:
+          $document: /clauses/documentSources/parameters/requirements
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var: requirements
+              key:
+                $var: alias
+        message: SOURCE_UNDECLARED_NAME
+    - $let:
+        name: requirement
+        expr:
+          $get:
+            object:
+              $var: requirements
+            key:
+              $var: alias
+    - $let:
+        name: source
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /document
+    - $let:
+        name: sourcePath
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /sourcePath
+            default: ''
+    - $if:
+        cond:
+          $ne:
+          - $var: sourcePath
+          - ''
+        then:
+        - $set:
+            name: source
+            expr:
+              $document:
+                $var: sourcePath
+    - $call:
+        function: validateSource
+        args:
+          source:
+            $var: source
+          requirement:
+            $var: requirement
+    - $let:
+        name: path
+        expr:
+          $concat:
+          - /sources/
+          - $var: alias
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $var: path
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $call:
+                  function: processOrigin
+                  args:
+                    document:
+                      $document:
+                        $var: path
+              - $var:
+                  name: requirement
+                  path: /origin
+            message: SOURCE_REBINDING_FORBIDDEN
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path:
+          $var: path
+        val:
+          $objectFromEntries:
+          - key: blueId
+            val:
+              $nodeBlueId:
+                $var: source
+    - $return:
+        outcome: acceptedNew
+  namedSourcesReady:
+    args:
+      document: {}
+    do:
+    - $let:
+        name: requirements
+        expr:
+          $pointerGet:
+            object:
+              $var: document
+            path: /clauses/documentSources/parameters/requirements
+            default: {}
+    - $forEach:
+        item: requirement
+        in:
+          $var: requirements
+        do:
+        - $let:
+            name: source
+            expr:
+              $pointerGet:
+                object:
+                  $var: document
+                path:
+                  $concat:
+                  - /sources/
+                  - $var: alias
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: source
+                    path: /contracts/initialized
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $ne:
+              - $call:
+                  function: processOrigin
+                  args:
+                    document:
+                      $var: source
+              - $var:
+                  name: requirement
+                  path: /origin
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: source
+                  path: /activation/active
+              - true
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $not:
+                $call:
+                  function: rosterCovers
+                  args:
+                    required:
+                      $pointerGet:
+                        object:
+                          $var: document
+                        path: /activation/parties
+                    available:
+                      $pointerGet:
+                        object:
+                          $var: source
+                        path: /activation/parties
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $ne:
+              - $var:
+                  name: requirement
+                  path: /selectionPath
+              - ''
+            then:
+            - $let:
+                name: selected
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: source
+                    path:
+                      $var:
+                        name: requirement
+                        path: /selectionPath
+            - $if:
+                cond:
+                  $not:
+                    $exists:
+                      $pointerGet:
+                        object:
+                          $var: selected
+                        path: /contracts/initialized
+                then:
+                - $return: false
+            - $if:
+                cond:
+                  $ne:
+                  - $call:
+                      function: processOrigin
+                      args:
+                        document:
+                          $var: selected
+                  - $call:
+                      function: processOrigin
+                      args:
+                        document:
+                          $var: document
+                then:
+                - $return: false
+        key: alias
+    - $return: true
+  refreshSourceReadiness:
+    args: {}
+    do:
+    - $let:
+        name: ready
+        expr:
+          $call:
+            function: namedSourcesReady
+            args:
+              document:
+                $document: ''
+    - $if:
+        cond:
+          $ne:
+          - $document: /sourceLinks/ready
+          - $var: ready
+        then:
+        - $appendChange:
+            op: add
+            path: /sourceLinks
+            val:
+              ready:
+                $var: ready
+        - $appendEvent:
+            $merge:
+            - type: Documents/Source Readiness Changed
+            - ready:
+                $var: ready
+    - $return:
+        outcome: acceptedNew
+
+  bindSourcePublic:
+    args:
+      input:
+        type: Documents/Source Binding Input
+        alias:
+          type: Text
+          description: Configured source requirement alias. Supply document or sourcePath; execution checks the
+            declared source origin and roster.
+    do:
+    - $return:
+        $call:
+          function: bindSource
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

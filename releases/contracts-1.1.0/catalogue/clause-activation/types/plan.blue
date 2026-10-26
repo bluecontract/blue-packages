@@ -1,0 +1,959 @@
+name: Activation Plan Functions
+type: Activation/Activation Functions
+functions:
+  configuration:
+    args: {}
+    do:
+    - $return:
+        $document:
+          $concat:
+          - /clauseRuntime/work/candidate/
+          - $const: clauseKey
+          - /parameters
+  validateConfiguration:
+    args: {}
+    do:
+    - $let:
+        name: p
+        expr:
+          $call:
+            function: configuration
+            args: {}
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /parties
+              kind: object
+        message: ACTIVATION_PARTIES_REQUIRED
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /parties
+                default: {}
+          - 0
+        message: ACTIVATION_PARTIES_REQUIRED
+    - $forEach:
+        item: party
+        in:
+          $pointerGet:
+            object:
+              $var: p
+            path: /parties
+            default: {}
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: validPartyName
+                  args:
+                    candidate:
+                      $var: role
+            message: INVALID_PARTY_NAME
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: party
+                    path: /lead/channel
+            message: PARTY_LEAD_CHANNEL_REQUIRED
+        - $forEach:
+            item: rep
+            in:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /representatives
+                default: {}
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $call:
+                      function: validPartyName
+                      args:
+                        candidate:
+                          $var: repId
+                message: INVALID_REPRESENTATIVE_NAME
+            key: repId
+        key: role
+    - $let:
+        name: seenPaths
+        expr: []
+    - $forEach:
+        item: path
+        in:
+          $pointerGet:
+            object:
+              $var: p
+            path: /negotiation/allowedPaths
+            default: []
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: path
+                  kind: text
+            message: INVALID_NEGOTIATION_PATH
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                  $var: seenPaths
+                val:
+                  $var: path
+            message: DUPLICATE_NEGOTIATION_PATH
+        - $set:
+            name: seenPaths
+            expr:
+              $listConcat:
+              - $var: seenPaths
+              - - $var: path
+        - $let:
+            name: parts
+            expr:
+              $split:
+                text:
+                  $var: path
+                separator: /
+        - $forEach:
+            item: segment
+            index: segmentIndex
+            in:
+              $var: parts
+            do:
+            - $failIf:
+                cond:
+                  $and:
+                  - $gt:
+                    - $var: segmentIndex
+                    - 0
+                  - $eq:
+                    - $var: segment
+                    - ''
+                message: INVALID_NEGOTIATION_PATH
+        - $failIf:
+            cond:
+              $or:
+              - $lt:
+                - $size:
+                    $var: parts
+                - 2
+              - $ne:
+                - $listGet:
+                    list:
+                      $var: parts
+                    index: 0
+                - ''
+              - $gt:
+                - $size:
+                    $split:
+                      text:
+                        $var: path
+                      separator: '~'
+                - 1
+            message: INVALID_NEGOTIATION_PATH
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                - clauses
+                - contracts
+                - activation
+                - clauseRuntime
+                - type
+                - name
+                - description
+                val:
+                  $listGet:
+                    list:
+                      $var: parts
+                    index: 1
+            message: EXECUTABLE_OR_CONTROL_TERMS_PATH
+        - $forEach:
+            item: accessPath
+            in:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /accessPaths
+                default: []
+            do:
+            - $failIf:
+                cond:
+                  $or:
+                  - $eq:
+                    - $var: path
+                    - $var: accessPath
+                  - $startsWith:
+                    - $var: path
+                    - $concat:
+                      - $var: accessPath
+                      - /
+                message: ACCESS_IS_NOT_COMMERCIAL_TERMS
+    - $return:
+        allowed: true
+        code: ''
+  validateTransition:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $and:
+          - $gt:
+            - $size:
+                $pointerGet:
+                  object:
+                    $document: /clauses/activation/parameters
+                  path: /negotiation/allowedPaths
+                  default: []
+            - 0
+          - $ne:
+            - $document: /activation/everActivated
+            - true
+          - $ne:
+            - $document: /clauses
+            - $document: /clauseRuntime/work/candidate
+        then:
+        - $return:
+            allowed: false
+            code: NEGOTIATION_POLICY_LOCKED
+    - $return:
+        allowed:
+          $eq:
+          - $document:
+              $concat:
+              - /clauses/
+              - $const: clauseKey
+          - $document:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - $const: clauseKey
+        code: USE_ACTIVATION_PARTY_OPERATIONS
+  plan:
+    args: {}
+    do:
+    - $let:
+        name: controlChannels
+        expr: []
+    - $let:
+        name: p
+        expr:
+          $call:
+            function: configuration
+            args: {}
+    - $let:
+        name: roster
+        expr:
+          $pointerGet:
+            object:
+              $var: p
+            path: /parties
+            default: {}
+    - $let:
+        name: contributions
+        expr:
+          $call:
+            function: rosterContracts
+            args:
+              parameters:
+                $var: p
+              roster:
+                $var: roster
+              runtimeDefinition:
+                type: Activation/Activation Functions
+    - $set:
+        name: contributions
+        expr:
+          $merge:
+          - $var: contributions
+          - activationInitialized:
+              kind: channel
+              contract:
+                type: Contracts/Triggered Event Channel
+                event:
+                  type: Clauses/Clauses Initialized
+            activationPartyAddition:
+              kind: channel
+              contract:
+                type: Contracts/Triggered Event Channel
+                event:
+                  type: Activation/Party Addition Requested
+            activationPartyAdditionHandler:
+              kind: handler
+              contract:
+                type: Contracts/Sequential Workflow
+                channel: activationPartyAddition
+                steps:
+                - type: Contracts/Compute
+                  definition:
+                    type: Activation/Activation Functions
+                  do:
+                  - $literal:
+                      $call:
+                        function: requestPartyAddition
+                        args: {}
+                - type: Activation/Refresh Activation
+            activationInitializedRefresh:
+              kind: handler
+              contract:
+                type: Contracts/Sequential Workflow
+                channel: activationInitialized
+                steps:
+                - type: Activation/Refresh Activation
+    - $forEach:
+        item: contribution
+        in:
+          $var: contributions
+        do:
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: contribution
+                    path: /kind
+                - channel
+              - $exists:
+                  $document:
+                    $concat:
+                    - /contracts/
+                    - $var: key
+              - $not:
+                  $hasKey:
+                    object:
+                      $document: /clauseRuntime/contracts
+                    key:
+                      $var: key
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document:
+                      $concat:
+                      - /contracts/
+                      - $var: key
+                  - $pointerGet:
+                      object:
+                        $var: contribution
+                      path: /contract
+                message: ACTIVATION_CHANNEL_CONFLICT
+            - $set:
+                name: contributions
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: contributions
+                    path:
+                      $concat:
+                      - /
+                      - $var: key
+                    op: remove
+        key: key
+    - $let:
+        name: paths
+        expr:
+          $pointerGet:
+            object:
+              $var: p
+            path: /accessPaths
+            default: []
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: embedded
+            val:
+              kind: embedding
+              contract:
+                $merge:
+                - type: Contracts/Process Embedded
+                - paths:
+                    $var: paths
+                  collectionPaths:
+                  - /partyAccess
+    - $let:
+        name: index
+        expr: 0
+    - $forEach:
+        item: path
+        in:
+          $var: paths
+        do:
+        - $let:
+            name: key
+            expr:
+              $concat:
+              - activationAccess
+              - $text:
+                  $var: index
+        - $set:
+            name: controlChannels
+            expr:
+              $listConcat:
+              - $var: controlChannels
+              - - $var: key
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $var: key
+                val:
+                  kind: channel
+                  contract:
+                    $merge:
+                    - type: Contracts/Embedded Node Channel
+                    - sourcePath:
+                        $var: path
+                      event:
+                        type: Coordination/Timeline Access Updated
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $concat:
+                  - $var: key
+                  - Changed
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel:
+                        $var: key
+                      steps:
+                      - type: Activation/Refresh Activation
+        - $set:
+            name: index
+            expr:
+              $add:
+              - $var: index
+              - 1
+    - $let:
+        name: preOperations
+        expr:
+          $pointerGet:
+            object:
+              $var: p
+            path: /preActivationOperations
+            default: []
+    - $forEach:
+        item: party
+        key: role
+        in:
+          $var: roster
+        do:
+        - $set:
+            name: preOperations
+            expr:
+              $listConcat:
+              - $var: preOperations
+              - - $concat:
+                  - approve_
+                  - $var: role
+                - $concat:
+                  - updateParty_
+                  - $var: role
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /negotiation/allowedPaths
+                default: []
+          - 0
+        then:
+        - $let:
+            name: negotiators
+            expr:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /required
+                default:
+                  $keys:
+                    $var: roster
+        - $failIf:
+            cond:
+              $eq:
+              - $size:
+                  $var: negotiators
+              - 0
+            message: NEGOTIATION_REQUIRES_APPROVERS
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $document: /type
+            message: NEGOTIATION_TARGET_TYPE_REQUIRED
+        - $let:
+            name: matcher
+            expr:
+              $literal:
+                args:
+                  candidate: {}
+                do:
+                - $return:
+                    $is:
+                      node:
+                        $var: candidate
+                      pattern: {}
+        - $set:
+            name: matcher
+            expr:
+              $pointerSet:
+                object:
+                  $var: matcher
+                path: /do/0/$return/$is/pattern
+                op: set
+                val:
+                  $objectSet:
+                    object: {}
+                    key: type
+                    val:
+                      $document: /type
+        - $let:
+            name: library
+            expr:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /clauseRuntime/work/candidate/
+                    - $const: clauseKey
+                path: /negotiationDefinition/functions
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: library
+                  key: proposeChanges
+            message: NEGOTIATION_FUNCTION_LIBRARY_REQUIRED
+        - $let:
+            name: definition
+            expr:
+              type: Contracts/Compute Definition
+              functions:
+                $objectSet:
+                  object:
+                    $var: library
+                  key: validTermsCandidate
+                  val:
+                    $var: matcher
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key: activationNegotiationDefinition
+                val:
+                  kind: definition
+                  contract:
+                    $var: definition
+        - $forEach:
+            item: role
+            in:
+              $var: negotiators
+            do:
+            - $forEach:
+                item: operation
+                in:
+                - proposeChanges
+                - proposeAndActivate
+                - activate
+                - withdrawProposal
+                - rejectProposal
+                - withdrawAcceptance
+                do:
+                - $let:
+                    name: operationName
+                    expr:
+                      $concat:
+                      - $var: operation
+                      - _
+                      - $var: role
+                - $set:
+                    name: preOperations
+                    expr:
+                      $listConcat:
+                      - $var: preOperations
+                      - - $var: operationName
+                - $let:
+                    name: step
+                    expr:
+                      type: Contracts/Compute
+                - $set:
+                    name: step
+                    expr:
+                      $merge:
+                      - $var: step
+                      - definition: /contracts/activationNegotiationDefinition
+                        constants:
+                          clauseKey: activationNegotiation
+                          fieldPaths:
+                            $pointerGet:
+                              object:
+                                $var: p
+                              path: /negotiation/allowedPaths
+                              default: []
+                          parameters:
+                            approvers:
+                              $var: negotiators
+                            paths:
+                            - /activation/terms/fields
+                          bindings:
+                            state: /activation/negotiation
+                            editable: /activation/negotiation/editable
+                        do:
+                        - $pointerSet:
+                            object:
+                              $literal:
+                                $call:
+                                  function: ''
+                                  args:
+                                    input:
+                                      $binding: call/request
+                            path: /$call/function
+                            op: set
+                            val:
+                              $concat:
+                              - $var: operation
+                              - Public
+                - $let:
+                    name: operationContract
+                    expr:
+                      type: Contracts/Sequential Workflow Operation
+                - $set:
+                    name: operationContract
+                    expr:
+                      $merge:
+                      - $var: operationContract
+                      - channel:
+                          $var: role
+                        steps:
+                        - $var: step
+                      - $get:
+                          object:
+                            $literal:
+                              proposeChanges:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: proposeChangesPublic
+                                  argument: input
+                              proposeAndActivate:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: proposeAndActivatePublic
+                                  argument: input
+                              activate:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: activatePublic
+                                  argument: input
+                              withdrawProposal:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: withdrawProposalPublic
+                                  argument: input
+                              rejectProposal:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: rejectProposalPublic
+                                  argument: input
+                              withdrawAcceptance:
+                                $blue:requestFrom:
+                                  definition:
+                                    type: Activation/Negotiation Functions
+                                  function: withdrawAcceptancePublic
+                                  argument: input
+                          key:
+                            $var: operation
+                - $set:
+                    name: contributions
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: contributions
+                        key:
+                          $var: operationName
+                        val:
+                          kind: handler
+                          contract:
+                            $var: operationContract
+    - $let:
+        name: policy
+        expr:
+          type: Dispatch/Document Dispatch Policy
+          definition:
+            type: Parties/Party Access Functions
+    - $set:
+        name: policy
+        expr:
+          $merge:
+          - $var: policy
+          - constants:
+              controlChannels:
+                $var: controlChannels
+              preOperations:
+                $var: preOperations
+              preChannels:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /preActivationChannels
+                  default: []
+            do:
+              $literal:
+              - $if:
+                  cond:
+                    $or:
+                    - $and:
+                      - $eq:
+                        - $binding: dispatch/kind
+                        - TRIGGERED
+                      - $includes:
+                          list:
+                          - activationInitialized
+                          val:
+                            $binding: dispatch/channel
+                    - $and:
+                      - $eq:
+                        - $binding: dispatch/kind
+                        - EMBEDDED
+                      - $includes:
+                          list:
+                            $listConcat:
+                            - $const: controlChannels
+                            - $pointerGet:
+                                object:
+                                  $document: /activation
+                                path: /registeredAccessChannels
+                                default: []
+                          val:
+                            $binding: dispatch/channel
+                  then:
+                  - $return:
+                      allowed: true
+              - $if:
+                  cond:
+                    $not:
+                      $exists:
+                        $document: /activation
+                  then:
+                  - $return:
+                      allowed: false
+                      reason: ACTIVATION_NOT_INITIALIZED
+              - $let:
+                  name: s
+                  expr:
+                    $document: /activation
+              - $if:
+                  cond:
+                    $and:
+                    - $eq:
+                      - $binding: dispatch/kind
+                      - EXTERNAL
+                    - $exists:
+                        $pointerGet:
+                          object:
+                            $var: s
+                          path: /channelsAdmittedAfter
+                    - $lte:
+                      - $binding: timestamp
+                      - $pointerGet:
+                          object:
+                            $var: s
+                          path: /channelsAdmittedAfter
+                  then:
+                  - $return:
+                      allowed: false
+                      reason: REQUEST_PRECEDES_PARTY_ADMISSION
+              - $if:
+                  cond:
+                    $ne:
+                    - $pointerGet:
+                        object:
+                          $var: s
+                        path: /accessReady
+                        default: false
+                    - true
+                  then:
+                  - $return:
+                      allowed: false
+                      reason: DOCUMENT_ACCESS_UNAVAILABLE
+              - $if:
+                  cond:
+                    $not:
+                      $call:
+                        function: accessValid
+                        args:
+                          roster:
+                            $pointerGet:
+                              object:
+                                $var: s
+                              path: /parties
+                              default: {}
+                          readers:
+                            $pointerGet:
+                              object:
+                                $var: s
+                              path: /readers
+                              default: {}
+                          accessPaths:
+                            $pointerGet:
+                              object:
+                                $var: s
+                              path: /accessPaths
+                              default: []
+                  then:
+                  - $return:
+                      allowed: false
+                      reason: DOCUMENT_ACCESS_UNAVAILABLE
+              - $if:
+                  cond:
+                    $eq:
+                    - $pointerGet:
+                        object:
+                          $var: s
+                        path: /closed
+                        default: false
+                    - true
+                  then:
+                  - $return:
+                      allowed: false
+                      reason: DOCUMENT_CLOSED
+              - $if:
+                  cond:
+                    $or:
+                    - $and:
+                      - $eq:
+                        - $binding: dispatch/kind
+                        - EXTERNAL
+                      - $includes:
+                          list:
+                            $const: preOperations
+                          val:
+                            $binding: dispatch/operation
+                    - $and:
+                      - $ne:
+                        - $binding: dispatch/kind
+                        - EXTERNAL
+                      - $includes:
+                          list:
+                            $const: preChannels
+                          val:
+                            $binding: dispatch/channel
+                  then:
+                  - $return:
+                      allowed: true
+              - $return:
+                  allowed:
+                    $call:
+                      function: businessReady
+                      args: {}
+                  reason: DOCUMENT_NOT_ACTIVE
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key: activationDispatch
+            val:
+              kind: policy
+              contract:
+                $var: policy
+    - $let:
+        name: initial
+        expr:
+          $call:
+            function: computeState
+            args:
+              state:
+                parties:
+                  $var: roster
+                readers:
+                  $pointerGet:
+                    object:
+                      $var: p
+                    path: /readers
+                    default: {}
+                accessPaths:
+                  $var: paths
+                required:
+                  $pointerGet:
+                    object:
+                      $var: p
+                    path: /required
+                    default:
+                      $keys:
+                        $var: roster
+                approved: {}
+                accessRequests: {}
+                revision:
+                  $pointerGet:
+                    object:
+                      $var: p
+                    path: /revision
+                    default: 1
+                frozen:
+                  $or:
+                  - $pointerGet:
+                      object:
+                        $var: p
+                      path: /frozen
+                      default: false
+                  - $eq:
+                    - $document: /partyRosterFrozen
+                    - true
+                allowNewParties:
+                  $pointerGet:
+                    object:
+                      $var: p
+                    path: /allowNewParties
+                    default: false
+    - $return:
+        contracts:
+          $var: contributions
+        states:
+          partyAccess:
+            path: /partyAccess
+            kind: object
+            initial: {}
+          activation:
+            path: /activation
+            kind: object
+            initial:
+              $var: initial
+        reads: []

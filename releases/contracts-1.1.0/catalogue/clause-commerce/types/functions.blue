@@ -1,0 +1,86 @@
+name: Product Functions
+type: Contracts/Compute Definition
+functions:
+  quote:
+    args:
+      input:
+        description: Quote the document-owned product. Currency comes from configured parameters.currency.
+        unitPriceMinor:
+          type: Integer
+          description: Exact unit price in minor units, from zero to one billion.
+          schema:
+            minimum: 0
+            maximum: 1000000000
+        quantity:
+          type: Integer
+          description: Number of product units, from one through one thousand.
+          schema:
+            minimum: 1
+            maximum: 1000
+    do:
+    - $let:
+        name: price
+        expr:
+          $var:
+            name: input
+            path: /unitPriceMinor
+    - $let:
+        name: quantity
+        expr:
+          $var:
+            name: input
+            path: /quantity
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: price
+                kind: integer
+            - $gte:
+              - $var: price
+              - 0
+            - $lte:
+              - $var: price
+              - 1000000000
+            - $isKind:
+                val:
+                  $var: quantity
+                kind: integer
+            - $gt:
+              - $var: quantity
+              - 0
+            - $lte:
+              - $var: quantity
+              - 1000
+        message: Invalid product quote
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /product
+        val:
+          unitPriceMinor:
+            $var: price
+          quantity:
+            $var: quantity
+          totalMinor:
+            $multiply:
+            - $var: price
+            - $var: quantity
+          currency:
+            $const:
+              name: parameters
+              path: /currency
+    - $appendEvent:
+        $merge:
+        - type: Commerce/Domain Event
+        - kind: Product Quoted
+          clause:
+            $const: clauseKey
+          totalMinor:
+            $multiply:
+            - $var: price
+            - $var: quantity

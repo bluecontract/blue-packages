@@ -1,0 +1,41 @@
+name: Hello Clause
+type: Connections/Connected Clause
+description: One reusable action; connection bindings determine how it is invoked.
+bindingTypes:
+  text: pointer
+actions:
+  say:
+    defaults:
+      text: Hello World
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var:
+                  name: params
+                  path: /text
+              kind: text
+        message: Hello text must be Text
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /text
+        val:
+          $var:
+            name: params
+            path: /text
+    - $appendEvent:
+        $merge:
+        - type: Connections/Hello Said
+        - clause:
+            $const: clauseKey
+          connection:
+            $const: connectionKey
+          text:
+            $var:
+              name: params
+              path: /text

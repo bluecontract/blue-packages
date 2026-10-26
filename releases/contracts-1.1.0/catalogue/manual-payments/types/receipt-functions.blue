@@ -1,0 +1,542 @@
+name: Manual Receipt Functions
+type: Parties/Party Mapping Functions
+description: Attributable transfer and full-refund reports. Only the recipient records receipt; this is
+  not bank evidence or card authorization.
+functions:
+  sameRecipient:
+    args: {}
+    do:
+    - $call:
+        function: requireSameMainParty
+        args:
+          left:
+            $document:
+              $concat:
+              - /activation/parties/
+              - $document: /paymentTerms/payeeChannel
+          right:
+            $document:
+              $concat:
+              - /activation/parties/
+              - $document: /paymentTerms/guarantorChannel
+  report:
+    args:
+      input:
+        description: Supply the same request identifier and transfer reference when retrying this report.
+        requestId:
+          type: Text
+          description: Identifier of this transfer or refund report.
+          schema:
+            minLength: 1
+            maxLength: 256
+        reference:
+          type: Text
+          description: Reference identifying the reported transfer or refund.
+          schema:
+            minLength: 1
+            maxLength: 256
+        schema:
+          maxFields: 2
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/payerChannel
+        message: MANUAL_PAYER_REQUIRED
+    - $call:
+        function: sameRecipient
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $keys:
+                $var: input
+          - 2
+        message: MANUAL_INPUT_FIELDS_INVALID
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /requestId
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+              - 256
+        message: MANUAL_REQUESTID_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /reference
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+              - 256
+        message: MANUAL_REFERENCE_REQUIRED
+    - $if:
+        cond:
+          $exists:
+            $document: /reportedTransfer
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /reportedTransfer
+              - $var: input
+            message: MANUAL_REPORT_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: MANUAL_ACCEPT_INSTRUCTION_FIRST
+    - $failIf:
+        cond:
+          $eq:
+          - $document: /payment/closed
+          - true
+        message: MANUAL_PAYMENT_CLOSED
+    - $appendChange:
+        op: add
+        path: /reportedTransfer
+        val:
+          $var: input
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Manual Transfer Reported
+          report:
+            $var: input
+    - $return:
+        outcome: acceptedNew
+  acknowledge:
+    args:
+      input:
+        description: Supply the same request identifier and transfer reference when retrying this report.
+        requestId:
+          type: Text
+          description: Identifier of this transfer or refund report.
+          schema:
+            minLength: 1
+            maxLength: 256
+        reference:
+          type: Text
+          description: Reference identifying the reported transfer or refund.
+          schema:
+            minLength: 1
+            maxLength: 256
+        schema:
+          maxFields: 2
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/guarantorChannel
+        message: MANUAL_GUARANTOR_REQUIRED
+    - $call:
+        function: sameRecipient
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $keys:
+                $var: input
+          - 2
+        message: MANUAL_INPUT_FIELDS_INVALID
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /requestId
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+              - 256
+        message: MANUAL_REQUESTID_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /reference
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+              - 256
+        message: MANUAL_REFERENCE_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $document: /reportedTransfer
+        message: MANUAL_TRANSFER_NOT_REPORTED
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /reportedTransfer
+          - $var: input
+        message: MANUAL_REPORT_MISMATCH
+    - $if:
+        cond:
+          $eq:
+          - $document: /payment/completed
+          - $document: /paymentTerms/amountMinor
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: MANUAL_ACCEPT_INSTRUCTION_FIRST
+    - $failIf:
+        cond:
+          $eq:
+          - $document: /payment/closed
+          - true
+        message: MANUAL_PAYMENT_CLOSED
+    - $appendChange:
+        op: replace
+        path: /payment/completed
+        val:
+          $document: /paymentTerms/amountMinor
+    - $appendChange:
+        op: replace
+        path: /payment/transactionId
+        val:
+          $concat:
+          - 'manual:'
+          - $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+    - $appendChange:
+        op: add
+        path: /manualReceipt
+        val:
+          $var: input
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Manual Receipt Acknowledged
+          requestId:
+            $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+          amountMinor:
+            $document: /paymentTerms/amountMinor
+          evidence: recipientAcknowledgment
+    - $return:
+        outcome: acceptedNew
+  reportRefund:
+    args:
+      input:
+        description: Supply the same request identifier and transfer reference when retrying this report.
+        requestId:
+          type: Text
+          description: Identifier of this transfer or refund report.
+          schema:
+            minLength: 1
+            maxLength: 256
+        reference:
+          type: Text
+          description: Reference identifying the reported transfer or refund.
+          schema:
+            minLength: 1
+            maxLength: 256
+        schema:
+          maxFields: 2
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/guarantorChannel
+        message: MANUAL_GUARANTOR_REQUIRED
+    - $call:
+        function: sameRecipient
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $keys:
+                $var: input
+          - 2
+        message: MANUAL_INPUT_FIELDS_INVALID
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /requestId
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+              - 256
+        message: MANUAL_REQUESTID_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /reference
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+              - 256
+        message: MANUAL_REFERENCE_REQUIRED
+    - $if:
+        cond:
+          $exists:
+            $document: /reportedRefund
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /reportedRefund
+              - $var: input
+            message: MANUAL_REPORT_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/completed
+          - $document: /paymentTerms/amountMinor
+        message: MANUAL_PAYMENT_NOT_RECEIVED
+    - $appendChange:
+        op: add
+        path: /reportedRefund
+        val:
+          $var: input
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Manual Refund Reported
+          report:
+            $var: input
+    - $return:
+        outcome: acceptedNew
+  acknowledgeRefund:
+    args:
+      input:
+        description: Supply the same request identifier and transfer reference when retrying this report.
+        requestId:
+          type: Text
+          description: Identifier of this transfer or refund report.
+          schema:
+            minLength: 1
+            maxLength: 256
+        reference:
+          type: Text
+          description: Reference identifying the reported transfer or refund.
+          schema:
+            minLength: 1
+            maxLength: 256
+        schema:
+          maxFields: 2
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/payerChannel
+        message: MANUAL_PAYER_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $keys:
+                $var: input
+          - 2
+        message: MANUAL_INPUT_FIELDS_INVALID
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /requestId
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+              - 256
+        message: MANUAL_REQUESTID_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+                kind: text
+            - $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /reference
+              - ''
+            - $lte:
+              - $size:
+                  $pointerGet:
+                    object:
+                      $var: input
+                    path: /reference
+              - 256
+        message: MANUAL_REFERENCE_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $document: /reportedRefund
+        message: MANUAL_REFUND_NOT_REPORTED
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /reportedRefund
+          - $var: input
+        message: MANUAL_REPORT_MISMATCH
+    - $if:
+        cond:
+          $eq:
+          - $document: /payment/reversed
+          - $document: /payment/completed
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /payment/reversed
+        val:
+          $document: /payment/completed
+    - $appendChange:
+        op: add
+        path: /manualRefundReceipt
+        val:
+          $var: input
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Manual Refund Acknowledged
+          requestId:
+            $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+          amountMinor:
+            $document: /payment/completed
+          evidence: payerAcknowledgment
+    - $return:
+        outcome: acceptedNew

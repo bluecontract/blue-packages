@@ -1,0 +1,96 @@
+name: Manual Receipt Instruction
+type: PaymentInstruction/Payment Instruction with Clauses
+description: Payer reports a transfer and the recipient acknowledges receipt. Guarantor and payee must
+  be the same main party. No card request actions are installed.
+paymentTerms:
+  method: manual
+  evidence: recipientAcknowledgment
+contracts:
+  reportTransfer:
+    type: Contracts/Sequential Workflow Operation
+    channel: payer
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      do:
+      - $call:
+          function: report
+          args:
+            input:
+              $object:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      function: report
+      argument: input
+  acknowledgeTransfer:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      do:
+      - $call:
+          function: acknowledge
+          args:
+            input:
+              $object:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      function: acknowledge
+      argument: input
+  reportRefund:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      do:
+      - $call:
+          function: reportRefund
+          args:
+            input:
+              $object:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      function: reportRefund
+      argument: input
+  acknowledgeRefund:
+    type: Contracts/Sequential Workflow Operation
+    channel: payer
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      do:
+      - $call:
+          function: acknowledgeRefund
+          args:
+            input:
+              $object:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: ManualPayments/Manual Receipt Functions
+      function: acknowledgeRefund
+      argument: input

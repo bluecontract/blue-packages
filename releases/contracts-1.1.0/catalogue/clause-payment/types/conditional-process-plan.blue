@@ -1,0 +1,585 @@
+name: Conditional Process Plan
+type: Connections/Connection Planning Functions
+functions:
+  predicatePaths:
+    args:
+      input: {}
+      depth:
+        type: Integer
+      sources: {}
+    do:
+    - $let:
+        name: pending
+        expr:
+        - $var: input
+    - $let:
+        name: paths
+        expr: []
+    - $forEach:
+        item: level
+        in:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+        - 18
+        - 19
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+        - 26
+        - 27
+        - 28
+        - 29
+        - 30
+        - 31
+        - 32
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $size:
+                  $var: pending
+              - 0
+            then:
+            - $return:
+                $var: paths
+        - $let:
+            name: next
+            expr: []
+        - $forEach:
+            item: node
+            in:
+              $var: pending
+            do:
+            - $let:
+                name: scanned
+                expr:
+                  $call:
+                    function: scanPredicateNode
+                    args:
+                      input:
+                        $var: node
+                      sources:
+                        $var: sources
+            - $set:
+                name: paths
+                expr:
+                  $listConcat:
+                  - $var: paths
+                  - $var:
+                      name: scanned
+                      path: /paths
+            - $set:
+                name: next
+                expr:
+                  $listConcat:
+                  - $var: next
+                  - $var:
+                      name: scanned
+                      path: /children
+        - $set:
+            name: pending
+            expr:
+              $var: next
+    - $failIf:
+        cond:
+          $gt:
+          - $size:
+              $var: pending
+          - 0
+        message: PAYMENT_PREDICATE_TOO_DEEP
+    - $return:
+        $var: paths
+  plan:
+    args: {}
+    do:
+    - $let:
+        name: policy
+        expr:
+          $call:
+            function: requestPolicy
+            args: {}
+    - $let:
+        name: plan
+        expr:
+          $call:
+            function: planConnections
+            args: {}
+    - $if:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: policy
+              path: /mode
+              default: workflow
+          - when
+        then:
+        - $return:
+            $var: plan
+    - $let:
+        name: sources
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+            path: /parameters/sources
+            default: {}
+    - $let:
+        name: paths
+        expr:
+          $call:
+            function: predicatePaths
+            args:
+              input:
+                expression:
+                  $pointerGet:
+                    object:
+                      $var: policy
+                    path: /when
+              depth: 0
+              sources:
+                $var: sources
+    - $let:
+        name: statePath
+        expr:
+          $concat:
+          - /paymentProcess_
+          - $const: clauseKey
+    - $let:
+        name: gate
+        expr:
+          $concat:
+          - $var: statePath
+          - /
+          - $call:
+              function: policyAction
+              args: {}
+          - Allowed
+    - $failIf:
+        cond:
+          $and:
+          - $exists:
+              $document:
+                $concat:
+                - /paymentTerms/
+                - $call:
+                    function: policyAction
+                    args: {}
+                - Gate
+          - $ne:
+            - $document:
+                $concat:
+                - /paymentTerms/
+                - $call:
+                    function: policyAction
+                    args: {}
+                - Gate
+            - $var: gate
+        message: PAYMENT_POLICY_GATE_CONFLICT
+    - $let:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path: /states/conditionalPolicy
+            val:
+              path:
+                $var: statePath
+              kind: object
+              initial:
+                $objectSet:
+                  object: {}
+                  key:
+                    $concat:
+                    - $call:
+                        function: policyAction
+                        args: {}
+                    - Allowed
+                  val: false
+    - $let:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path: /states/conditionalGate
+            val:
+              path: /paymentTerms
+              kind: object
+              replace: true
+              initial:
+                $objectSet:
+                  object:
+                    $document: /paymentTerms
+                  key:
+                    $concat:
+                    - $call:
+                        function: policyAction
+                        args: {}
+                    - Gate
+                  val:
+                    $var: gate
+    - $let:
+        name: steps
+        expr:
+        - $merge:
+          - type: Contracts/Compute
+          - constants:
+              gate:
+                $var: gate
+            do:
+              $listConcat:
+              - - $pointerSet:
+                    object:
+                      $literal:
+                        $let:
+                          name: allowed
+                          expr:
+                            $and:
+                            - $eq:
+                              - $document: /activation/active
+                              - true
+                            - $or:
+                              - $not:
+                                  $exists:
+                                    $document: /clauses/documentSources
+                              - $eq:
+                                - $document: /sourceLinks/ready
+                                - true
+                            - $eq:
+                              - {}
+                              - true
+                    path: /$let/expr/$and/2/$eq/0
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: policy
+                        path: /when
+              - $literal:
+                - $if:
+                    cond:
+                      $ne:
+                      - $document:
+                          $const: gate
+                      - $var: allowed
+                    then:
+                    - $appendChange:
+                        op: replace
+                        path:
+                          $const: gate
+                        val:
+                          $var: allowed
+        - $call:
+            function: requestStep
+            args:
+              gate:
+                $var: gate
+              policy:
+                $var: policy
+    - $let:
+        name: watches
+        expr:
+          $listConcat:
+          - $call:
+              function: policyWatches
+              args: {}
+          - $var: paths
+    - $let:
+        name: ordinal
+        expr: 0
+    - $forEach:
+        item: watched
+        in:
+          $var: watches
+        do:
+        - $let:
+            name: key
+            expr:
+              $concat:
+              - paymentPolicy_
+              - $const: clauseKey
+              - _
+              - $text:
+                  $var: ordinal
+        - $let:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: key
+                val:
+                  kind: channel
+                  contract:
+                    $merge:
+                    - type: Contracts/Document Update Channel
+                    - path:
+                        $var: watched
+        - $let:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path:
+                  $concat:
+                  - /contracts/
+                  - $var: key
+                  - Handler
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel:
+                        $var: key
+                      steps:
+                        $var: steps
+        - $set:
+            name: ordinal
+            expr:
+              $add:
+              - $var: ordinal
+              - 1
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $var: sources
+          - 0
+        then:
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path: /contracts/paymentSources
+                val:
+                  kind: channel
+                  contract:
+                    type: Contracts/Embedded Node Channel
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object:
+                  $var: plan
+                path: /contracts/paymentSourcesHandler
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel: paymentSources
+                      steps:
+                        $var: steps
+    - $return:
+        $var: plan
+  validateConfiguration:
+    args: {}
+    do:
+    - $let:
+        name: valid
+        expr:
+          $call:
+            function: validateConnectionsConfiguration
+            args: {}
+    - $let:
+        name: policy
+        expr:
+          $call:
+            function: requestPolicy
+            args: {}
+    - $return:
+        $var: valid
+  validateTransition:
+    args: {}
+    do:
+    - $return:
+        allowed: false
+        code: PAYMENT_PROCESS_POLICY_IMMUTABLE
+  scanPredicateNode:
+    args:
+      input: {}
+      sources: {}
+    do:
+    - $let:
+        name: expression
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /expression
+    - $let:
+        name: paths
+        expr: []
+    - $let:
+        name: children
+        expr: []
+    - $if:
+        cond:
+          $isKind:
+            val:
+              $var: expression
+            kind: list
+        then:
+        - $forEach:
+            item: child
+            in:
+              $var: expression
+            do:
+            - $set:
+                name: children
+                expr:
+                  $listConcat:
+                  - $var: children
+                  - - expression:
+                        $var: child
+    - $if:
+        cond:
+          $isKind:
+            val:
+              $var: expression
+            kind: object
+        then:
+        - $forEach:
+            key: operator
+            item: operand
+            in:
+              $var: expression
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $includes:
+                      list:
+                      - $document
+                      - $eq
+                      - $ne
+                      - $lt
+                      - $lte
+                      - $gt
+                      - $gte
+                      - $and
+                      - $or
+                      - $not
+                      - $exists
+                      - $includes
+                      - $size
+                      - $add
+                      - $subtract
+                      - $literal
+                      - list
+                      - val
+                      val:
+                        $var: operator
+                message: PAYMENT_PREDICATE_REQUIRES_STATIC_PURE_DEPENDENCIES
+            - $if:
+                cond:
+                  $eq:
+                  - $var: operator
+                  - $document
+                then:
+                - $failIf:
+                    cond:
+                      $not:
+                        $and:
+                        - $isKind:
+                            val:
+                              $var: operand
+                            kind: text
+                        - $startsWith:
+                          - $var: operand
+                          - /
+                        - $ne:
+                          - $var: operand
+                          - /
+                    message: PAYMENT_PREDICATE_STATIC_PATH_REQUIRED
+                - $if:
+                    cond:
+                      $startsWith:
+                      - $var: operand
+                      - /sources/
+                    then:
+                    - $let:
+                        name: alias
+                        expr:
+                          $listGet:
+                            list:
+                              $split:
+                                text:
+                                  $var: operand
+                                separator: /
+                            index: 2
+                    - $failIf:
+                        cond:
+                          $not:
+                            $hasKey:
+                              object:
+                                $var: sources
+                              key:
+                                $var: alias
+                        message: PAYMENT_PREDICATE_SOURCE_NOT_DECLARED
+                - $set:
+                    name: paths
+                    expr:
+                      $listConcat:
+                      - $var: paths
+                      - - $var: operand
+                else:
+                - $if:
+                    cond:
+                      $ne:
+                      - $var: operator
+                      - $literal
+                    then:
+                    - $set:
+                        name: children
+                        expr:
+                          $listConcat:
+                          - $var: children
+                          - - expression:
+                                $var: operand
+    - $return:
+        paths:
+          $var: paths
+        children:
+          $var: children
+  policyAction:
+    args: {}
+  requestStep:
+    args:
+      gate:
+        type: Text
+      policy: {}
+  policyWatches:
+    args: {}
+  requestPolicy:
+    args: {}

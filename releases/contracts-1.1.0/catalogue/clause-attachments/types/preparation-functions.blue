@@ -1,0 +1,922 @@
+name: Preparation Functions
+type: Attachments/Attachment Functions
+functions:
+  progress:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /status
+            - $var:
+                name: input
+                path: /status
+          - $eq:
+            - $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /reason
+                default: ''
+            - $pointerGet:
+                object:
+                  $var: input
+                path: /reason
+                default: ''
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /preparation_
+          - $const: key
+        val:
+          $merge:
+          - $document:
+              $concat:
+              - /preparation_
+              - $const: key
+          - $var: input
+    - $appendEvent:
+        $merge:
+        - type: Attachments/Document Attachment Pending
+        - clauseId:
+            $const: key
+          inResponseTo:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /requestId
+          status:
+            $var:
+              name: input
+              path: /status
+          reason:
+            $pointerGet:
+              object:
+                $var: input
+              path: /reason
+              default: ''
+    - $return:
+        outcome: acceptedNew
+  begin:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: requireInvocation
+        args: {}
+    - $let:
+        name: id
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validPartyName
+              args:
+                candidate:
+                  $var: id
+        message: PREPARATION_REQUEST_ID_REQUIRED
+    - $let:
+        name: intent
+        expr:
+          $var: input
+    - $if:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /requestId
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $document:
+                      $concat:
+                      - /preparation_
+                      - $const: key
+                  path: /requestId
+              - $var: id
+            message: PREPARATION_SINGLETON_ALREADY_REQUESTED
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $document:
+                      $concat:
+                      - /preparation_
+                      - $const: key
+                  path: /intent
+              - $var: intent
+            message: PREPARATION_REQUEST_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $call:
+        function: prepare
+        args:
+          input:
+            $var: input
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /preparation_
+          - $const: key
+        val:
+          requestId:
+            $var: id
+          intent:
+            $var: intent
+          status: preparing
+          reason: ''
+    - $return:
+        outcome: acceptedNew
+  provide:
+    args:
+      input:
+        inResponseTo:
+          type: Text
+          description: Request identifier of the active preparation.
+        requirementRef:
+          type: Text
+          description: Document Blue ID in the current preparation request.
+        document:
+          description: Existing initialized document publication supplied by Blue ID. Execution validates the prepared
+            source, configured policy and parties.
+          contracts:
+            initialized:
+              document: {}
+    do:
+    - $call:
+        function: requireInvocation
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $const: actor
+        message: PREPARATION_WRONG_SUPPLIER
+    - $failIf:
+        cond:
+          $eq:
+          - $const: obtain
+          - create
+        message: PREPARATION_LOCAL_CREATION_ONLY
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /requestId
+        message: PREPARATION_NOT_REQUESTED
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: input
+              path: /inResponseTo
+          - $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /requestId
+        message: PREPARATION_WRONG_REQUEST
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: input
+              path: /requirementRef
+          - $pointerGet:
+              object:
+                $document:
+                  $const: requestPath
+              path: /documentBlueId
+        message: PREPARATION_WRONG_REQUIREMENT
+    - $let:
+        name: candidate
+        expr:
+          $var:
+            name: input
+            path: /document
+    - $let:
+        name: origin
+        expr:
+          $call:
+            function: checkPreparedCandidate
+            args:
+              candidate:
+                $var: candidate
+    - $if:
+        cond:
+          $exists:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /candidateOrigin
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $document:
+                      $concat:
+                      - /preparation_
+                      - $const: key
+                  path: /candidateOrigin
+              - $var: origin
+            message: ATTACHMENT_REPLACEMENT_FORBIDDEN
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /preparation_
+          - $const: key
+        val:
+          $merge:
+          - $document:
+              $concat:
+              - /preparation_
+              - $const: key
+          - candidate:
+              $objectSet:
+                object: {}
+                key: blueId
+                val:
+                  $nodeBlueId:
+                    $var: candidate
+            candidateOrigin:
+              $var: origin
+    - $return:
+        outcome: acceptedNew
+  resume:
+    args:
+      input:
+        description: Resume current preparation from document state; no request fields are required.
+    do:
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /requestId
+        then:
+        - $return:
+            outcome: duplicate
+    - $if:
+        cond:
+          $eq:
+          - $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /status
+          - ready
+        then:
+        - $return:
+            outcome: duplicate
+    - $if:
+        cond:
+          $not:
+            $eq:
+            - $document: /activation/active
+            - true
+        then:
+        - $return:
+            $call:
+              function: progress
+              args:
+                input:
+                  status: pending
+                  reason: activation
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $const: instructionPath
+        then:
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $document:
+                        $concat:
+                        - /preparation_
+                        - $const: key
+                    path: /candidate
+            then:
+            - $return:
+                outcome: duplicate
+        - $let:
+            name: candidate
+            expr:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /candidate
+        - $if:
+            cond:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /requiresAdmission
+                default: false
+            then:
+            - $if:
+                cond:
+                  $or:
+                  - $not:
+                      $exists:
+                        $pointerGet:
+                          object:
+                            $document:
+                              $concat:
+                              - /preparation_
+                              - $const: key
+                          path: /admission
+                  - $not:
+                      $eq:
+                      - $document:
+                          $concat:
+                          - /admission_
+                          - $const: key
+                      - $pointerGet:
+                          object:
+                            $document:
+                              $concat:
+                              - /preparation_
+                              - $const: key
+                          path: /admission/replacement
+                then:
+                - $return:
+                    $call:
+                      function: progress
+                      args:
+                        input:
+                          status: pending
+                          reason: amendment
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $document:
+                        $const: requestPath
+                    path: /policy/relationship
+                - cross-embedded
+              - $not:
+                  $exists:
+                    $document:
+                      $concat:
+                      - /activation/parties/
+                      - $const: authority
+            then:
+            - $return:
+                $call:
+                  function: progress
+                  args:
+                    input:
+                      status: pending
+                      reason: party_admission
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $document:
+                        $const: requestPath
+                    path: /policy/relationship
+                - cross-embedded
+              - $not:
+                  $exists:
+                    $pointerGet:
+                      object:
+                        $var: candidate
+                      path: /attachmentLink/parentOrigin
+            then:
+            - $return:
+                $call:
+                  function: progress
+                  args:
+                    input:
+                      status: pending
+                      reason: reverse_link
+        - $call:
+            function: checkPreparedCandidate
+            args:
+              candidate:
+                $var: candidate
+        - $call:
+            function: attach
+            args:
+              input:
+                document:
+                  $var: candidate
+    - $return:
+        outcome: acceptedNew
+  prepareAdmission:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $or:
+          - $not:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /requiresAdmission
+                default: false
+          - $not:
+              $exists:
+                $pointerGet:
+                  object:
+                    $document:
+                      $concat:
+                      - /preparation_
+                      - $const: key
+                  path: /candidate
+          - $exists:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /admission
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $const: admissionKey
+        message: PREPARATION_ADMISSION_CLAUSE_REQUIRED
+    - $let:
+        name: amendment
+        expr:
+          $document:
+            $concat:
+            - /clauses/
+            - $const: admissionKey
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  $var: amendment
+                path: /type
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  type: Amendments/Amendments Clause
+                path: /type
+        message: PREPARATION_INVALID_ADMISSION_CLAUSE
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: amendment
+                path: /parameters/approvers
+                default: []
+          - 0
+        message: PREPARATION_APPROVERS_REQUIRED
+    - $let:
+        name: amendmentPath
+        expr:
+          $pointerGet:
+            object:
+              $var: amendment
+            path: /bindings/state
+            default: /amendments
+    - $let:
+        name: proposal
+        expr:
+          proposalId:
+            $concat:
+            - $const: key
+            - _
+            - $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /requestId
+          expectedRevision:
+            $document:
+              $concat:
+              - $var: amendmentPath
+              - /revision
+          path:
+            $concat:
+            - /admission_
+            - $const: key
+          replacement:
+            requestId:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /requestId
+            requirementRef:
+              $pointerGet:
+                object:
+                  $document:
+                    $const: requestPath
+                path: /documentBlueId
+            candidateOrigin:
+              $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /candidateOrigin
+            authority:
+              $const: authority
+            profile:
+              $pointerGet:
+                object:
+                  $document:
+                    $const: requestPath
+                path:
+                  $concat:
+                  - /document/clauses/activation/parameters/parties/
+                  - $const: authority
+            activationRevision:
+              $document: /activation/revision
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $concat:
+            - /preparation_
+            - $const: key
+          - /admission
+        val:
+          $var: proposal
+    - $appendEvent:
+        $merge:
+        - type: Attachments/Party Admission Requested
+        - clauseId:
+            $const: key
+          inResponseTo:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /requestId
+          proposalId:
+            $var:
+              name: proposal
+              path: /proposalId
+          requirementRef:
+            $pointerGet:
+              object:
+                $document:
+                  $const: requestPath
+              path: /documentBlueId
+          authority:
+            $const: authority
+    - $return:
+        outcome: acceptedNew
+  prepared:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /status
+          - preparing
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /preparation_
+          - $const: key
+        val:
+          $merge:
+          - $document:
+              $concat:
+              - /preparation_
+              - $const: key
+          - status:
+              $choose:
+                cond:
+                  $eq:
+                  - $const: obtain
+                  - create
+                then: creating
+                else: awaiting_document
+            reason: ''
+            requiresAdmission:
+              $and:
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $document:
+                        $const: requestPath
+                    path: /policy/relationship
+                - cross-embedded
+              - $not:
+                  $exists:
+                    $document:
+                      $concat:
+                      - /activation/parties/
+                      - $const: authority
+    - $appendEvent:
+        $merge:
+        - type: Attachments/Document Preparation Requested
+        - clauseId:
+            $const: key
+          requestId:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /requestId
+          requirementRef:
+            $pointerGet:
+              object:
+                $document:
+                  $const: requestPath
+              path: /documentBlueId
+    - $if:
+        cond:
+          $eq:
+          - $const: obtain
+          - provide
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Attachments/Document Provision Requested
+            - clauseId:
+                $const: key
+              inResponseTo:
+                $pointerGet:
+                  object:
+                    $document:
+                      $concat:
+                      - /preparation_
+                      - $const: key
+                  path: /requestId
+              party:
+                $const: actor
+              requirementRef:
+                $pointerGet:
+                  object:
+                    $document:
+                      $const: requestPath
+                  path: /documentBlueId
+    - $return:
+        outcome: acceptedNew
+  createPrepared:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $or:
+          - $ne:
+            - $const: obtain
+            - create
+          - $not:
+              $exists:
+                $pointerGet:
+                  object:
+                    $document:
+                      $concat:
+                      - /preparation_
+                      - $const: key
+                  path: /requestId
+          - $exists:
+              $document:
+                $const: instructionPath
+        then:
+        - $return:
+            outcome: duplicate
+    - $return:
+        $call:
+          function: create
+          args:
+            input: {}
+  settle:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond:
+          $or:
+          - $not:
+              $exists:
+                $document:
+                  $const: instructionPath
+          - $eq:
+            - $pointerGet:
+                object:
+                  $document:
+                    $concat:
+                    - /preparation_
+                    - $const: key
+                path: /status
+            - ready
+        then:
+        - $return:
+            outcome: duplicate
+    - $if:
+        cond:
+          $ne:
+          - $document: /activation/active
+          - true
+        then:
+        - $return:
+            $call:
+              function: progress
+              args:
+                input:
+                  status: pending
+                  reason: activation
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $concat:
+                - $const: instructionPath
+                - /contracts/initialized/document
+        then:
+        - $return:
+            $call:
+              function: progress
+              args:
+                input:
+                  status: selected
+                  reason: native_initialization
+    - $if:
+        cond:
+          $ne:
+          - $document:
+              $concat:
+              - $const: instructionPath
+              - /activation/active
+          - true
+        then:
+        - $return:
+            $call:
+              function: progress
+              args:
+                input:
+                  status: selected
+                  reason: child_activation
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - /preparation_
+          - $const: key
+        val:
+          $merge:
+          - $document:
+              $concat:
+              - /preparation_
+              - $const: key
+          - status: ready
+            reason: ''
+            documentOrigin:
+              $call:
+                function: origin
+                args:
+                  document:
+                    $document:
+                      $const: instructionPath
+    - $appendEvent:
+        $merge:
+        - type: Attachments/Document Attached
+        - clauseId:
+            $const: key
+          inResponseTo:
+            $pointerGet:
+              object:
+                $document:
+                  $concat:
+                  - /preparation_
+                  - $const: key
+              path: /requestId
+          documentOrigin:
+            $call:
+              function: origin
+              args:
+                document:
+                  $document:
+                    $const: instructionPath
+          documentPath:
+            $const: instructionPath
+          relationship:
+            $pointerGet:
+              object:
+                $document:
+                  $const: requestPath
+              path: /policy/relationship
+    - $return:
+        outcome: acceptedNew
+  beginPublic:
+    args:
+      input:
+        type: Attachments/Attachment Preparation Input
+        requestId:
+          type: Text
+          schema:
+            minLength: 1
+          description: User-provided unique request key. Must satisfy configured party-key syntax.
+    do:
+    - $return:
+        $call:
+          function: begin
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

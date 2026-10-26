@@ -1,0 +1,420 @@
+name: Bank Transfer Functions
+type: Contracts/Compute Definition
+functions:
+  requestId:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: id
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: id
+                kind: text
+            - $ne:
+              - $var: id
+              - ''
+            - $lte:
+              - $size:
+                  $var: id
+              - 128
+        message: BANK_REQUEST_ID_REQUIRED
+    - $return:
+        $var: id
+  request:
+    args:
+      input:
+        description: Request the transfer using amounts and currency already stored in paymentTerms. Only
+          requestId is supplied.
+        schema:
+          maxFields: 1
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
+    do:
+    - $forEach:
+        item: inputKey
+        in:
+          $keys:
+            $var: input
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - requestId
+                  val:
+                    $var: inputKey
+            message: BANK_INPUT_FIELD_NOT_ALLOWED
+    - $failIf:
+        cond:
+          $and:
+          - $exists:
+              $document: /clauses/documentSources
+          - $ne:
+            - $document: /sourceLinks/ready
+            - true
+        message: BANK_SOURCE_NOT_READY
+    - $failIf:
+        cond:
+          $and:
+          - $ne:
+            - $const: sourceMode
+            - event
+          - $ne:
+            - $binding: call/channel
+            - $document: /paymentTerms/payerChannel
+        message: BANK_PAYER_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: BANK_ACCEPT_INSTRUCTION_FIRST
+    - $let:
+        name: id
+        expr:
+          $call:
+            function: requestId
+            args:
+              input:
+                $var: input
+    - $if:
+        cond:
+          $ne:
+          - $document: /bankTransfer/requestId
+          - ''
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var: id
+              - $document: /bankTransfer/requestId
+            message: BANK_REQUEST_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $eq:
+          - $document: /payment/closed
+          - true
+        message: BANK_PAYMENT_CLOSED
+    - $let:
+        name: gate
+        expr:
+          $document: /paymentTerms/transferGate
+    - $if:
+        cond:
+          $exists:
+            $var: gate
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $var: gate
+              - true
+            message: BANK_TRANSFER_NOT_READY
+    - $appendChange:
+        op: replace
+        path: /bankTransfer/requestId
+        val:
+          $var: id
+    - $appendChange:
+        op: replace
+        path: /bankTransfer/status
+        val: requested
+    - $appendEvent:
+        $merge:
+        - type: ACME/Bank Transfer Event
+        - kind: Transfer Requested
+          requestId:
+            $var: id
+          amountMinor:
+            $document: /paymentTerms/amountMinor
+          currency:
+            $document: /paymentTerms/currency
+    - $return:
+        outcome: acceptedNew
+  record:
+    args:
+      input: {}
+      status:
+        type: Text
+    do:
+    - $forEach:
+        item: inputKey
+        in:
+          $keys:
+            $var: input
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - requestId
+                  - reference
+                  - amountMinor
+                  - currency
+                  val:
+                    $var: inputKey
+            message: BANK_INPUT_FIELD_NOT_ALLOWED
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/guarantorChannel
+        message: BANK_GUARANTOR_REQUIRED
+    - $let:
+        name: id
+        expr:
+          $call:
+            function: requestId
+            args:
+              input:
+                $var: input
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $document: /bankTransfer/requestId
+            - ''
+          - $ne:
+            - $var: id
+            - $document: /bankTransfer/requestId
+        message: BANK_REQUEST_MISMATCH
+    - $let:
+        name: reference
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /reference
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: reference
+                kind: text
+            - $ne:
+              - $var: reference
+              - ''
+            - $lte:
+              - $size:
+                  $var: reference
+              - 256
+        message: BANK_REFERENCE_REQUIRED
+    - $if:
+        cond:
+          $eq:
+          - $var: status
+          - completed
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /amountMinor
+                  default: -1
+              - $document: /paymentTerms/amountMinor
+            message: BANK_AMOUNT_MISMATCH
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /currency
+                  default: ''
+              - $document: /paymentTerms/currency
+            message: BANK_CURRENCY_MISMATCH
+    - $if:
+        cond:
+          $eq:
+          - $document: /bankTransfer/status
+          - $var: status
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /bankTransfer/reference
+              - $var: reference
+            message: BANK_OUTCOME_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - requested
+              - unknown
+              val:
+                $document: /bankTransfer/status
+        message: BANK_OUTCOME_FINAL
+    - $appendChange:
+        op: replace
+        path: /bankTransfer/status
+        val:
+          $var: status
+    - $appendChange:
+        op: replace
+        path: /bankTransfer/reference
+        val:
+          $var: reference
+    - $if:
+        cond:
+          $eq:
+          - $var: status
+          - completed
+        then:
+        - $appendChange:
+            op: replace
+            path: /payment/completed
+            val:
+              $document: /paymentTerms/amountMinor
+        - $appendChange:
+            op: replace
+            path: /payment/transactionId
+            val:
+              $var: reference
+        - $appendEvent:
+            $merge:
+            - type: PaymentInstruction/Payment Completed
+            - requestId:
+                $var: id
+              amountCompleted:
+                $document: /paymentTerms/amountMinor
+              evidence: bankConfirmation
+              reference:
+                $var: reference
+    - $appendEvent:
+        $merge:
+        - type: ACME/Bank Transfer Event
+        - kind: Transfer Outcome
+          status:
+            $var: status
+          requestId:
+            $var: id
+          reference:
+            $var: reference
+    - $return:
+        outcome: acceptedNew
+  confirmPublic:
+    args:
+      input:
+        description: Confirm the requested bank transfer. Amount and currency must exactly match paymentTerms.
+        schema:
+          maxFields: 4
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
+        reference:
+          type: Text
+          description: Bank reference for this transfer outcome. Reuse the existing reference when retrying
+            the same recorded outcome.
+          schema:
+            minLength: 1
+            maxLength: 256
+        amountMinor:
+          type: Integer
+          description: Exact paymentTerms.amountMinor for the confirmed transfer.
+        currency:
+          type: Text
+          description: Exact paymentTerms.currency for the confirmed transfer.
+    do:
+    - $return:
+        $call:
+          function: record
+          args:
+            input:
+              $var: input
+            status: completed
+  unknownPublic:
+    args:
+      input:
+        description: Report an unknown outcome for the current bankTransfer.requestId. Amount and currency
+          may be omitted.
+        type: ACME/Bank Transfer Outcome Input
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
+        reference:
+          type: Text
+          description: Bank reference for this transfer outcome. Reuse the existing reference when retrying
+            the same recorded outcome.
+          schema:
+            minLength: 1
+            maxLength: 256
+    do:
+    - $return:
+        $call:
+          function: record
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+            status: unknown
+  declinePublic:
+    args:
+      input:
+        description: Decline the current bankTransfer.requestId. Amount and currency may be omitted.
+        type: ACME/Bank Transfer Outcome Input
+        requestId:
+          type: Text
+          description: Identifier chosen for this transfer request. Reuse the same identifier only for
+            retrying the same transfer.
+          schema:
+            minLength: 1
+            maxLength: 128
+        reference:
+          type: Text
+          description: Bank reference for this transfer outcome. Reuse the existing reference when retrying
+            the same recorded outcome.
+          schema:
+            minLength: 1
+            maxLength: 256
+    do:
+    - $return:
+        $call:
+          function: record
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove
+            status: declined

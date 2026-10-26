@@ -1,0 +1,27 @@
+name: Bank Method Events
+type: Connections/Connected Clause
+actions:
+  announce:
+    automatic:
+      'on': initialized
+      once: true
+    do:
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Bank Payment Instruction Created
+          bank: ACME
+  request:
+    automatic:
+      'on': event
+      event:
+        type: Events/Event
+        kind: Payment Requested
+    do:
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Bank Execution Requested
+          bank: ACME
+          request:
+            $var: trigger

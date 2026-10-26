@@ -1,0 +1,86 @@
+name: Manual Transfer Functions
+type: Contracts/Compute Definition
+functions:
+  reportTransfer:
+    args:
+      input:
+        description: Supply the same request identifier and transfer reference when retrying this report.
+        requestId:
+          type: Text
+          description: Identifier of this transfer or refund report.
+          schema:
+            minLength: 1
+        reference:
+          type: Text
+          description: Reference identifying the reported transfer or refund.
+          schema:
+            minLength: 1
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/payerChannel
+        message: MANUAL_PAYER_REQUIRED
+    - $let:
+        name: requestId
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $let:
+        name: reference
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /reference
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: requestId
+                kind: text
+            - $ne:
+              - $var: requestId
+              - ''
+            - $isKind:
+                val:
+                  $var: reference
+                kind: text
+            - $ne:
+              - $var: reference
+              - ''
+        message: TRANSFER_REFERENCE_REQUIRED
+    - $if:
+        cond:
+          $exists:
+            $document: /reportedTransfer
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /reportedTransfer
+              - $var: input
+            message: TRANSFER_REPORT_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: add
+        path: /reportedTransfer
+        val:
+          $var: input
+    - $appendEvent:
+        $merge:
+        - type: ManualPayments/Transfer Reported
+        - requestId:
+            $var: requestId
+          reference:
+            $var: reference
+    - $return:
+        outcome: acceptedNew

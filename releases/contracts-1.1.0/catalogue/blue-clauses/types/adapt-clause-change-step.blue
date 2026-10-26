@@ -1,0 +1,73 @@
+name: Adapt Clause Change Step
+type: Contracts/Compute
+do:
+- $let:
+    name: request
+    expr:
+      $event: /request
+- $let:
+    name: action
+    expr:
+      $pointerGet:
+        object:
+          $var: request
+        path: /action
+        default: ''
+- $let:
+    name: c
+    expr:
+      action:
+        $var: action
+      key:
+        $pointerGet:
+          object:
+            $var: request
+          path: /key
+          default: ''
+- $if:
+    cond:
+      $ne:
+      - $var: action
+      - remove
+    then:
+    - $set:
+        name: c
+        expr:
+          $objectSet:
+            object:
+              $var: c
+            key: clause
+            val:
+              $pointerGet:
+                object:
+                  $var: request
+                path: /clause
+                default: {}
+- $appendEvent:
+    $merge:
+    - type: Clauses/Amendment Requested
+    - actorChannel:
+        $event: /actorChannel
+      request:
+        requestId:
+          $pointerGet:
+            object:
+              $var: request
+            path: /requestId
+            default: clause-change
+        expectedRevision:
+          $pointerGet:
+            object:
+              $var: request
+            path: /expectedRevision
+            default:
+              $document: /clauseRuntime/revision
+        expectedConfigurationId:
+          $pointerGet:
+            object:
+              $var: request
+            path: /expectedConfigurationId
+            default:
+              $document: /clauseRuntime/configurationId
+        changes:
+        - $var: c

@@ -1,0 +1,117 @@
+name: Rounding
+type: Contracts/Compute Definition
+functions:
+  roundBps:
+    args:
+      basis:
+        type: Integer
+      bps:
+        type: Integer
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: basis
+                kind: integer
+            - $gte:
+              - $var: basis
+              - 0
+            - $lte:
+              - $var: basis
+              - 1000000000000
+            - $isKind:
+                val:
+                  $var: bps
+                kind: integer
+            - $gte:
+              - $var: bps
+              - 0
+            - $lte:
+              - $var: bps
+              - 10000
+        message: INVALID_COMMISSION_INPUT
+    - $let:
+        name: remaining
+        expr:
+          $add:
+          - $multiply:
+            - $var: basis
+            - $var: bps
+          - 5000
+    - $let:
+        name: result
+        expr: 0
+    - $forEach:
+        item: power
+        in:
+        - 1099511627776
+        - 549755813888
+        - 274877906944
+        - 137438953472
+        - 68719476736
+        - 34359738368
+        - 17179869184
+        - 8589934592
+        - 4294967296
+        - 2147483648
+        - 1073741824
+        - 536870912
+        - 268435456
+        - 134217728
+        - 67108864
+        - 33554432
+        - 16777216
+        - 8388608
+        - 4194304
+        - 2097152
+        - 1048576
+        - 524288
+        - 262144
+        - 131072
+        - 65536
+        - 32768
+        - 16384
+        - 8192
+        - 4096
+        - 2048
+        - 1024
+        - 512
+        - 256
+        - 128
+        - 64
+        - 32
+        - 16
+        - 8
+        - 4
+        - 2
+        - 1
+        do:
+        - $let:
+            name: unit
+            expr:
+              $multiply:
+              - $var: power
+              - 10000
+        - $if:
+            cond:
+              $gte:
+              - $var: remaining
+              - $var: unit
+            then:
+            - $set:
+                name: remaining
+                expr:
+                  $subtract:
+                  - $var: remaining
+                  - $var: unit
+            - $set:
+                name: result
+                expr:
+                  $add:
+                  - $var: result
+                  - $var: power
+    - $return:
+        $var: result

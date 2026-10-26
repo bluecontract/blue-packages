@@ -1,0 +1,256 @@
+name: Customer Session Functions
+type: Contracts/Compute Definition
+functions:
+  provideSession:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $document: /paymentTerms/guarantorChannel
+        message: CUSTOMER_SESSION_OPERATOR_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: ACCEPT_INSTRUCTION_FIRST
+    - $let:
+        name: id
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /sessionId
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: id
+                kind: text
+            - $ne:
+              - $var: id
+              - ''
+        message: SESSION_ID_REQUIRED
+    - $if:
+        cond:
+          $ne:
+          - $document: /customerSession/id
+          - ''
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /customerSession/id
+              - $var: id
+            message: SESSION_ID_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: expiresAt
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /expiresAt
+            default:
+              $add:
+              - $binding: timestamp
+              - 900000000
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: expiresAt
+                kind: integer
+            - $gt:
+              - $var: expiresAt
+              - $binding: timestamp
+        message: CUSTOMER_SESSION_EXPIRY_INVALID
+    - $appendChange:
+        op: replace
+        path: /customerSession/expiresAt
+        val:
+          $var: expiresAt
+    - $appendChange:
+        op: replace
+        path: /customerSession/id
+        val:
+          $var: id
+    - $appendChange:
+        op: add
+        path: /paymentAction
+        val:
+          $merge:
+          - type: PaymentInstruction/Payment Action
+          - kind: customer-funding
+            id:
+              $var: id
+            party:
+              $document: /paymentTerms/payerChannel
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Customer Payment Session Ready
+          sessionId:
+            $var: id
+    - $return:
+        outcome: acceptedNew
+  confirmFunding:
+    args:
+      input:
+        description: Identify the existing customer funding session.
+        sessionId:
+          type: Text
+          description: Identifier of the existing customer funding session.
+          schema:
+            minLength: 1
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $const: sourceMode
+              - workflow
+            - $eq:
+              - $binding: call/channel
+              - $document: /paymentTerms/guarantorChannel
+        message: CUSTOMER_SESSION_OPERATOR_REQUIRED
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $document: /customerSession/id
+            - ''
+          - $ne:
+            - $document: /customerSession/id
+            - $pointerGet:
+                object:
+                  $var: input
+                path: /sessionId
+                default: ''
+        message: SESSION_ID_MISMATCH
+    - $if:
+        cond:
+          $eq:
+          - $document: /customerSession/funded
+          - true
+        then:
+        - $return:
+            outcome: duplicate
+    - $appendChange:
+        op: replace
+        path: /customerSession/funded
+        val: true
+    - $appendChange:
+        op: remove
+        path: /paymentAction
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Customer Funding Confirmed
+          sessionId:
+            $document: /customerSession/id
+    - $return:
+        outcome: acceptedNew
+  requestFunding:
+    args:
+      input:
+        description: Identify the existing customer funding session.
+        sessionId:
+          type: Text
+          description: Identifier of the existing customer funding session.
+          schema:
+            minLength: 1
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/payerChannel
+        message: CUSTOMER_PAYER_REQUIRED
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $document: /customerSession/id
+            - ''
+          - $ne:
+            - $document: /customerSession/id
+            - $pointerGet:
+                object:
+                  $var: input
+                path: /sessionId
+                default: ''
+        message: SESSION_ID_MISMATCH
+    - $failIf:
+        cond:
+          $gte:
+          - $binding: timestamp
+          - $document: /customerSession/expiresAt
+        message: CUSTOMER_SESSION_EXPIRED
+    - $if:
+        cond:
+          $eq:
+          - $document: /customerSession/requested
+          - true
+        then:
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $eq:
+          - $document: /payment/closed
+          - true
+        message: CUSTOMER_PAYMENT_CLOSED
+    - $appendChange:
+        op: replace
+        path: /customerSession/requested
+        val: true
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Customer Funding Requested
+          sessionId:
+            $document: /customerSession/id
+          amountMinor:
+            $document: /paymentTerms/amountMinor
+          currency:
+            $document: /paymentTerms/currency
+    - $return:
+        outcome: acceptedNew
+  provideSessionPublic:
+    args:
+      input:
+        type: MyOS/Customer Session Input
+        description: Provide a customer funding session for the accepted payment instruction. Omit expiresAt
+          to use the execution-time expiry default.
+        sessionId:
+          type: Text
+          description: Identifier of the customer funding session.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: provideSession
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

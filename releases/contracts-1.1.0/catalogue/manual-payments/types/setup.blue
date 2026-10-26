@@ -1,0 +1,52 @@
+name: Manual Payment Setup
+type: Payment/Payment Setup
+functions:
+  build:
+    args: {}
+    do:
+    - $let:
+        name: p
+        expr:
+          $document:
+            $concat:
+            - /clauses/
+            - $const: clauseKey
+            - /parameters
+    - $let:
+        name: recipient
+        expr:
+          $pointerGet:
+            object:
+              $var: p
+            path: /payee
+            default: seller
+    - $let:
+        name: result
+        expr:
+          $call:
+            function: buildInstruction
+            args:
+              configOverride:
+                guarantor:
+                  $var: recipient
+              details:
+                method: manual-bank-transfer
+                confirmation: recipient
+              methodClauses: {}
+              termsOverride: {}
+              instructionPatch:
+                rootType:
+                  $get:
+                    object:
+                      type: ManualPayments/Manual Payment Instruction
+                    key: type
+                contracts:
+                  reportTransfer:
+                    channel:
+                      $pointerGet:
+                        object:
+                          $var: p
+                        path: /payer
+                        default: customer
+    - $return:
+        $var: result

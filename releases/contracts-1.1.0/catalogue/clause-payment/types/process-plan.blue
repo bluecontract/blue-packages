@@ -1,0 +1,176 @@
+name: Payment Process Plan
+type: Payment/Conditional Process Plan
+functions:
+  policyAction:
+    args: {}
+    do:
+    - $return: capture
+  requestStep:
+    args:
+      gate:
+        type: Text
+      policy: {}
+    do:
+    - $return:
+        $merge:
+        - type: Contracts/Compute
+        - definition:
+            type: PaymentInstruction/Payment Protocol Functions
+          constants:
+            gate:
+              $var: gate
+            requestId:
+              $pointerGet:
+                object:
+                  $var: policy
+                path: /requestId
+            sourceMode: event
+          do:
+            $literal:
+            - $if:
+                cond:
+                  $not:
+                    $and:
+                    - $eq:
+                      - $document:
+                          $const: gate
+                      - true
+                    - $eq:
+                      - $document: /payment/accepted
+                      - true
+                    - $ne:
+                      - $document: /payment/transactionId
+                      - ''
+                    - $eq:
+                      - $document: /payment/closed
+                      - false
+                    - $eq:
+                      - $document: /payment/locks/capture
+                      - false
+                    - $eq:
+                      - $document: /payment/cancellationPending
+                      - false
+                    - $gte:
+                      - $subtract:
+                        - $document: /payment/secured
+                        - $document: /payment/reserved/capture
+                        - $document: /payment/reserved/void
+                      - $document: /paymentTerms/amountMinor
+                    - $or:
+                      - $eq:
+                        - $document: /paymentTerms/recipientApprovalRequired
+                        - false
+                      - $eq:
+                        - $document: /payment/recipientApproved
+                        - true
+                    - $not:
+                        $exists:
+                          $document:
+                            $concat:
+                            - /payment/requests/
+                            - $const: requestId
+                then:
+                - $return: {}
+            - $return:
+                $call:
+                  function: request
+                  args:
+                    action: capture
+                    input:
+                      requestId:
+                        $const: requestId
+                      amountMinor:
+                        $document: /paymentTerms/amountMinor
+  policyWatches:
+    args: {}
+    do:
+    - $return:
+      - /payment
+      - /activation
+      - /sourceLinks
+  requestPolicy:
+    args: {}
+    do:
+    - $let:
+        name: clause
+        expr:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - reservation
+              - card
+              - myos-customer
+              val:
+                $pointerGet:
+                  object:
+                    $var: clause
+                  path: /parameters/method
+                  default: reservation
+        message: PAYMENT_PROCESS_METHOD_UNSUPPORTED
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $var: clause
+            path: /parameters/capture
+            default: {}
+    - $let:
+        name: mode
+        expr:
+          $pointerGet:
+            object:
+              $var: policy
+            path: /mode
+            default: workflow
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - workflow
+              - when
+              val:
+                $var: mode
+        message: PAYMENT_CAPTURE_MODE_UNSUPPORTED
+    - $if:
+        cond:
+          $eq:
+          - $var: mode
+          - when
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: policy
+                    path: /when
+            message: PAYMENT_CAPTURE_CONDITION_REQUIRED
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: policy
+                        path: /requestId
+                    kind: text
+                - $ne:
+                  - $pointerGet:
+                      object:
+                        $var: policy
+                      path: /requestId
+                  - ''
+            message: PAYMENT_CAPTURE_REQUEST_ID_REQUIRED
+    - $return:
+        $var: policy

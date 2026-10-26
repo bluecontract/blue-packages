@@ -1,0 +1,133 @@
+name: Amendments Functions
+type: Amendments/Amendment Proposal Functions
+functions:
+  initialize:
+    args:
+      input: {}
+    do:
+    - $appendChange:
+        op: add
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          revision: 1
+          proposal: {}
+          history: {}
+    - $return:
+        outcome: acceptedNew
+  propose:
+    args:
+      input:
+        description: Propose a permitted change against the current amendment revision. preservePending
+          is optional and defaults to false.
+        expectedRevision:
+          type: Integer
+          description: Current revision in the configured amendments state.
+        path:
+          type: Text
+          description: Editable path allowed by clause parameters.paths.
+        proposalId:
+          type: Text
+          description: New proposal identifier without slash or tilde.
+          schema:
+            minLength: 1
+        replacement:
+          description: Exact replacement value chosen by the user for the selected editable path.
+    do:
+    - $let:
+        name: actor
+        expr:
+          $binding: call/channel
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $const:
+                  name: parameters
+                  path: /approvers
+              val:
+                $var: actor
+        message: APPROVER_REQUIRED
+    - $return:
+        $call:
+          function: recordProposal
+          args:
+            input:
+              $var: input
+  approve:
+    args:
+      input:
+        description: Approve the existing amendment proposal identified by proposalId.
+        proposalId:
+          type: Text
+          description: Identifier of the pending amendment proposal, from the configured amendments state.
+          schema:
+            minLength: 1
+    do:
+    - $return:
+        $call:
+          function: approveAmendmentProposal
+          args:
+            input:
+              $var: input
+            parameters:
+              $const: parameters
+            bindings:
+              $const: bindings
+            clauseKey:
+              $const: clauseKey
+            state:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state
+  recordProposal:
+    args:
+      input: {}
+    do:
+    - $return:
+        $call:
+          function: recordAmendmentProposal
+          args:
+            input:
+              $var: input
+            parameters:
+              $const: parameters
+            bindings:
+              $const: bindings
+            clauseKey:
+              $const: clauseKey
+            state:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state
+  proposePublic:
+    args:
+      input:
+        type: Amendments/Amendment Input
+        description: Propose a permitted change against the current amendment revision. preservePending
+          is optional and defaults to false.
+        expectedRevision:
+          type: Integer
+          description: Current revision in the configured amendments state.
+        path:
+          type: Text
+          description: Editable path allowed by clause parameters.paths.
+        proposalId:
+          type: Text
+          description: New proposal identifier without slash or tilde.
+          schema:
+            minLength: 1
+        replacement:
+          description: Exact replacement value chosen by the user for the selected editable path.
+    do:
+    - $return:
+        $call:
+          function: propose
+          args:
+            input:
+              $var: input

@@ -1,0 +1,295 @@
+name: Payment Setup
+type: Payment/Payment Setup
+functions:
+  resolveParty:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: candidate
+        expr:
+          $var:
+            name: input
+            path: /candidate
+    - $if:
+        cond:
+          $and:
+          - $isKind:
+              val:
+                $var: candidate
+              kind: text
+          - $hasKey:
+              object:
+                $document: /activation/parties
+              key:
+                $var: candidate
+        then:
+        - $return:
+            channel:
+              $var: candidate
+            party:
+              $document:
+                $concat:
+                - /activation/parties/
+                - $var: candidate
+            myosAccountId:
+              $document:
+                $concat:
+                - /activation/parties/
+                - $var: candidate
+                - /myosAccountId
+    - $let:
+        name: account
+        expr:
+          $choose:
+            cond:
+              $isKind:
+                val:
+                  $var: candidate
+                kind: text
+            then:
+              $var: candidate
+            else:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /myosAccountId
+                default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: account
+                kind: text
+            - $ne:
+              - $var: account
+              - ''
+        message: MYOS_ACCOUNT_REQUIRED
+    - $let:
+        name: matches
+        expr: []
+    - $forEach:
+        key: role
+        item: party
+        in:
+          $object:
+            $document: /activation/parties
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: party
+                  path: /myosAccountId
+                  default: ''
+              - $var: account
+            then:
+            - $set:
+                name: matches
+                expr:
+                  $listConcat:
+                  - $var: matches
+                  - - $var: role
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $var: matches
+          - 1
+        message: 'MYOS_PARTY_ROUTE: account must identify exactly one declared party/channel'
+    - $let:
+        name: role
+        expr:
+          $listGet:
+            list:
+              $var: matches
+            index: 0
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $concat:
+                - /contracts/
+                - $var: role
+        message: MYOS_PARTY_CHANNEL_MISSING
+    - $return:
+        channel:
+          $var: role
+        party:
+          $document:
+            $concat:
+            - /activation/parties/
+            - $var: role
+        myosAccountId:
+          $var: account
+  build:
+    args: {}
+    do:
+    - $let:
+        name: p
+        expr:
+          $object:
+            $document:
+              $concat:
+              - /clauses/
+              - $const: clauseKey
+              - /parameters
+    - $let:
+        name: method
+        expr:
+          $document:
+            $concat:
+            - /clauses/
+            - $const: clauseKey
+            - /paymentMethod
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - myos-customer
+              - myos-account-to-account
+              val:
+                $var: method
+        message: MYOS_PAYMENT_METHOD
+    - $let:
+        name: recipient
+        expr:
+          $call:
+            function: resolveParty
+            args:
+              input:
+                candidate:
+                  $pointerGet:
+                    object:
+                      $var: p
+                    path: /recipient
+                    default: null
+    - $let:
+        name: patch
+        expr:
+          recipient: ''
+          payee:
+            $var:
+              name: recipient
+              path: /channel
+    - $let:
+        name: snapshots
+        expr:
+          recipient:
+            $var:
+              name: recipient
+              path: /party
+    - $if:
+        cond:
+          $eq:
+          - $var: method
+          - myos-account-to-account
+        then:
+        - $let:
+            name: payer
+            expr:
+              $call:
+                function: resolveParty
+                args:
+                  input:
+                    candidate:
+                      $pointerGet:
+                        object:
+                          $var: p
+                        path: /payer
+                        default: null
+        - $failIf:
+            cond:
+              $eq:
+              - $var:
+                  name: payer
+                  path: /myosAccountId
+              - $var:
+                  name: recipient
+                  path: /myosAccountId
+            message: MYOS_SAME_ACCOUNT
+        - $set:
+            name: patch
+            expr:
+              $objectSet:
+                object:
+                  $var: patch
+                key: payer
+                val:
+                  $var:
+                    name: payer
+                    path: /channel
+        - $set:
+            name: snapshots
+            expr:
+              $objectSet:
+                object:
+                  $var: snapshots
+                key: payer
+                val:
+                  $var:
+                    name: payer
+                    path: /party
+    - $let:
+        name: operator
+        expr:
+          $pointerGet:
+            object:
+              $var: p
+            path: /guarantor
+            default: guarantor
+    - $let:
+        name: methodClauses
+        expr:
+          method:
+            type: MyOS/Payment Method Events
+    - $let:
+        name: methodTerms
+        expr: {}
+    - $if:
+        cond:
+          $eq:
+          - $var: method
+          - myos-customer
+        then:
+        - $set:
+            name: methodTerms
+            expr:
+              initiationGate: /customerSession/funded
+    - $let:
+        name: result
+        expr:
+          $call:
+            function: buildInstruction
+            args:
+              configOverride:
+                $var: patch
+              details:
+                method:
+                  $var: method
+                parties:
+                  $var: snapshots
+              methodClauses:
+                $var: methodClauses
+              termsOverride:
+                $var: methodTerms
+              instructionPatch:
+                $choose:
+                  cond:
+                    $eq:
+                    - $var: method
+                    - myos-customer
+                  then:
+                    rootType:
+                      $get:
+                        object:
+                          type: MyOS/MyOS Customer Payment Instruction
+                        key: type
+                  else: {}
+    - $return:
+        $var: result

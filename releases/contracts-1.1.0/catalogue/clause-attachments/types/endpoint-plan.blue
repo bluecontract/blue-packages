@@ -1,0 +1,100 @@
+name: Attachment Endpoint Plan
+type: Attachments/Attachment Rules
+functions:
+  validateConfiguration:
+    args: {}
+    do:
+    - $return:
+        allowed: true
+        code: ''
+  validateTransition:
+    args: {}
+    do:
+    - $return:
+        allowed: false
+        code: ATTACHMENT_POLICY_IMMUTABLE
+  plan:
+    args: {}
+    do:
+    - $let:
+        name: spec
+        expr:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+            - /parameters
+    - $let:
+        name: contributions
+        expr: {}
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: spec
+              path: /relationship
+          - cross-embedded
+        then:
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key: embedded
+                val:
+                  kind: embedding
+                  contract:
+                    type: Contracts/Process Embedded
+                    paths:
+                    - /sources/parent
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key: attachDocument
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow Operation
+                    - channel:
+                        $var:
+                          name: spec
+                          path: /linkBy
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition:
+                            $objectSet:
+                              object: {}
+                              key: blueId
+                              val:
+                                $nodeBlueId:
+                                  type: Attachments/Attachment Endpoint Functions
+                        - constants:
+                            spec:
+                              $var: spec
+                          do:
+                          - $objectSet:
+                              object: {}
+                              key: $call
+                              val:
+                                function: linkParent
+                                args:
+                                  $literal:
+                                    input:
+                                      $binding: call/request
+                    - $literal:
+                        $blue:requestFrom:
+                          definition:
+                            type: Attachments/Attachment Endpoint Functions
+                          function: linkParent
+                          argument: input
+    - $return:
+        contracts:
+          $var: contributions
+        states: {}
+        reads: []

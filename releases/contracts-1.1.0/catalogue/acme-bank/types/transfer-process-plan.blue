@@ -1,0 +1,157 @@
+name: Bank Transfer Process Plan
+type: Payment/Conditional Process Plan
+functions:
+  policyAction:
+    args: {}
+    do:
+    - $return: transfer
+  policyWatches:
+    args: {}
+    do:
+    - $return:
+      - /payment
+      - /bankTransfer
+      - /activation
+      - /sourceLinks
+  requestStep:
+    args:
+      gate:
+        type: Text
+      policy: {}
+    do:
+    - $return:
+        $merge:
+        - type: Contracts/Compute
+        - definition:
+            type: ACME/Bank Transfer Functions
+          constants:
+            gate:
+              $var: gate
+            requestId:
+              $pointerGet:
+                object:
+                  $var: policy
+                path: /requestId
+            sourceMode: event
+          do:
+            $literal:
+            - $if:
+                cond:
+                  $not:
+                    $and:
+                    - $eq:
+                      - $document:
+                          $const: gate
+                      - true
+                    - $eq:
+                      - $document: /payment/accepted
+                      - true
+                    - $eq:
+                      - $document: /payment/closed
+                      - false
+                    - $eq:
+                      - $document: /bankTransfer/status
+                      - idle
+                then:
+                - $return: {}
+            - $return:
+                $call:
+                  function: request
+                  args:
+                    input:
+                      requestId:
+                        $const: requestId
+  requestPolicy:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $document: ''
+              pattern:
+                type: ACME/Bank Transfer Contract
+        message: BANK_TRANSFER_INSTRUCTION_REQUIRED
+    - $let:
+        name: clause
+        expr:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - bank-transfer
+              - conditional-bank
+              val:
+                $pointerGet:
+                  object:
+                    $var: clause
+                  path: /parameters/method
+                  default: bank-transfer
+        message: BANK_PROCESS_METHOD_UNSUPPORTED
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $var: clause
+            path: /parameters/transfer
+            default: {}
+    - $let:
+        name: mode
+        expr:
+          $pointerGet:
+            object:
+              $var: policy
+            path: /mode
+            default: workflow
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - workflow
+              - when
+              val:
+                $var: mode
+        message: BANK_TRANSFER_MODE_UNSUPPORTED
+    - $if:
+        cond:
+          $eq:
+          - $var: mode
+          - when
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: policy
+                    path: /when
+            message: BANK_TRANSFER_CONDITION_REQUIRED
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: policy
+                        path: /requestId
+                    kind: text
+                - $ne:
+                  - $pointerGet:
+                      object:
+                        $var: policy
+                      path: /requestId
+                  - ''
+            message: BANK_TRANSFER_REQUEST_ID_REQUIRED
+    - $return:
+        $var: policy

@@ -1,0 +1,265 @@
+name: Payment Preparation Functions
+type: Documents/Preparation Functions
+functions:
+  domainPrepare:
+    args:
+      prepared: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $var: prepared
+              pattern:
+                type: PaymentInstruction/Payment Instruction with Clauses
+        message: PAYMENT_INSTRUCTION_TEMPLATE_REQUIRED
+    - $let:
+        name: terms
+        expr:
+          $merge:
+          - $object:
+              $call:
+                function: configuredTemplateValue
+                args:
+                  path: /paymentTerms
+          - $pointerGet:
+              object:
+                $var: prepared
+              path: /paymentTerms
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: terms
+                    path: /amountMinor
+                kind: integer
+            - $gt:
+              - $var:
+                  name: terms
+                  path: /amountMinor
+              - 0
+        message: PAYMENT_POSITIVE_INTEGER_AMOUNT_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: terms
+                    path: /limitMinor
+                kind: integer
+            - $gte:
+              - $var:
+                  name: terms
+                  path: /limitMinor
+              - 0
+        message: PAYMENT_NONNEGATIVE_INTEGER_AMOUNT_REQUIRED
+    - $failIf:
+        cond:
+          $gt:
+          - $var:
+              name: terms
+              path: /amountMinor
+          - $var:
+              name: terms
+              path: /limitMinor
+        message: PAYMENT_AMOUNT_EXCEEDS_LIMIT
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: terms
+                    path: /currency
+                kind: text
+            - $ne:
+              - $var:
+                  name: terms
+                  path: /currency
+              - ''
+        message: PAYMENT_CURRENCY_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: prepared
+                  path: /clauses/activation/parameters/parties
+              key:
+                $var:
+                  name: terms
+                  path: /payerChannel
+        message: PAYMENT_ROLE_NOT_DECLARED
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: prepared
+                  path: /clauses/activation/parameters/parties
+              key:
+                $var:
+                  name: terms
+                  path: /payeeChannel
+        message: PAYMENT_ROLE_NOT_DECLARED
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: prepared
+                  path: /clauses/activation/parameters/parties
+              key:
+                $var:
+                  name: terms
+                  path: /guarantorChannel
+        message: PAYMENT_ROLE_NOT_DECLARED
+    - $failIf:
+        cond:
+          $gt:
+          - $var:
+              name: terms
+              path: /limitMinor
+          - 1000000000000
+        message: PAYMENT_LIMIT_EXCEEDS_NATIVE_MAXIMUM
+    - $forEach:
+        key: processKey
+        item: processClause
+        in:
+          $pointerGet:
+            object:
+              $var: prepared
+            path: /clauses
+        do:
+        - $let:
+            name: policyAction
+            expr:
+              $call:
+                function: configuredTemplateValue
+                args:
+                  path:
+                    $concat:
+                    - /clauses/
+                    - $var: processKey
+                    - /paymentPolicyAction
+        - $if:
+            cond:
+              $and:
+              - $includes:
+                  list:
+                  - capture
+                  - transfer
+                  val:
+                    $var: policyAction
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: processClause
+                    path:
+                      $concat:
+                      - /parameters/
+                      - $var: policyAction
+                      - /mode
+                    default: workflow
+                - when
+            then:
+            - $set:
+                name: terms
+                expr:
+                  $objectSet:
+                    object:
+                      $var: terms
+                    key:
+                      $concat:
+                      - $var: policyAction
+                      - Gate
+                    val:
+                      $concat:
+                      - /paymentProcess_
+                      - $var: processKey
+                      - /
+                      - $var: policyAction
+                      - Allowed
+    - $return:
+        $var: terms
+  domainValidateCandidate:
+    args:
+      frozenTerms: {}
+      candidate: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $var: frozenTerms
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /paymentTerms
+        message: PAYMENT_TERMS_MISMATCH
+    - $return: true
+  domainNextActions:
+    args:
+      documentRef: {}
+    do:
+    - $let:
+        name: selected
+        expr:
+          $document:
+            $var:
+              name: documentRef
+              path: /path
+    - $let:
+        name: action
+        expr:
+          $pointerGet:
+            object:
+              $var: selected
+            path: /paymentAction
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $var: action
+        then:
+        - $return: []
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $var: action
+              pattern:
+                type: PaymentInstruction/Payment Action
+        message: PAYMENT_ACTION_INVALID
+    - $return:
+      - $merge:
+        - type: Payment/Payment Action Required
+        - party:
+            $var:
+              name: action
+              path: /party
+          document:
+            $var: documentRef
+          action:
+            $var: action
+          amountMinor:
+            $var:
+              name: selected
+              path: /paymentTerms/amountMinor
+          currency:
+            $var:
+              name: selected
+              path: /paymentTerms/currency

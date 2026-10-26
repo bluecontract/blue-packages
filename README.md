@@ -1,5 +1,7 @@
 # Blue packages
 
+Current runtime review candidate: [Blue Contracts 1.1.0](releases/contracts-1.1.0/REVIEW.md), including compact receipts and exact rebuilt native/application dependencies. Prior publications remain immutable.
+
 One current package set lives at the repository root. `PACKAGE-SOURCES.json` selects source directories; `PACKAGES.json` pins the built archives. `PUBLIC-CLAUSES.json` is the public catalogue: 13 feature families, including one payment family with provider-specific variants.
 
 Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [executable examples](examples/apps). They use Activation and clauses throughout. Raw contracts are implementation details of reusable packages. The Payment clause exposes requests; guarantor operations belong to the Payment Instruction.

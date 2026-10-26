@@ -1,0 +1,760 @@
+name: Attachment Planning Functions
+type: Attachments/Attachment Rules
+functions:
+  validateConfiguration:
+    args: {}
+    do:
+    - $return:
+        allowed: true
+        code: ''
+  validateTransition:
+    args: {}
+    do:
+    - $return:
+        allowed: false
+        code: ATTACHMENT_POLICY_IMMUTABLE
+  attachmentPlan:
+    args: {}
+    do:
+    - $let:
+        name: clause
+        expr:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+    - $let:
+        name: spec
+        expr:
+          $merge:
+          - authority: guarantor
+            payer: customer
+            payee: seller
+            hooks: {}
+          - $pointerGet:
+              object:
+                $var: clause
+              path: /parameters
+              default: {}
+    - $let:
+        name: actor
+        expr:
+          $get:
+            object:
+              $var: spec
+            key:
+              $coalesce:
+              - $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+                  - /type/actorParameter
+              - payer
+    - $let:
+        name: requestPath
+        expr:
+          $pointerGet:
+            object:
+              $var: clause
+            path: /bindings/request
+            default:
+              $concat:
+              - /attachmentRequest_
+              - $const: clauseKey
+    - $let:
+        name: instructionPath
+        expr:
+          $pointerGet:
+            object:
+              $var: clause
+            path: /bindings/instruction
+            default:
+              $concat:
+              - /instruction_
+              - $const: clauseKey
+    - $let:
+        name: statePath
+        expr:
+          $concat:
+          - /attachmentState_
+          - $const: clauseKey
+    - $forEach:
+        item: targetPath
+        in:
+        - $var: requestPath
+        - $var: instructionPath
+        do:
+        - $failIf:
+            cond:
+              $or:
+              - $not:
+                  $startsWith:
+                  - $var: targetPath
+                  - /
+              - $ne:
+                - $size:
+                    $split:
+                      text:
+                        $var: targetPath
+                      separator: /
+                - 2
+              - $eq:
+                - $var: targetPath
+                - /
+            message: ATTACHMENT_TOP_LEVEL_PATH_REQUIRED
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                - /activation
+                - /contracts
+                - /clauses
+                - /clauseRuntime
+                - /sources
+                - $var: statePath
+                - $concat:
+                  - /attachmentAccess_
+                  - $const: clauseKey
+                val:
+                  $var: targetPath
+            message: ATTACHMENT_RESERVED_PATH
+    - $failIf:
+        cond:
+          $eq:
+          - $var: requestPath
+          - $var: instructionPath
+        message: ATTACHMENT_PATH_COLLISION
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validPartyName
+              args:
+                candidate:
+                  $const: clauseKey
+        message: ATTACHMENT_INVALID_NAME
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validPartyName
+              args:
+                candidate:
+                  $var: actor
+        message: ATTACHMENT_INVALID_ACTOR
+    - $failIf:
+        cond:
+          $not:
+            $call:
+              function: validPartyName
+              args:
+                candidate:
+                  $var:
+                    name: spec
+                    path: /authority
+        message: ATTACHMENT_INVALID_AUTHORITY
+    - $failIf:
+        cond:
+          $ne:
+          - $var:
+              name: spec
+              path: /authority
+          - $document:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - $const: clauseKey
+              - /type/authorityRole
+        message: ATTACHMENT_AUTHORITY_ROLE_REQUIRED
+    - $let:
+        name: template
+        expr:
+          $pointerGet:
+            object:
+              $var: spec
+            path: /template
+            default: {}
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $pointerGet:
+                object:
+                  $var: template
+                path: /type
+        message: ATTACHMENT_TEMPLATE_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+                - /parameters/template/type
+          - $nodeBlueId:
+              $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+                - /type/instructionType/type
+        message: ATTACHMENT_WRONG_TEMPLATE_TYPE
+    - $forEach:
+        item: fieldPath
+        in:
+          $document:
+            $concat:
+            - /clauseRuntime/work/candidate/
+            - $const: clauseKey
+            - /type/partyFields
+        do:
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: template
+                  path:
+                    $var: fieldPath
+              - $get:
+                  object:
+                    $var: spec
+                  key:
+                    $var: parameter
+            message: ATTACHMENT_TEMPLATE_PARTY_MISMATCH
+        key: parameter
+    - $let:
+        name: compiled
+        expr:
+          $call:
+            function: compileHooks
+            args:
+              hooks:
+                $var:
+                  name: spec
+                  path: /hooks
+              allowed:
+                $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+                  - /type/allowedActions
+              key:
+                $const: clauseKey
+    - $let:
+        name: constants
+        expr:
+          key:
+            $const: clauseKey
+          actor:
+            $var: actor
+          authority:
+            $var:
+              name: spec
+              path: /authority
+          kind:
+            $document:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - $const: clauseKey
+              - /type/kind
+          allowed:
+            $document:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - $const: clauseKey
+              - /type/allowedActions
+          instructionType:
+            $nodeBlueId:
+              $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+                - /type/instructionType/type
+          requestType:
+            $nodeBlueId:
+              $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+                - /type/requestType/type
+          termsPath:
+            $document:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - $const: clauseKey
+              - /type/termsPath
+          allowCreate:
+            $eq:
+            - $document:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $const: clauseKey
+                - /type/allowCreate
+            - true
+          requestPath:
+            $var: requestPath
+          instructionPath:
+            $var: instructionPath
+          statePath:
+            $var: statePath
+          automatic: false
+    - $let:
+        name: contributions
+        expr:
+          embedded:
+            kind: embedding
+            contract:
+              $merge:
+              - type: Contracts/Process Embedded
+              - paths:
+                - $var: instructionPath
+                collectionPaths:
+                - $concat:
+                  - /attachmentAccess_
+                  - $const: clauseKey
+    - $forEach:
+        item: fn
+        in:
+          $choose:
+            cond:
+              $eq:
+              - $document:
+                  $concat:
+                  - /clauseRuntime/work/candidate/
+                  - $const: clauseKey
+                  - /type/allowCreate
+              - true
+            then:
+            - prepare
+            - attach
+            - create
+            else:
+            - prepare
+            - attach
+        do:
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $concat:
+                  - $var: fn
+                  - _
+                  - $const: clauseKey
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow Operation
+                    - channel:
+                        $var: actor
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition:
+                            $objectSet:
+                              object: {}
+                              key: blueId
+                              val:
+                                $nodeBlueId:
+                                  type: Attachments/Attachment Functions
+                        - constants:
+                            $var: constants
+                          do:
+                          - $objectSet:
+                              object: {}
+                              key: $call
+                              val:
+                                function:
+                                  $choose:
+                                    cond:
+                                      $eq:
+                                      - $var: fn
+                                      - prepare
+                                    then: preparePublic
+                                    else:
+                                      $var: fn
+                                args:
+                                  $literal:
+                                    input:
+                                      $binding: call/request
+                    - $get:
+                        object:
+                          $literal:
+                            prepare:
+                              $blue:requestFrom:
+                                definition:
+                                  type: Attachments/Attachment Functions
+                                function: preparePublic
+                                argument: input
+                            attach:
+                              $blue:requestFrom:
+                                definition:
+                                  type: Attachments/Attachment Functions
+                                function: attach
+                                argument: input
+                            create:
+                              $blue:requestFrom:
+                                definition:
+                                  type: Attachments/Attachment Functions
+                                function: create
+                                argument: input
+                        key:
+                          $var: fn
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: spec
+            key: createOn
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $document:
+                    $concat:
+                    - /clauseRuntime/work/candidate/
+                    - $const: clauseKey
+                    - /type/allowCreate
+                - true
+            message: ATTACHMENT_CREATE_HOOK_NOT_ALLOWED
+        - $failIf:
+            cond:
+              $eq:
+              - $var:
+                  name: compiled
+                  path: /relationship
+              - cross-embedded
+            message: ATTACHMENT_CROSS_CREATE_REQUIRES_EXPLICIT_OPERATION
+        - $let:
+            name: creation
+            expr:
+              $var:
+                name: spec
+                path: /createOn
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - initialized
+                  - state
+                  val:
+                    $var:
+                      name: creation
+                      path: /on
+            message: ATTACHMENT_UNKNOWN_CREATE_HOOK
+        - $let:
+            name: channel
+            expr:
+              $concat:
+              - attachmentCreate_
+              - $const: clauseKey
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $var: channel
+                val:
+                  kind: channel
+                  contract:
+                    $choose:
+                      cond:
+                        $eq:
+                        - $var:
+                            name: creation
+                            path: /on
+                        - initialized
+                      then:
+                        type: Contracts/Triggered Event Channel
+                        event:
+                          type: Clauses/Clauses Initialized
+                      else:
+                        $merge:
+                        - type: Contracts/Document Update Channel
+                        - path:
+                            $var:
+                              name: creation
+                              path: /path
+        - $let:
+            name: createSteps
+            expr: []
+        - $forEach:
+            item: creationFunction
+            in:
+            - prepare
+            - create
+            do:
+            - $let:
+                name: createBody
+                expr:
+                - $objectSet:
+                    object: {}
+                    key: $call
+                    val:
+                      function:
+                        $var: creationFunction
+                      args:
+                        input: {}
+            - $if:
+                cond:
+                  $eq:
+                  - $var:
+                      name: creation
+                      path: /on
+                  - state
+                then:
+                - $set:
+                    name: createBody
+                    expr:
+                    - $objectSet:
+                        object: {}
+                        key: $if
+                        val:
+                          cond:
+                            $objectSet:
+                              object: {}
+                              key: $eq
+                              val:
+                              - $objectSet:
+                                  object: {}
+                                  key: $document
+                                  val:
+                                    $var:
+                                      name: creation
+                                      path: /path
+                              - $var:
+                                  name: creation
+                                  path: /equals
+                          then:
+                            $var: createBody
+            - $set:
+                name: createSteps
+                expr:
+                  $listConcat:
+                  - $var: createSteps
+                  - - $merge:
+                      - type: Contracts/Compute
+                      - definition:
+                          $objectSet:
+                            object: {}
+                            key: blueId
+                            val:
+                              $nodeBlueId:
+                                type: Attachments/Attachment Functions
+                        constants:
+                          $merge:
+                          - $var: constants
+                          - automatic: true
+                        do:
+                          $var: createBody
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $concat:
+                  - $var: channel
+                  - _run
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel:
+                        $var: channel
+                      steps:
+                        $var: createSteps
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key:
+              $concat:
+              - addAuthority_
+              - $const: clauseKey
+            val:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow Operation
+                - channel:
+                    $var: actor
+                  steps:
+                  - $merge:
+                    - type: Contracts/Compute
+                    - definition:
+                        $objectSet:
+                          object: {}
+                          key: blueId
+                          val:
+                            $nodeBlueId:
+                              type: Attachments/Attachment Access Functions
+                    - constants:
+                        $var: constants
+                      do:
+                      - $objectSet:
+                          object: {}
+                          key: $call
+                          val:
+                            function: addAuthority
+                            args:
+                              $literal:
+                                input:
+                                  $binding: call/request
+                - $literal:
+                    $blue:requestFrom:
+                      definition:
+                        type: Attachments/Attachment Access Functions
+                      function: addAuthority
+                      argument: input
+    - $let:
+        name: registerOperation
+        expr:
+          $merge:
+          - type: Contracts/Sequential Workflow Operation
+          - channel:
+              $var: actor
+            steps:
+            - $merge:
+              - type: Contracts/Compute
+              - definition:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        type: Attachments/Attachment Access Functions
+              - constants:
+                  $var: constants
+                do:
+                - $objectSet:
+                    object: {}
+                    key: $call
+                    val:
+                      function: registerAccessPublic
+                      args:
+                        $literal:
+                          input:
+                            $binding: call/request
+          - $literal:
+              $blue:requestFrom:
+                definition:
+                  type: Attachments/Attachment Access Functions
+                function: registerAccessPublic
+                argument: input
+    - $set:
+        name: registerOperation
+        expr:
+          $pointerSet:
+            object:
+              $var: registerOperation
+            path: /steps
+            val:
+              $listConcat:
+              - $var:
+                  name: registerOperation
+                  path: /steps
+              - - type: Activation/Refresh Activation
+    - $set:
+        name: contributions
+        expr:
+          $objectSet:
+            object:
+              $var: contributions
+            key:
+              $concat:
+              - registerAccess_
+              - $const: clauseKey
+            val:
+              kind: handler
+              contract:
+                $var: registerOperation
+    - $forEach:
+        item: signal
+        in:
+          $var:
+            name: compiled
+            path: /signals
+        do:
+        - $let:
+            name: channel
+            expr:
+              $concat:
+              - attachment_signal_
+              - $const: clauseKey
+              - _
+              - $var:
+                  name: signal
+                  path: /id
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $var: channel
+                val:
+                  kind: channel
+                  contract:
+                    $merge:
+                    - type: Contracts/Document Update Channel
+                    - path:
+                        $var:
+                          name: signal
+                          path: /path
+        - $set:
+            name: contributions
+            expr:
+              $objectSet:
+                object:
+                  $var: contributions
+                key:
+                  $concat:
+                  - $var: channel
+                  - _emit
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel:
+                        $var: channel
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - do:
+                          - $objectSet:
+                              object: {}
+                              key: $appendEvent
+                              val:
+                                $merge:
+                                - type: Attachments/Source Changed
+                                - attachment:
+                                    $const: clauseKey
+                                  hook:
+                                    $var:
+                                      name: signal
+                                      path: /id
+    - $return:
+        contracts:
+          $var: contributions
+        states:
+          attachment:
+            path:
+              $var: statePath
+            kind: object
+            initial:
+              status: waiting
+        reads: []

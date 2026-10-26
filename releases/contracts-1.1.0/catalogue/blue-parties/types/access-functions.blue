@@ -1,0 +1,553 @@
+name: Party Access Functions
+type: Contracts/Compute Definition
+functions:
+  validPartyName:
+    args:
+      candidate:
+        type: Text
+    do:
+    - $return:
+        $and:
+        - $isKind:
+            val:
+              $var: candidate
+            kind: text
+        - $ne:
+          - $var: candidate
+          - ''
+        - $eq:
+          - $size:
+              $split:
+                text:
+                  $var: candidate
+                separator: .
+          - 1
+        - $eq:
+          - $size:
+              $split:
+                text:
+                  $var: candidate
+                separator: /
+          - 1
+        - $eq:
+          - $size:
+              $split:
+                text:
+                  $var: candidate
+                separator: '~'
+          - 1
+        - $eq:
+          - $size:
+              $split:
+                text:
+                  $var: candidate
+                separator: __
+          - 1
+  readerGroups:
+    args:
+      roster: {}
+      readers: {}
+    do:
+    - $let:
+        name: groups
+        expr:
+          $var: readers
+    - $forEach:
+        item: party
+        in:
+          $var: roster
+        do:
+        - $set:
+            name: groups
+            expr:
+              $objectSet:
+                object:
+                  $var: groups
+                key:
+                  $var: role
+                val:
+                  $pointerGet:
+                    object:
+                      $var: party
+                    path: /readerKeys
+                    default: []
+        - $forEach:
+            item: rep
+            in:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /representatives
+                default: {}
+            do:
+            - $set:
+                name: groups
+                expr:
+                  $objectSet:
+                    object:
+                      $var: groups
+                    key:
+                      $concat:
+                      - $var: role
+                      - __
+                      - $var: repId
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: rep
+                        path: /readerKeys
+                        default: []
+            key: repId
+        key: role
+    - $return:
+        $var: groups
+  transports:
+    args:
+      roster: {}
+    do:
+    - $let:
+        name: all
+        expr: {}
+    - $forEach:
+        item: party
+        in:
+          $var: roster
+        do:
+        - $set:
+            name: all
+            expr:
+              $objectSet:
+                object:
+                  $var: all
+                key:
+                  $var: role
+                val:
+                  $pointerGet:
+                    object:
+                      $var: party
+                    path: /lead/channel
+                    default: {}
+        - $forEach:
+            item: rep
+            in:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /representatives
+                default: {}
+            do:
+            - $set:
+                name: all
+                expr:
+                  $objectSet:
+                    object:
+                      $var: all
+                    key:
+                      $concat:
+                      - $var: role
+                      - __
+                      - $var: repId
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: rep
+                        path: /channel
+                        default: {}
+            key: repId
+        key: role
+    - $return:
+        $var: all
+  accessValid:
+    args:
+      roster: {}
+      readers: {}
+      accessPaths: []
+    do:
+    - $let:
+        name: groups
+        expr:
+          $call:
+            function: readerGroups
+            args:
+              roster:
+                $var: roster
+              readers:
+                $var: readers
+    - $let:
+        name: transports
+        expr:
+          $call:
+            function: transports
+            args:
+              roster:
+                $var: roster
+    - $let:
+        name: valid
+        expr: true
+    - $forEach:
+        item: channel
+        in:
+          $var: transports
+        do:
+        - $if:
+            cond:
+              $is:
+                node:
+                  $var: channel
+                pattern:
+                  type: Contracts/External Channel
+            then: []
+            else:
+            - $failIf:
+                cond:
+                  $not:
+                    $is:
+                      node:
+                        $var: channel
+                      pattern:
+                        type: Coordination/Timeline Channel
+                message: ACTIVATION_CHANNEL_REQUIRED
+            - $let:
+                name: matched
+                expr: false
+            - $forEach:
+                item: path
+                in:
+                  $var: accessPaths
+                do:
+                - $let:
+                    name: access
+                    expr:
+                      $document:
+                        $var: path
+                - $failIf:
+                    cond:
+                      $not:
+                        $is:
+                          node:
+                            $var: access
+                          pattern:
+                            type: Coordination/Timeline Access
+                    message: TIMELINE_ACCESS_DOCUMENT_REQUIRED
+                - $let:
+                    name: timelineFound
+                    expr: false
+                - $let:
+                    name: keysFound
+                    expr: true
+                - $forEach:
+                    item: timeline
+                    in:
+                      $pointerGet:
+                        object:
+                          $var: access
+                        path: /allowedTimelines
+                        default: []
+                    do:
+                    - $if:
+                        cond:
+                          $eq:
+                          - $nodeBlueId:
+                              $objectFromEntries:
+                                $entries:
+                                  $var: timeline
+                          - $nodeBlueId:
+                              $objectFromEntries:
+                                $entries:
+                                  $pointerGet:
+                                    object:
+                                      $var: channel
+                                    path: /timeline
+                        then:
+                        - $set:
+                            name: timelineFound
+                            expr: true
+                - $forEach:
+                    item: keys
+                    in:
+                      $var: groups
+                    do:
+                    - $let:
+                        name: keyFound
+                        expr: false
+                    - $forEach:
+                        item: key
+                        in:
+                          $var: keys
+                        do:
+                        - $if:
+                            cond:
+                              $includes:
+                                list:
+                                  $pointerGet:
+                                    object:
+                                      $var: access
+                                    path: /allowedKeys
+                                    default: []
+                                val:
+                                  $var: key
+                            then:
+                            - $set:
+                                name: keyFound
+                                expr: true
+                    - $if:
+                        cond:
+                          $not:
+                            $var: keyFound
+                        then:
+                        - $set:
+                            name: keysFound
+                            expr: false
+                    key: groupName
+                - $if:
+                    cond:
+                      $and:
+                      - $var: timelineFound
+                      - $var: keysFound
+                      - $eq:
+                        - $nodeBlueId:
+                            $objectFromEntries:
+                              $entries:
+                                $pointerGet:
+                                  object:
+                                    $var: channel
+                                  path: /timeline/provider
+                                  default: {}
+                        - $nodeBlueId:
+                            $objectFromEntries:
+                              $entries:
+                                $pointerGet:
+                                  object:
+                                    $var: access
+                                  path: /contracts/provider/provider
+                                  default: {}
+                    then:
+                    - $set:
+                        name: matched
+                        expr: true
+            - $if:
+                cond:
+                  $not:
+                    $var: matched
+                then:
+                - $set:
+                    name: valid
+                    expr: false
+        key: transportName
+    - $return:
+        $var: valid
+  authority:
+    args:
+      state: {}
+      channel:
+        type: Text
+    do:
+    - $let:
+        name: allowed
+        expr: false
+    - $forEach:
+        item: party
+        in:
+          $pointerGet:
+            object:
+              $var: state
+            path: /parties
+            default: {}
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $var: channel
+              - $var: role
+            then:
+            - $set:
+                name: allowed
+                expr: true
+        - $forEach:
+            item: rep
+            in:
+              $pointerGet:
+                object:
+                  $var: party
+                path: /representatives
+                default: {}
+            do:
+            - $if:
+                cond:
+                  $eq:
+                  - $var: channel
+                  - $concat:
+                    - $var: role
+                    - __
+                    - $var: repId
+                then:
+                - $set:
+                    name: allowed
+                    expr: true
+            key: repId
+        key: role
+    - $return:
+        $var: allowed
+  businessReady:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document: /activation
+        then:
+        - $return: true
+    - $let:
+        name: state
+        expr:
+          $document: /activation
+    - $if:
+        cond:
+          $pointerGet:
+            object:
+              $var: state
+            path: /closed
+            default: false
+        then:
+        - $return: false
+    - $forEach:
+        item: role
+        in:
+          $pointerGet:
+            object:
+              $var: state
+            path: /required
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $pointerGet:
+                  object:
+                    $var: state
+                  path:
+                    $concat:
+                    - /approved/
+                    - $var: role
+                  default: false
+            then:
+            - $return: false
+    - $if:
+        cond:
+          $not:
+            $call:
+              function: termsCurrent
+              args: {}
+        then:
+        - $return: false
+    - $return:
+        $call:
+          function: accessValid
+          args:
+            roster:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /parties
+                default: {}
+            readers:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /readers
+                default: {}
+            accessPaths:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /accessPaths
+                default: []
+  requireActive:
+    args:
+      channel:
+        type: Text
+      workflow:
+        type: Boolean
+    do:
+    - $if:
+        cond:
+          $exists:
+            $document: /activation
+        then:
+        - $let:
+            name: s
+            expr:
+              $document: /activation
+        - $failIf:
+            cond:
+              $not:
+                $pointerGet:
+                  object:
+                    $var: s
+                  path: /active
+                  default: false
+            message: DOCUMENT_NOT_ACTIVE
+        - $failIf:
+            cond:
+              $not:
+                $call:
+                  function: accessValid
+                  args:
+                    roster:
+                      $pointerGet:
+                        object:
+                          $var: s
+                        path: /parties
+                        default: {}
+                    readers:
+                      $pointerGet:
+                        object:
+                          $var: s
+                        path: /readers
+                        default: {}
+                    accessPaths:
+                      $pointerGet:
+                        object:
+                          $var: s
+                        path: /accessPaths
+                        default: []
+            message: PARTICIPANT_ACCESS_MISSING
+        - $if:
+            cond:
+              $var: workflow
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $call:
+                      function: authority
+                      args:
+                        state:
+                          $var: s
+                        channel:
+                          $var: channel
+                message: REPRESENTATIVE_NO_LONGER_AUTHORIZED
+    - $return: true
+  termsCurrent:
+    args: {}
+    do:
+    - $forEach:
+        item: agreed
+        in:
+          $pointerGet:
+            object:
+              $document: /activation
+            path: /terms/fields
+            default: {}
+        do:
+        - $if:
+            cond:
+              $ne:
+              - $document:
+                  $var: path
+              - $var: agreed
+            then:
+            - $return: false
+        key: path
+    - $return: true

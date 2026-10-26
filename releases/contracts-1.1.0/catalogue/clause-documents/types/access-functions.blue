@@ -1,0 +1,47 @@
+name: Document Access Functions
+type: Activation/Child Activation Functions
+description: Owner-reviewed registration using Activation's ordinary embedded Timeline Access event channels.
+functions:
+  registerDocumentAccess:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: ACCESS_EXACT_REVIEW_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $document: /activation/parties
+              key:
+                $binding: call/channel
+        message: ONLY_PARTY_LEAD_CAN_MANAGE
+    - $return:
+        $call:
+          function: installTimelineAccess
+          args:
+            input:
+              $var: input
+  registerDocumentAccessPublic:
+    args:
+      input:
+        documents:
+          type: List
+          itemType: Coordination/Timeline Access
+          schema:
+            minItems: 1
+            maxItems: 16
+          description: One to sixteen initialized Timeline Access document publications. Supply existing document
+            references; execution verifies initialization, authority and permitted access.
+    do:
+    - $return:
+        $call:
+          function: registerDocumentAccess
+          args:
+            input:
+              $var: input
