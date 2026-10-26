@@ -25,10 +25,12 @@ integration for this candidate.
 
 ## Build and verify
 
-The [unpublished BEX staged-list-preview correction](blue-bex/spec/resultvalue-preview-correction.md)
-specifies MyOS Core's structural `$resultValue` list operations and incremental
-projection costs. It leaves the selected package archives, frozen specification
-and executable reference algorithms unchanged.
+The [unpublished BEX working specification](blue-bex/spec/bex-resultvalue-preview.md)
+defines structural `$resultValue` list operations and incremental projection costs
+in both prose and executable algorithms. Run its isolated tests with Python 3.13+:
+`python3 blue-bex/tests/test_resultvalue_preview.py`. It leaves selected archives,
+frozen specifications, historical reference sources and pins unchanged; it has no
+assigned publication BlueId and is not selected by the package manifest.
 
 ```sh
 # Java 21 and a qualified Blue Java runtime classpath are required.
