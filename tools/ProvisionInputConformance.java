@@ -22,20 +22,24 @@ public final class ProvisionInputConformance {
   }
   public static void main(String[] args)throws Exception {
     var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    for(String mode:List.of("omitted","explicit","inherited","reference","inherited-wrong-key"))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    for(String mode:List.of("omitted","explicit","inherited","reference","inherited-wrong-key","wrong-request","wrong-requirement","changed-terms"))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
       var p=runtime.processor(packages.language());var values=p.execution().values();
       var host=applied(p.initialize(source()));host=applied(p.process(host.document(),event(host.document(),"approve_owner",m("revision",1)),1));
       host=applied(p.process(host.document(),event(host.document(),"prepareWork",m()),2));
       var pending=obj(obj(p.read(host.document(),"/process_work/entries")).values().iterator().next());
-      var child=applied(p.initialize(AttachmentDocuments.source(p,host.document(),pending.get("itemPath")+"/prepared")));
+      var childSource=obj(AttachmentDocuments.source(p,host.document(),pending.get("itemPath")+"/prepared"));
+      if(mode.equals("changed-terms"))childSource.put("result","substituted");
+      var child=applied(p.initialize(childSource));
       child=applied(p.process(child.document(),event(child.document(),"approve_owner",m("revision",1)),3));
       var request=m("type","Documents/Provision Input","inResponseTo",pending.get("requestId"),"requirementRef",pending.get("requirementRef"),"document",m("blueId",child.document().blueId()));
       if(mode.equals("explicit"))request.put("key","single");
+      if(mode.equals("wrong-request"))request.put("inResponseTo","other-request");
+      if(mode.equals("wrong-requirement"))request.put("requirementRef",m("blueId",child.document().blueId()));
       if(mode.startsWith("inherited"))request.put("type",m("type","Documents/Provision Input","key",mode.endsWith("wrong-key")?"different":"single"));
       Object input=mode.equals("reference")?m("blueId",NativeRuntime.identity(values.source(request))):request;
       String before=WireData.write(input);var result=p.process(host.document(),event(host.document(),"provideWork",input),4);
-      if(mode.endsWith("wrong-key")) {
-        require(!result.commits(),"An inherited concrete key must not be replaced by single");
+      if(Set.of("inherited-wrong-key","wrong-request","wrong-requirement","changed-terms").contains(mode)) {
+        require(!result.commits(),"Invalid provision must not commit: "+mode);
         require(host.document().identity().equals(result.document().identity())&&p.emitted(result).isEmpty(),"Rejected key leaves document/effects untouched");
       } else {
         applied(result);var selected=values.select(new Exact.Ref(result.document().blueId()),"/work");

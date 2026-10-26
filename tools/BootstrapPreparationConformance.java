@@ -1,4 +1,5 @@
 import blue.contracts.*;
+import blue.bex.*;
 import blue.coordination.AuthoringRuntime;
 import blue.core.CompositionPackages;
 import blue.language.next.*;
@@ -43,6 +44,8 @@ public final class BootstrapPreparationConformance {
   }
   public static void main(String[] args)throws Exception {
     Path root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    bootstrapPartyGuards(packages);
+    bootstrapAccessGuards(packages);
     for(String mode:List.of("bootstrap","inherited","unknown"))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
       var p=runtime.processor(packages.language());
       var host=applied(p.initialize(source(mode.equals("inherited")?null:mode)));
@@ -77,4 +80,86 @@ public final class BootstrapPreparationConformance {
       System.out.println("PASS native preparation "+mode);
     }
   }
+  static Map<String,Object> party(String timeline) {
+    return m("lead",m("channel",m("actor","merchant","timeline",timeline)),
+        "readerKeys",List.of("merchant-reader"),"representatives",m("myosAgent",
+            m("representativeId","agent","channel",m("actor","agent","timeline",timeline+"-agent"),
+              "readerKeys",List.of("agent-reader"))));
+  }
+  static void bootstrapPartyGuards(CompositionPackages packages)throws Exception {
+    try(var blue=packages.language()) {
+      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var definition=values.source(m("type","Documents/Factory Functions"),"definition");
+      var functions=new LinkedHashMap<>(obj(values.bexData(values.select(definition,"/functions"))));
+      functions.keySet().retainAll(Set.of("requireSameBootstrapParty","requireSameBootstrapPrimary","requireSameMainParty"));
+      var library=m("functions",functions);
+      var source=m("do",List.of(m("$return",m("$call",m("function","requireSameBootstrapParty","args",
+          m("expected",m("$binding","call/request/expected"),"actual",m("$binding","call/request/actual")))))));
+      var bex=new Bex(BexProfile.current());var program=bex.compile(source,library,null);
+      for(String variant:List.of("fresh-transports","changed-actor","changed-reader","removed-agent","changed-agent","changed-agent-reader")) {
+        var actual=party("child");
+        switch(variant) {
+          case "changed-actor" -> obj(obj(actual.get("lead")).get("channel")).put("actor","stranger");
+          case "changed-reader" -> actual.put("readerKeys",List.of("stranger-reader"));
+          case "removed-agent" -> actual.put("representatives",m());
+          case "changed-agent" -> obj(obj(obj(actual.get("representatives")).get("myosAgent")).get("channel")).put("actor","stranger");
+          case "changed-agent-reader" -> obj(obj(actual.get("representatives")).get("myosAgent")).put("readerKeys",List.of("stranger-reader"));
+        }
+        var context=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m("call",m("request",m("expected",party("parent"),"actual",actual))),"/",null,
+            (a,p)->values.matches(a,values.source(p,"definition")),(a,g)->NativeRuntime.identity(values.source(Values.blueValue(a))));
+        boolean rejected=false;
+        try {bex.execute(program,context,1000000);}catch(BexError failure) {rejected=true;}
+        require(rejected!=variant.equals("fresh-transports"),"Bootstrap mapped-party guard: "+variant);
+      }
+      System.out.println("PASS bootstrap mapped-party and representative guards");
+    }
+  }
+  static Map<String,Object> typed(ContractsExecution.Values values,String type,Object... fields) {
+    var result=m("type",m("blueId",values.head(values.source(m("type",type),"definition")).type));
+    result.putAll(m(fields));return result;
+  }
+  static Map<String,Object> accessCandidate(ContractsExecution.Values values) {
+    var key=typed(values,"Coordination/Ed25519 Public Key","value","00".repeat(32));
+    var provider=typed(values,"Coordination/Timeline Provider","publicKey",key,"endpoint","https://provider.example");
+    var timeline=typed(values,"Coordination/Signed Timeline","provider",provider,"publicRead",false,"url","https://provider.example/order");
+    var channel=typed(values,"Coordination/Timeline Channel","actor",typed(values,"Coordination/Actor","id","merchant"),"timeline",timeline);
+    var access=typed(values,"Coordination/Timeline Access","allowedKeys",List.of(key),"allowedTimelines",List.of(timeline),
+        "contracts",m("initialized",m("document",m("state","origin")),"provider",
+            typed(values,"Coordination/Public Timeline Channel","provider",provider,"url","https://provider.example/public")));
+    return m("activation",m("parties",m("seller",m("lead",m("channel",channel),"readerKeys",List.of(key))),
+        "accessPaths",List.of("/timelineAccess/seller")),"timelineAccess",m("seller",access));
+  }
+  static void bootstrapAccessGuards(CompositionPackages packages)throws Exception {
+    try(var blue=packages.language()) {
+      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var definition=values.source(m("type","Documents/Factory Functions"),"definition");
+      var functions=new LinkedHashMap<>(obj(values.bexData(values.select(definition,"/functions"))));
+      functions.keySet().retainAll(Set.of("validateBootstrapAccess","accessRecordsValid","readerGroups","transports"));
+      var source=m("do",List.of(m("$return",m("$call",m("function","validateBootstrapAccess","args",m("candidate",m("$binding","call/request")))))));
+      var bex=new Bex(BexProfile.current());var program=bex.compile(source,m("functions",functions),null);
+      for(String variant:List.of("complete","missing-proof","uninitialized","wrong-provider","missing-key","wrong-timeline","extra-proof","wrong-path")) {
+        var candidate=accessCandidate(values);var access=obj(obj(candidate.get("timelineAccess")).get("seller"));
+        String reason="PREPARATION_BOOTSTRAP_ACCESS_MISSING";
+        switch(variant) {
+          case "missing-proof" -> {candidate.put("timelineAccess",m());reason="PREPARATION_BOOTSTRAP_ACCESS_SHAPE";}
+          case "extra-proof" -> {obj(candidate.get("timelineAccess")).put("extra",access);reason="PREPARATION_BOOTSTRAP_ACCESS_SHAPE";}
+          case "wrong-path" -> {obj(candidate.get("activation")).put("accessPaths",List.of("/timelineAccess/other"));reason="PREPARATION_BOOTSTRAP_ACCESS_SHAPE";}
+          case "uninitialized" -> {obj(access.get("contracts")).remove("initialized");reason="PREPARATION_BOOTSTRAP_ACCESS_NOT_INITIALIZED";}
+          case "wrong-provider" -> obj(obj(access.get("contracts")).get("provider")).put("provider",typed(values,"Coordination/Timeline Provider","publicKey",typed(values,"Coordination/Ed25519 Public Key","value","11".repeat(32)),"endpoint","https://other.example"));
+          case "missing-key" -> access.put("allowedKeys",List.of());
+          case "wrong-timeline" -> access.put("allowedTimelines",List.of());
+        }
+        var context=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m("call",m("request",candidate)),"/",null,
+            (a,p)->values.matches(a,values.source(p,"definition")),(a,g)->NativeRuntime.identity(values.source(Values.blueValue(a))));
+        boolean rejected=false;
+        try {bex.execute(program,context,1000000);}catch(BexError failure) {
+          require(failure.getMessage().contains(reason),variant+" failed for unexpected reason: "+failure.getMessage());
+          rejected=true;
+        }
+        require(rejected!=variant.equals("complete"),"Bootstrap access guard: "+variant);
+      }
+      System.out.println("PASS bootstrap access coverage and provider guards");
+    }
+  }
+
 }

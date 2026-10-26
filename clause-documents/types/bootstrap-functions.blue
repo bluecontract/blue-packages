@@ -118,6 +118,44 @@ functions:
       expected: {}
       actual: {}
     do:
+    - $call:
+        function: requireSameBootstrapPrimary
+        args: {expected: {$var: expected}, actual: {$var: actual}}
+    - $let:
+        name: expectedRepresentatives
+        expr: {$pointerGet: {object: {$var: expected}, path: /representatives, default: {}}}
+    - $let:
+        name: actualRepresentatives
+        expr: {$pointerGet: {object: {$var: actual}, path: /representatives, default: {}}}
+    - $failIf:
+        cond: {$ne: [{$size: {$var: expectedRepresentatives}}, {$size: {$var: actualRepresentatives}}]}
+        message: PREPARATION_BOOTSTRAP_REPRESENTATIVES_MISMATCH
+    - $forEach:
+        item: representative
+        key: representativeName
+        in: {$var: expectedRepresentatives}
+        do:
+        - $let:
+            name: actualRepresentative
+            expr: {$get: {object: {$var: actualRepresentatives}, key: {$var: representativeName}}}
+        - $failIf:
+            cond: {$ne: [{$pointerGet: {object: {$var: representative}, path: /representativeId}}, {$pointerGet: {object: {$var: actualRepresentative}, path: /representativeId}}]}
+            message: PREPARATION_BOOTSTRAP_REPRESENTATIVES_MISMATCH
+        - $call:
+            function: requireSameBootstrapPrimary
+            args:
+              expected:
+                lead: {$var: representative}
+                readerKeys: {$pointerGet: {object: {$var: representative}, path: /readerKeys}}
+              actual:
+                lead: {$var: actualRepresentative}
+                readerKeys: {$pointerGet: {object: {$var: actualRepresentative}, path: /readerKeys}}
+    - $return: true
+  requireSameBootstrapPrimary:
+    args:
+      expected: {}
+      actual: {}
+    do:
     # Keep the existing primary reader-set validation, substituting only the
     # new channel after verifying that both channels name the same native actor.
     - $failIf:

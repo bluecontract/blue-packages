@@ -1787,11 +1787,15 @@ functions:
                 - $if:
                     cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}, bootstrap]}
                     then:
-                    - $call:
-                        function: requireSameBootstrapParty
-                        args:
-                          expected: {$pointerGet: {object: {$var: slot}, path: /bootstrapPrimary}}
-                          actual: {$var: originalValue}
+                    - $forEach:
+                        item: providedParty
+                        in: [{$var: originalValue}, {$var: currentParty}]
+                        do:
+                        - $call:
+                            function: requireSameBootstrapParty
+                            args:
+                              expected: {$pointerGet: {object: {$var: slot}, path: /bootstrapPrimary}}
+                              actual: {$var: providedParty}
                     else:
                     - $call:
                         function: requireSameMainParty
