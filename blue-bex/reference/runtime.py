@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 from .values import (UNDEFINED, BexError, BoundaryError, ResourceError, ExecutionRejected, clone, kind,
     truthy, number, integer, text, required_text, equal, estimated_size,
-    segments, escape, pointer_get, pointer_overlay, blue_value)
+    segments, escape, pointer_get, pointer_overlay, project_patch, blue_value)
 from .compiler import Compiler, Program, operator, STATIC, UNARY, ARRAY, QUERY
 from .gas import Gas
 from blue_host import host_boundary
@@ -61,6 +61,7 @@ class Invocation:
         self.context=context;self.gas=gas;self.intrinsics=dict(intrinsics)
         self.constants=self.program.get('constants',{});self.functions=self.program.get('functions',{})
         self.changes=[];self.events=[];self.frames=[{}]
+        self.previews={}  # Separate roots/cursors, local to this invocation.
         self.start_gas=gas.used
 
     def copy(self,value):
@@ -159,7 +160,15 @@ class Invocation:
         doc=self.context.resolved_document if view=='resolved' else self.context.document
         if doc is UNDEFINED:raise BexError('resolved document capability unavailable')
         if op=='$resultValue':
-            for patch in self.changes:doc=pointer_overlay(doc,patch['path'],patch.get('val',UNDEFINED),remove=patch['op']=='remove',charge=self.gas.charge)
+            snapshot='resolved' if view=='resolved' else 'canonical'
+            if snapshot not in self.previews:self.previews[snapshot]=[doc,0]
+            preview=self.previews[snapshot]
+            while preview[1]<len(self.changes):
+                patch=self.changes[preview[1]]
+                preview[0]=project_patch(preview[0],patch['path'],patch.get('val',UNDEFINED),
+                                         operation=patch['op'],charge=self.gas.charge)
+                preview[1]+=1
+            doc=preview[0]
         result=(self.context.read_document(p,view,doc) if self.context.read_document else pointer_get(doc,p))
         return self.copy(result)
 

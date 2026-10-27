@@ -3,7 +3,16 @@
 BEX evaluates explicit inputs into a value, ordered proposed changes and events,
 and a deterministic admitted gas total. It does not apply document changes.
 
-## Final gas edition
+## Result-value preview edition
+
+`1.0.0-resultvalue-preview.1` uses structural List removal and lazy immutable
+preview roots. Each read retains its fixed charge and demanded host obligations.
+The selected rules are `spec/bex-resultvalue-preview.md`; its six embedded modules
+are executed directly by `tests/test_resultvalue_preview.py`. Earlier frozen
+specifications and exact archives retain their identities. Core adoption is separate
+from building this package; package data cannot install a native evaluator.
+
+## Historical final gas edition
 
 `1.0.0-final-gas.1` checks each charge before work and accumulates scalar gas.
 Results have `value`, `changeset`, `events` and `gas_used`; accepted-charge rows
@@ -12,9 +21,9 @@ remains 10,000,000. A supplied shared meter is never reset. Local and shared cap
 retain their rejection order and one compact first-rejected-charge diagnostic.
 A meter that has rejected work cannot resume accepting charges.
 
-`SPECIFICATION.md` and `spec/bex-final-gas.md` contain the identical complete
-normative text and six executable modules. The exact overrides and hashes are
-listed in `docs/sources.json`. The earlier specification remains in `spec/bex.md`
+The historical `spec/bex-final-gas.md` retains that edition’s complete
+normative text and six executable modules. `docs/sources.json` now records the
+selected result-value preview modules and overrides. The earlier specification remains in `spec/bex.md`
 and the frozen references remain unchanged for historical qualification.
 
 This is a new exact protocol identity. Hosts must retain the old edition when

@@ -6,4 +6,4 @@
 
 The loader adapter intentionally constructs Language with `core_contracts=False` when auditing a data repository. This prevents an unrelated installed Contracts namespace from being implicitly mounted during generic package validation. The original strict definition-audit algorithm is still used. The package verifier also checks a revisited bootstrap Language against the selected identity. Neither correction changes Language BlueId calculation or relaxes invalid/missing-content checks.
 
-The local `blue-package` launcher is distribution tooling, not part of the interpreter. BEX/Contracts source algorithms remain unchanged. Python >=3.13 is used because the original reference depends on its supported behavior. No Python or Java library per business type is generated.
+The local `blue-package` launcher is distribution tooling, not part of the interpreter. The original reference source remains unchanged; selected BEX overrides are recorded in `docs/sources.json` and embedded in the selected specification. Python >=3.13 is used because the original reference depends on its supported behavior. No Python or Java library per business type is generated.
