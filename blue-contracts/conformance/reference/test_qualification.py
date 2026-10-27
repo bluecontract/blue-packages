@@ -11,11 +11,11 @@ class QualificationBindingTests(unittest.TestCase):
         root = Path(__file__).resolve().parents[3]
         profiles = (
             ('qualification.json', {
-                'blue-contracts': 'blue-contracts/dist/package.bluepkg',
+                'blue-contracts': 'blue-contracts/conformance/reference/retained/contracts-demand-scoped.3.bluepkg',
                 'blue-coordination': 'blue-coordination/conformance/reference/retained/coordination-receiver-relative.8.bluepkg',
             }),
             ('qualification-source-transport.json', {
-                'blue-contracts': 'blue-contracts/dist/package.bluepkg',
+                'blue-contracts': 'blue-contracts/conformance/reference/retained/contracts-demand-scoped.3.bluepkg',
                 'blue-coordination': 'blue-coordination/conformance/reference/retained/coordination-receiver-relative.10.bluepkg',
             }),
         )
@@ -35,11 +35,12 @@ class QualificationBindingTests(unittest.TestCase):
                     if retained is None:
                         self.assertEqual(manifest, json.loads((root / name / 'dist/package.json').read_text()))
         for _, retained in profiles:
-            retained_archive = root / retained['blue-coordination']
-            provenance = json.loads(retained_archive.with_suffix('.provenance.json').read_text())
-            self.assertEqual(provenance['archive'], retained_archive.name)
-            self.assertEqual(provenance['size'], retained_archive.stat().st_size)
-            self.assertEqual(provenance['archiveSha256'], hashlib.sha256(retained_archive.read_bytes()).hexdigest())
+            for archive_path in retained.values():
+                retained_archive = root / archive_path
+                provenance = json.loads(retained_archive.with_suffix('.provenance.json').read_text())
+                self.assertEqual(provenance['archive'], retained_archive.name)
+                self.assertEqual(provenance['size'], retained_archive.stat().st_size)
+                self.assertEqual(provenance['archiveSha256'], hashlib.sha256(retained_archive.read_bytes()).hexdigest())
         contracts = root / 'blue-contracts'
         self.assertEqual((contracts / 'conformance/reference/coverage.json').read_bytes(),
                          (contracts / 'dist/conformance/reference/coverage.json').read_bytes())
