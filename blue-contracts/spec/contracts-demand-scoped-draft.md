@@ -6,6 +6,8 @@
 **Baseline:** [final-gas specification](contracts-final-gas.md).
 **Conformance and implementation gates:** [demand-scoped cases](contracts-demand-scoped-conformance.md).
 
+**Documentation clarification (2026-10-27):** Section 12.4 makes the preserved empty/metadata-only document-root allowance explicit. Rejecting those inputs was an implementation defect, not an intended change to the document contract. This source clarification does not rewrite existing archives, distributed specification copies or their exact identities.
+
 The canonical build assigns the candidate BlueIds from these exact rules and their pinned imports. Prior archived publications and existing specifications remain unchanged. This candidate may be built locally to bind and test the new implementation; it MUST NOT become a production default or a qualified release until the linked conformance gates and normal lifecycle tests pass. Sections 12.1–12.5 define the replacement algorithms and take precedence over the baseline's conflicting whole-certification and whole-closure calls; baseline scheduling and unrelated semantics remain unchanged. The candidate label is not evidence that D1–D5 have passed.
 
 ## 1. Contract and compatibility
@@ -299,7 +301,7 @@ The following table defines the initial obligations. A transition to a child ret
 
 | Boundary | Required observations | Deferred edges until their consumer runs |
 | --- | --- | --- |
-| Snapshot member | Exact root, native required object container, governing definitions, contracts container, graph declarations, marker headers and lifetime fields | Ordinary state values not read by these observations; checkpoint event payload/history |
+| Snapshot member | Exact root satisfying the document-root rule below, governing definitions, contracts container, graph declarations, marker headers and lifetime fields | Ordinary state values not read by these observations; checkpoint event payload/history |
 | Contracts map | Required container and each declaration's type/role, specification compatibility, allowed field names, ordering/channel/embedding headers | Native `BODY` fields of unselected declarations |
 | Sequential Workflow / Operation header | `channel`, `event` or `request` filter, `order`; existence and list shape of `steps` | Step bodies before selection |
 | Selected step | Exact declaration type and governing definitions; step parameters as the existing handler consumes them | BEX operands represented by a view until the corresponding BEX operation consumes a value |
@@ -308,6 +310,10 @@ The following table defines the initial obligations. A transition to a child ret
 | BEX child lookup | Enclosing required container and requested key/index; preserve the child Recipe | Child value until its operation needs value semantics; BlueId observation requires exact identity only |
 | Mutation | Constructed value, changed contextual value and every enclosing container; graph/marker/lifetime invariants | Unchanged branches unless governing predicates or the selected handler consume them |
 | Completion/receive | Same structural obligations on exact before/after members, original cause, edition/runtime compatibility, units, provenance and local capability checks | Unconsumed original cause graph; no receiving-time inference that a selected fact is whole certification |
+
+The document-root rule preserves the baseline allowance for native kind `object` or `none`, with neither a scalar value nor list items. In particular, `{}`, `{"name":"TEST"}` and `{"description":"TEST"}` are valid document shapes: `name` and `description` are metadata, and a document MUST NOT require an artificial ordinary data field to become a valid root. A scalar or list root remains invalid. This allowance applies consistently during initialization, finalization and snapshot restoration; it does not change Language's native kind classification.
+
+This is a document-root shape rule, not an exemption from contextual validation. Governing definitions, metadata, type/schema predicates, required evidence and logical metering MUST still be checked. A typed scalar or list declaration lacking a value does not become a valid document merely because its authored node has kind `none`; the effective contextual root must satisfy the rule. The generic required-container observation in section 3.1 remains strict for other roles. Implementations MUST NOT reject a valid empty/metadata-only document by applying that generic shape check before the document-root rule.
 
 For the native declaration roles, body fields are exactly: workflow/operation `steps`; compute `expr do constants functions entry definition`; compute-definition `constants functions`; patch-step `changeset`; emit-step `event`; terminate-step `cause reason`. All other declared fields are header fields. `specification` is a governing definition, not an ignored body field. Existing native allowed-field and required-field checks still apply. Installed extensions use their exact edition-bound `headerFields`/`bodyFields`; selecting an extension requires its declared body operands before invocation unless that extension's own normative specification defines finer contextual reads. An unknown extension cannot inherit a native role's deferrals.
 
