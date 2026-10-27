@@ -1,4 +1,13 @@
-# Final-gas qualification
+# Result-value preview qualification
+
+The selected edition executes 191 finite conformance vectors, including two updated
+List-removal observations, plus 15 focused structural/lazy preview tests. The
+historical final-gas specification is extracted separately and executes its original
+191 vectors unchanged. These are bounded reference checks, not complete Python/Java
+parity, whole-host qualification, GitHub Release publication or deployment evidence.
+Native host integration requires its own package-loading and behavior checks.
+
+## Historical final-gas qualification
 
 The new BEX edition removes accepted-charge histories from the normative result
 and reference meter. Qualification compares value, effects, error, admitted total

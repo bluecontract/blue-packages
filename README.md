@@ -8,12 +8,10 @@ The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,00
 
 ## Demand-scoped candidate (2026-10-23)
 
-The current source candidate includes Contracts `1.0.0-demand-scoped.3`
-(`Cj2SnbMNz9VkQg9Dc7hzEoy7GdBUYqTfzh1XCKu5ANSr`) and Coordination
-`0.3.0-receiver-relative.8`
-(`5NC7oK5Qi6RcxhtBgZsh6AtiJroVopKmCmx7iBc6offt`). `PACKAGES.json`
-is the authoritative dependency/archive inventory. These are new identities;
-prior immutable publications remain unchanged. Native package construction and
+The selected source candidate retains the demand-scoped Contracts semantics and
+adds the BEX result-value preview edition. `PACKAGES.json` records exact versions,
+identities and archives for the rebuilt dependency closure; prior immutable
+publications remain unchanged. Native package construction and
 archive/dependency integrity passed; final host integration and whole-edition
 qualification are separate gates. Bounded executable reference models and paired
 Java vectors do not qualify a second complete Python runtime.
@@ -25,12 +23,12 @@ integration for this candidate.
 
 ## Build and verify
 
-The [unpublished BEX working specification](blue-bex/spec/bex-resultvalue-preview.md)
+The [BEX result-value preview specification](blue-bex/spec/bex-resultvalue-preview.md)
 defines structural `$resultValue` list operations and incremental projection costs
 in both prose and executable algorithms. Run its isolated tests with Python 3.13+:
-`python3 blue-bex/tests/test_resultvalue_preview.py`. It leaves selected archives,
-frozen specifications, historical reference sources and pins unchanged; it has no
-assigned publication BlueId and is not selected by the package manifest.
+`python3 blue-bex/tests/test_resultvalue_preview.py`. Historical frozen specifications and reference sources remain unchanged. It is selected by the new `1.0.0-resultvalue-preview.1` package manifest.
+The dependency closure is rebuilt for this exact BEX identity; no GitHub Release
+or Core deployment is performed by building these artifacts.
 
 ```sh
 # Java 21 and a qualified Blue Java runtime classpath are required.
@@ -48,10 +46,10 @@ The final-gas edition enforces every charge but omits per-charge receipt histori
 It has new exact identities; existing documents must keep their original runtime.
 See [Contracts migration](blue-contracts/MIGRATION.md).
 
-For the matching Core branch, run its `scripts/import-final-gas.py --packages
-/path/to/blue-packages` after validation. This preserves Core's authored examples
-and retained 10M publications, builds its internal Coordination bridge and Task
-fixture, and updates the new default pins. The general example exporter should
-only be used when intentionally replacing Core's example sources.
+The matching Core integration installs the generated dependency closure in its
+existing demand-scoped runtime with explicit profile registration and catalogue
+selection. Do not run the generic final-gas importer for this selection. Existing
+saved account manifests and their resources remain supported; building package
+archives neither changes those manifests nor deploys Core.
 
 These are unpublished candidates, not a production certification or a live financial service. See the tutorial for execution boundaries and the distinction between protocol requests and confirmed external outcomes.

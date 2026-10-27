@@ -16,7 +16,7 @@ def verify_authoring_overrides(directory, package):
     folder=directory/'reference'
     if not folder.exists():return
     expected={
-        'blue-bex': {'reference/gas.py','reference/runtime.py'},
+        'blue-bex': {'reference/gas.py','reference/runtime.py','reference/values.py'},
         'blue-contracts': {'reference/model.py','reference/processor.py','reference/GAS_MANIFEST.json','reference/chunks.py','reference/completion.py','reference/runtime.py'},
     }
     name=package.manifest['name']

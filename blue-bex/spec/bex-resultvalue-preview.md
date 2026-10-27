@@ -1,17 +1,14 @@
 # Blue BEX 1.0
 
-**Status: UNPUBLISHED working specification — staged result-value previews.**
+**Status: Selected release candidate — structural result-value previews.**
 
 **Normative form:** one complete specification with executable algorithm appendices
 
-This candidate defines the corrected `$resultValue` behavior implemented in MyOS
-Core. Its prose and six embedded executable modules are the authoritative source
-for this candidate; the modules are extracted directly for its focused tests.
-It is not selected by `blue-package.yaml` and has no assigned publication BlueId.
-The existing final-gas publication, frozen sources, archives, manifests and pins
-remain unchanged. Their sparse-overlay algorithms do not implement this candidate.
-No runtime edition, dispatch selection, migration or account repinning is installed
-by this source change. Publication and host adoption require separate review.
+This release candidate defines structural, lazy result-value previews. The complete
+specification and its six executable modules identify this edition. Historical
+specifications and their exact publications remain unchanged. Installing this
+package does not install a native evaluator, migrate accounts, or select a Core
+runtime. Host adoption and GitHub Release publication require separate review.
 
 ## Abstract
 
@@ -50,7 +47,7 @@ BEX is a deterministic expression and statement language encoded as Blue-compati
 <a id="scope"></a>
 ## 1. Scope and conformance
 
-This working specification defines the candidate protocol; no exact publication identity has been assigned. Its prose, tables and algorithm appendices form one normative contract. It is independent of source-repository branches, release tags, installation paths and prior discussions. Named external semantics are selected exactly in §2. Where an implementation uses another programming language, it MUST preserve the same specified observations; matching internal classes or diagnostic wording is not required unless explicitly identified as an observation.
+This specification defines the selected result-value preview protocol; generated package metadata records its exact identity. Its prose, tables and algorithm appendices form one normative contract. It is independent of source-repository branches, release tags, installation paths and prior discussions. Named external semantics are selected exactly in §2. Where an implementation uses another programming language, it MUST preserve the same specified observations; matching internal classes or diagnostic wording is not required unless explicitly identified as an observation.
 
 **MUST** and **REQUIRED** express requirements. **MUST NOT** and **PROHIBITED** express prohibitions. **SHOULD** and **SHOULD NOT** express recommendations whose departures require understood consequences. **MAY** and **OPTIONAL** express permissions. Examples marked informative do not add requirements. A conflict between normative prose and algorithms is a defect, not permission to choose an outcome. A finite conformance corpus is evidence, not a proof for every possible input.
 
@@ -1767,7 +1764,7 @@ The corresponding MyOS Core implementation and regression tests were inspected a
 `2992f6c6a92db8c9d2efbda8d923dfefa9a9daa0`: `Engine.Invocation.read`,
 `Values.projectPatch`, `blue.bex.ResultValueTest` and `blue.contracts.ResultValueTest`.
 This is bounded source-level alignment for the staged-preview correction, not a
-claim of complete Python/Java parity or whole-host qualification. This candidate
-has no published identity, and current package selections still identify the
-unchanged historical specification. Publishing or installing a new selection
-requires a separate compatibility and identity decision.
+claim of complete Python/Java parity or whole-host qualification. The package
+manifest selects this specification, and generated metadata records the resulting
+identities. Historical specifications and archives retain their identities. Building
+these artifacts does not publish a GitHub Release or deploy a host implementation.

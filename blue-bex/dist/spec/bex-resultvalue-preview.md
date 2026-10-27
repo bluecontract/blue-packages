@@ -1,7 +1,14 @@
 # Blue BEX 1.0
 
-**Edition:** `blue-bex/2026-10-12-final-gas-1`  
+**Status: Selected release candidate — structural result-value previews.**
+
 **Normative form:** one complete specification with executable algorithm appendices
+
+This release candidate defines structural, lazy result-value previews. The complete
+specification and its six executable modules identify this edition. Historical
+specifications and their exact publications remain unchanged. Installing this
+package does not install a native evaluator, migrate accounts, or select a Core
+runtime. Host adoption and GitHub Release publication require separate review.
 
 ## Abstract
 
@@ -40,7 +47,7 @@ BEX is a deterministic expression and statement language encoded as Blue-compati
 <a id="scope"></a>
 ## 1. Scope and conformance
 
-This specification defines the protocol identified by this edition. Its prose, tables and algorithm appendices form one normative contract. It is independent of source-repository branches, release tags, installation paths and prior discussions. Named external semantics are selected exactly in §2. Where an implementation uses another programming language, it MUST preserve the same specified observations; matching internal classes or diagnostic wording is not required unless explicitly identified as an observation.
+This specification defines the selected result-value preview protocol; generated package metadata records its exact identity. Its prose, tables and algorithm appendices form one normative contract. It is independent of source-repository branches, release tags, installation paths and prior discussions. Named external semantics are selected exactly in §2. Where an implementation uses another programming language, it MUST preserve the same specified observations; matching internal classes or diagnostic wording is not required unless explicitly identified as an observation.
 
 **MUST** and **REQUIRED** express requirements. **MUST NOT** and **PROHIBITED** express prohibitions. **SHOULD** and **SHOULD NOT** express recommendations whose departures require understood consequences. **MAY** and **OPTIONAL** express permissions. Examples marked informative do not add requirements. A conflict between normative prose and algorithms is a defect, not permission to choose an outcome. A finite conformance corpus is evidence, not a proof for every possible input.
 
@@ -78,7 +85,7 @@ A successful invocation returns `Result(value, changeset, events, gas_used)`. It
 
 The domains are undefined, null, Text, Integer, Double, Boolean, Object, and List. `UNDEFINED` is a singleton distinct from Python `None`, which represents internal BEX null. Boolean is not Integer. Objects have Text keys. Integers use exact integer arithmetic; Doubles use finite decimal observations and cross the Blue Double boundary as finite binary64 values.
 
-Missing member lookup yields undefined. Undefined object members are omitted by Blue conversion. Undefined list elements, including sparse overlay holes, cannot cross that boundary. Null is not an empty object and is rejected at the Blue output boundary. An actual empty object remains an actual empty object. `$emptyObject` is the explicit empty-object constructor.
+Missing member lookup yields undefined. Undefined object members are omitted by Blue conversion. Undefined list elements, including sparse `$pointerSet` holes, cannot cross that boundary. Null is not an empty object and is rejected at the Blue output boundary. An actual empty object remains an actual empty object. `$emptyObject` is the explicit empty-object constructor.
 
 `$exists` is false only for undefined. Null therefore exists. Truth is false for undefined, null, false, empty Text, empty Object, and empty List; other values are true, **including numeric zero**. `$empty` and `$isEmpty` test the inverse of this truth rule, not Python's truthiness.
 
@@ -114,7 +121,7 @@ A static error in an unused branch is still an error. A runtime error or gas cha
 
 `$document`, `$event`, `$currentContract`, `$binding`, `$steps`, `$var`, and `$const` read only their designated source. A variable or constant name containing `/` remains a name; its optional pointer is a separate operand. A named step is addressed by the step's actual Language `name` label, not its list position when a name was supplied.
 
-A Compute invocation sees a stable selected-document snapshot. A later Compute step sees effects successfully applied by earlier steps. `$resultValue` overlays this invocation's accumulated changes on its snapshot; it does not publish them. Finite managed-document reads use the closure's selected dependency projection, never an independently advancing source's latest public head.
+A Compute invocation sees a stable selected-document snapshot. A later Compute step sees effects successfully applied by earlier steps. `$resultValue` projects this invocation's accumulated changes in append order on its snapshot; it does not publish them. Finite managed-document reads use the closure's selected dependency projection, never an independently advancing source's latest public head.
 
 The context's matcher implements `$is` using Blue semantic admission and specialization. The interpreter does not guess that a JSON shape is a valid Blue type. Missing patterns, unknown required definitions, and uninstalled matcher capabilities are not accepted as successful matches.
 
@@ -149,7 +156,50 @@ BEX value pointers use JSON-pointer escaping. Both empty Text and `/` designate 
 
 A changeset is an ordered list of add, replace, or remove proposals. Non-remove proposals require a value. Remove ignores no hidden expression: its value operand is not evaluated by the append operation. Appending preserves duplicate operations and their order.
 
-BEX's observation overlay is **not** Contracts mutation. Overlay removal from a List creates a sparse undefined position and does not shift later elements. Actual Contracts array removal does shift later elements. Intermediate overlay objects are constructed deterministically. A sparse result may be observed internally but cannot be serialized as a Blue List containing undefined.
+`$resultValue` projects ordered structural List patches. `add` inserts before
+an existing index or appends at the current length or `-`. `remove` deletes an
+existing element and shifts later indices down by one. `replace` requires an
+existing index and replaces that element without shifting. Numeric indices use
+canonical nonnegative decimal syntax (`0` or a nonzero digit followed by digits).
+Negative indices, leading zeros and out-of-bounds positions fail when projected.
+`-` is permitted only for `add` at the final path segment; intermediate List
+segments require existing elements. Every patch uses the structure left by its
+predecessors, including changed lengths. Duplicate operations remain distinct.
+
+For example, two `remove /queue/0` proposals on `[A, B, C, D, E]` make
+`$resultValue: /queue/0` return `C`, and `/queue` return `[C, D, E]`.
+A missing read still yields undefined and cannot supply an add/replace value.
+Object overlay behavior, including missing-parent construction, is unchanged.
+`$pointerSet` retains assignment/sparse-List semantics: removal leaves an undefined
+position and does not shift later elements. Such a sparse value can be observed
+internally but cannot cross the Blue List output boundary.
+
+This projection is not Contracts mutation. It does not publish, generalize,
+validate every native object rule or invoke Document Update reactions. For a
+valid changeset on the same starting value, its structural List result matches
+native application when no additional reactions intervene. An explicit returned
+`changeset` can replace accumulated proposals without changing this preview;
+reactions can change the next Compute's actual document. Neither is simulated.
+`$document` remains the current Compute's starting snapshot.
+
+
+Each invocation lazily maintains a projected root and an applied-patch cursor for
+each selected starting view (`canonical` and `resolved`). Reads project only the
+newly appended suffix; repeated reads without new patches do no projection work.
+Functions share the invocation's accumulator and projected state. Appending alone
+does not project a patch, and an unexecuted read does no projection work. State
+MUST NOT be shared between invocations. Previously exposed roots and descendants
+remain unchanged when later patches copy their path containers; untouched
+subtrees, including captured host values, remain shared. Replacement-value copying
+retains the existing overlay rule.
+
+Every executed read still pays `resultValueRead` and, after successful projection,
+performs its requested lookup through the configured host document reader (or the
+ordinary pointer lookup if no reader is configured). Caching does not waive
+missing capabilities, resource failures or demanded host logical-read obligations.
+The resolved view still requires its supplied snapshot. This candidate installs
+no definition-view capability; an independently installed host extension must not
+interpret staged state as the starting-document definition.
 
 <a id="section-11"></a>
 ## 11. Collections
@@ -181,9 +231,9 @@ An intrinsic must have an exact static type ID present in the invocation's insta
 
 Compilation consumes no semantic gas. Each admitted expression, statement, read, call, pointer operation, collection item, append, and size-dependent operation is charged by the algorithm at its specified point. A failed charge is recorded as rejected work and does not increment admitted `used` gas.
 
-Accepted charges update the running scalar only. They have no canonical rows, ordinals or transcript. Results contain `gas_used`, not `gas_trace`. The default standalone allowance remains 10,000,000. A caller-supplied shared meter is never reset; each invocation reports its own admitted contribution. Local counters and the shared total still enforce each charge before work. Retain only the first rejected charge, without a charge ordinal; a failed meter cannot resume accepting work. Optional debug traces are noncanonical, off by default, and never required for conformance, replay or durable publication. A compatibility API may expose an empty trace accessor, but this is not a result field in the new protocol.
+Accepted charges update the running scalar only. They have no canonical rows, ordinals or transcript. Results contain `gas_used`, not `gas_trace`. The default standalone allowance remains 10,000,000. A caller-supplied shared meter is never reset; each invocation reports its own admitted contribution. Local counters and the shared total still enforce each charge before work. Retain only the first rejected charge, without a charge ordinal; a failed meter cannot resume accepting work. Optional debug traces are noncanonical, off by default, and never required for conformance, replay or durable publication. A compatibility API may expose an empty trace accessor, but this is not a result field in this candidate.
 
-This is a new exact BEX edition. Earlier publications retain their original trace-bearing result and conformance rules; hosts must select those rules explicitly when replaying earlier histories.
+This candidate retains scalar metering from final gas. Earlier publications keep their original metering and conformance rules. This source does not replace their identities or select new rules for historical replay.
 
 The default scalar tariffs are: expression 1; statement 1; document read 2; event/current-contract/steps/variable read 1; result-value read 2; pointer get base 1; pointer set base 3; object set base 2; append-change/event base 5; iteration item 1; function call 2. Size/path contributions are defined by the algorithms, not by wall-clock time.
 
@@ -282,6 +332,15 @@ per at-most-64-code-point block; Integer comparison debits the sum of operand
 limbs. Equality visits pairs in order and stops on the first mismatch. Concatenation
 and split debit their known input/output-bound text blocks before allocation;
 collection concatenation/merge debit each copied member before insertion.
+
+Staged projection retains the existing ordered-key/member/text charges for each
+copied object. Each List copy charges `valueMember` for its current length before
+reading or copying its elements. There is no new patch tariff. Each newly appended
+patch is projected at most once per selected view; unaffected reads do not repeat
+these copy charges. Existing expression, statement, read and append charges remain.
+Removing repeated projection work and changing List lengths can change admitted
+gas totals and receipts. No historical-gas or receipt equality is promised for
+affected programs. Scalar metering and shared/local ceilings remain as specified.
 
 Specified size-dependent effect/overlay charges retain their base and size
 formula, but debit the base first and then each visited size contribution before
@@ -459,7 +518,7 @@ An executable form is a one-key object whose key begins with `$`. The operand sh
 | Operators | Operand | Delivered behavior |
 |---|---|---|
 | `$var`, `$const` | `name` or `{name,path?:E}` | Frame or constant lookup; names must be known at compilation. |
-| `$document`, `$resultValue` | path expression or `{path?:E,view?:E}` | Stable document view or current logical changeset overlay. The Contracts host applies patches separately. |
+| `$document`, `$resultValue` | path expression or `{path?:E,view?:E}` | Stable document view or ordered staged projection with structural List patches. The Contracts host applies patches separately. |
 | `$event`, `$currentContract` | path expression or `{path?:E}` | Read the selected event or executing contract. |
 | `$binding` | name/path Text or `{name?:E,path?:E}` | Read a provided binding. |
 | `$steps` | step/path Text or `{step?:E,path?:E}` | Read a named earlier step result. |
@@ -833,7 +892,7 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 from .values import (UNDEFINED, BexError, BoundaryError, ResourceError, ExecutionRejected, clone, kind,
     truthy, number, integer, text, required_text, equal, estimated_size,
-    segments, escape, pointer_get, pointer_overlay, blue_value)
+    segments, escape, pointer_get, pointer_overlay, project_patch, blue_value)
 from .compiler import Compiler, Program, operator, STATIC, UNARY, ARRAY, QUERY
 from .gas import Gas
 from blue_host import host_boundary
@@ -890,6 +949,7 @@ class Invocation:
         self.context=context;self.gas=gas;self.intrinsics=dict(intrinsics)
         self.constants=self.program.get('constants',{});self.functions=self.program.get('functions',{})
         self.changes=[];self.events=[];self.frames=[{}]
+        self.previews={}  # Separate roots/cursors, local to this invocation.
         self.start_gas=gas.used
 
     def copy(self,value):
@@ -988,7 +1048,15 @@ class Invocation:
         doc=self.context.resolved_document if view=='resolved' else self.context.document
         if doc is UNDEFINED:raise BexError('resolved document capability unavailable')
         if op=='$resultValue':
-            for patch in self.changes:doc=pointer_overlay(doc,patch['path'],patch.get('val',UNDEFINED),remove=patch['op']=='remove',charge=self.gas.charge)
+            snapshot='resolved' if view=='resolved' else 'canonical'
+            if snapshot not in self.previews:self.previews[snapshot]=[doc,0]
+            preview=self.previews[snapshot]
+            while preview[1]<len(self.changes):
+                patch=self.changes[preview[1]]
+                preview[0]=project_patch(preview[0],patch['path'],patch.get('val',UNDEFINED),
+                                         operation=patch['op'],charge=self.gas.charge)
+                preview[1]+=1
+            doc=preview[0]
         result=(self.context.read_document(p,view,doc) if self.context.read_document else pointer_get(doc,p))
         return self.copy(result)
 
@@ -1573,6 +1641,39 @@ def pointer_overlay(value: Any, path: str, replacement: Any, *, remove: bool = F
     return result
 
 
+
+def project_patch(value: Any, path: str, replacement: Any, *, operation: str, charge=None) -> Any:
+    """Project one staged patch; pointer_overlay keeps assignment semantics."""
+    parts=segments(path)
+    remove=operation=='remove'
+    if not parts:return UNDEFINED if remove else clone(replacement)
+    spine=[];at=value
+    for offset,segment in enumerate(parts):
+        if at is None or at is UNDEFINED:at={}
+        k=kind(at);last=offset==len(parts)-1
+        if k not in ('object','list'):raise BexError('scalar pointer target parent')
+        if k=='object':
+            out={key:at[key] for key in ordered_keys(at,charge)}
+            key=segment
+        else:
+            length=len(at)
+            key=index(segment,length,add=last and operation=='add')
+            if charge:charge('valueMember',length)
+            out=[at[i] for i in range(length)]
+        spine.append((out,key))
+        if not last:at=out.get(key,UNDEFINED) if k=='object' else out[key]
+    result=UNDEFINED if remove else clone(replacement)
+    for offset,(out,key) in enumerate(reversed(spine)):
+        if isinstance(out,dict):
+            if offset==0 and result is UNDEFINED:out.pop(key,None)
+            else:out[key]=result
+        elif offset==0 and remove:out.pop(key)
+        elif offset==0 and operation=='add':out.insert(key,result)
+        else:out[key]=result
+        result=out
+    return result
+
+
 def blue_value(value: Any, *, _in_object: bool = False) -> Any:
     """Prepare semantic output; the Language MUST then admit it.
 
@@ -1636,12 +1737,34 @@ def host_boundary(fn):
 
 ### Source inventory
 
-| Module | SHA-256 of supplied UTF-8 file |
+| Module | SHA-256 of extracted UTF-8 module |
 |---|---|
 | `src/blue_bex/__init__.py` | `820ef8825a174b5f9666b9b713d51e20bcf8fa6c509b79128fb373433033e8d8` |
 | `src/blue_bex/compiler.py` | `6af97e5067510b862cbb0edc808fc7903f4f0be51c8ff45a31df07be9bdfa55d` |
 | `src/blue_bex/gas.py` | `78cb48147d907a6b84535563d5dddd543b6bf734447a184e7a50b49b5cc42803` |
-| `src/blue_bex/runtime.py` | `171ad8489e317d2a22326649e88fa64a8a45461d5956850c6d5080cd997c9b65` |
-| `src/blue_bex/values.py` | `59fc4bee80e54e5e9d64824ee18aed8a195220137f0eaaf5f1e58adb11951b8a` |
+| `src/blue_bex/runtime.py` | `3184b935ae68c68bb8850a199142879c8ddac7563a01168b69037f42ca62a012` |
+| `src/blue_bex/values.py` | `5d6677df295197343648d6dcbac94c4853f3daf367cab5752911f9fbb5f65b8b` |
 | `src/blue_host/__init__.py` | `ac30b5090d56b101150b3bdb9bb05fff265308737c3ea0dd8b9caa22b0b5b607` |
 
+## Candidate verification and publication boundary
+
+Run the focused candidate tests from the repository root with Python 3.13+:
+
+```sh
+python3 blue-bex/tests/test_resultvalue_preview.py
+```
+
+The runner extracts the six modules above into a temporary directory and executes
+them in a separate process. No frozen reference is edited or selected by accident.
+The test file is also included by `./blue-bex/blue-package test` where the full
+historical package-test prerequisites are installed. Candidate tests do not
+replace existing publication-integrity or frozen-reference qualification checks.
+
+The corresponding MyOS Core implementation and regression tests were inspected at
+`2992f6c6a92db8c9d2efbda8d923dfefa9a9daa0`: `Engine.Invocation.read`,
+`Values.projectPatch`, `blue.bex.ResultValueTest` and `blue.contracts.ResultValueTest`.
+This is bounded source-level alignment for the staged-preview correction, not a
+claim of complete Python/Java parity or whole-host qualification. The package
+manifest selects this specification, and generated metadata records the resulting
+identities. Historical specifications and archives retain their identities. Building
+these artifacts does not publish a GitHub Release or deploy a host implementation.

@@ -7,7 +7,7 @@ import bootstrap
 from package_core import build,read_package,wire,config,mount,PackageError
 from package_v2 import requirements,lock_v2
 ROOT=bootstrap.ROOT
-REVISION='blue-bex-2026-10-12-final-gas-1'
+REVISION='blue-bex-2026-10-27-resultvalue-preview-1'
 def package_path():return ROOT/'dist/package.bluepkg'
 def checked_package(path=None):
  p=read_package(path or package_path());r=json.loads((ROOT/'release.json').read_text())

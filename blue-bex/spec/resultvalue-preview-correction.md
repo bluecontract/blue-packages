@@ -1,10 +1,11 @@
 # BEX staged list previews — specification location
 
-The complete [unpublished working specification](bex-resultvalue-preview.md)
-now contains the staged-list-preview rules and matching executable algorithms.
-It supersedes the prose-only correction previously recorded here. The candidate
-is tested by extracting its modules directly; this page defines no separate rules.
+The complete [result-value preview specification](bex-resultvalue-preview.md)
+contains the staged-list-preview rules and matching executable algorithms.
+It supersedes the prose-only correction previously recorded here. The selected
+edition is tested by extracting its modules directly; this page defines no
+separate rules.
 
-Current package archives, frozen specifications, reference sources and pins remain
-unchanged. The candidate has no assigned publication identity and is not selected
-by `blue-package.yaml`.
+Version `1.0.0-resultvalue-preview.1` selects these rules. Historical frozen
+specifications and exact archives retain their identities. Building the new
+package and dependent closure does not publish a GitHub Release or deploy Core.

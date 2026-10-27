@@ -16,7 +16,7 @@ premises of receiver algorithms require actual authentication outside the model.
 
 ## tools/receiver_reference.py
 
-SHA-256: `2d41ec70db726d2a9b7922edba693e210fa4254b865010e83cfde3347524c879`
+SHA-256: `c6f2c778cd1d6223037dc977e0b98929f6e985d59477d9d0bf4c1b739085947c`
 
 ```python
 """Receiver-relative decision models over already authenticated history premises.
