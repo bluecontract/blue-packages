@@ -1,7 +1,8 @@
 name: Bank Transfer Contract
 type: PaymentInstruction/Payment Instruction with Clauses
-description: One payer-requested transfer with separate bank confirmation. Unknown outcomes reconcile against the
-  same request. There is no synthetic card authorization or capture; a refund is a separate transfer instruction.
+description: One payer-requested transfer with separate bank confirmation. Unknown outcomes reconcile
+  against the same request. There is no synthetic card authorization or capture; a refund is a separate
+  transfer instruction.
 paymentTerms:
   method: bank-transfer
   evidence: bankConfirmation
@@ -25,6 +26,11 @@ contracts:
             input:
               $object:
                 $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: ACME/Bank Transfer Functions
+      function: request
+      argument: input
   confirmTransfer:
     type: Contracts/Sequential Workflow Operation
     channel: guarantor
@@ -39,12 +45,16 @@ contracts:
         sourceMode: workflow
       do:
       - $call:
-          function: record
+          function: confirmPublic
           args:
             input:
               $object:
                 $binding: call/request
-            status: completed
+    $blue:requestFrom:
+      definition:
+        type: ACME/Bank Transfer Functions
+      function: confirmPublic
+      argument: input
   reportTransferUnknown:
     type: Contracts/Sequential Workflow Operation
     channel: guarantor
@@ -59,12 +69,15 @@ contracts:
         sourceMode: workflow
       do:
       - $call:
-          function: record
+          function: unknownPublic
           args:
             input:
-              $object:
-                $binding: call/request
-            status: unknown
+              $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: ACME/Bank Transfer Functions
+      function: unknownPublic
+      argument: input
   declineTransfer:
     type: Contracts/Sequential Workflow Operation
     channel: guarantor
@@ -79,9 +92,12 @@ contracts:
         sourceMode: workflow
       do:
       - $call:
-          function: record
+          function: declinePublic
           args:
             input:
-              $object:
-                $binding: call/request
-            status: declined
+              $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: ACME/Bank Transfer Functions
+      function: declinePublic
+      argument: input

@@ -221,14 +221,18 @@ functions:
               - event:
                   type: Clauses/Clauses Initialized
     - $if:
-        cond: {$eq: [{$var: mode}, activated]}
+        cond:
+          $eq:
+          - $var: mode
+          - activated
         then:
         - $set:
             name: result
             expr:
               $merge:
               - $var: result
-              - event: {type: Parties/Document Activated}
+              - event:
+                  type: Parties/Document Activated
     - $return:
         $var: result
   validateConnectionsConfiguration:
@@ -277,6 +281,13 @@ functions:
                 name: clause
                 path: /bindings
     - $let:
+        name: actionsPath
+        expr:
+          $concat:
+          - /clauseRuntime/work/candidate/
+          - $const: clauseKey
+          - /type/actions
+    - $let:
         name: actions
         expr:
           $document:
@@ -294,6 +305,13 @@ functions:
               - /type/configurableActions
           - true
         then:
+        - $set:
+            name: actionsPath
+            expr:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - $const: clauseKey
+              - /parameters/actions
         - $set:
             name: actions
             expr:
@@ -515,7 +533,9 @@ functions:
     - $if:
         cond:
           $and:
-          - $not: {$exists: {$var: actions}}
+          - $not:
+              $exists:
+                $var: actions
           - $isKind:
               val:
                 $document:
@@ -866,12 +886,53 @@ functions:
                     name: handler
                     expr:
                       type: Contracts/Sequential Workflow Operation
+                - $let:
+                    name: requestPath
+                    expr:
+                      $choose:
+                        cond:
+                          $and:
+                          - $eq:
+                            - $var: connectionName
+                            - _automatic
+                          - $exists:
+                              $var:
+                                name: action
+                                path: /automatic
+                        then:
+                          $concat:
+                          - $var: actionsPath
+                          - /
+                          - $var: actionName
+                          - /automatic/request
+                        else:
+                          $concat:
+                          - /clauseRuntime/work/candidate/
+                          - $const: clauseKey
+                          - $choose:
+                              cond:
+                                $exists:
+                                  $document:
+                                    path:
+                                      $concat:
+                                      - /clauseRuntime/work/candidate/
+                                      - $const: clauseKey
+                                      - /bindings/
+                                      - $var: actionName
+                                    view: definition
+                              then: /bindings/
+                              else: /type/defaultBindings/
+                          - $var: actionName
+                          - /
+                          - $var: connectionName
+                          - /request
                 - $if:
                     cond:
                       $exists:
-                        $var:
-                          name: c
-                          path: /request
+                        $document:
+                          path:
+                            $var: requestPath
+                          view: definition
                     then:
                     - $set:
                         name: handler
@@ -879,9 +940,10 @@ functions:
                           $merge:
                           - $var: handler
                           - request:
-                              $var:
-                                name: c
-                                path: /request
+                              $document:
+                                path:
+                                  $var: requestPath
+                                view: definition
                 - $if:
                     cond:
                       $exists:
@@ -1367,7 +1429,8 @@ functions:
                                     $var:
                                       name: actionResult
                                       path: /outcome
-                            message: 'ACTION_RESULT_REQUIRED: outcome-v1 action must return an explicit outcome'
+                            message: 'ACTION_RESULT_REQUIRED: outcome-v1 action must return an explicit
+                              outcome'
                         - $if:
                             cond:
                               $ne:
@@ -1456,7 +1519,8 @@ functions:
                 expr:
                   $merge:
                   - $var: handler
-                  - channel: {$var: channel}
+                  - channel:
+                      $var: channel
                     steps:
                     - $var: compute
             - $let:
@@ -2047,9 +2111,11 @@ functions:
         name: plannedStates
         expr:
           connections:
-            path: {$var: statePath}
+            path:
+              $var: statePath
             kind: object
-            initial: {$var: state}
+            initial:
+              $var: state
     - $forEach:
         item: initial
         key: bindingName
@@ -2065,22 +2131,46 @@ functions:
             cond:
               $not:
                 $and:
-                - $eq: [{$get: {object: {$var: bindingTypes}, key: {$var: bindingName}}}, pointer]
-                - $isKind: {val: {$var: initial}, kind: object}
-                - $call: {function: validName, args: {candidate: {$var: bindingName}}}
+                - $eq:
+                  - $get:
+                      object:
+                        $var: bindingTypes
+                      key:
+                        $var: bindingName
+                  - pointer
+                - $isKind:
+                    val:
+                      $var: initial
+                    kind: object
+                - $call:
+                    function: validName
+                    args:
+                      candidate:
+                        $var: bindingName
             message: Structural state requires a named pointer binding and object initial value
         - $set:
             name: plannedStates
             expr:
               $objectSet:
-                object: {$var: plannedStates}
-                key: {$concat: [initial_, {$var: bindingName}]}
+                object:
+                  $var: plannedStates
+                key:
+                  $concat:
+                  - initial_
+                  - $var: bindingName
                 val:
-                  path: {$get: {object: {$var: bindings}, key: {$var: bindingName}}}
+                  path:
+                    $get:
+                      object:
+                        $var: bindings
+                      key:
+                        $var: bindingName
                   kind: object
-                  initial: {$var: initial}
+                  initial:
+                    $var: initial
     - $return:
         contracts:
           $var: contributions
-        states: {$var: plannedStates}
+        states:
+          $var: plannedStates
         reads: []

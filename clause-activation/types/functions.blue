@@ -11,31 +11,52 @@ functions:
           $var: state
     - $let:
         name: accessRoster
-        expr: {$pointerGet: {object: {$var: s}, path: /parties, default: {}}}
+        expr:
+          $pointerGet:
+            object:
+              $var: s
+            path: /parties
+            default: {}
     - $forEach:
         item: addition
         key: admissionRef
-        in: {$pointerGet: {object: {$var: s}, path: /accessRequests, default: {}}}
+        in:
+          $pointerGet:
+            object:
+              $var: s
+            path: /accessRequests
+            default: {}
         do:
         - $if:
             cond:
               $eq:
-              - {$pointerGet: {object: {$var: addition}, path: /expectedRevision}}
-              - {$pointerGet: {object: {$var: s}, path: /revision}}
+              - $pointerGet:
+                  object:
+                    $var: addition
+                  path: /expectedRevision
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /revision
             then:
             - $set:
                 name: accessRoster
                 expr:
                   $merge:
-                  - {$var: accessRoster}
-                  - {$pointerGet: {object: {$var: addition}, path: /parties, default: {}}}
+                  - $var: accessRoster
+                  - $pointerGet:
+                      object:
+                        $var: addition
+                      path: /parties
+                      default: {}
     - $let:
         name: functional
         expr:
           $call:
             function: accessValid
             args:
-              roster: {$var: accessRoster}
+              roster:
+                $var: accessRoster
               readers:
                 $pointerGet:
                   object:
@@ -158,10 +179,16 @@ functions:
     - $call:
         function: refreshAccessRequests
         args: {}
-    - $return: {$var: active}
+    - $return:
+        $var: active
   approve:
     args:
-      input: {}
+      input:
+        description: Approve this party for the currently reviewed Activation revision.
+        revision:
+          type: Integer
+          description: Current Activation revision from the document activation.revision. A changed publication
+            requires a new review.
     do:
     - $failIf:
         cond:
@@ -497,6 +524,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $pointerGet:
                   object:
@@ -515,6 +544,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $var: roster
               runtimeDefinition:
@@ -606,6 +637,7 @@ functions:
     - $return: true
   rosterContracts:
     args:
+      parameters: {}
       roster: {}
       runtimeDefinition:
         type: Contracts/Compute Definition
@@ -646,6 +678,33 @@ functions:
             - approve
             - updateParty
             do:
+            - $let:
+                name: entry
+                expr:
+                  $choose:
+                    cond:
+                      $and:
+                      - $eq:
+                        - $var: operation
+                        - approve
+                      - $gt:
+                        - $size:
+                            $pointerGet:
+                              object:
+                                $var: parameters
+                              path: /negotiation/allowedPaths
+                              default: []
+                        - 0
+                    then: approveWithTerms
+                    else:
+                      $choose:
+                        cond:
+                          $eq:
+                          - $var: operation
+                          - updateParty
+                        then: updatePartyPublic
+                        else:
+                          $var: operation
             - $set:
                 name: contributions
                 expr:
@@ -683,7 +742,30 @@ functions:
                                             $binding: call/request
                                   path: /$call/function
                                   val:
-                                    $var: operation
+                                    $var: entry
+                        - $get:
+                            object:
+                              $literal:
+                                approve:
+                                  $blue:requestFrom:
+                                    definition:
+                                      type: Activation/Activation Functions
+                                    function: approve
+                                    argument: input
+                                approveWithTerms:
+                                  $blue:requestFrom:
+                                    definition:
+                                      type: Activation/Activation Functions
+                                    function: approveWithTerms
+                                    argument: input
+                                updatePartyPublic:
+                                  $blue:requestFrom:
+                                    definition:
+                                      type: Activation/Activation Functions
+                                    function: updatePartyPublic
+                                    argument: input
+                            key:
+                              $var: entry
         key: role
     - $return:
         $var: contributions
@@ -833,6 +915,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $pointerGet:
                   object:
@@ -848,6 +932,8 @@ functions:
           $call:
             function: rosterContracts
             args:
+              parameters:
+                $document: /clauses/activation/parameters
               roster:
                 $var: roster
               runtimeDefinition:
@@ -955,57 +1041,84 @@ functions:
       state: {}
     do:
     - $if:
-        cond: {$pointerGet: {object: {$var: state}, path: /channelsInstalled, default: false}}
+        cond:
+          $pointerGet:
+            object:
+              $var: state
+            path: /channelsInstalled
+            default: false
         then:
-        - $return: {$var: state}
+        - $return:
+            $var: state
     - $let:
         name: transports
         expr:
           $call:
             function: transports
             args:
-              roster: {$pointerGet: {object: {$var: state}, path: /parties, default: {}}}
+              roster:
+                $pointerGet:
+                  object:
+                    $var: state
+                  path: /parties
+                  default: {}
     - $let:
         name: ready
-        expr: {$pointerGet: {object: {$var: state}, path: /accessReady, default: false}}
+        expr:
+          $pointerGet:
+            object:
+              $var: state
+            path: /accessReady
+            default: false
     - $let:
         name: pendingChannel
         expr:
           type: Contracts/Composite External Channels
           channels: []
-    # Keep operation declarations (including inherited, fixed channel names)
-    # intact. Empty ports have no timeline membership or callable route.
     - $forEach:
         item: transport
         key: key
-        in: {$var: transports}
+        in:
+          $var: transports
         do:
         - $let:
             name: path
-            expr: {$concat: [/contracts/, {$var: key}]}
+            expr:
+              $concat:
+              - /contracts/
+              - $var: key
         - $failIf:
             cond:
               $and:
-              - {$exists: {$document: {$var: path}}}
-              - {$ne: [{$document: {$var: path}}, {$var: transport}]}
-              - {$ne: [{$document: {$var: path}}, {$var: pendingChannel}]}
+              - $exists:
+                  $document:
+                    $var: path
+              - $ne:
+                - $document:
+                    $var: path
+                - $var: transport
+              - $ne:
+                - $document:
+                    $var: path
+                - $var: pendingChannel
             message: PARTY_CONTRACT_NAME_CONFLICT
         - $appendChange:
             op: add
-            path: {$var: path}
-            val: {$choose: {cond: {$var: ready}, then: {$var: transport}, else: {$var: pendingChannel}}}
+            path:
+              $var: path
+            val:
+              $choose:
+                cond:
+                  $var: ready
+                then:
+                  $var: transport
+                else:
+                  $var: pendingChannel
     - $return:
         $merge:
-        - {$var: state}
-        - channelsInstalled: {$var: ready}
-        - $choose:
-            cond:
-              $and:
-              - {$var: ready}
-              - {$exists: {$binding: timestamp}}
-            then:
-              channelsAdmittedAfter: {$binding: timestamp}
-            else: {}
+        - $var: state
+        - channelsInstalled:
+            $var: ready
   commitState:
     args:
       state: {}
@@ -1118,9 +1231,6 @@ functions:
             expr:
               $merge:
               - $var: state
-              # Negotiated consent is bound to the exact authority definition.
-              # Legacy updateParty already clears its approvals; explicitly
-              # approved admission retains that path's commercial-consent policy.
               - approved:
                   $choose:
                     cond:
@@ -1170,7 +1280,8 @@ functions:
           $call:
             function: reconcileInitialChannels
             args:
-              state: {$var: next}
+              state:
+                $var: next
     - $if:
         cond:
           $pointerGet:
@@ -1454,7 +1565,6 @@ functions:
             history: {}
             outcomes: {}
             editable: true
-
   requestPartyAddition:
     args: {}
     do:
@@ -1504,22 +1614,35 @@ functions:
         name: evidence
         expr:
           $pointerGet:
-            object: {$var: input}
+            object:
+              $var: input
             path: /accessDocuments
             default: {}
     - $call:
         function: requirePartyAccessDocuments
         args:
-          parties: {$var: additions}
-          documents: {$var: evidence}
+          parties:
+            $var: additions
+          documents:
+            $var: evidence
     - $if:
-        cond: {$gt: [{$size: {$var: evidence}}, 0]}
+        cond:
+          $gt:
+          - $size:
+              $var: evidence
+          - 0
         then:
         - $call:
             function: installTimelineAccess
             args:
               input:
-                documents: {$map: {in: {$var: evidence}, item: access, expr: {$var: access}}}
+                documents:
+                  $map:
+                    in:
+                      $var: evidence
+                    item: access
+                    expr:
+                      $var: access
                 basePath: /partyAccess
     - $let:
         name: roster
@@ -1743,3 +1866,44 @@ functions:
                 key: role
         key: ref
     - $return: {}
+  approveWithTerms:
+    args:
+      input:
+        description: Approve this party for the current negotiated terms and Activation revision.
+        revision:
+          type: Integer
+          description: Current Activation revision from the document activation.revision. A changed publication
+            requires a new review.
+        termsRef:
+          type: Text
+          description: The current negotiated terms reference stored in activation.terms.ref for the reviewed
+            publication.
+    do:
+    - $return:
+        $call:
+          function: approve
+          args:
+            input:
+              $var: input
+  updatePartyPublic:
+    args:
+      input:
+        type: Activation/Party Update Input
+        replacement:
+          description: Replacement party data selected by the user. Includes a lead representative channel;
+            no revision is required.
+          lead:
+            channel:
+              type: Contracts/Channel
+              description: The explicitly selected lead representative channel.
+    do:
+    - $return:
+        $call:
+          function: updateParty
+          args:
+            input:
+              $pointerSet:
+                object:
+                  $var: input
+                path: /type
+                op: remove

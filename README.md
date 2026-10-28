@@ -6,6 +6,23 @@ Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [exe
 
 The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,000 maximum), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 
+## Demand-scoped candidate (2026-10-23)
+
+The current source candidate includes Contracts `1.0.0-demand-scoped.3`
+(`Cj2SnbMNz9VkQg9Dc7hzEoy7GdBUYqTfzh1XCKu5ANSr`) and Coordination
+`0.3.0-receiver-relative.8`
+(`5NC7oK5Qi6RcxhtBgZsh6AtiJroVopKmCmx7iBc6offt`). `PACKAGES.json`
+is the authoritative dependency/archive inventory. These are new identities;
+prior immutable publications remain unchanged. Native package construction and
+archive/dependency integrity passed; final host integration and whole-edition
+qualification are separate gates. Bounded executable reference models and paired
+Java vectors do not qualify a second complete Python runtime.
+
+Do not import this candidate with the generic final-gas importer: the host must
+install it in its dedicated demand-scoped edition resources and catalogue while
+preserving existing final-gas/legacy manifests. Use an explicitly reviewed host
+integration for this candidate.
+
 ## Build and verify
 
 ```sh

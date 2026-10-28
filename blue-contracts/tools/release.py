@@ -7,7 +7,7 @@ import bootstrap
 from package_core import build,read_package,wire,config,mount,PackageError
 from package_v2 import requirements,lock_v2
 ROOT=bootstrap.ROOT
-REVISION='blue-contracts-2026-10-12-final-gas-1'
+REVISION='blue-contracts-2026-10-22-demand-scoped-1'
 def package_path():return ROOT/'dist/package.bluepkg'
 def checked_package(path=None):
  p=read_package(path or package_path());r=json.loads((ROOT/'release.json').read_text())
@@ -15,15 +15,16 @@ def checked_package(path=None):
  if p.archive_sha!=r['archiveSha256']:raise RuntimeError('Archive differs from release.json')
  return p
 
-def runtime_tree(output):
- """Separate derived reference: source bytes unchanged; one runtime rules resource is rebound."""
+def runtime_tree(output, *, profile="legacy-final-gas"):
+ """Historical whole processor, never the demand-edition reference authority."""
+ if profile != "legacy-final-gas":raise ValueError("Demand edition uses tools/run_demand_reference.py, not the legacy processor")
  output=Path(output)
  shutil.copytree(ROOT.parent/'verification/reference/blue-contracts/python/src',output,dirs_exist_ok=True,ignore=shutil.ignore_patterns('__pycache__'))
  if config(ROOT)['name']=='blue-contracts':
   wb=output/'blue_workbench';wb.mkdir(exist_ok=True)
   for f in ('__init__.py','guide_extensions.py'):
    shutil.copyfile(ROOT.parent/'verification/reference/blue-contracts/python/apps/workbench'/f,wb/f)
-  shutil.copyfile(ROOT/'SPECIFICATION.md',output/'blue_contracts/COMPLETE_SPECIFICATION.md')
+  shutil.copyfile(ROOT/'spec/contracts-final-gas.md',output/'blue_contracts/COMPLETE_SPECIFICATION.md')
   shutil.copytree(ROOT.parent/'verification/reference/blue-contracts/python/tools',output.parent/'tools',dirs_exist_ok=True)
  # Apply only the explicitly published source overrides after copying the frozen base.
  for layer in ('blue-bex', 'blue-contracts'):
@@ -33,17 +34,21 @@ def runtime_tree(output):
    if not original.startswith('src/'):raise ValueError('Invalid runtime override')
    destination=output/original[4:];destination.parent.mkdir(parents=True,exist_ok=True)
    shutil.copyfile(project/relative,destination)
+ (output/"REFERENCE-PROFILE.json").write_text(json.dumps({"profile":profile,"newEditionConformance":False}))
  return output
 
 def main():
  parser=argparse.ArgumentParser(description=__doc__)
  parser.add_argument('command',choices=['build','verify','inspect','requirements','test','demo','reference-tests','runtime-copy'])
  parser.add_argument('path',nargs='?',type=Path)
+ parser.add_argument('--profile',choices=['legacy-final-gas'])
  args=parser.parse_args()
+ if args.command in ('runtime-copy','reference-tests','demo') and args.profile is None:
+  parser.error('select --profile legacy-final-gas explicitly; demand reference uses run_demand_reference.py')
  if args.command=='runtime-copy':
   if args.path is None:raise ValueError('runtime-copy requires a destination directory')
   if args.path.resolve().is_relative_to((ROOT.parent/'verification/reference/blue-contracts').resolve()):raise ValueError('Never overwrite the frozen reference')
-  runtime_tree(args.path);print(args.path);return 0
+  runtime_tree(args.path,profile=args.profile);print(args.path);return 0
  if args.command=='build':
   cfg=config(ROOT);s=ROOT/cfg['protocol']['rules']
   if (ROOT/'SPECIFICATION.md').read_bytes()!=s.read_bytes():raise RuntimeError('Root specification and identified specification differ')
@@ -59,7 +64,7 @@ def main():
  if args.command=='demo':return subprocess.run([sys.executable,str(ROOT/'examples/run.py')],cwd=ROOT).returncode
  if args.command=='reference-tests':
   with tempfile.TemporaryDirectory(prefix='blue-reference-') as d:
-   src=runtime_tree(Path(d)/'src');env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1',PYTHONPATH=str(src)+os.pathsep+str(src.parent),BLUE_BENCHMARK_ROOT=str(src.parent))
+   src=runtime_tree(Path(d)/'src',profile=args.profile);env=dict(os.environ,PYTHONDONTWRITEBYTECODE='1',PYTHONPATH=str(src)+os.pathsep+str(src.parent),BLUE_BENCHMARK_ROOT=str(src.parent))
    name=config(ROOT)['name']
    group='bex' if name=='blue-bex' else 'contracts_event'
    return subprocess.run([sys.executable,str(ROOT/'tools/run_reference_tests.py'),str(ROOT.parent/'verification/reference/blue-contracts/python/tests'/group)],cwd=d,env=env).returncode
