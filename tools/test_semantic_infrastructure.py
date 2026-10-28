@@ -257,14 +257,40 @@ class BootstrapSecurityTests(unittest.TestCase):
                     self.assertEqual(decision(policy, action, resource), "implicitDeny")
             self.assertEqual(decision(policy, "cloudformation:DeleteStack", stack), "implicitDeny")
 
-    def test_cli_changeset_name_and_arn_are_scoped_to_the_target_stack(self):
+    def test_describe_changeset_is_read_only_and_scoped_without_name_context(self):
+        for environment, template in self.templates.items():
+            policy = role_policy(template, "GitHubDeploymentRole")
+            account = ACCOUNTS[environment]
+            stack = f"arn:aws:cloudformation:eu-west-1:{account}:stack/blue-semantic-cards-{environment}/stack-id"
+            change_set = f"arn:aws:cloudformation:eu-west-1:{account}:changeSet/awscli-cloudformation-package-deploy-123/id"
+            other_environment = "prod" if environment == "dev" else "dev"
+            denied_resources = [
+                "*", change_set,
+                stack.replace(account, "000000000000"),
+                stack.replace("eu-west-1", "us-east-1"),
+                stack.replace(f"-{environment}/", f"-{other_environment}/"),
+                stack.replace(f"-{environment}/", f"-{environment}-automation/"),
+                stack.replace(f"-{environment}/", "-unrelated/"),
+            ]
+            # Exercise the missing IAM context directly: the API request's
+            # ChangeSetName parameter is not supplied to this offline matcher.
+            for context in ({}, {"cloudformation:ChangeSetName": change_set},
+                            {"cloudformation:ChangeSetName": "administrator-reviewed-change-set"}):
+                with self.subTest(environment=environment, context=context):
+                    self.assertEqual(decision(policy, "cloudformation:DescribeChangeSet", stack, context), "allowed")
+                    for resource in denied_resources:
+                        self.assertEqual(decision(policy, "cloudformation:DescribeChangeSet", resource, context), "implicitDeny")
+            for action in ("cloudformation:CreateChangeSet", "cloudformation:ExecuteChangeSet", "cloudformation:DeleteChangeSet"):
+                self.assertEqual(decision(policy, action, stack), "implicitDeny")
+
+    def test_cli_changeset_writes_require_name_or_arn_and_target_stack(self):
         for environment, template in self.templates.items():
             policy = role_policy(template, "GitHubDeploymentRole")
             account = ACCOUNTS[environment]
             stack = f"arn:aws:cloudformation:eu-west-1:{account}:stack/blue-semantic-cards-{environment}/stack-id"
             name = "awscli-cloudformation-package-deploy-1234567890"
             arn = f"arn:aws:cloudformation:eu-west-1:{account}:changeSet/{name}/change-set-id"
-            for action in ("cloudformation:DescribeChangeSet", "cloudformation:ExecuteChangeSet", "cloudformation:DeleteChangeSet"):
+            for action in ("cloudformation:ExecuteChangeSet", "cloudformation:DeleteChangeSet"):
                 for change_set in (name, arn):
                     context = {"cloudformation:ChangeSetName": change_set}
                     # These APIs do not provide cloudformation:RoleArn.

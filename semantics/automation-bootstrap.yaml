@@ -188,6 +188,9 @@ Resources:
                   - cloudformation:DescribeStacks
                   - cloudformation:GetTemplateSummary
                   - cloudformation:DescribeStackEvents
+                  # Reading the selected stack's change sets must not depend
+                  # on cloudformation:ChangeSetName being in the IAM context.
+                  - cloudformation:DescribeChangeSet
                 Resource:
                   Fn::Sub: arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/blue-semantic-cards-${EnvName}/*
               - Sid: CreateTargetChangeSetUsingExecutionRole
@@ -203,11 +206,12 @@ Resources:
                     cloudformation:ChangeSetName: awscli-cloudformation-package-deploy-*
               # These APIs authorize the stack ARN, not a changeSet ARN. The CLI
               # passes a generated change-set ARN after CreateChangeSet succeeds.
-              # RoleArn is not supported by Describe/Execute/DeleteChangeSet.
+              # Keep write operations name-scoped; the read grant above remains
+              # bounded by the exact stack, region and account.
+              # RoleArn is not supported by Execute/DeleteChangeSet.
               - Sid: UseOnlyTargetCliChangeSets
                 Effect: Allow
                 Action:
-                  - cloudformation:DescribeChangeSet
                   - cloudformation:ExecuteChangeSet
                   - cloudformation:DeleteChangeSet
                 Resource:
