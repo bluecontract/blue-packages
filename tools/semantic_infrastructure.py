@@ -86,7 +86,8 @@ def deploy(config: dict, output: Path) -> dict:
                            f"ReadRolePermissionsBoundaryArn={config['read_boundary_arn']}",
                            f"PublishRolePermissionsBoundaryArn={config['publish_boundary_arn']}",
                            "--capabilities", "CAPABILITY_NAMED_IAM",
-                           "--no-fail-on-empty-changeset"), check=True)
+                           "--no-fail-on-empty-changeset", "--debug"),
+                       check=True, stderr=subprocess.PIPE, text=True)
         response = aws_json(config, "cloudformation", "describe-stacks",
                             "--stack-name", config["stack_name"])
         stack, = response["Stacks"]
@@ -101,8 +102,16 @@ def deploy(config: dict, output: Path) -> dict:
                        stack_id=stack["StackId"], outputs=values)
         (output / "github-variables.txt").write_text(values["GitHubVariables"])
     except Exception as exc:
-        # Messages come from local checks/CLI, never a credential-bearing command.
-        receipt.update(result="FAIL", error_type=type(exc).__name__, error=str(exc))
+        error = str(exc)
+        if isinstance(exc, subprocess.CalledProcessError) and exc.stderr:
+            # CLI waiter handling can hide the AWS error behind KeyError('Status').
+            # Keep only exception messages: raw debug includes signed credentials.
+            causes = [line for line in exc.stderr.splitlines() if line.startswith(
+                ("botocore.exceptions.WaiterError:", "botocore.exceptions.ClientError:"))]
+            for cause in causes:
+                print(cause, file=sys.stderr)
+                error += "\n" + cause
+        receipt.update(result="FAIL", error_type=type(exc).__name__, error=error)
         raise
     finally:
         receipt["finished_at_utc"] = dt.datetime.now(dt.timezone.utc).isoformat()

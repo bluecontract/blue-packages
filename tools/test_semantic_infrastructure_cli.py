@@ -1,4 +1,6 @@
 import json
+from contextlib import redirect_stderr
+from io import StringIO
 from pathlib import Path
 import subprocess
 import tempfile
@@ -59,6 +61,9 @@ class InfrastructureCliTests(unittest.TestCase):
         self.assertIn('PublishRolePermissionsBoundaryArn=' + self.config['publish_boundary_arn'], command)
         self.assertIn('--no-fail-on-empty-changeset', command)
         self.assertNotIn('--resource-types', command)
+        self.assertIn('--debug', command)
+        self.assertEqual(subprocess.PIPE, run.call_args.kwargs['stderr'])
+        self.assertTrue(run.call_args.kwargs['text'])
         self.assertTrue((self.output / 'github-variables.txt').exists())
 
     @patch.object(infra, 'aws_json')
@@ -69,6 +74,26 @@ class InfrastructureCliTests(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             infra.deploy(self.config, self.output)
         self.assertEqual('FAIL', json.loads((self.output / 'receipt.json').read_text())['result'])
+        self.assertFalse((self.output / 'github-variables.txt').exists())
+
+    @patch.object(infra, 'aws_json')
+    @patch.object(infra.subprocess, 'run')
+    def test_waiter_failure_reports_aws_cause_without_debug_credentials(self, run, aws_json):
+        aws_json.return_value = {'Account': '604151511147', 'Arn': 'fixture-caller'}
+        cause = ('botocore.exceptions.WaiterError: Waiter ChangeSetCreateComplete failed: '
+                 'An error occurred (AccessDenied): Not authorized to perform cloudformation:DescribeChangeSet')
+        run.side_effect = subprocess.CalledProcessError(255, ['aws', 'cloudformation', 'deploy'],
+            stderr='Authorization: fixture-secret\nX-Amz-Security-Token: fixture-token\n'
+                   + cause + "\nKeyError: 'Status'\n")
+        stderr = StringIO()
+        with redirect_stderr(stderr), self.assertRaises(subprocess.CalledProcessError):
+            infra.deploy(self.config, self.output)
+        receipt = json.loads((self.output / 'receipt.json').read_text())
+        self.assertEqual('FAIL', receipt['result'])
+        self.assertIn(cause, receipt['error'])
+        self.assertIn(cause, stderr.getvalue())
+        for secret in ('fixture-secret', 'fixture-token'):
+            self.assertNotIn(secret, json.dumps(receipt) + stderr.getvalue())
         self.assertFalse((self.output / 'github-variables.txt').exists())
 
     @patch.object(infra, 'aws_json')
