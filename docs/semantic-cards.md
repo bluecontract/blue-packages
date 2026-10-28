@@ -368,7 +368,7 @@ previous object contents.
 
 ```sh
 .venv/bin/python -m unittest discover -s tools -p 'test_semantic*.py' -v
-python3 -m unittest discover -s tools -p 'test_release.py' -v
+.venv/bin/python -m unittest discover -s tools -p 'test_release.py' -v
 .venv/bin/python tools/semantic_cards.py check
 ```
 
