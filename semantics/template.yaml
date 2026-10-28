@@ -23,6 +23,8 @@ Parameters:
     Description: Bootstrap-owned publish boundary required by the delegated deployment role.
 
 Conditions:
+  PublicDevCards:
+    Fn::Equals: [{Ref: EnvName}, dev]
   HasReadBoundary:
     Fn::Not: [{Fn::Equals: [{Ref: ReadRolePermissionsBoundaryArn}, '']}]
   HasPublishBoundary:
@@ -58,8 +60,10 @@ Resources:
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
-        BlockPublicPolicy: true
-        RestrictPublicBuckets: true
+        BlockPublicPolicy:
+          Fn::If: [PublicDevCards, false, true]
+        RestrictPublicBuckets:
+          Fn::If: [PublicDevCards, false, true]
   SemanticCardsBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
@@ -68,6 +72,15 @@ Resources:
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
+          - Fn::If:
+              - PublicDevCards
+              - Sid: PublicReadDevCards
+                Effect: Allow
+                Principal: '*'
+                Action: s3:GetObject
+                Resource:
+                  Fn::Sub: '${SemanticCardsBucket.Arn}/*.json'
+              - Ref: 'AWS::NoValue'
           - Effect: Deny
             Principal: '*'
             Action: s3:*

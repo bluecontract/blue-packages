@@ -197,6 +197,21 @@ head files. Git preserves review history; bucket versioning preserves previous
 published contents under the same object key. Publication compares the entire
 two-field card to detect corrections; no content hash is stored in the card.
 
+After deploying the public DEV infrastructure change, cards are also available
+without AWS credentials at:
+
+```text
+https://blue-semantic-cards-dev.s3.eu-west-1.amazonaws.com/<typeBlueId>.json
+```
+
+DEV permits anonymous HTTPS reads of JSON objects, including historical type
+cards retained in the bucket. It does not grant anonymous listing, writes,
+deletion or access to earlier S3 object versions. Backend HTTP clients can read
+these URLs without CORS configuration. These are public package descriptions;
+private document content must never be published here. PROD remains private.
+See [deployment prerequisites and checks](semantic-infrastructure.md#public-dev-card-access)
+before expecting these URLs to work; merging the PR alone does not update AWS.
+
 The planner uses paginated `ListObjectsV2` for the dedicated bucket (up to 1,000
 keys per request), then compares sets locally. It does **not** issue a presence
 `HEAD` request for every clause. For a card absent from the repo, it fetches that
@@ -236,9 +251,10 @@ The following steps remain the administrator-driven setup for the card pipeline;
 deploying infrastructure does not itself enable generation or switch its target.
 
 `semantics/template.yaml` defines the bucket as `blue-semantic-cards-${EnvName}`.
-It enables versioning, encryption and private access, requires HTTPS, and retains
-the bucket when deleting or replacing the stack. It also creates separate GitHub
-read/publish roles and can create the account's GitHub OIDC provider if needed.
+It enables versioning and encryption, requires HTTPS, and retains the bucket when
+deleting or replacing the stack. DEV allows public JSON reads; PROD remains
+private. It also creates separate GitHub read/publish roles and can create the
+account's GitHub OIDC provider if needed.
 
 Give the template and these steps to the colleague with AWS deployment access.
 The deployer needs permission to manage this CloudFormation stack, its S3 bucket
@@ -343,10 +359,11 @@ The template grants:
 Use the corresponding bucket name for other environments. Listing is at the bucket
 root, so do not retain a condition restricting `s3:prefix` to the old layout.
 
-With SSE-KMS, grant the corresponding KMS permissions as well. Keep bucket access
-private unless public delivery through a bucket/CDN policy is intentionally
-configured; Business can use a read role. Keep bucket versioning enabled to retain
-earlier corrections. See AWS's
+With SSE-KMS, grant the corresponding KMS permissions as well. The current
+template uses SSE-S3. Public DEV reads are intentionally configured by its bucket
+policy; PROD requires an authorized reader. Account/organization Block Public
+Access settings can still prevent public DEV delivery. Keep bucket versioning
+enabled to retain earlier corrections. See AWS's
 [OIDC setup](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html),
 [S3 listing contract](https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html)
 and [conditional writes](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html).

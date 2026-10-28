@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Offline security regression tests for the administrator-installed delegation.
+"""Offline security regression tests for deployment delegation and card access.
 
 The small policy matcher deliberately supports only the operators used by this
 template and fails on unknown syntax. It checks policy behavior, not AWS service
@@ -17,6 +17,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = yaml.safe_load((ROOT / "semantics/automation-bootstrap.yaml").read_text())
+APPLICATION = yaml.safe_load((ROOT / "semantics/template.yaml").read_text())
 ACCOUNTS = {"dev": "604151511147", "prod": "334557859583"}
 SUBJECT = "repo:bluecontract@93829250/blue-packages@1391542341:ref:refs/heads/main"
 
@@ -25,17 +26,26 @@ def items(value):
     return value if isinstance(value, list) else [value]
 
 
-def rendered(environment):
-    """Resolve only the intrinsic functions used in the bootstrap template."""
-    values = {"EnvName": environment, "AWS::AccountId": ACCOUNTS[environment],
-              "AWS::Region": "eu-west-1", "AWS::Partition": "aws"}
+def rendered(environment, template=TEMPLATE):
+    """Resolve only the intrinsic functions used in these two templates."""
+    absent = object()
+    values = {name: parameter["Default"] for name, parameter in template["Parameters"].items()
+              if "Default" in parameter}
+    values.update({"EnvName": environment, "AWS::AccountId": ACCOUNTS[environment],
+                   "AWS::Region": "eu-west-1", "AWS::Partition": "aws", "AWS::NoValue": absent})
 
     def reference(name):
         if name in values:
             return values[name]
         logical_id, _, attribute = name.partition(".")
-        resource = TEMPLATE["Resources"][logical_id]
+        resource = template["Resources"][logical_id]
         properties = resource["Properties"]
+        if resource["Type"] == "AWS::S3::Bucket":
+            bucket = resolve(properties["BucketName"])
+            if attribute == "Arn":
+                return f"arn:aws:s3:::{bucket}"
+            if not attribute:
+                return bucket
         if resource["Type"] == "AWS::IAM::ManagedPolicy" and not attribute:
             return f"arn:aws:iam::{values['AWS::AccountId']}:policy/{resolve(properties['ManagedPolicyName'])}"
         if resource["Type"] == "AWS::IAM::Role":
@@ -48,7 +58,7 @@ def rendered(environment):
 
     def resolve(value):
         if isinstance(value, list):
-            return [resolve(item) for item in value]
+            return [result for item in value if (result := resolve(item)) is not absent]
         if not isinstance(value, dict):
             return value
         if set(value) == {"Ref"}:
@@ -57,11 +67,19 @@ def rendered(environment):
             return reference(".".join(value["Fn::GetAtt"]))
         if set(value) == {"Fn::Sub"}:
             return re.sub(r"\$\{([^}]+)}", lambda match: reference(match[1]), value["Fn::Sub"])
+        if set(value) == {"Fn::Equals"}:
+            left, right = value["Fn::Equals"]
+            return resolve(left) == resolve(right)
+        if set(value) == {"Fn::Not"}:
+            return not resolve(value["Fn::Not"][0])
+        if set(value) == {"Fn::If"}:
+            condition, when_true, when_false = value["Fn::If"]
+            return resolve(when_true if resolve(template["Conditions"][condition]) else when_false)
         if any(key.startswith("Fn::") for key in value):
             raise AssertionError(f"Unsupported intrinsic: {value}")
-        return {key: resolve(item) for key, item in value.items()}
+        return {key: result for key, item in value.items() if (result := resolve(item)) is not absent}
 
-    return resolve(TEMPLATE)
+    return resolve(template)
 
 
 def decision(policy, action, resource="*", context=None, principal=None):
@@ -89,13 +107,15 @@ def decision(policy, action, resource="*", context=None, principal=None):
         elif "Principal" not in statement:
             raise AssertionError("Only trust statements may omit Resource")
         if "Principal" in statement:
-            if not isinstance(statement["Principal"], dict):
+            if statement["Principal"] == "*":
+                pass
+            elif not isinstance(statement["Principal"], dict):
                 raise AssertionError("Unsupported principal syntax")
-            if principal not in [p for group in statement["Principal"].values() for p in items(group)]:
+            elif principal not in [p for group in statement["Principal"].values() for p in items(group)]:
                 continue
         matches = True
         for operator, conditions in statement.get("Condition", {}).items():
-            if operator not in ("StringEquals", "ArnEquals", "StringLike"):
+            if operator not in ("StringEquals", "ArnEquals", "StringLike", "Bool"):
                 raise AssertionError(f"Unsupported condition: {operator}")
             for key, expected in conditions.items():
                 if key not in context:
@@ -314,6 +334,45 @@ class BootstrapSecurityTests(unittest.TestCase):
                 for resource in ("*", execution_role, execution_role.replace("-cloudformation", "-read"),
                                  f"arn:aws:s3:::blue-semantic-cards-{environment}"):
                     self.assertEqual(decision(policy, action, resource), "implicitDeny")
+
+
+class CardAccessTests(unittest.TestCase):
+    def test_only_dev_json_cards_are_public_and_http_is_denied(self):
+        for environment in ACCOUNTS:
+            resources = rendered(environment, APPLICATION)["Resources"]
+            policy = resources["SemanticCardsBucketPolicy"]["Properties"]["PolicyDocument"]
+            bucket = f"arn:aws:s3:::blue-semantic-cards-{environment}"
+            https = {"aws:SecureTransport": "true"}
+            with self.subTest(environment=environment):
+                self.assertEqual(decision(policy, "s3:GetObject", bucket + "/model.json", https,
+                                          principal="anonymous"),
+                                 "allowed" if environment == "dev" else "implicitDeny")
+                for action, resource in [("s3:ListBucket", bucket),
+                                         ("s3:GetObject", bucket + "/credentials.txt"),
+                                         ("s3:GetObject", bucket + "-other/model.json"),
+                                         ("s3:GetObjectVersion", bucket + "/model.json"),
+                                         ("s3:PutObject", bucket + "/model.json"),
+                                         ("s3:DeleteObject", bucket + "/model.json"),
+                                         ("s3:PutObjectAcl", bucket + "/model.json")]:
+                    self.assertEqual(decision(policy, action, resource, https, principal="anonymous"),
+                                     "implicitDeny")
+                self.assertEqual(decision(policy, "s3:GetObject", bucket + "/model.json",
+                                          {"aws:SecureTransport": "false"}, principal="anonymous"),
+                                 "explicitDeny")
+
+    def test_public_dev_access_preserves_bucket_and_prod_protections(self):
+        for environment in ACCOUNTS:
+            resource = rendered(environment, APPLICATION)["Resources"]["SemanticCardsBucket"]
+            bucket = resource["Properties"]
+            with self.subTest(environment=environment):
+                self.assertEqual(bucket["PublicAccessBlockConfiguration"], {
+                    "BlockPublicAcls": True, "IgnorePublicAcls": True,
+                    "BlockPublicPolicy": environment != "dev", "RestrictPublicBuckets": environment != "dev"})
+                self.assertEqual(bucket["OwnershipControls"]["Rules"], [{"ObjectOwnership": "BucketOwnerEnforced"}])
+                self.assertEqual(bucket["VersioningConfiguration"]["Status"], "Enabled")
+                self.assertEqual(resource["DeletionPolicy"], "Retain")
+                self.assertEqual(resource["UpdateReplacePolicy"], "Retain")
+                self.assertNotIn("CorsConfiguration", bucket)
 
 
 if __name__ == "__main__":
