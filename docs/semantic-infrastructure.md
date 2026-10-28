@@ -64,8 +64,9 @@ allows bucket listing and JSON reads; the publish boundary also allows JSON writ
 Explicit denies exclude other actions and resources. The execution role cannot
 remove or broaden those boundaries. It does administer the selected bucket's
 access policy; this is intentionally an infrastructure-administration role for
-that bucket, not merely a publisher. Bucket versioning, encryption, private access,
-HTTPS and retained data are configured by the application template.
+that bucket, not merely a publisher. Bucket versioning, encryption, HTTPS and
+retained data are configured by the application template. DEV permits public
+JSON reads with browser CORS; PROD remains private.
 
 The optional boundary parameters preserve the previous administrator-driven
 template interface. They are mandatory when deploying through the delegated
@@ -114,6 +115,58 @@ and use the existing `semantics-publish` environment. Follow
 chosen target and its environment protections. The infrastructure role is distinct
 from the read role and publish role. AWS access is through OIDC; `OPENAI_API_KEY`
 is only needed for model generation, which this workflow never runs.
+
+## Public DEV card access
+
+The application template makes only DEV JSON cards publicly readable over HTTPS.
+PROD keeps all four Block Public Access settings enabled and has no anonymous
+read grant or browser CORS rule. The existing generation and publication roles
+and their permissions boundaries are unchanged. ACLs remain disabled in both
+environments; public access comes from the DEV bucket policy.
+
+Setting `public-read` during upload is not supported: `BucketOwnerEnforced`
+disables ACLs, and the publisher's boundary denies `s3:PutObjectAcl`. The bucket
+policy covers existing and future cards without changing the upload code.
+See [AWS Object Ownership](https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html).
+
+After merge, for an already bootstrapped DEV account, an administrator must first update
+`blue-semantic-cards-dev-automation` using the bootstrap command above. This adds
+`s3:GetBucketCORS` and `s3:PutBucketCORS` to the existing CloudFormation execution
+role, scoped to its card bucket. No new role is needed. The GitHub deployment
+workflow cannot update that administrator-owned stack itself.
+
+Then run **Deploy semantic cards infrastructure → main → dev**.
+Generation and publication do not need to run again: existing
+JSON objects become readable under the updated bucket policy.
+
+Account/organization Block Public Access settings take precedence over the bucket
+configuration. If they block public policies, the account administrator must
+review the delivery approach before deployment. This PR does not change those
+settings. See [AWS Block Public Access](https://docs.aws.amazon.com/AmazonS3/latest/userguide/access-control-block-public-access.html).
+
+After deployment, verify a published card without AWS credentials:
+
+```sh
+curl --fail --include \
+  -H 'Origin: http://localhost:3000' \
+  'https://blue-semantic-cards-dev.s3.eu-west-1.amazonaws.com/GGJkb1eT3fsELNGUzujUXohSKN2ZzhFAMf3kbGHNAu1S.json'
+```
+
+Expect HTTP 200, the matching `blueId` and `semanticText`,
+`Access-Control-Allow-Origin: *`, and `ETag` in `Access-Control-Expose-Headers`.
+Browser reads may use any local port. To verify conditional-read preflight:
+
+```sh
+curl --fail --include --request OPTIONS \
+  -H 'Origin: http://localhost:3000' \
+  -H 'Access-Control-Request-Method: GET' \
+  -H 'Access-Control-Request-Headers: If-None-Match' \
+  'https://blue-semantic-cards-dev.s3.eu-west-1.amazonaws.com/GGJkb1eT3fsELNGUzujUXohSKN2ZzhFAMf3kbGHNAu1S.json'
+```
+
+Expect HTTP 200 with the requested method/header allowed. This CORS configuration
+supports public reads from browsers; it grants no object writes or bucket listing.
+See [AWS CORS configuration](https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-properties-s3-bucket-corsrule.html).
 
 ## Validation
 
