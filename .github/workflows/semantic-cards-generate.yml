@@ -1,0 +1,174 @@
+name: Generate missing semantic cards
+
+on:
+  workflow_run:
+    workflows: [Semantic cards check]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: semantic-generate-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    if: >-
+      vars.SEMANTICS_GENERATION_ENABLED == 'true' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
+    outputs:
+      eligible: ${{ steps.target.outputs.eligible }}
+      sha: ${{ steps.target.outputs.sha }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+      model: ${{ steps.plan.outputs.model }}
+      effort: ${{ steps.plan.outputs.effort }}
+      codexVersion: ${{ steps.plan.outputs.codexVersion }}
+    steps:
+      # Privileged jobs run only tooling from the trusted default-branch workflow.
+      # The PR checkout is parsed as data; none of its scripts are executed.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: automation
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r automation/tools/semantic-requirements.txt
+      - name: Select an open same-repository PR or current main revision
+        id: target
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python automation/tools/semantic_ci.py target
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        if: steps.target.outputs.eligible == 'true'
+        with:
+          ref: ${{ steps.target.outputs.sha }}
+          path: candidate
+          persist-credentials: false
+      - uses: aws-actions/configure-aws-credentials@cabfdba3510de1431bac9dba27511d97497fc100 # v5
+        if: steps.target.outputs.eligible == 'true'
+        with:
+          aws-region: ${{ vars.SEMANTICS_AWS_REGION }}
+          role-to-assume: ${{ vars.SEMANTICS_READ_ROLE_ARN }}
+          allowed-account-ids: ${{ vars.SEMANTICS_AWS_ACCOUNT_ID }}
+      - name: Reuse repo cards first, restore S3 cards, prepare only missing identities
+        if: steps.target.outputs.eligible == 'true'
+        id: plan
+        env:
+          SEMANTICS_BUCKET: ${{ vars.SEMANTICS_BUCKET }}
+        run: |
+          test -n "$SEMANTICS_BUCKET"
+          python automation/tools/semantic_cards.py plan --root candidate --bucket "$SEMANTICS_BUCKET" --output prepared
+          cp target.json prepared/target.json
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: steps.target.outputs.eligible == 'true'
+        with:
+          name: semantic-prepared
+          path: prepared/
+          retention-days: 14
+          if-no-files-found: error
+
+  generate:
+    needs: plan
+    if: needs.plan.outputs.eligible == 'true' && needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        blueId: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: automation
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: semantic-prepared
+          path: prepared
+      - name: Prepare an isolated model workspace
+        run: mkdir -p "$RUNNER_TEMP/semantic-input" responses
+      - name: Generate one exact type with no AWS or repository write credentials
+        uses: openai/codex-action@c05cfd74ad95c626cdf05c6685e62becc3bf7813
+        with:
+          openai-api-key: ${{ secrets.OPENAI_API_KEY }}
+          codex-version: ${{ needs.plan.outputs.codexVersion }}
+          model: ${{ needs.plan.outputs.model }}
+          effort: ${{ needs.plan.outputs.effort }}
+          safety-strategy: drop-sudo
+          permission-profile: ':read-only'
+          allow-bots: true
+          working-directory: ${{ runner.temp }}/semantic-input
+          prompt-file: ${{ github.workspace }}/prepared/requests/${{ matrix.blueId }}.txt
+          output-schema-file: ${{ github.workspace }}/automation/semantics/output.schema.json
+          output-file: ${{ github.workspace }}/responses/${{ matrix.blueId }}.json
+          codex-args: '["--ephemeral"]'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: semantic-output-${{ matrix.blueId }}
+          path: responses/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  collect:
+    needs: [plan, generate]
+    if: always() && needs.plan.result == 'success' && needs.plan.outputs.eligible == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: automation
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          path: candidate
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.13'
+      - run: python -m pip install -r automation/tools/semantic-requirements.txt
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: semantic-prepared
+          path: prepared
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        if: needs.generate.result != 'skipped'
+        continue-on-error: true # No outputs is an explicit per-card failure in collect.
+        with:
+          pattern: semantic-output-*
+          path: responses
+          merge-multiple: true
+      - name: Validate outputs and preserve successful cards from a partial batch
+        run: python automation/tools/semantic_ci.py collect
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: semantic-validated-cards
+          path: candidate/semantics/cards/*.json
+          retention-days: 14
+          if-no-files-found: ignore
+      - name: Commit only new cards, then check the new commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python automation/tools/semantic_ci.py commit --target prepared/target.json

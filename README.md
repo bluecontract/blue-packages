@@ -41,6 +41,10 @@ The final-gas edition enforces every charge but omits per-charge receipt histori
 It has new exact identities; existing documents must keep their original runtime.
 See [Contracts migration](blue-contracts/MIGRATION.md).
 
+[Semantic cards](docs/semantic-cards.md) can be prepared locally and committed with
+package changes. GitHub generates only exact type BlueIds missing from both the
+repo and S3, then publishes committed cards independently of package releases.
+
 For the matching Core branch, run its `scripts/import-final-gas.py --packages
 /path/to/blue-packages` after validation. This preserves Core's authored examples
 and retained 10M publications, builds its internal Coordination bridge and Task
