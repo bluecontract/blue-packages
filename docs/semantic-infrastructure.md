@@ -48,6 +48,17 @@ exact execution role, and only to CloudFormation. The execution role can manage
 only the selected card bucket and the two named read/publish roles. It cannot
 deploy Core, Business, compute, databases, nested stacks or change the OIDC provider.
 
+`DescribeChangeSet` is a read-only grant on the selected application stack ARN,
+including its exact account, region and stack name. It does not require a
+`cloudformation:ChangeSetName` IAM context value, so the CLI waiter can read that
+stack's change sets even when this context is absent. This also permits reading
+administrator-created change sets on that same stack. Create, execute and delete
+remain restricted to CLI-generated change-set names; creating a change set still
+requires the exact execution role, and `PassRole` remains unchanged. Other stacks,
+including the automation stack, receive no additional access. Updating this grant
+requires an administrator to update the bootstrap stack; the routine workflow
+cannot grant itself permissions.
+
 Each application role must carry its corresponding boundary. The read boundary
 allows bucket listing and JSON reads; the publish boundary also allows JSON writes.
 Explicit denies exclude other actions and resources. The execution role cannot
