@@ -16,6 +16,7 @@ import yaml
 from botocore.exceptions import ClientError
 from botocore.response import StreamingBody
 from botocore.stub import Stubber
+from jsonschema import ValidationError
 
 from release import ROOT, digest, wire
 import semantic_cards as cards
@@ -42,9 +43,7 @@ def subject(blue_id):
 
 
 def response(blue_id):
-    return dict(blueId=blue_id, semanticText='# Fixture\n\n' + 'An exact reusable type description. ' * 8,
-                metadata=dict(displayLabel='Fixture', parameterRefs=[], covers=[], dependencies=[],
-                              stateFacts=[], limitations=[]))
+    return dict(blueId=blue_id, semanticText='# Fixture\n\nAn exact reusable type description.')
 
 
 def request(blue_id):
@@ -197,7 +196,7 @@ class CardTests(unittest.TestCase):
         model.assert_not_called()
         self.assertEqual([], plan['generate'])
         self.assertEqual([B], plan['restored'])
-        self.assertEqual({B}, set(cards.cards_in(self.root, DEFINITIONS)))
+        self.assertEqual({B}, set(cards.cards_in(self.root)))
 
     def test_replanning_refreshes_s3_staging_after_an_approved_remote_correction(self):
         remote = self.card()
@@ -208,7 +207,7 @@ class CardTests(unittest.TestCase):
         store.restore.return_value = remote
         cards.prepare(self.root, self.output, store)
         corrected = deepcopy(remote)
-        corrected['metadata']['displayLabel'] = 'Corrected remote card'
+        corrected['semanticText'] += '\n\nCorrected meaning.'
         store.restore.return_value = corrected
         plan = cards.prepare(self.root, self.output, store)
         self.assertEqual([B], plan['restored'])
@@ -228,28 +227,61 @@ class CardTests(unittest.TestCase):
              patch.object(cards.subprocess, 'run', side_effect=run):
             with self.assertRaisesRegex(ValueError, 'successful cards were retained'):
                 cards.generate(self.root, self.output, 2)
-        self.assertEqual({B}, set(cards.cards_in(self.root, DEFINITIONS)))
+        self.assertEqual({B}, set(cards.cards_in(self.root)))
         self.assertEqual([C], cards.prepare(self.root, self.output)['generate'])
 
-    def test_validation_rejects_wrong_identity_hash_paths_and_symlinks(self):
+    def test_accept_stores_only_identity_and_text_without_padding_or_fixed_sections(self):
+        card = self.card()
+        self.assertEqual(response(B), card)
+        self.assertEqual(wire(response(B)), (self.destination / (B + '.json')).read_bytes())
+        self.assertEqual(card, cards.validate_card(card, B))
+
+    def test_validation_rejects_wrong_identity_and_symlinks(self):
         card = self.card()
         with self.assertRaisesRegex(ValueError, 'BlueId'):
-            cards.validate_card(card, C, DEFINITIONS)
-        changed = deepcopy(card)
-        changed['semanticText'] += ' Changed'
-        with self.assertRaisesRegex(ValueError, 'hash'):
-            cards.validate_card(changed, B, DEFINITIONS)
-        invalid = response(B)
-        invalid['metadata']['stateFacts'] = [dict(id='counter', scope='document', path='/invented',
-            binding=None, defaultPath=None, suffix='', type='count', absent='Unknown',
-            meaning='Counter', evidence='Declared field', aggregate=None)]
-        with self.assertRaisesRegex(ValueError, 'Unestablished'):
-            cards.validate_output(invalid, request(B)['context'])
-        invalid['metadata']['stateFacts'][0]['path'] = '/counter'
-        cards.validate_output(invalid, request(B)['context'])
+            cards.validate_card(card, C)
+        with self.assertRaisesRegex(ValueError, 'BlueId'):
+            cards.accept(request(C), response(B), self.root / 'wrong-identity')
         (self.destination / (C + '.json')).symlink_to(self.destination / (B + '.json'))
         with self.assertRaisesRegex(ValueError, 'Symlink'):
-            cards.cards_in(self.root, DEFINITIONS)
+            cards.cards_in(self.root)
+
+    def test_validation_rejects_extra_fields_invalid_text_and_size(self):
+        for field in ('metadata', 'dependencies', 'omittedDependencies', 'sourceDigest',
+                      'definitionDigest', 'semanticHash', 'package', 'generator', 'review',
+                      'validation', 'language', 'format'):
+            with self.subTest(field=field), self.assertRaises(ValidationError):
+                cards.validate_card({**response(B), field: {}}, B)
+        for changes in ({'blueId': '../invalid'}, {'semanticText': []}, {'semanticText': ''},
+                        {'semanticText': '# Fixture\n\n' + 'x' * 20_000}):
+            with self.subTest(changes=changes.keys()), self.assertRaises(ValidationError):
+                cards.validate_card({**response(B), **changes}, B)
+        for text, error in (('No heading\n\nMeaning.', 'heading'), ('# \n\nMeaning.', 'heading'),
+                            ('# Fixture\n\n', 'explanation'), ('# Fixture\n\n' + '界' * 16_000, 'byte limit')):
+            with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                cards.validate_card(dict(response(B), semanticText=text), B)
+
+    def test_accept_checks_request_checksum_and_refuses_overwrite(self):
+        invalid = request(B)
+        invalid['context']['definition']['name'] = 'Changed source'
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            cards.accept(invalid, response(B), self.destination)
+        self.assertFalse(self.destination.exists())
+        self.card()
+        corrected = dict(response(B), semanticText='# Fixture\n\nCorrected meaning.')
+        with self.assertRaisesRegex(ValueError, 'Refusing to replace'):
+            cards.accept(request(B), corrected, self.destination)
+        self.assertEqual(response(B), cards.read_json(self.destination / (B + '.json')))
+
+    def test_restore_rejects_legacy_envelope_before_generation(self):
+        store = Mock()
+        store.keys.return_value = {card_key(B)}
+        store.restore.return_value = dict(response(B), metadata={})
+        with patch.object(cards.subprocess, 'check_output') as model:
+            with self.assertRaises(ValidationError):
+                cards.generate(self.root, self.output, 2, store)
+        model.assert_not_called()
+        self.assertFalse(self.destination.exists())
 
     def test_collect_preserves_success_when_another_output_fails_schema(self):
         cards.prepare(self.root, self.output)
@@ -260,7 +292,21 @@ class CardTests(unittest.TestCase):
         with patch.object(ci, 'inventory', return_value=(self.subjects, DEFINITIONS)):
             result = ci.collect(self.root, self.output, responses)
         self.assertEqual({'accepted': [B], 'failed': [C]}, result)
-        self.assertEqual({B}, set(cards.cards_in(self.root, DEFINITIONS)))
+        self.assertEqual({B}, set(cards.cards_in(self.root)))
+
+    def test_collect_rejects_changed_definition_or_dependency_evidence(self):
+        self.subjects.pop(C)
+        cards.prepare(self.root, self.output)
+        responses = self.root / 'responses'
+        responses.mkdir()
+        (responses / (B + '.json')).write_bytes(wire(response(B)))
+        for blue_id in (B, A):
+            changed = deepcopy(DEFINITIONS)
+            changed[blue_id]['name'] = 'Changed source'
+            with self.subTest(blue_id=blue_id), \
+                 patch.object(ci, 'inventory', return_value=(self.subjects, changed)):
+                self.assertEqual({'accepted': [], 'failed': [B]}, ci.collect(self.root, self.output, responses))
+                self.assertFalse(self.destination.exists())
 
 
 class S3Tests(unittest.TestCase):
@@ -334,10 +380,9 @@ class S3Tests(unittest.TestCase):
             self.store.publish(B, self.card, set())
         self.stub.assert_no_pending_responses()
 
-    def test_metadata_correction_requires_promotion_and_uses_conditional_write(self):
+    def test_text_correction_requires_promotion_and_uses_conditional_write(self):
         corrected = deepcopy(self.card)
-        corrected['metadata']['displayLabel'] = 'Corrected label'
-        self.assertEqual(corrected['semanticHash'], self.card['semanticHash'])
+        corrected['semanticText'] += '\n\nCorrected meaning.'
         self.get(self.key, self.card)
         self.assertTrue(self.store.publish(B, corrected, {self.key})['correctionPending'])
         self.get(self.key, self.card)

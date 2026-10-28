@@ -5,22 +5,18 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 from pathlib import Path
-import re
 import subprocess
 import tempfile
 
 from jsonschema import Draft202012Validator
 
 from release import ROOT, digest, local, require, wire
-from semantic_sources import BLUE_ID, definition_digest, evidence, inventory, pointer
+from semantic_sources import definition_digest, evidence, inventory
 from semantic_s3 import MAX_CARD_BYTES, Store, card_key
 
 ASSETS = Path(__file__).resolve().parents[1] / 'semantics'
 OUTPUT_SCHEMA = json.loads((ASSETS / 'output.schema.json').read_text())
 VALIDATOR = Draft202012Validator(OUTPUT_SCHEMA)
-HASH = re.compile(r'sha256:[0-9a-f]{64}')
-CARD_KEYS = {'format', 'language', 'blueId', 'semanticText', 'semanticHash', 'metadata',
-             'definitionDigest', 'sourceDigest', 'package', 'generator', 'review', 'validation'}
 
 
 def read_json(path, limit=MAX_CARD_BYTES):
@@ -31,71 +27,28 @@ def read_json(path, limit=MAX_CARD_BYTES):
 
 def validate_output(value, context=None):
     VALIDATOR.validate(value)
-    require(value['semanticText'].lstrip().startswith('# '), 'Card text needs a heading')
+    title, _, body = value['semanticText'].strip().partition('\n')
+    require(title.startswith('# ') and title[2:].strip(), 'Card text needs a heading')
+    require(body.strip(), 'Card text needs an explanation')
     require(len(value['semanticText'].encode()) <= 48_000, 'Card text exceeds the byte limit')
-    metadata = value['metadata']
-    require(len(wire(metadata)) <= 16_384, 'Card metadata exceeds the byte limit')
-    facts = metadata['stateFacts']
-    require(len({fact['id'] for fact in facts}) == len(facts), 'Duplicate state fact')
-    for fact in facts:
-        require(fact['suffix'] == '' or pointer(fact['suffix']), 'Invalid fact suffix')
-        require(fact['aggregate'] is None or fact['type'] in {'number', 'count', 'money-minor'}, 'Aggregate must be numeric')
-        if fact['scope'] == 'document':
-            require(pointer(fact['path']) and fact['binding'] is None and fact['defaultPath'] is None
-                    and fact['suffix'] == '', 'Invalid document fact')
-        else:
-            require(fact['path'] is None and isinstance(fact['binding'], str)
-                    and (fact['defaultPath'] is None or pointer(fact['defaultPath'])), 'Invalid binding fact')
-    if context is None:
-        return
-    require(value['blueId'] == context['blueId'], 'Generated BlueId differs from source')
-    require(set(metadata['parameterRefs']) <= set(context['parameterRefs']), 'Unestablished parameter reference')
-    require(set(metadata['covers'] + metadata['dependencies']) <= set(context['referencedBlueIds']), 'Unestablished dependency')
-    bindings = {b['name']: b['defaultPath'] for b in context['bindings']}
-    for fact in facts:
-        if fact['scope'] == 'document':
-            require(fact['path'] in context['documentPaths'], 'Unestablished document fact path')
-        else:
-            require(fact['binding'] in bindings and bindings[fact['binding']] == fact['defaultPath'], 'Unestablished binding/default')
+    if context is not None:
+        require(value['blueId'] == context['blueId'], 'Generated BlueId differs from source')
 
 
-def validate_card(card, blue_id, definitions=None):
-    require(isinstance(card, dict) and set(card) == CARD_KEYS, 'Invalid card envelope')
-    require(card['format'] == 'blue-semantic-card/1' and card['language'] == 'en', 'Incompatible semantic card')
-    require(BLUE_ID.fullmatch(blue_id) is not None and card['blueId'] == blue_id, 'Card filename/BlueId mismatch')
-    require(card['validation'] == {'state': 'valid', 'problems': []}, 'Card has not passed validation')
-    for field in ('semanticHash', 'definitionDigest', 'sourceDigest'):
-        require(isinstance(card[field], str) and HASH.fullmatch(card[field]), 'Invalid ' + field)
-    require(card['semanticHash'] == digest(card['semanticText'].encode()), 'Semantic text hash mismatch')
-    package = card['package']
-    require(isinstance(package, dict) and set(package) == {'name', 'version', 'blueId', 'archiveSha256'}, 'Invalid package provenance')
-    require(all(isinstance(v, str) and 0 < len(v) <= 200 for v in package.values()), 'Invalid package provenance value')
-    require(BLUE_ID.fullmatch(package['blueId']) and HASH.fullmatch(package['archiveSha256']), 'Invalid package identity')
-    generator = card['generator']
-    require(isinstance(generator, dict) and set(generator) == {'model', 'effort', 'codexVersion', 'promptVersion', 'promptSha256'}, 'Invalid generator provenance')
-    require(all(isinstance(v, str) and 0 < len(v) <= 200 for v in generator.values()), 'Invalid generator provenance value')
-    require(HASH.fullmatch(generator['promptSha256']), 'Invalid prompt hash')
-    review = card['review']
-    require(isinstance(review, dict) and set(review) == {'state', 'basis'}
-            and review['state'] in {'unreviewed', 'static-reviewed', 'corrected'}, 'Unusable review state')
-    require(review['basis'] is None or isinstance(review['basis'], str) and len(review['basis']) <= 2000, 'Invalid review basis')
-    require(review['state'] == 'unreviewed' or bool(review['basis']), 'Reviewed card needs a review basis')
-    context = None
-    if definitions is not None and blue_id in definitions:
-        require(card['definitionDigest'] == definition_digest(blue_id, definitions), 'Card definition digest mismatch')
-        context = evidence(blue_id, definitions)
-    validate_output({k: card[k] for k in ('blueId', 'semanticText', 'metadata')}, context)
+def validate_card(card, blue_id):
+    validate_output(card)
+    require(card['blueId'] == blue_id, 'Card filename/BlueId mismatch')
     require(len(wire(card)) <= MAX_CARD_BYTES, 'Card exceeds stored byte limit')
     return card
 
 
-def cards_in(root, definitions=None):
+def cards_in(root):
     require(not (root / 'semantics').is_symlink() and not (root / 'semantics/cards').is_symlink(),
             'Semantic directories cannot be symlinks')
     folder = local(root, 'semantics/cards')
     cards = {}
     for path in sorted(folder.glob('*.json')):
-        cards[path.stem] = validate_card(read_json(path), path.stem, definitions)
+        cards[path.stem] = validate_card(read_json(path), path.stem)
     return cards
 
 
@@ -113,13 +66,13 @@ def save_card(folder, card):
 
 def prepare(root, output, store=None):
     subjects, definitions = inventory(root)
-    cards = cards_in(root, definitions)
+    cards = cards_in(root)
     keys = store.keys() if store else set()
     restored = []
     for blue_id in subjects.keys() - cards.keys():
         card = store.restore(blue_id, keys) if store else None
         if card is not None:
-            validate_card(card, blue_id, definitions)
+            validate_card(card, blue_id)
             staged = output / 'cards' / (blue_id + '.json')
             require(not staged.is_symlink() and not staged.parent.is_symlink(), 'Semantic cache cannot be a symlink')
             staged.parent.mkdir(parents=True, exist_ok=True)
@@ -150,18 +103,19 @@ def prepare(root, output, store=None):
     return report
 
 
-def accept(request, response, output):
+def accept(request, response, output, definitions=None):
     context = request['context']
     require(request['sourceDigest'] == digest(wire(context)), 'Generation request checksum mismatch')
+    if definitions is not None:
+        require(context['blueId'] in definitions, 'Generation source is outside current selection')
+        require(request['definitionDigest'] == definition_digest(context['blueId'], definitions),
+                'Generation definition digest mismatch')
+        require(request['sourceDigest'] == digest(wire(evidence(context['blueId'], definitions))),
+                'Generation evidence differs from current source')
     validate_output(response, context)
-    card = dict(response, format='blue-semantic-card/1', language='en',
-                semanticHash=digest(response['semanticText'].encode()),
-                definitionDigest=request['definitionDigest'], sourceDigest=request['sourceDigest'],
-                package=request['package'], generator=request['generator'],
-                validation={'state': 'valid', 'problems': []}, review={'state': 'unreviewed', 'basis': None})
-    validate_card(card, context['blueId'])
-    save_card(output, card)
-    return card
+    validate_card(response, context['blueId'])
+    save_card(output, response)
+    return response
 
 
 def generate(root, output, jobs, store=None):
@@ -235,15 +189,15 @@ def main():
         result = generate(root, args.output, args.jobs, store)
     elif args.command == 'publish':
         require(store is not None, 'publish requires --bucket')
-        subjects, definitions = inventory(root)
-        cards = cards_in(root, definitions)
+        subjects, _ = inventory(root)
+        cards = cards_in(root)
         keys = store.keys()
         result = {'published': {}, 'missing': sorted(subjects.keys() - cards.keys())}
         for blue_id, card in cards.items():
             result['published'][blue_id] = store.publish(blue_id, card, keys, promote=args.promote)
     elif args.command == 'check':
-        subjects, definitions = inventory(root)
-        cards = cards_in(root, definitions)
+        subjects, _ = inventory(root)
+        cards = cards_in(root)
         result = dict(subjects=list(subjects.values()), ready=sorted(subjects.keys() & cards.keys()),
                       missing=sorted(subjects.keys() - cards.keys()))
     else:

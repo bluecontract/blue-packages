@@ -17,6 +17,47 @@ Changing a README, package version, generator or prompt does not regenerate an
 existing card. A new type BlueId does. Invalid cards fail validation rather than
 being silently replaced. Generated prose still needs review.
 
+## Card content
+
+The generated response, committed file and S3 object have the same two fields:
+
+```json
+{
+  "blueId": "<exact type BlueId>",
+  "semanticText": "# Type name\n\nWhat this type means and does."
+}
+```
+
+See [Hello Clause](../semantics/cards/6djSCK7TuFMBty51HWymVGRpnBdYTyFGf944FWZFYG4D.json)
+for a concrete card.
+
+`blueId` selects the exact type definition. `semanticText` explains its meaning
+in English Markdown for both UI generation and agents discussing documents,
+including consumers reached through MCP. It starts with the type name and covers
+only applicable information:
+
+- Purpose, parameters, bindings and source-defined defaults explain what is
+  configured and how configuration changes behavior.
+- Triggers, actors, guards, effects and rejections explain what can happen and
+  distinguish an attempted operation from a confirmed outcome.
+- State sources, units and absence semantics explain how to interpret document
+  data without inventing values or treating missing state as a default.
+- Material constraints and non-guarantees prevent claims the type does not support.
+
+There is no mandatory section list or minimum prose length. A simple type may
+need only a short explanation; headings help organize complex types. State and
+limitations sections are unnecessary when there is nothing relevant to explain.
+Cards contain shared type semantics, not screen layouts, UI components,
+Terms-writing instructions or conversation style. Current values and permissions
+still come from authorized document data, not the card.
+
+Do not add `metadata`, dependency BlueId lists, hashes, package versions, model
+details or review/validation envelopes to cards. Bounded source definitions,
+dependencies and checksums remain in ignored generation requests for grounding
+and source checks. The prompt version remains in `semantics/generator.json`.
+Validation checks the two-field shape, exact identity and size; it does not prove
+that the prose correctly describes execution. Review the meaning against sources.
+
 ## Discovery
 
 Every check reads `PACKAGES.json`, verifies the selected archives using the existing
@@ -82,8 +123,10 @@ corresponding `build/semantics/requests/<blueId>.txt` and
 ```
 
 For a different generator, record its actual model, effort and version in that
-request's `generator` object before acceptance. Acceptance adds source identity,
-hashes and provenance and validates the output. It refuses to overwrite a card.
+request's `generator` object for diagnostics. Acceptance checks the request
+checksum, exact BlueId and output schema, then saves the two-field response
+without enriching it. It refuses to overwrite an existing different card. The
+CI collector also rechecks the request against the current source evidence.
 The model receives bounded exact definitions and dependencies, never credentials
 or private account documents as input. Local execution uses a temporary working
 directory and the CLI read-only sandbox.
@@ -151,14 +194,13 @@ s3://blue-semantic-cards-dev/6djSCK7TuFMBty51HWymVGRpnBdYTyFGf944FWZFYG4D.json
 Each object contains the complete card JSON, identical to the canonical repo
 file in `semantics/cards/<typeBlueId>.json`. There are no intermediate folders or
 head files. Git preserves review history; bucket versioning preserves previous
-published contents under the same object key. `semanticHash` covers only the
-Markdown text, so publication compares the entire card to detect metadata-only
-corrections too.
+published contents under the same object key. Publication compares the entire
+two-field card to detect corrections; no content hash is stored in the card.
 
 The planner uses paginated `ListObjectsV2` for the dedicated bucket (up to 1,000
 keys per request), then compares sets locally. It does **not** issue a presence
 `HEAD` request for every clause. For a card absent from the repo, it fetches that
-BlueId's JSON directly, checks identity/hash/schema, and stages the file. A local
+BlueId's JSON directly, checks identity/schema/size, and stages the file. A local
 card whose key is absent from S3 is reported as `unpublished`, not generated again.
 This presence check does not compare existing S3 contents to local corrections;
 publication handles that. AWS errors, including access denied, are never treated
@@ -171,13 +213,19 @@ current ETag. Concurrent different writes cannot silently overwrite each other;
 a conflict fails publication and is resolved by rerunning from current main.
 Each upload is a single object write; there is no separate pointer to repair.
 
-Clients fetch `<typeBlueId>.json` directly and validate its identity, hash and
-format. Objects use `Cache-Control: no-cache`; clients can revalidate with the
+Clients fetch `<typeBlueId>.json` directly and validate its identity and two-field
+schema. Objects use `Cache-Control: no-cache`; clients can revalidate with the
 ETag so corrections are visible even when the type BlueId is unchanged.
 This change supplies the producer and S3 contract. Business/chat still need an
 S3 or CDN reader and mapping to their registry; no `blue-packages` code dependency
 is needed. Only public package semantics belong in this bucket. Private/custom
 document semantics remain in their existing account scope.
+
+The earlier full-record format is not accepted by this schema. When migrating,
+review existing repo cards as `blueId` plus `semanticText`, update consumers that
+require removed fields, and publish the reviewed correction from main. Existing
+S3 objects are replaced through the same conditional promotion; bucket versioning
+retains their previous contents. Restore does not silently strip legacy fields.
 
 ## Enable automation
 
@@ -311,10 +359,10 @@ A maintainer can publish a reviewed local checkout manually, without generation:
 
 This fills missing objects but does not promote corrections. Only use
 `--promote` when deliberately applying the reviewed current-main card selection.
-To correct a card, edit its repo JSON, update `semanticHash` if the text changed,
-set `review` to `corrected` with a basis, validate, and submit a PR. Keep its BlueId
-and source provenance unchanged. Publication replaces `<typeBlueId>.json` after
-merge; S3 versioning retains the previous object contents.
+To correct a card, edit `semanticText` in its repo JSON, validate, and submit a PR
+explaining the correction and its source basis. Keep its exact BlueId unchanged.
+Publication replaces `<typeBlueId>.json` after merge; S3 versioning retains the
+previous object contents.
 
 ## Verification
 
@@ -325,8 +373,9 @@ python3 -m unittest discover -s tools -p 'test_release.py' -v
 ```
 
 Tests cover discovery, new unbuilt exports, unchanged identities, local cards
-missing from S3, S3 restoration, partial generation, provenance validation,
-pagination, AWS errors, conditional publication/corrections and stale PRs. AWS
+missing from S3, S3 restoration, partial generation, the two-field schema,
+generation request/source checks, pagination, AWS errors, conditional
+publication/corrections and stale PRs. AWS
 responses and model processes are simulated; these tests spend no model tokens
 and do not write to S3. A configured GitHub run is still needed to verify actual
 IAM, model access and repository branch policies.

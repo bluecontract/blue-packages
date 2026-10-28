@@ -57,7 +57,7 @@ def collect(root, prepared, responses):
     accepted, failed = [], []
     for blue_id in plan['restored']:
         require(blue_id in subjects, 'Recovered card is outside current selection')
-        card = validate_card(read_json(prepared / 'cards' / (blue_id + '.json')), blue_id, definitions)
+        card = validate_card(read_json(prepared / 'cards' / (blue_id + '.json')), blue_id)
         save_card(destination, card)
         accepted.append(blue_id)
     for blue_id in plan['generate']:
@@ -67,17 +67,16 @@ def collect(root, prepared, responses):
             continue
         try:
             request = read_json(prepared / 'requests' / (blue_id + '.json'), 1_000_000)
-            # Accept into an isolated folder before checking against the exact
-            # candidate source again. No agent output becomes executable code.
+            # Recheck source evidence and identity before saving to the candidate.
             with tempfile.TemporaryDirectory() as tmp:
-                card = accept(request, read_json(response), Path(tmp))
-                validate_card(card, blue_id, definitions)
+                card = accept(request, read_json(response), Path(tmp), definitions)
+                validate_card(card, blue_id)
                 save_card(destination, card)
             accepted.append(blue_id)
         except (ValueError, KeyError, TypeError, ValidationError) as error:
             print(f'Rejected {blue_id}: {str(error).splitlines()[0][:500]}')
             failed.append(blue_id)
-    cards_in(root, definitions)
+    cards_in(root)
     return dict(accepted=accepted, failed=failed)
 
 
