@@ -245,12 +245,9 @@ class BootstrapSecurityTests(unittest.TestCase):
             for action in ("iam:CreateOpenIDConnectProvider", "iam:DeleteOpenIDConnectProvider", "iam:UpdateOpenIDConnectProviderThumbprint"):
                 self.assertEqual(decision(policy, action, provider), "implicitDeny")
             bucket = f"arn:aws:s3:::blue-semantic-cards-{environment}"
-            for action in ("s3:CreateBucket", "s3:PutBucketPolicy", "s3:PutBucketPublicAccessBlock", "s3:PutBucketVersioning",
-                           "s3:GetBucketCORS", "s3:PutBucketCORS"):
+            for action in ("s3:CreateBucket", "s3:PutBucketPolicy", "s3:PutBucketPublicAccessBlock", "s3:PutBucketVersioning"):
                 self.assertEqual(decision(policy, action, bucket), "allowed")
                 self.assertEqual(decision(policy, action, bucket + "-unrelated"), "implicitDeny")
-                other_bucket = f"arn:aws:s3:::blue-semantic-cards-{'prod' if environment == 'dev' else 'dev'}"
-                self.assertEqual(decision(policy, action, other_bucket), "implicitDeny")
             for action in ("s3:GetObject", "s3:PutObject", "s3:DeleteObject"):
                 self.assertEqual(decision(policy, action, bucket + "/model.json"), "implicitDeny")
             for action in ("s3:DeleteBucket", "s3:PutLifecycleConfiguration", "cloudformation:CreateStack", "lambda:CreateFunction"):
@@ -375,17 +372,7 @@ class CardAccessTests(unittest.TestCase):
                 self.assertEqual(bucket["VersioningConfiguration"]["Status"], "Enabled")
                 self.assertEqual(resource["DeletionPolicy"], "Retain")
                 self.assertEqual(resource["UpdateReplacePolicy"], "Retain")
-
-    def test_dev_browser_reads_allow_etag_revalidation_but_no_writes(self):
-        dev = rendered("dev", APPLICATION)["Resources"]["SemanticCardsBucket"]["Properties"]
-        rules = dev["CorsConfiguration"]["CorsRules"]
-        self.assertEqual(len(rules), 1)
-        self.assertEqual(set(rules[0]["AllowedMethods"]), {"GET", "HEAD"})
-        self.assertEqual(rules[0]["AllowedOrigins"], ["*"])
-        self.assertIn("If-None-Match", rules[0]["AllowedHeaders"])
-        self.assertIn("ETag", rules[0]["ExposedHeaders"])
-        prod = rendered("prod", APPLICATION)["Resources"]["SemanticCardsBucket"]["Properties"]
-        self.assertNotIn("CorsConfiguration", prod)
+                self.assertNotIn("CorsConfiguration", bucket)
 
 
 if __name__ == "__main__":

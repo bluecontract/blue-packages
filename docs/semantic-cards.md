@@ -206,10 +206,9 @@ https://blue-semantic-cards-dev.s3.eu-west-1.amazonaws.com/<typeBlueId>.json
 
 DEV permits anonymous HTTPS reads of JSON objects, including historical type
 cards retained in the bucket. It does not grant anonymous listing, writes,
-deletion or access to earlier S3 object versions. CORS permits browser `GET` and
-`HEAD` from any origin, including localhost, exposes `ETag`, and permits
-`If-None-Match` revalidation. These are public package descriptions; private
-document content must never be published here. PROD remains private.
+deletion or access to earlier S3 object versions. Backend HTTP clients can read
+these URLs without CORS configuration. These are public package descriptions;
+private document content must never be published here. PROD remains private.
 See [deployment prerequisites and checks](semantic-infrastructure.md#public-dev-card-access)
 before expecting these URLs to work; merging the PR alone does not update AWS.
 
