@@ -160,6 +160,11 @@ def summary(report):
     lines = ['## Semantic cards', '',
              f"Required: {len(report['subjects'])}; ready: {len(report['ready'])}; missing: {len(report['missing'])}.",
              '', 'Missing cards do not block package publication. Generation never changes package identities.', '']
+    for collection in sorted({c for s in report['subjects'] for c in s.get('collections', [])}):
+        selected = {s['blueId'] for s in report['subjects'] if collection in s.get('collections', [])}
+        missing = selected.intersection(report['missing'])
+        lines.append(f'- {collection}: required {len(selected)}; missing {len(missing)}.')
+    lines.append('')
     for item in report['subjects']:
         if item['blueId'] in report['missing']:
             lines.append('- Missing `' + item['alias'].replace('`', '') + '` — `' + item['blueId'] + '`')

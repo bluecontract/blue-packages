@@ -68,14 +68,16 @@ def discover(exports, definitions, clause_id):
     pending = list(selected)
     while pending:
         blue_id = pending.pop()
-        for _, value in type_chain(blue_id, definitions):
+        for identity, value in type_chain(blue_id, definitions):
+            if selected[blue_id]['roles'] == ['helper'] and identity in exports and identity not in selected:
+                selected[identity] = dict(exports[identity], roles=['helper'])
             def visit(node):
                 if isinstance(node, list):
                     for child in node:
                         visit(child)
                 elif isinstance(node, dict):
                     for key, child in node.items():
-                        if key == 'definition' or key.lower().endswith('template') or key == 'instructionClauses':
+                        if key.lower().endswith('definition') or key.lower().endswith('template') or key == 'instructionClauses':
                             for ref in references(child):
                                 if ref in exports and ref not in selected:
                                     selected[ref] = dict(exports[ref], roles=['helper'])
@@ -85,14 +87,60 @@ def discover(exports, definitions, clause_id):
     return dict(sorted(selected.items()))
 
 
-def inventory(root):
+def source_collections(root):
+    """Current publications plus explicitly pinned, dependency-closed collections."""
+    yield 'current', selections(root), False
+    path = local(root, 'semantics/collections.json')
+    if not path.exists():
+        return
+    config = json.loads(path.read_bytes())
+    require(config['format'] == 'blue-semantic-collections/1', 'Unknown semantic collection format')
+    names = {'current'}
+    for collection in config['collections']:
+        name = collection['name']
+        require(name not in names, 'Duplicate semantic collection: ' + name)
+        names.add(name)
+        pin = collection['selection']
+        data = local(root, pin['path']).read_bytes()
+        require(digest(data) == pin['sha256'], 'Semantic selection checksum differs: ' + name)
+        defaults = json.loads(data)
+        require(defaults['format'] == 'myos-default-packages/1', 'Unknown default package format')
+        packages = {p['blueId']: p for p in collection['packages']}
+        require(len(packages) == len(collection['packages']), 'Duplicate semantic package identity')
+        roots = defaults['packages']
+        require(roots and len({p['name'] for p in roots}) == len(roots)
+                and len({p['blueId'] for p in roots}) == len(roots), 'Invalid semantic selection')
+        for selected in roots:
+            package = packages.get(selected['blueId'], {})
+            require(all(package.get(k) == selected[k] for k in ('id', 'name', 'blueId')),
+                    'Semantic selection differs from pinned package: ' + selected['name'])
+        pending, included = [p['blueId'] for p in roots], set()
+        while pending:
+            blue_id = pending.pop()
+            if blue_id in included:
+                continue
+            require(blue_id in packages, 'Missing semantic dependency: ' + blue_id)
+            included.add(blue_id)
+            pending.extend(packages[blue_id]['imports'].values())
+        require(included == packages.keys(), 'Unselected packages in semantic collection: ' + name)
+        yield name, [dict(p, packageBlueId=p['blueId']) for p in packages.values()], True
+
+
+def collection_inventory(root, rows, *, retained=False):
     definitions, exports, aliases = {}, {}, {}
-    for row in selections(root):
-        checked, data = check_archive(root, row)
-        config = yaml.safe_load(local(root, row['directory'] + '/blue-package.yaml').read_text())
-        authored = {e['name'] for e in config['exports']}
-        built = {e['name'] for e in checked['exports']}
-        require(authored == built, 'Unbuilt exports in ' + row['name'] + '; rebuild the package')
+    for row in rows:
+        checked, data = check_archive(root, row, retained=retained)
+        if retained:
+            require(row['id'] == checked['name'] + '@' + checked['version'] + '+' + row['packageBlueId']
+                    and row['version'] == checked['version'] and row['imports'] == checked['imports']
+                    and row['exports'] == {e['name']: e['blueId'] for e in checked['exports']}
+                    and all(e['alias'] == row['name'] + '/' + e['name'] for e in checked['exports']),
+                    'Semantic catalogue differs from archive: ' + row['name'])
+        else:
+            config = yaml.safe_load(local(root, row['directory'] + '/blue-package.yaml').read_text())
+            authored = {e['name'] for e in config['exports']}
+            built = {e['name'] for e in checked['exports']}
+            require(authored == built, 'Unbuilt exports in ' + row['name'] + '; rebuild the package')
         with zipfile.ZipFile(io.BytesIO(data)) as archive:
             records = json.loads(archive.read('package-records.json'))
         for blue_id, record in records.items():
@@ -107,12 +155,27 @@ def inventory(root):
             blue_id = entry['blueId']
             require(BLUE_ID.fullmatch(blue_id) is not None, 'Invalid exported BlueId')
             require(blue_id in definitions, 'Missing exact export: ' + entry['alias'])
+            require(entry['alias'] not in aliases or aliases[entry['alias']] == blue_id,
+                    'Conflicting export alias in collection: ' + entry['alias'])
             aliases[entry['alias']] = blue_id
             exports.setdefault(blue_id, dict(blueId=blue_id, alias=entry['alias'], package={
                 'name': row['name'], 'version': checked['version'],
                 'blueId': row['packageBlueId'], 'archiveSha256': row['archiveSha256']}))
     require('Clauses/Clause' in aliases, 'The selected collection has no Clauses/Clause base')
     return discover(exports, definitions, aliases['Clauses/Clause']), definitions
+
+
+def inventory(root):
+    subjects, definitions = {}, {}
+    for name, rows, retained in source_collections(root):
+        selected, exact = collection_inventory(root, rows, retained=retained)
+        for blue_id, definition in exact.items():
+            require(blue_id not in definitions or definitions[blue_id] == definition,
+                    'Conflicting exact definition across collections: ' + blue_id)
+            definitions[blue_id] = definition
+        for blue_id, subject in selected.items():
+            subjects.setdefault(blue_id, dict(subject, collections=[]))['collections'].append(name)
+    return dict(sorted(subjects.items())), definitions
 
 
 def pointer(value):
