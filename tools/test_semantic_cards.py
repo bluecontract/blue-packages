@@ -95,6 +95,82 @@ class InfrastructureTests(unittest.TestCase):
 
 
 class SourceTests(unittest.TestCase):
+    def test_inventory_includes_exact_core_access_events_and_current_collection(self):
+        subjects, definitions = sources.inventory(ROOT)
+        expected = {
+            '9m3aRVdJFRsFPUZJFRCGpM1wohYSyP9uCB5BwJR9qKLZ': 'Activation/Activation Clause',
+            'HqTPdqCwVN1fkg8mArqptB9ywbyT3MdMBG3Rks3h622m': 'Payment/Payment Clause',
+            'E9D2hMTnDHeShhe2r5gaCXRXComc6wxKpAmrRtUQpi2L': 'PaymentInstruction/Payment Instruction with Clauses',
+            'E7m8RtheNfKZXAjx92n93gC4DFujakWrZDQkffrHvG3x': 'Features/Feature Clause',
+            '75ZpSzSyjPn9NxjFxn5EQfAB8rGgca8g9aoY48fyezE2': 'PaymentInstruction/Payment Request Actions',
+        }
+        self.assertTrue(expected.keys() <= subjects.keys())
+        for blue_id, alias in expected.items():
+            self.assertEqual(alias, subjects[blue_id]['alias'])
+        current = {b for b, s in subjects.items() if 'current' in s['collections']}
+        retained = {b for b, s in subjects.items() if 'myos-access-events' in s['collections']}
+        self.assertEqual(111, len(retained))
+        self.assertEqual(current | retained, subjects.keys())
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(cards, 'inventory', return_value=(subjects, definitions)), \
+                patch.object(cards, 'cards_in', return_value={b: response(b) for b in current}):
+            plan = cards.prepare(ROOT, Path(tmp))
+        self.assertEqual(retained - current, set(plan['missing']))
+
+    def test_retained_selection_rejects_drift_missing_dependencies_and_extra_history(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.object(sources, 'selections', return_value=[]):
+            root = Path(tmp)
+            (root / 'semantics').mkdir()
+            defaults = wire(dict(format='myos-default-packages/1',
+                                 packages=[dict(id='fixture@1+' + A, name='Fixture', blueId=A)]))
+            (root / 'defaults.json').write_bytes(defaults)
+            first = dict(id='fixture@1+' + A, name='Fixture', blueId=A, imports={'Dependency': B})
+            dependency = dict(id='dependency@1+' + B, name='Dependency', blueId=B, imports={})
+            collection = dict(name='retained', selection=dict(path='defaults.json', sha256=digest(defaults)),
+                              packages=[first, dependency])
+
+            def read(value):
+                (root / 'semantics/collections.json').write_bytes(wire(
+                    dict(format='blue-semantic-collections/1', collections=[value])))
+                return list(sources.source_collections(root))[-1]
+
+            self.assertEqual({A, B}, {p['packageBlueId'] for p in read(collection)[1]})
+            changed = deepcopy(collection)
+            changed['packages'][1]['blueId'] = C
+            with self.assertRaisesRegex(ValueError, 'Missing semantic dependency'):
+                read(changed)
+            changed = deepcopy(collection)
+            changed['packages'].append(dict(blueId=C, imports={}))
+            with self.assertRaisesRegex(ValueError, 'Unselected packages'):
+                read(changed)
+            changed = deepcopy(collection)
+            changed['packages'][0]['id'] = 'wrong-version'
+            with self.assertRaisesRegex(ValueError, 'selection differs'):
+                read(changed)
+            (root / 'defaults.json').write_bytes(defaults + b' ')
+            with self.assertRaisesRegex(ValueError, 'selection checksum'):
+                read(collection)
+
+    def test_retained_archive_pins_and_catalogue_are_verified(self):
+        _, rows, _ = next(c for c in sources.source_collections(ROOT) if c[0] == 'myos-access-events')
+        self.assertEqual(32, len(rows))
+        row = deepcopy(next(r for r in rows if r['name'] == 'Activation'))
+        row['archiveSha256'] = digest(b'wrong')
+        with self.assertRaisesRegex(ValueError, 'Archive checksum'):
+            sources.collection_inventory(ROOT, [row], retained=True)
+        row = deepcopy(next(r for r in rows if r['name'] == 'Activation'))
+        row['exports']['Activation Clause'] = A
+        with self.assertRaisesRegex(ValueError, 'catalogue differs'):
+            sources.collection_inventory(ROOT, [row], retained=True)
+
+    def test_collections_reject_conflicting_definitions_for_the_same_identity(self):
+        with patch.object(sources, 'source_collections', return_value=[('current', [], False), ('old', [], True)]), \
+                patch.object(sources, 'collection_inventory', side_effect=[
+                    ({A: subject(A)}, {A: {'name': 'Original'}}),
+                    ({A: subject(A)}, {A: {'name': 'Changed'}})]):
+            with self.assertRaisesRegex(ValueError, 'Conflicting exact definition across collections'):
+                sources.inventory(ROOT)
+
     def test_discovers_new_inherited_clause_host_and_template_without_name_catalogue(self):
         exports = {key: subject(key) for key in DEFINITIONS}
         found = sources.discover(exports, DEFINITIONS, A)
@@ -104,6 +180,17 @@ class SourceTests(unittest.TestCase):
         self.assertEqual(['helper'], found[F]['roles'])
         with self.assertRaisesRegex(ValueError, 'cycle'):
             sources.discover(exports, {A: {'type': {'blueId': B}}, B: {'type': {'blueId': A}}}, A)
+
+    def test_discovers_action_hook_and_inherited_executable_helpers(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B]['actionDefinition'] = {'type': {'blueId': D}}
+        definitions[B]['hookDefinition'] = {'type': {'blueId': E}}
+        definitions[D] = {'type': {'blueId': F}, 'functions': {}}
+        definitions[E] = {'functions': {}}
+        found = sources.discover({key: subject(key) for key in definitions}, definitions, A)
+        self.assertEqual(set(definitions), set(found))
+        for blue_id in (D, E, F):
+            self.assertEqual(['helper'], found[blue_id]['roles'])
 
     def test_evidence_includes_inheritance_bindings_and_literal_written_fields(self):
         context = sources.evidence(C, DEFINITIONS)
@@ -146,6 +233,7 @@ class SourceTests(unittest.TestCase):
 
     def test_current_collection_covers_public_clause_catalogue(self):
         subjects, definitions = sources.inventory(ROOT)
+        subjects = {b: s for b, s in subjects.items() if 'current' in s['collections']}
         catalogue = json.loads((ROOT / 'PUBLIC-CLAUSES.json').read_text())
         public_aliases = {alias for family in catalogue['families'] for alias in family['types']}
         self.assertTrue(public_aliases)

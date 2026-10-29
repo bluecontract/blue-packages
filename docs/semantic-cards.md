@@ -60,11 +60,13 @@ that the prose correctly describes execution. Review the meaning against sources
 
 ## Discovery
 
-Every check reads `PACKAGES.json`, verifies the selected archives using the existing
+Every check reads `PACKAGES.json` **and** the package lists in
+`semantics/collections.json`, verifies the selected archives using the existing
 release tooling and inspects their exact `package-records.json` definitions. It
 finds all exported descendants of `Clauses/Clause`, exported types with `clauses`
 (including inherited declarations), and exported helpers referenced by executable
-definitions, child templates or instruction clauses. `PUBLIC-CLAUSES.json` is not
+`*Definition` fields (including action and hook definitions), child templates or
+instruction clauses, together with their exported ancestors. `PUBLIC-CLAUSES.json` is not
 the discovery source; it is only an additional coverage assertion in tests.
 
 To add a clause, declare its export in `blue-package.yaml`, build its package and
@@ -75,12 +77,71 @@ which has not been exported/built has no published identity to describe. This
 pipeline does not rebuild packages or prove that authored sources match a build;
 the normal package build and qualification checks still apply.
 
-On the initial implementation's source collection, discovery finds 69 subjects:
-52 clauses, 11 clause hosts and 6 helpers. No model calls are needed for discovery.
+The current demandscoped collection has 131 subjects: 52 clauses, 11 clause hosts
+and 68 helpers. This includes the original 69 subjects plus 62 helpers reached by
+action/hook definitions and helper inheritance. No model calls are needed for discovery.
 Older committed cards are retained and published even after leaving the current
 selection. Historical editions absent from both repo and S3 need an explicit
-backfill using their exact package sources. Core adaptations which create new
+package selection using their exact sources. Core adaptations which create new
 BlueIds need their own exact cards; upstream identity aliases cannot cover them.
+
+### Pinned consumer collections
+
+`semantics/collections.json` declares **packages to check, not a list of cards**.
+The normal check, planner, generator and CI collector discover subjects from each
+collection independently, using that collection's own `Clauses/Clause` base.
+They then deduplicate by exact BlueId and reject conflicting exact definitions.
+CI reports required and missing counts for each collection; the existing S3
+restore/generation workflow handles missing cards without changing package
+publication's nonblocking coverage policy.
+
+`myos-access-events` pins the 32 default packages used by MyOS Core commit
+`75b8c4ddf031c44e66fb096306bfdbef0a559d3b`. Its defaults are copied byte for byte
+from `runtime/blue-core-service/src/main/resources/package-catalog/access-events-defaults.json`;
+the selected catalogue rows and unmodified archives come from
+`runtime/blue-core-service/src/main/resources/access-event-packages/` at that
+commit. The source commit and original file SHA-256 values are recorded in the
+collection. Only the defaults and their transitive imports belong in this list;
+the other historical catalogue entries are excluded. These 32 packages already
+form a complete dependency closure.
+
+The archives in `semantics/sources/myos-access-events/` are frozen semantic inputs,
+not active package mounts or release assets. CI needs neither a Core checkout nor
+network access to inspect them. `check_archive(..., retained=True)` checks archive
+and member checksums, manifest identity and embedded imports. Discovery additionally
+checks the selected IDs, versions, namespaces, exports, dependency closure and
+exact definitions against the pinned catalogue. This is source integrity checking,
+not execution qualification or proof that generated prose is correct.
+
+This collection discovers 111 subjects: 45 clauses, 10 hosts (including nested
+payment/shipping instructions) and 56 helpers. One identity is shared with current
+demandscoped, giving 241 required identities across both collections. At backfill
+time, 5 access-events cards already existed and 106 were missing. The expanded
+helper discovery also required 62 new current-collection cards. Existing cards
+are reused by exact BlueId.
+
+To update a consumer selection:
+
+1. Pin the consumer commit and verify the defaults, catalogue and archives against
+   that commit. Record the repository, commit and SHA-256 of the original defaults
+   and catalogue in `source`.
+2. Copy the exact defaults file to the collection's source directory and update
+   its `selection.path` and `selection.sha256`. Starting from its package BlueIds,
+   follow catalogue `imports` transitively. Copy only those catalogue rows into
+   `packages`, preserving `id`, `name`, `blueId`, `version`, `archiveSha256`,
+   `imports` and `exports`; add each archive's repo-relative `path`.
+3. Copy those `.bluepkg` bytes unchanged. Retain an older collection while its
+   consumers still need coverage; do not replace `PACKAGES.json` or alias one
+   edition's type to another. Review scope changes and update the pinned
+   collection regression assertions when intentionally changing that selection.
+4. Run `plan --bucket YOUR_BUCKET` and the verification commands below. Review
+   restored/generated cards against their exact request evidence and commit them
+   with the package-list update. Missing types are discovered by CI automatically.
+
+Generation jobs use tooling from main to inspect PR data. A PR introducing a new
+discovery capability must prepare its initial backfill locally; after merge the
+same package-list format participates in automatic generation. Publication uses
+the existing main-only `Publish semantic cards` workflow after review and merge.
 
 ## Local preparation
 
