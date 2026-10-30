@@ -47,9 +47,13 @@ It admits actual Source and Exact descriptors, preserves a sibling declaration,
 and checks native required-field and list-uniqueness constraints. It also checks
 that omitted optionals remain absent in Source, Exact and canonical values,
 including a node type that declares a profile field without supplying a value.
-This does not
-install or qualify a Core runtime. Core's reader separately checks the closed
-descriptor, exact types/references and implemented native semantics; graph,
+The native fixture includes the published Time package and an interpreted
+approval record referencing its required Timer Fired definition. Text identifiers
+keep those definitions out of ordinary value admission, while explicit
+definition-role checks retain their dependency closure. Inline Text and pure
+references to Text-ID values are checked without changing the containing node.
+This does not install or qualify a Core runtime. Core's reader separately checks
+the closed descriptor, exact Text IDs, canonicalization and implemented semantics; graph,
 restore and replay conformance remains part of the linked Core PR.
 
 The existing release CI job runs the publication/fixture checks and prepares

@@ -4,6 +4,8 @@
 runtime selection. The declaration is the `executionProfile` sibling of an
 executable node's `contracts`. It can be inline, referenced or contributed by
 the node's type. The complete node remains unchanged for native processing.
+Identifiers inside the descriptor are Text BlueIds. They name exact native
+dependencies; the runtime validates those dependencies in their proper roles.
 
 See [normative rules](spec/execution-profile-v1.md) and
 [conformance cases](conformance/cases.json). Profile records are produced only

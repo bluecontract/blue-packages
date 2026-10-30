@@ -1,6 +1,8 @@
 # Execution profile integration contract
 
 Status: G0 agreed by the Packages, Core and integration owners, 2026-10-30.
+The pre-merge repair uses Text BlueIds for every identifier inside a descriptor;
+the declaration itself remains inline or an exact descriptor reference.
 
 The normative public rules are in
 [`blue-execution-profile/spec/execution-profile-v1.md`](../blue-execution-profile/spec/execution-profile-v1.md).
@@ -72,6 +74,16 @@ the retained Contracts/BEX identities. The effective profile type is the exact
 base schema export. Node type inheritance is supported; arbitrary profile
 subclasses are not erased. Both input modes canonicalize list order and reject
 duplicate capabilities/native package IDs without changing source identity.
+
+Descriptor scalars and list entries are ordinary primitive Text values carrying
+final BlueIds. A pure reference to a plain Text-ID value resolves normally;
+references directly to packages or protocols do not satisfy this grammar.
+Canonical values contain plain typed Text, without labels, overlays or subtypes.
+The native catalogue explicitly resolves every carried dependency in its proper
+role and exports its complete closure. Language value admission of a descriptor
+does not itself verify these identifier targets. In particular, Time packages
+and interpreted-capability approvals can contain required definitions without
+being incorrectly interpreted as instance values through the declaration.
 
 ## Conformance ownership
 

@@ -36,8 +36,8 @@ Contracts parser. Ordinary non-executable data needs no profile binding.
 
 The effective schema type is exactly the published `Execution/Profile` export.
 A profile subclass is not silently converted to that base type. The following
-six fields are required and each contains only an exact `{blueId: id}` reference,
-without an alias, version selector or refinement overlay:
+six fields are required and each contains a plain Text value whose payload is
+an exact final BlueId, without an alias or version selector:
 
 - `executionSpecification`: the exact Text identity of these outer execution
   profile rules, independently of the retained native runtime protocols.
@@ -50,30 +50,53 @@ without an alias, version selector or refinement overlay:
 
 No implicit protocol or rules ID is supplied.
 
-`coordination` and `coordinationSpecification` are optional exact references
-to the native coordination execution protocol and its rules. They must appear
-together. `provider` is an optional exact reference to the public provider
+`coordination` and `coordinationSpecification` are optional Text BlueIds
+of the native coordination execution protocol and its rules. They must appear
+together. `provider` is an optional Text BlueId of the public provider
 protocol. It does not select or replace the native coordination protocol.
 
-`capabilities` is a required list of exact references to optional native
-semantics. `supportedPackages` is a required list of exact references to the
+`capabilities` is a required list of Text BlueIds identifying optional native
+semantics. `supportedPackages` is a required list of Text BlueIds identifying the
 native package identities accepted by this implementation profile. Both lists
 may be empty. Duplicate entries are rejected. The reader sorts unique entries
-lexicographically by BlueId when deriving the effective profile in both Source
+lexicographically by the carried BlueId when deriving the effective profile in both Source
 and Exact input modes; it does not modify the original node or source identity. An
 unlisted capability is unavailable even if another node or worker supports it.
 The supported native package set does not replace ordinary package installation
 or the complete exact dependency closure of a node.
 
+Each identifier has exactly the primitive Text type. Source strings and Exact
+plain typed Text values are accepted. A pure reference to such a Text value is
+also accepted after normal content resolution. Labels, extra fields, refinement
+overlays and Text subtypes are rejected; the reader does not erase them. A
+reference directly to a package, protocol or other non-Text target is not an
+identifier value. Unavailable referenced Text content is missing content, not
+absence. Equivalent inline and referenced Text spellings carry the same ID;
+duplicates are rejected even when their spellings differ.
+
+Identifier payloads name dependencies; they are not ordinary Language references
+to those dependencies. This keeps a package or capability containing required
+definitions from being incorrectly admitted as an instance value. The runtime
+must explicitly resolve and validate every carried dependency in its proper
+native role, including the complete exact closure even when currently inactive.
+Packages, protocols and capability definitions are admitted in their definition
+roles; normative rules are verified as Text. A capability identity binds its
+complete approved semantics, not only a type label or implementation class.
+Ordinary Language admission of the descriptor alone does not prove that these
+dependencies are available or implemented.
+
 Only the declared descriptor fields and its schema type are allowed. Display
 names, versions, deployment identifiers and implementation build identifiers
 are not descriptor fields. The referenced protocol/rules pairs must agree with
 the exact admitted publications. Loading a similarly named/newer publication
-cannot satisfy a different exact reference.
+cannot satisfy a different exact identifier.
 
 The reader resolves the effective descriptor fields and constructs a canonical
-profile record using the exact base schema type, exact references and the
-ordered lists. The BlueId of that record is the effective profile identity.
+profile record using the exact base schema type, plain typed Text identifiers
+and the ordered lists. Each canonical identifier is
+`{type: {blueId: Text}, value: id}`, where `Text` is the exact primitive Text
+identity and `id` is the carried final BlueId. The BlueId of the canonical
+record is the effective profile identity.
 Source spelling and a node's source identity remain separate. A profile record
 or source reference with unavailable content cannot be replaced with a guess.
 
