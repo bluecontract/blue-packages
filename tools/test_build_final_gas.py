@@ -1,5 +1,6 @@
 """A complete source inventory builds in dependency order, never using stale downstream archives."""
 import json
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -32,6 +33,13 @@ class DependencyOrderTest(unittest.TestCase):
         self.package('documents')
         with self.assertRaisesRegex(ValueError, 'absent from the source inventory'):
             dependency_order(self.root, ['payment'])
+
+    def test_shell_builder_rejects_removed_edition_option_before_building(self):
+        script = Path(__file__).resolve().parent / 'build-payment-family.sh'
+        result = subprocess.run(['bash', str(script), '--edition', 'demand-scoped'],
+                                text=True, capture_output=True)
+        self.assertEqual(2, result.returncode)
+        self.assertIn('Unsupported option: --edition', result.stderr)
 
     def test_cycle_fails_before_building(self):
         self.package('a', ['b'])

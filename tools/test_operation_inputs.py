@@ -21,7 +21,7 @@ class OperationInputTest(unittest.TestCase):
         cls.addClassCleanup(cls.temporary.cleanup)
         subprocess.run([javac, '-cp', cls.classpath, '-d', cls.temporary.name,
                         *[str(ROOT / 'tools' / name) for name in
-                          ['OperationInputs.java', 'BuildPaymentFamily.java',
+                          ['QualificationRuntime.java', 'OperationInputs.java', 'BuildPaymentFamily.java',
                            'BuildFinalGas.java', 'OperationInputConformance.java']]], check=True)
 
     def run_native(self, mode):

@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.contracts.*;
 import blue.bex.*;
 import blue.coordination.AuthoringRuntime;
@@ -29,7 +30,7 @@ public final class DocumentInputConformance {
   }
   static void connectionRequests(Path root)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    try(var authoring=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    try(var authoring=new AuthoringRuntime(QualificationRuntime.bindings())) {
       var processor=authoring.processor(packages.language());
       var initialized=processor.initialize(workOrder(root));
       require(initialized.status().equals("APPLIED"),"Document preparation initialization: "+initialized.receipt()+" observations="+initialized.observations());
@@ -49,7 +50,7 @@ public final class DocumentInputConformance {
   static void accessLibrary(Path root)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language()) {
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       var definition=values.source(m("type","Attachments/Attachment Access Functions"),"definition");
       var library=m("functions",values.bexData(values.select(definition,"/functions")));
       var bex=new Bex(BexProfile.current());
@@ -60,7 +61,7 @@ public final class DocumentInputConformance {
   static void accessGuards(Path root)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language()) {
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       for(String owner:List.of("Attachments/Attachment Access Functions","Documents/Document Access Functions")) {
       String fn=owner.startsWith("Attachments")?"registerAccessPublic":"registerDocumentAccessPublic";
       var definition=values.source(m("type",owner),"definition");
@@ -100,7 +101,7 @@ public final class DocumentInputConformance {
     var function=(Map<String,Object>)functions.get("recordConsent");
     var args=(Map<String,Object>)function.get("args");
     try(var blue=Blue.builder().build()) {
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       require(!values.matches(values.source(m()),values.source(args.get("input"),"definition")),"recordConsent must reject missing admissionRef and decision");
     }
   }
@@ -118,7 +119,7 @@ public final class DocumentInputConformance {
   static void inputs(Path root)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language()) {
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       for(var entry:List.of(List.of("Documents/Admission Consent Functions","recordConsent","admissionRef"),
           List.of("Attachments/Attachment Endpoint Functions","linkParent","document"),
           List.of("Attachments/Attachment Functions","attach","document"),
@@ -173,7 +174,7 @@ public final class DocumentInputConformance {
     var originalClauses=(Map<String,Object>)original.get("clauses");var originalInstruction=(Map<String,Object>)originalClauses.get("instruction");
     instruction.put("bindings",originalInstruction.get("bindings"));
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    try(var authoring=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    try(var authoring=new AuthoringRuntime(QualificationRuntime.bindings())) {
       var processor=authoring.processor(packages.language());var initial=processor.initialize(source);
       require(initial.status().equals("APPLIED"),"Preparation source initialization: "+initial.observations());
       var request=m("type","Attachments/Attachment Preparation Input","requestId","reviewed-preparation-1");
@@ -192,7 +193,7 @@ public final class DocumentInputConformance {
   }
   static void paymentPreparation(Path root)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    try(var authoring=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    try(var authoring=new AuthoringRuntime(QualificationRuntime.bindings())) {
       var processor=authoring.processor(packages.language());
       var initial=processor.initialize(workOrder(root,"13-current-payment-document.blue",false));
       require(initial.status().equals("APPLIED"),"Current Payment Clause initialization: "+initial.observations());
@@ -208,7 +209,7 @@ public final class DocumentInputConformance {
   }
   static void nativeLists() {
     try(var blue=Blue.builder().build()) {
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       var fresh=values.source(m("name","New document review item","count",m("type","Integer","schema",m("required",true))),"definition");
       var itemType=m("blueId",NativeRuntime.identity(fresh));
       var item=m("type",itemType,"count",7);
@@ -229,7 +230,7 @@ public final class DocumentInputConformance {
   }
   static void referenceExecutor(Path root)throws Exception {
     try(var blue=Blue.builder().build()) {
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       var sourceLibrary=(Map<?,?>)WireData.parse(Files.readString(root.resolve("clause-attachments/types/rules.blue")),"yaml");
       var sourceFunctions=(Map<?,?>)sourceLibrary.get("functions");
       var library=m("functions",m("origin",sourceFunctions.get("origin")));
@@ -252,7 +253,7 @@ public final class DocumentInputConformance {
   static void consentEffect(Path root)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language()) {
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       var definition=values.source(m("type","Documents/Admission Consent Functions"),"definition");
       var library=m("functions",values.bexData(values.select(definition,"/functions")));
       var source=m("constants",m("itemPath","/pending","admissionRef","admission-1","party","buyer"),"do",List.of(m("$return",m("$call",m("function","recordConsent","args",m("input",m("$binding","call/request")))))));
@@ -270,7 +271,7 @@ public final class DocumentInputConformance {
   static void attachmentValues(Path root)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     for(String configuration:List.of("task","description-mapped","description-unmapped"))
-      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      try(var runtime=new AuthoringRuntime(QualificationRuntime.bindings())) {
         var processor=runtime.processor(packages.language());var values=processor.execution().values();
         var source=(Map<String,Object>)CompositionPackages.yaml(root.resolve("examples/attachments/02-card-parent-state.blue"));
         var parameters=(Map<String,Object>)((Map<String,Object>)((Map<String,Object>)source.get("clauses")).get("instruction")).get("parameters");
@@ -318,7 +319,7 @@ public final class DocumentInputConformance {
   static void documentPreparationValues(Path root,String field)throws Exception {
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     for(String configuration:List.of("configured","description-mapped","description-unmapped"))
-      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      try(var runtime=new AuthoringRuntime(QualificationRuntime.bindings())) {
         var processor=runtime.processor(packages.language());var values=processor.execution().values();
         var channel=m("type","Contracts/External Channel","event",m("source","owner"));
         var activation=m("type","Activation/Activation Clause","parameters",m("parties",m("owner",m("type","Parties/Party","readerKeys",List.of("reader-owner"),"lead",m("channel",channel))),"required",List.of()));

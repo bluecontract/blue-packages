@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.language.next.*;
 import blue.contracts.*;
 import blue.bex.*;
@@ -114,7 +115,7 @@ public final class OperationInputConformance {
       if(payment)BuildPaymentFamily.main(new String[]{root.toString()});else BuildFinalGas.main(new String[]{root.toString(),"fixture"});
       var pkg=BluePackage.open(fixture.resolve("dist/package.bluepkg"));
       try(var blue=Blue.builder().packages(PackageBundle.builder().mount("Fixture",pkg).build()).build()) {
-        var values=new Contracts(blue,RuntimeBindings.demandScopedEdition()).execution().values();
+        var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
         var document=new Exact.Ref(pkg.exportId("Fixture"));
         var request=values.select(document,"/contracts/differentPublicName/request");
         require(request!=null,"Builder must publish requestFrom function input as contract.request");
@@ -161,8 +162,7 @@ public final class OperationInputConformance {
   }
   public static void main(String[] args)throws Exception {
     if(args[0].equals("native")) {
-      nativeInputs(RuntimeBindings.finalGas(), "final-gas");
-      nativeInputs(RuntimeBindings.demandScopedEdition(), "demand-scoped");
+      nativeInputs(QualificationRuntime.bindings(), "access-events");
     }
     else publication(Path.of(args[1]),args[0].equals("payment"));
   }

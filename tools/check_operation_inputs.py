@@ -15,12 +15,19 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
+    'access-events-behavior': ('blue.core.AccessEventsConformance',),
     'helper-native': ('OperationInputConformance', 'native'),
     'helper-payment': ('OperationInputConformance', 'payment'),
     'helper-final': ('OperationInputConformance', 'final'),
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
     'activation-effects': ('ActivationExecutionConformance',),
     'source-binding': ('SourceBindingConformance',),
+    'source-binding-cyclic': ('SourceBindingConformance', 'cyclic'),
+    'source-binding-public': ('SourceBindingConformance', 'public', 'cyclic'),
+    'source-binding-history': ('SourceBindingConformance', 'cyclic', 'history'),
+    'source-binding-replay': ('SourceBindingConformance', 'cyclic', 'replay'),
+    'source-binding-guards': ('SourceBindingConformance', 'guards'),
+    'source-binding-routing': ('SourceBindingConformance', 'routing'),
     'document-provision': ('ProvisionInputConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),
@@ -51,6 +58,7 @@ def main():
     selected = args.case or list(CASES)
     untracked = subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '-z'], cwd=ROOT).split(b'\0')
     report = {
+        'edition': 'access-events',
         'catalogueSha256': hashlib.sha256((ROOT / 'PACKAGES.json').read_bytes()).hexdigest(),
         'packages': json.loads((ROOT / 'PACKAGES.json').read_text())['packages'],
         'runtimeClasspath': classpath.split(os.pathsep),
@@ -60,7 +68,7 @@ def main():
         'sourceDirtyDiffSha256': hashlib.sha256(subprocess.check_output(['git', 'diff', '--binary', 'HEAD'], cwd=ROOT)).hexdigest(),
         'cases': [],
     }
-    sources = {'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
+    sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
+for arg in "$@"; do
+  if [[ "$arg" == --* ]]; then
+    echo "Unsupported option: $arg (this builder uses Access Events)" >&2
+    exit 2
+  fi
+done
 : "${BLUE_JAVA_CLASSPATH:?Set BLUE_JAVA_CLASSPATH to the qualified Java runtime jars; no runtime binaries are vendored here}"
 java_cmd=java
 javac_cmd=javac
