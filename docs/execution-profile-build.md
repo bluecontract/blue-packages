@@ -44,7 +44,10 @@ mkdir -p reports/execution-profile/classes
 ```
 
 It admits actual Source and Exact descriptors, preserves a sibling declaration,
-and checks native required-field and list-uniqueness constraints. This does not
+and checks native required-field and list-uniqueness constraints. It also checks
+that omitted optionals remain absent in Source, Exact and canonical values,
+including a node type that declares a profile field without supplying a value.
+This does not
 install or qualify a Core runtime. Core's reader separately checks the closed
 descriptor, exact types/references and implemented native semantics; graph,
 restore and replay conformance remains part of the linked Core PR.

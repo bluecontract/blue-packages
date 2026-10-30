@@ -10,6 +10,13 @@ public final class ExecutionProfileConformance {
   static void require(boolean condition, String message) {
     if (!condition) throw new AssertionError(message);
   }
+  static void absentOptionals(Blue blue, Exact descriptor) {
+    var runtime = new NativeRuntime(blue);
+    var head = NativeRuntime.head(NativeRuntime.recipe(descriptor), runtime);
+    for (String field : List.of("coordination", "coordinationSpecification", "provider"))
+      require(!NativeRuntime.present(NativeRuntime.child(head, field), runtime),
+          "Omitted profile field must be absent under native Language semantics: " + field);
+  }
   static Map<String,Object> manifest(Path root, String folder) throws Exception {
     return map(WireData.json(Files.readString(root.resolve(folder + "/dist/package.json"))));
   }
@@ -58,6 +65,21 @@ public final class ExecutionProfileConformance {
       var admitted = blue.createJson(WireData.write(value));
       var exact = blue.create(admitted.exactText(), Blue.Mode.EXACT, "json", Blue.Goal.VALUE);
       require(admitted.blueId().equals(exact.blueId()), "Source/Exact preserve the profile identity");
+      var canonicalSource = new TreeMap<>(value);
+      canonicalSource.put("type", ref(profile.exportId("Profile")));
+      var runtime = new NativeRuntime(blue);
+      var canonical = NativeRuntime.normalize(canonicalSource, runtime, "exact", false);
+      require(admitted.blueId().equals(NativeRuntime.identity(canonical)),
+          "Canonical base-schema record preserves the native profile identity");
+      for (Exact form : List.of(NativeRuntime.exactOf(admitted), NativeRuntime.exactOf(exact), canonical))
+        absentOptionals(blue, form);
+      var definition = blue.admitDefinition(WireData.write(Map.of("name", "Optional profile input",
+          "executionProfile", Map.of("type", ref(profile.exportId("Profile"))))));
+      var node = runtime.prepare(Map.of("type", ref(definition.blueId())));
+      var declaration = NativeRuntime.child(NativeRuntime.head(NativeRuntime.recipe(node), runtime),
+          "executionProfile");
+      require(!NativeRuntime.present(declaration, runtime),
+          "An inherited profile schema alone must not supply a profile value");
       var embedded = blue.createJson(WireData.write(Map.of("executionProfile", value,
           "contracts", Map.of())));
       require(embedded.exactText().contains("executionProfile"), "Declaration stays in native node");
@@ -69,7 +91,7 @@ public final class ExecutionProfileConformance {
       rejected(blue, duplicates);
       System.out.println(WireData.write(Map.of("schemaBlueId", profile.exportId("Profile"),
           "executionSpecification", execution, "profileBlueId", admitted.blueId(),
-          "checks", 4, "scope", "Language schema, not native execution qualification")));
+          "checks", 7, "scope", "Language schema, not native execution qualification")));
     }
   }
 }

@@ -32,6 +32,8 @@ class ExecutionProfilePublicationTest(unittest.TestCase):
         # Plural contracts is Language execution metadata, not a descriptor field.
         self.assertNotIn('contracts', profile)
         self.assertIn('contract', profile)
+        for field in ('coordination', 'coordinationSpecification', 'provider'):
+            self.assertEqual({'schema': {'required': False}}, profile[field])
         required = {name for name, value in profile.items()
                     if isinstance(value, dict) and value.get('schema', {}).get('required')}
         self.assertEqual({'executionSpecification', 'language', 'bex', 'bexSpecification',
