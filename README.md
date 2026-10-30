@@ -6,22 +6,20 @@ Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [exe
 
 The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,000 maximum), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 
-## Demand-scoped candidate (2026-10-23)
+## Runtime editions
 
-The current source candidate includes Contracts `1.0.0-demand-scoped.3`
-(`Cj2SnbMNz9VkQg9Dc7hzEoy7GdBUYqTfzh1XCKu5ANSr`) and Coordination
-`0.3.0-receiver-relative.8`
-(`5NC7oK5Qi6RcxhtBgZsh6AtiJroVopKmCmx7iBc6offt`). `PACKAGES.json`
-is the authoritative dependency/archive inventory. These are new identities;
-prior immutable publications remain unchanged. Native package construction and
-archive/dependency integrity passed; final host integration and whole-edition
-qualification are separate gates. Bounded executable reference models and paired
-Java vectors do not qualify a second complete Python runtime.
+The standard source tree, build and release preparation use **Access Events**.
+Contracts and Coordination retain the exact Access Events native identities.
+Compatible business fixes are rebuilt from current authored sources; see the
+[publication comparison](docs/access-events-default.md).
 
-Do not import this candidate with the generic final-gas importer: the host must
-install it in its dedicated demand-scoped edition resources and catalogue while
-preserving existing final-gas/legacy manifests. Use an explicitly reviewed host
-integration for this candidate.
+Demand remains explicit: pass `--edition demand-scoped` to the builder, release
+preparation or operation qualification. Its exact native sources, configurations
+and previous archives are preserved under `editions/demand-scoped`; tools
+materialize an isolated candidate in `build/demand-scoped`. Shared business source
+changes require a full Demand rebuild before release preparation. Changes to
+shared package interfaces fail until their explicit Demand overlays are updated.
+No command uploads or deploys a runtime. Existing documents keep their runtime.
 
 ## Build and verify
 
@@ -30,6 +28,9 @@ integration for this candidate.
 BLUE_JAVA_CLASSPATH=... python3 tools/build_final_gas.py all
 python3 tools/sync_catalogues.py
 python3 tools/release.py check
+# Explicit alternative; outputs remain isolated from the standard Access Events set.
+BLUE_JAVA_CLASSPATH=... python3 tools/build_final_gas.py all --edition demand-scoped
+python3 tools/release.py check --edition demand-scoped
 python3 tools/check_payment_family.py
 python3 tools/check_clause_tutorial.py
 python3 -m unittest discover -s tools -p 'test_release.py'
@@ -45,10 +46,8 @@ See [Contracts migration](blue-contracts/MIGRATION.md).
 package changes. GitHub generates only exact type BlueIds missing from both the
 repo and S3, then publishes committed cards independently of package releases.
 
-For the matching Core branch, run its `scripts/import-final-gas.py --packages
-/path/to/blue-packages` after validation. This preserves Core's authored examples
-and retained 10M publications, builds its internal Coordination bridge and Task
-fixture, and updates the new default pins. The general example exporter should
-only be used when intentionally replacing Core's example sources.
+Core integration must explicitly select the matching Access Events or Demand
+runtime and catalogue. Package build and release preparation do not import into
+Core, change deployed defaults, or qualify a production rollout.
 
 These are unpublished candidates, not a production certification or a live financial service. See the tutorial for execution boundaries and the distinction between protocol requests and confirmed external outcomes.

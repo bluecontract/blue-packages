@@ -175,7 +175,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments'} <= {row['name'] for row in rows})
         self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-tasks' for row in rows))
-        self.assertFalse((release.ROOT / 'editions').exists())
+        self.assertTrue((release.ROOT / 'editions/demand-scoped/edition.json').is_file())
         self.assertEqual({row['directory'] for row in rows},
                          {row['path'].split('/')[0] for row in rows})
 

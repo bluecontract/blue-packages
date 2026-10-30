@@ -1,5 +1,6 @@
 package blue.core;
 
+import blue.packages.QualificationRuntime;
 import blue.coordination.AuthoringRuntime;
 import blue.contracts.RuntimeBindings;
 import blue.contracts.ClauseGasProbe;
@@ -25,7 +26,7 @@ public final class CurrentOperationScenarios {
     Path prepared=Files.createTempDirectory(reports,"case-");
     Files.writeString(prepared.resolve(scenario.get("document").toString()),WireData.write(source));
     Files.writeString(prepared.resolve(name),WireData.write(scenario));
-    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    try(var runtime=new AuthoringRuntime(QualificationRuntime.bindings())) {
       try {
         CompositionExamples.run(packages,prepared.resolve(name),reports,()->runtime.processor(packages.language()));
       } catch(AssertionError|RuntimeException failure) {

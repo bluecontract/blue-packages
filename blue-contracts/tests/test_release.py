@@ -20,11 +20,9 @@ def test_clean_protocol_has_one_rules_document(package):
     assert p['language']=={'blueId':'8XGYNufx24r7Dc5bGoeobcGNCn9roLzSfZCQyHBTaTx4'}
     assert not any('source-binding' in x or 'upstream' in x for x in package.files)
 
-def test_legacy_reference_algorithms_are_exact_and_separate():
+def test_included_algorithms_are_exact():
     source=json.loads((ROOT/'docs/sources.json').read_text())
-    text=(ROOT/'spec/contracts-final-gas.md').read_text()
-    assert source['referenceProfiles']['legacy-final-gas']['newEditionConformance'] is False
-    assert source['referenceProfiles']['demand-algorithms']['status'] == 'NOT_VERIFIED'
+    text=(ROOT/'SPECIFICATION.md').read_text()
     assert len(source['modules']) in (6,18)
     for name,digest in source['modules'].items():
         data=((ROOT/source['overrides'][name]) if name in source.get('overrides',{}) else (ROOT.parent/'verification/reference/blue-contracts/python'/name)).read_bytes()

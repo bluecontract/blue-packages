@@ -1,5 +1,6 @@
 package blue.core;
 
+import blue.packages.QualificationRuntime;
 import blue.contracts.RuntimeBindings;
 import blue.language.next.WireData;
 import java.nio.file.*;
@@ -64,7 +65,7 @@ public final class PaymentExecutionConformance {
     if(!unchanged)outcomes.add(Map.of("case","candidate-identity","result","FAIL","reason","Package candidate changed during execution"));
     boolean passed=unchanged&&missingResponses.isEmpty()&&missingActions.isEmpty()&&outcomes.stream().allMatch(row->"PASS".equals(object(row).get("result")));
     var summary=new LinkedHashMap<String,Object>();summary.put("result",passed?"PASS":"FAIL");
-    summary.put("runtime",RuntimeBindings.accessEvents().withDefinitionReadV1().identities());summary.put("packages",WireData.parse(catalogue,"json"));
+    summary.put("runtime",QualificationRuntime.bindings().identities());summary.put("packages",WireData.parse(catalogue,"json"));
     summary.put("cases",outcomes);summary.put("responsesWithNativeEffect",checkedResponses);summary.put("actionsWithNativeEffect",checkedActions);
     summary.put("missingResponses",missingResponses);summary.put("missingActions",missingActions);
     Files.writeString(reports.resolve("summary.json"),WireData.write(summary));

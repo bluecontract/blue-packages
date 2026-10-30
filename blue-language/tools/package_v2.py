@@ -116,7 +116,7 @@ def _source_info(root, revision, source_url):
     rev = revision or git(root, 'rev-parse', 'HEAD') or 'uncommitted'
     if revision is None and git(root, 'status', '--porcelain'):
         rev += '+working-tree'
-    url = (git(root, 'remote', 'get-url', 'origin') or '') if source_url is None else source_url
+    url = source_url or git(root, 'remote', 'get-url', 'origin') or ''
     if url.startswith('git@github.com:'):
         url = 'https://github.com/' + url.removeprefix('git@github.com:').removesuffix('.git')
     if not url.startswith('https://'):

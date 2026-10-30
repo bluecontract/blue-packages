@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.contracts.*;
 import blue.core.CompositionPackages;
 import blue.language.next.*;
@@ -11,7 +12,7 @@ public final class PaymentInputConformance {
   public static void main(String[] args)throws Exception {
     Path root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language()) {
-      var runtime=new NativeRuntime(blue);var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var runtime=new NativeRuntime(blue);var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       var definition=blue.admitDefinition(WireData.write(m("type","PaymentInstruction/Payment Instruction")));
       var contracts=NativeRuntime.head(NativeRuntime.recipe(NativeRuntime.exactOf(definition)),runtime).contracts;
       @SuppressWarnings("unchecked") var source=(Map<String,Object>)WireData.parse(Files.readString(root.resolve("payment-instruction/types/payment-instruction.blue")),"yaml");

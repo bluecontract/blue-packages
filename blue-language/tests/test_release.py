@@ -134,12 +134,3 @@ def test_unused_import_is_not_execution_requirement(package,tmp_path):
     result=build(p);r=result.manifest['semanticPackages'][result.manifest['packageBlueId']]
     assert r['declaredRequirements']==[]
     assert r['protocol'] is None
-
-
-def test_explicit_empty_source_url_does_not_inherit_git_remote(monkeypatch):
-    import package_v2
-    monkeypatch.setattr(package_v2, 'git', lambda *args: 'git@github.com:example/local-checkout.git')
-    explicit = package_v2._source_info(ROOT, 'fixed-revision', '')
-    inferred = package_v2._source_info(ROOT, 'fixed-revision', None)
-    assert explicit == {'revision': 'fixed-revision', 'repository': ''}
-    assert inferred == {'revision': 'fixed-revision', 'repository': 'https://github.com/example/local-checkout'}

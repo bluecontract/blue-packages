@@ -157,7 +157,7 @@ def build(root, output=None, release_version=None, revision=None, source_url=Non
         return build_v2(root, output, release_version, revision, source_url)
     ver = version(release_version or cfg['version'])
     rev = revision or git(root, 'rev-parse', 'HEAD') or 'uncommitted'
-    url = (git(root, 'remote', 'get-url', 'origin') or '') if source_url is None else source_url
+    url = source_url or git(root, 'remote', 'get-url', 'origin') or ''
     if url.startswith('git@github.com:'):
         url = 'https://github.com/' + url.removeprefix('git@github.com:').removesuffix('.git')
     if not url.startswith('https://'):

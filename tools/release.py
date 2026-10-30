@@ -253,18 +253,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('check', 'bundle', 'assets'))
     parser.add_argument('--output', type=Path)
+    from editions import EDITIONS, edition_root, require_built
+    parser.add_argument('--edition', choices=EDITIONS, default='access-events')
     args = parser.parse_args()
+    selected = edition_root(ROOT, args.edition)
+    require_built(selected)
     if (args.command != 'check') != (args.output is not None):
         parser.error('--output is required for bundle/assets and not allowed for check')
-    catalogue, payloads = check()
+    catalogue, payloads = check(selected)
     result = dict(verified=True, packages=len(catalogue['packages']),
                   sourceFilesChecked=catalogue['sourceFilesChecked'],
                   publicationStatus='unpublished-candidate',
                   previewPackages=[r['name'] for r in catalogue['packages'] if 'preview' in r['version']])
     if args.command == 'bundle':
-        result['bundle'] = bundle(args.output, catalogue, payloads)
+        result['bundle'] = bundle(args.output, catalogue, payloads, selected)
     elif args.command == 'assets':
-        result['assets'] = assets(args.output, catalogue, payloads)
+        result['assets'] = assets(args.output, catalogue, payloads, selected)
     print(json.dumps(result, indent=2))
 
 

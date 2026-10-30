@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.contracts.*;
 import blue.bex.*;
 import blue.coordination.AuthoringRuntime;
@@ -22,7 +23,7 @@ public final class SourceBindingConformance {
   }
   public static void main(String[] args)throws Exception {
     var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.demandScopedEdition().withDefinitionReadV1())) {
+    try(var blue=packages.language();var runtime=new AuthoringRuntime(QualificationRuntime.bindings())) {
       var p=runtime.processor(blue);var values=p.execution().values();
       var original=p.initialize(agreement("Existing independent source"));require(original.status().equals("APPLIED"),"Source init: "+OperationInputConformance.initializationDiagnostic(p,original));
       var source=p.process(original.document(),event(original.document(),"approve_owner",m("revision",p.read(original.document(),"/activation/revision"))),1);
