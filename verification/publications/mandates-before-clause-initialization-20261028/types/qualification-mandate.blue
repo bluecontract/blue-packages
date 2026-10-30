@@ -1,0 +1,627 @@
+{
+  "contracts": {
+    "evidenceProviderChannel": {
+      "schema": {
+        "required": true
+      },
+      "type": "Coordination/Timeline Channel"
+    },
+    "initializeQualification": {
+      "channel": "lifecycle",
+      "event": {
+        "type": "Contracts/Document Processing Initiated"
+      },
+      "order": 20,
+      "steps": [
+        {
+          "do": [
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/stage",
+                "val": "AwaitingEvidence"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/scope",
+                "val": {
+                  "$emptyObject": true
+                }
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/pendingEvidence",
+                "val": {
+                  "$emptyObject": true
+                }
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/evidenceResponse",
+                "val": {
+                  "$emptyObject": true
+                }
+              }
+            }
+          ],
+          "type": "Contracts/Compute"
+        }
+      ],
+      "type": "Contracts/Sequential Workflow"
+    },
+    "provideEvidence": {
+      "channel": "evidenceProviderChannel",
+      "request": {
+        "type": "Mandates/Evidence Responded"
+      },
+      "steps": [
+        {
+          "do": [
+            {
+              "$let": {
+                "expr": {
+                  "$binding": "call/request"
+                },
+                "name": "reply"
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$exists": {
+                    "$document": "/evidenceResponse/executionId"
+                  }
+                },
+                "then": [
+                  {
+                    "$if": {
+                      "cond": {
+                        "$eq": [
+                          {
+                            "$nodeBlueId": {
+                              "$document": "/evidenceResponse"
+                            }
+                          },
+                          {
+                            "$nodeBlueId": {
+                              "$var": "reply"
+                            }
+                          }
+                        ]
+                      },
+                      "then": [
+                        {
+                          "$return": true
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "$failIf": {
+                      "cond": {
+                        "$not": {
+                          "$eq": [
+                            {
+                              "$document": "/evidenceResponse/executionId"
+                            },
+                            {
+                              "$var": {
+                                "name": "reply",
+                                "path": "/executionId"
+                              }
+                            }
+                          ]
+                        }
+                      },
+                      "message": "EXECUTION_MISMATCH"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$document": "/status"
+                      },
+                      "Active"
+                    ]
+                  }
+                },
+                "message": "MANDATE_NOT_ACTIVE"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$document": "/stage"
+                      },
+                      "EvidencePending"
+                    ]
+                  }
+                },
+                "message": "NO_PENDING_EVIDENCE"
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$eq": [
+                    {
+                      "$var": {
+                        "name": "reply",
+                        "path": "/executionStatus"
+                      }
+                    },
+                    "Succeeded"
+                  ]
+                },
+                "else": [
+                  {
+                    "$failIf": {
+                      "cond": {
+                        "$not": {
+                          "$eq": [
+                            {
+                              "$keys": {
+                                "$var": {
+                                  "name": "reply",
+                                  "path": "/result"
+                                }
+                              }
+                            },
+                            []
+                          ]
+                        }
+                      },
+                      "message": "NON_SUCCESS_RESULT_MUST_BE_EMPTY"
+                    }
+                  }
+                ],
+                "then": [
+                  {
+                    "$failIf": {
+                      "cond": {
+                        "$not": {
+                          "$eq": [
+                            {
+                              "$keys": {
+                                "$var": {
+                                  "name": "reply",
+                                  "path": "/result"
+                                }
+                              }
+                            },
+                            [
+                              "qualified"
+                            ]
+                          ]
+                        }
+                      },
+                      "message": "QUALIFIED_RESULT_REQUIRED"
+                    }
+                  },
+                  {
+                    "$failIf": {
+                      "cond": {
+                        "$not": {
+                          "$isKind": {
+                            "kind": "boolean",
+                            "val": {
+                              "$var": {
+                                "name": "reply",
+                                "path": "/result/qualified"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "message": "QUALIFIED_BOOLEAN_REQUIRED"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "$let": {
+                "expr": {
+                  "$objectSet": {
+                    "key": "result",
+                    "object": {
+                      "$objectSet": {
+                        "key": "executionStatus",
+                        "object": {
+                          "$objectSet": {
+                            "key": "executionId",
+                            "object": {
+                              "$objectSet": {
+                                "key": "inResponseTo",
+                                "object": {
+                                  "$literal": {
+                                    "executionId": "uninitialized",
+                                    "executionStatus": "Unknown",
+                                    "inResponseTo": {
+                                      "document": {
+                                        "subject": "placeholder"
+                                      },
+                                      "operationId": "uninitialized",
+                                      "operationRevision": 1,
+                                      "recipientChannel": "evidenceProviderChannel",
+                                      "requestId": "uninitialized",
+                                      "responseOperation": "provideEvidence",
+                                      "type": "Mandates/Evidence Requested"
+                                    },
+                                    "result": {},
+                                    "type": "Mandates/Evidence Responded"
+                                  }
+                                },
+                                "val": {
+                                  "$document": "/pendingEvidence"
+                                }
+                              }
+                            },
+                            "val": {
+                              "$var": {
+                                "name": "reply",
+                                "path": "/executionId"
+                              }
+                            }
+                          }
+                        },
+                        "val": {
+                          "$var": {
+                            "name": "reply",
+                            "path": "/executionStatus"
+                          }
+                        }
+                      }
+                    },
+                    "val": {
+                      "$choose": {
+                        "cond": {
+                          "$eq": [
+                            {
+                              "$var": {
+                                "name": "reply",
+                                "path": "/executionStatus"
+                              }
+                            },
+                            "Succeeded"
+                          ]
+                        },
+                        "else": {
+                          "$emptyObject": true
+                        },
+                        "then": {
+                          "qualified": {
+                            "$var": {
+                              "name": "reply",
+                              "path": "/result/qualified"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "name": "expected"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$nodeBlueId": {
+                          "$var": "expected"
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$var": "reply"
+                        }
+                      }
+                    ]
+                  }
+                },
+                "message": "RESPONSE_REQUEST_MISMATCH"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/evidenceResponse",
+                "val": {
+                  "$var": "reply"
+                }
+              }
+            },
+            {
+              "$appendEvent": {
+                "$var": "reply"
+              }
+            },
+            {
+              "$if": {
+                "cond": {
+                  "$eq": [
+                    {
+                      "$var": {
+                        "name": "reply",
+                        "path": "/executionStatus"
+                      }
+                    },
+                    "Unknown"
+                  ]
+                },
+                "else": [
+                  {
+                    "$if": {
+                      "cond": {
+                        "$and": [
+                          {
+                            "$eq": [
+                              {
+                                "$var": {
+                                  "name": "reply",
+                                  "path": "/executionStatus"
+                                }
+                              },
+                              "Succeeded"
+                            ]
+                          },
+                          {
+                            "$eq": [
+                              {
+                                "$var": {
+                                  "name": "reply",
+                                  "path": "/result/qualified"
+                                }
+                              },
+                              true
+                            ]
+                          }
+                        ]
+                      },
+                      "else": [
+                        {
+                          "$appendChange": {
+                            "op": "replace",
+                            "path": "/scope",
+                            "val": {
+                              "$emptyObject": true
+                            }
+                          }
+                        },
+                        {
+                          "$appendChange": {
+                            "op": "replace",
+                            "path": "/stage",
+                            "val": "NeedsReview"
+                          }
+                        }
+                      ],
+                      "then": [
+                        {
+                          "$appendChange": {
+                            "op": "replace",
+                            "path": "/scope",
+                            "val": {
+                              "$document": "/scopeOnSuccess"
+                            }
+                          }
+                        },
+                        {
+                          "$appendChange": {
+                            "op": "replace",
+                            "path": "/stage",
+                            "val": "EvidencePassed"
+                          }
+                        }
+                      ]
+                    }
+                  }
+                ],
+                "then": [
+                  {
+                    "$appendChange": {
+                      "op": "replace",
+                      "path": "/scope",
+                      "val": {
+                        "$emptyObject": true
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          ],
+          "type": "Contracts/Compute"
+        }
+      ],
+      "type": "Contracts/Sequential Workflow Operation"
+    },
+    "requestEvidence": {
+      "channel": "authorizedActorChannel",
+      "request": {},
+      "steps": [
+        {
+          "do": [
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$document": "/status"
+                      },
+                      "Active"
+                    ]
+                  }
+                },
+                "message": "MANDATE_NOT_ACTIVE"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$keys": {
+                          "$binding": "call/request"
+                        }
+                      },
+                      []
+                    ]
+                  }
+                },
+                "message": "EMPTY_REQUEST_REQUIRED"
+              }
+            },
+            {
+              "$failIf": {
+                "cond": {
+                  "$not": {
+                    "$eq": [
+                      {
+                        "$document": "/stage"
+                      },
+                      "AwaitingEvidence"
+                    ]
+                  }
+                },
+                "message": "EVIDENCE_ALREADY_REQUESTED"
+              }
+            },
+            {
+              "$let": {
+                "expr": {
+                  "$objectSet": {
+                    "key": "document",
+                    "object": {
+                      "$objectSet": {
+                        "key": "operationRevision",
+                        "object": {
+                          "$objectSet": {
+                            "key": "operationId",
+                            "object": {
+                              "$objectSet": {
+                                "key": "requestId",
+                                "object": {
+                                  "$literal": {
+                                    "document": {
+                                      "subject": "placeholder"
+                                    },
+                                    "operationId": "uninitialized",
+                                    "operationRevision": 1,
+                                    "recipientChannel": "evidenceProviderChannel",
+                                    "requestId": "uninitialized",
+                                    "responseOperation": "provideEvidence",
+                                    "type": "Mandates/Evidence Requested"
+                                  }
+                                },
+                                "val": {
+                                  "$nodeBlueId": {
+                                    "$event": ""
+                                  }
+                                }
+                              }
+                            },
+                            "val": {
+                              "$document": "/evidenceRequirement/operationId"
+                            }
+                          }
+                        },
+                        "val": {
+                          "$document": "/evidenceRequirement/operationRevision"
+                        }
+                      }
+                    },
+                    "val": {
+                      "$document": "/evidenceRequirement/document"
+                    }
+                  }
+                },
+                "name": "request"
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "add",
+                "path": "/pendingEvidence",
+                "val": {
+                  "$var": "request"
+                }
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/stage",
+                "val": "EvidencePending"
+              }
+            },
+            {
+              "$appendEvent": {
+                "$var": "request"
+              }
+            }
+          ],
+          "type": "Contracts/Compute"
+        }
+      ],
+      "type": "Contracts/Sequential Workflow Operation"
+    }
+  },
+  "description": "Optional one-check preset: an attributed positive qualified result installs owner-reviewed scopeOnSuccess. Unknown is reconciled, never treated as success.",
+  "evidenceRequirement": {
+    "document": {},
+    "operationId": {
+      "schema": {
+        "minLength": 1,
+        "required": true
+      },
+      "type": "Text"
+    },
+    "operationRevision": {
+      "schema": {
+        "minimum": 1,
+        "required": true
+      },
+      "type": "Integer"
+    },
+    "schema": {
+      "required": true
+    }
+  },
+  "evidenceResponse": {},
+  "name": "Qualification Mandate",
+  "pendingEvidence": {},
+  "scopeOnSuccess": {
+    "schema": {
+      "required": true
+    },
+    "type": "Mandates/Scope"
+  },
+  "stage": {
+    "type": "Text"
+  },
+  "type": "Mandates/Operation Mandate",
+  "specification": {
+    "blueId": "7nTzS5jVoHeZC9xq9PWrvWAL3oxBcHGfPQjaf8A6FhhA"
+  }
+}

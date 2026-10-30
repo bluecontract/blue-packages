@@ -16,6 +16,12 @@ public final class BuildPaymentFamily {
   @SuppressWarnings("unchecked") static List<Object> list(Object o) { return (List<Object>)o; }
   static Object read(Path p) throws Exception { return WireData.json(WireData.write(WireData.parse(Files.readString(p), "yaml"))); }
   static String sha(Path p) throws Exception { return "sha256:"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(p))); }
+  static void verifyImport(Map<String,Object> declaration, Path path, BluePackage pkg) throws Exception {
+    if (declaration.containsKey("packageBlueId") && !pkg.blueId().equals(declaration.get("packageBlueId")))
+      throw new IllegalArgumentException("Pinned package identity differs: " + path);
+    if (declaration.containsKey("archiveSha256") && !sha(path).equals(declaration.get("archiveSha256")))
+      throw new IllegalArgumentException("Pinned package integrity differs: " + path);
+  }
   static void references(Object v, String prefix, Set<String> names, Set<String> found) {
     if (v instanceof String s && s.startsWith(prefix) && names.contains(s.substring(prefix.length()))) found.add(s.substring(prefix.length()));
     else if(v instanceof Map<?,?> m) m.values().forEach(x->references(x,prefix,names,found));
@@ -58,6 +64,7 @@ public final class BuildPaymentFamily {
         // Foundation mounts are taken from the declared, exact repository paths too.
         for(var e:map(cfg.get("imports")).entrySet()) if(!mounted.containsKey(e.getKey())) {
           Path dep=source.resolve(map(e.getValue()).get("path").toString()).normalize();var imported=open(dep);
+          verifyImport(map(e.getValue()),dep,imported);
           mounted.put(e.getKey(),Map.of("path",root.relativize(dep).toString(),"blueId",imported.blueId(),"archiveSha256",sha(dep)));
         }
         continue;
@@ -68,7 +75,7 @@ public final class BuildPaymentFamily {
       for(var entry:map(cfg.get("imports")).entrySet()) {
         String relative=map(entry.getValue()).get("path").toString();Path path=source.resolve(relative).normalize();
         if(!path.startsWith(root)) throw new IllegalArgumentException("Dependency outside blue-packages: "+path);
-        var pkg=open(path);builder.importPackage(entry.getKey(),pkg);
+        var pkg=open(path);verifyImport(map(entry.getValue()),path,pkg);builder.importPackage(entry.getKey(),pkg);
         importedPackages.put(entry.getKey(),pkg);
         if(entry.getKey().equals(cfg.get("language"))) builder.language(entry.getKey(),pkg);
         var pin=Map.of("path",relative,"packageBlueId",pkg.blueId(),"archiveSha256",sha(path),"name",pkg.name(),"version",pkg.version());

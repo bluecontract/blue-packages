@@ -1,0 +1,89 @@
+name: Document Scope Plan
+type: Connections/Connection Plan
+description: >-
+  Freeze the approved document pattern into a native Blue matcher during clause
+  installation. The registered document cannot supply or replace its own matcher.
+functions:
+  plan:
+    expr: {$call: {function: planDocumentScopes, args: {}}}
+  planDocumentScopes:
+    args: {}
+    do:
+    - $let:
+        name: clause
+        expr: {$document: {$concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}]}}
+    - $let:
+        name: pattern
+        expr:
+          $choose:
+            cond: {$exists: {$var: {name: clause, path: /bindings/pattern}}}
+            then: {$document: {$var: {name: clause, path: /bindings/pattern}}}
+            else: {$var: {name: clause, path: /parameters/documentPattern}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: pattern}, kind: object}}}
+        message: MANDATE_DOCUMENT_PATTERN_REQUIRED
+    - $let:
+        name: planned
+        expr: {$call: {function: planConnections, args: {}}}
+    - $failIf:
+        cond:
+          $and:
+          - {$hasKey: {object: {$var: {name: clause, path: /parameters}}, key: embedDocuments}}
+          - {$not: {$isKind: {val: {$var: {name: clause, path: /parameters/embedDocuments}}, kind: boolean}}}
+        message: MANDATE_EMBED_DOCUMENTS_BOOLEAN_REQUIRED
+    - $if:
+        cond: {$ne: [{$var: {name: clause, path: /parameters/embedDocuments}}, false]}
+        then:
+        - $let:
+            name: embedding
+            expr:
+              type: Contracts/Process Embedded
+        - $set:
+            name: embedding
+            expr:
+              $choose:
+                cond: {$exists: {$var: {name: planned, path: /contracts/embedded/contract}}}
+                then: {$var: {name: planned, path: /contracts/embedded/contract}}
+                else:
+                  $merge:
+                  - {$var: embedding}
+                  - {paths: [], collectionPaths: []}
+        - $set:
+            name: planned
+            expr:
+              $pointerSet:
+                object: {$var: planned}
+                path: /contracts/embedded
+                val:
+                  kind: embedding
+                  contract:
+                    $pointerSet:
+                      object: {$var: embedding}
+                      path: /collectionPaths
+                      val:
+                        $listConcat:
+                        - {$var: {name: embedding, path: /collectionPaths}}
+                        - - {$var: {name: clause, path: /bindings/documents}}
+    - $forEach:
+        key: contributionKey
+        item: contribution
+        in: {$var: {name: planned, path: /contracts}}
+        do:
+        - $if:
+            cond: {$eq: [{$var: {name: contribution, path: /kind}}, handler]}
+            then:
+            - $set:
+                name: planned
+                expr:
+                  $pointerSet:
+                    object: {$var: planned}
+                    path: {$concat: [/contracts/, {$var: contributionKey}, /contract/steps/0/functions/qualifiesMandateDocument]}
+                    val:
+                      $pointerSet:
+                        object:
+                          $literal:
+                            args: {candidate: {}}
+                            expr: {$is: {node: {$var: candidate}, pattern: {}}}
+                        path: /expr/$is/pattern
+                        val: {$var: pattern}
+    - $return: {$var: planned}

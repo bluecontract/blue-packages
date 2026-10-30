@@ -1,5 +1,6 @@
 """A complete source inventory builds in dependency order, never using stale downstream archives."""
 import json
+import hashlib
 from pathlib import Path
 import tempfile
 import unittest
@@ -46,6 +47,25 @@ class DependencyOrderTest(unittest.TestCase):
         }))
         with self.assertRaisesRegex(ValueError, 'Unsupported package import path'):
             dependency_order(self.root, ['payment'])
+
+    def test_retained_edition_requires_an_exact_pin_and_is_not_rebuilt(self):
+        self.package('representation')
+        path = self.root / 'verification/publications/mandates-v1/dist/package.bluepkg'
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b'retained archive fixture')
+        declaration = {'path': '../verification/publications/mandates-v1/dist/package.bluepkg',
+                       'packageBlueId': 'identity-checked-by-native-builder',
+                       'archiveSha256': 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()}
+        manifest = self.root / 'representation/blue-package.yaml'
+        manifest.write_text(json.dumps({'imports': {'Mandates': declaration}}))
+        self.assertEqual(['representation'], dependency_order(self.root, ['representation']))
+        path.write_bytes(b'changed archive')
+        with self.assertRaisesRegex(ValueError, 'integrity differs'):
+            dependency_order(self.root, ['representation'])
+        del declaration['packageBlueId']
+        manifest.write_text(json.dumps({'imports': {'Mandates': declaration}}))
+        with self.assertRaisesRegex(ValueError, 'Unsupported package import path'):
+            dependency_order(self.root, ['representation'])
 
 
 if __name__ == '__main__':

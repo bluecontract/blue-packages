@@ -5,6 +5,7 @@ Set BLUE_JAVA_CLASSPATH to the qualified Language runtime and its dependencies.
 --check builds in isolation and compares every distribution byte, including the archive.
 """
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -35,7 +36,15 @@ def dependency_order(root, names):
             archive = (folder / declaration['path']).resolve()
             dependency = archive.parent.parent
             if dependency.parent != root or archive != dependency / 'dist/package.bluepkg':
-                raise ValueError('Unsupported package import path: ' + declaration['path'])
+                # Retained editions are immutable leaves, never candidates to rebuild.
+                retained = root / 'verification/publications'
+                if (not archive.is_relative_to(retained) or not declaration.get('packageBlueId')
+                        or not declaration.get('archiveSha256')):
+                    raise ValueError('Unsupported package import path: ' + declaration['path'])
+                digest = 'sha256:' + hashlib.sha256(archive.read_bytes()).hexdigest()
+                if digest != declaration['archiveSha256']:
+                    raise ValueError('Retained package integrity differs: ' + declaration['path'])
+                continue
             visit(dependency.name)
         active.remove(name)
         complete.add(name)
