@@ -112,5 +112,12 @@ abstract optional fields do not become supplied values. It retains the exact
 source publication and does not mutate the test input object. This native gate does
 not establish HTTP transport byte preservation. Document-reference prose belongs
 on the enclosing input: adding a child description can decorate an otherwise
-unchanged referenced document and change its effective native identity. The
-initialized-document constraint remains on the document field.
+unchanged referenced document and change its effective native identity. Initialization is checked by the execution validator; the input document field
+must not structurally intersect and change the supplied reference identity.
+
+The expanded `source-binding` suite covers cyclic exact references, history,
+replay, guard rejection and routing. Focused cases are `source-binding-cyclic`,
+`source-binding-public`, `source-binding-history`, `source-binding-replay`,
+`source-binding-guards` and `source-binding-routing`. The public case uses actual
+DocumentClause prepare/configureSources and the generated requestFrom matcher,
+then binds the supplied cyclic source; it does not substitute a handwritten matcher.

@@ -1,5 +1,9 @@
 # Access Events standard build and publication preparation
 
+This report records the original default migration. The subsequent exact-reference
+fix and current rebuilt publication identities are recorded in
+[source-binding integration](source-binding-access-events.md).
+
 Verified source HEAD: `4ca6a0a26c233a25e605fa67189c9b428f66af10` (initial working tree clean).
 Native Java validation: Core `19820cfdc01325aa119a162fa95f7e054608e3f8`, Java 21;
 Core test classes and runtime dependency JARs rebuilt before qualification.
