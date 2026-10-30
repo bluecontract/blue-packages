@@ -134,3 +134,33 @@ def test_unused_import_is_not_execution_requirement(package,tmp_path):
     result=build(p);r=result.manifest['semanticPackages'][result.manifest['packageBlueId']]
     assert r['declaredRequirements']==[]
     assert r['protocol'] is None
+
+@pytest.mark.parametrize('origin', ['https://github.com/example/local-checkout.git',
+                                    'git@github.com:example/local-checkout.git'])
+@pytest.mark.parametrize('format_version', [1, 2])
+def test_explicit_empty_source_url_does_not_inherit_git_remote(tmp_path, origin, format_version):
+    import subprocess
+    root = make_project(tmp_path/'project', 'Example', {}, {'name': 'Value', 'type': 'Text'}, bootstrap=True)
+    cfg = json.loads((root/'blue-package.yaml').read_text())
+    cfg['format'] = format_version
+    if format_version == 1:
+        (root/'blue-package.lock.json').write_text(json.dumps({'format': 1, 'imports': {}}))
+    (root/'blue-package.yaml').write_text(json.dumps(cfg))
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    subprocess.run(['git', '-C', str(root), 'remote', 'add', 'origin', origin], check=True)
+    explicit = build(root, revision='fixed-revision', source_url='')
+    inferred = build(root, revision='fixed-revision', source_url=None)
+    assert explicit.manifest['source'] == {'revision': 'fixed-revision', 'repository': ''}
+    assert inferred.manifest['source'] == {'revision': 'fixed-revision', 'repository': 'https://github.com/example/local-checkout'}
+
+@pytest.mark.parametrize('origin', ['https://github.com/example/local-checkout.git',
+                                    'git@github.com:example/local-checkout.git'])
+def test_language_rebuild_is_identical_with_git_origin(package, tmp_path, origin):
+    import subprocess
+    root = tmp_path/'language'
+    shutil.copytree(ROOT, root, ignore=shutil.ignore_patterns('dist', '__pycache__', '.pytest_cache'))
+    subprocess.run(['git', 'init', '-q', str(root)], check=True)
+    subprocess.run(['git', '-C', str(root), 'remote', 'add', 'origin', origin], check=True)
+    rebuilt = build(root, revision='blue-language-1.0-2026-09-26', source_url='')
+    assert rebuilt.manifest['source']['repository'] == ''
+    assert rebuilt.archive == package.archive
