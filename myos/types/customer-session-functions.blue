@@ -1,6 +1,98 @@
 name: Customer Session Functions
 type: Contracts/Compute Definition
 functions:
+  validateProvider:
+    args: {}
+    do:
+    - $let:
+        name: terms
+        expr:
+          $object:
+            $document: /paymentTerms
+    - $if:
+        cond:
+          $not:
+            $or:
+            - $hasKey:
+                object:
+                  $var: terms
+                key: allowedProviders
+            - $hasKey:
+                object:
+                  $var: terms
+                key: provider
+        then:
+        - $return: true
+    - $let:
+        name: allowed
+        expr:
+          $pointerGet:
+            object:
+              $var: terms
+            path: /allowedProviders
+            default: null
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: allowed
+              kind: list
+        message: MYOS_PAYMENT_ALLOWED_PROVIDERS_REQUIRED
+    - $failIf:
+        cond:
+          $eq:
+          - $size:
+              $var: allowed
+          - 0
+        message: MYOS_PAYMENT_ALLOWED_PROVIDERS_REQUIRED
+    - $forEach:
+        item: provider
+        in:
+          $var: allowed
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: provider
+                    kind: text
+                - $ne:
+                  - $var: provider
+                  - ''
+            message: MYOS_PAYMENT_ALLOWED_PROVIDERS_REQUIRED
+    - $let:
+        name: selected
+        expr:
+          $pointerGet:
+            object:
+              $var: terms
+            path: /provider
+            default: null
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: selected
+                kind: text
+            - $ne:
+              - $var: selected
+              - ''
+        message: MYOS_PAYMENT_PROVIDER_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+                $var: allowed
+              val:
+                $var: selected
+        message: MYOS_PAYMENT_PROVIDER_NOT_ALLOWED
+    - $return: true
   provideSession:
     args:
       input: {}
