@@ -120,8 +120,6 @@ def build(package, check=False, root=None):
             import sys
             from sync_catalogues import sync
             sync(root)
-            from editions import mark_built
-            mark_built(root)
         if check:
             def files(folder):
                 return {p.relative_to(folder).as_posix():p.read_bytes() for p in folder.rglob('*') if p.is_file()}
@@ -134,9 +132,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('package', help='One directory, or all to rebuild the candidate in dependency order')
     parser.add_argument('--check', action='store_true')
-    from editions import EDITIONS, edition_root
-    parser.add_argument('--edition', choices=EDITIONS, default='access-events')
     args = parser.parse_args()
-    selected = edition_root(ROOT, args.edition)
-    build(args.package, args.check, selected)
-    print('Built edition ' + args.edition + ' in ' + str(selected))
+    build(args.package, args.check, ROOT)
+    print('Built Access Events packages in ' + str(ROOT))

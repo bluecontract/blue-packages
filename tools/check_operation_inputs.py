@@ -12,7 +12,6 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
-from editions import EDITIONS, edition_root, require_built
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
@@ -44,13 +43,10 @@ CASES = {
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--edition', choices=EDITIONS, default='access-events')
     parser.add_argument('--case', action='append', choices=CASES)
     parser.add_argument('--report-dir', type=Path, default=ROOT / 'reports/operation-input/qualification',
                         help='Separate evidence directory for a qualification run')
     args = parser.parse_args()
-    selected_root = edition_root(ROOT, args.edition)
-    require_built(selected_root)
     classpath = os.environ.get('BLUE_JAVA_CLASSPATH')
     if not classpath:
         parser.error('BLUE_JAVA_CLASSPATH must identify the qualified native Core runtime')
@@ -59,15 +55,12 @@ def main():
     javac = str(Path(java_home) / 'bin/javac') if java_home else 'javac'
     report_dir = args.report_dir.resolve()
     report_dir.mkdir(parents=True, exist_ok=True)
-    selected = args.case or [key for key in CASES
-        if args.edition == 'access-events' or key != 'access-events-behavior']
-    if args.edition != 'access-events' and 'access-events-behavior' in selected:
-        parser.error('access-events-behavior requires --edition access-events')
+    selected = args.case or list(CASES)
     untracked = subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '-z'], cwd=ROOT).split(b'\0')
     report = {
-        'edition': args.edition,
-        'catalogueSha256': hashlib.sha256((selected_root / 'PACKAGES.json').read_bytes()).hexdigest(),
-        'packages': json.loads((selected_root / 'PACKAGES.json').read_text())['packages'],
+        'edition': 'access-events',
+        'catalogueSha256': hashlib.sha256((ROOT / 'PACKAGES.json').read_bytes()).hexdigest(),
+        'packages': json.loads((ROOT / 'PACKAGES.json').read_text())['packages'],
         'runtimeClasspath': classpath.split(os.pathsep),
         'sourceHead': subprocess.check_output(['git', 'rev-parse', 'HEAD'], cwd=ROOT, text=True).strip(),
         'sourceUntrackedSha256': {name.decode(): hashlib.sha256((ROOT / name.decode()).read_bytes()).hexdigest()
@@ -87,9 +80,9 @@ def main():
                         *[str(ROOT / 'tools' / (name + '.java')) for name in sorted(sources)]], check=True)
         for key in selected:
             name, *arguments = CASES[key]
-            argv = ([*arguments, str(selected_root)] if name == 'OperationInputConformance'
-                    else [str(selected_root), *arguments])
-            command = [java, '-Xmx1500m', '-Dblue.packages.edition=' + args.edition, '-cp', classes + os.pathsep + classpath, name, *argv]
+            argv = ([*arguments, str(ROOT)] if name == 'OperationInputConformance'
+                    else [str(ROOT), *arguments])
+            command = [java, '-Xmx1500m', '-cp', classes + os.pathsep + classpath, name, *argv]
             start = time.monotonic()
             with (report_dir / (key + '.log')).open('w') as log:
                 result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)

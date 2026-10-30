@@ -6,8 +6,8 @@ The cross-repository implementation plan is maintained in Business at
 
 ## Native deterministic suite
 
-Build the complete unpublished candidate before testing. Access Events is the default;
-`--edition demand-scoped` selects the isolated preserved Demand candidate. Set `JAVA_HOME` to Java21
+Build the complete unpublished Access Events candidate before testing. Demand
+qualification is deferred until reactivation; there is no edition selector. Set `JAVA_HOME` to Java21
 and `BLUE_JAVA_CLASSPATH` to the qualified Core native runtime/test classpath. The
 classpath must include freshly built runtime JARs and the Core composition fixtures and the explicitly selected
 DefinitionReadV1 implementation. The runtime selection is accessEvents plus that
@@ -25,8 +25,7 @@ python3 tools/check_operation_inputs.py --case shipping --case activation-effect
 
 The default suite also runs `access-events-behavior`: actual native Activation consent,
 access denial/recovery, observation gating, Clauses recomposition and the removed
-admission-timestamp cutoff regression. This AE-only case is excluded from explicit
-Demand runs.
+admission-timestamp cutoff regression. All selected native cases use Access Events.
 
 The full suite runs both authoring builders, native argument semantics, generated
 Activation inputs and effects, all Payment response/request-action effects,

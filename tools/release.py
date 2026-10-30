@@ -253,11 +253,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=('check', 'bundle', 'assets'))
     parser.add_argument('--output', type=Path)
-    from editions import EDITIONS, edition_root, require_built
-    parser.add_argument('--edition', choices=EDITIONS, default='access-events')
     args = parser.parse_args()
-    selected = edition_root(ROOT, args.edition)
-    require_built(selected)
+    selected = ROOT
     if (args.command != 'check') != (args.output is not None):
         parser.error('--output is required for bundle/assets and not allowed for check')
     catalogue, payloads = check(selected)

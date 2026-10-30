@@ -22,16 +22,8 @@ archives and published to S3 by their own workflow. Missing descriptions or a
 failed model/upload job do not block this package release. Locally generated
 cards are reused; GitHub generates only missing exact type identities.
 
-Demand is an explicit alternative, preserved without overwriting prior archives:
-
-```sh
-python3 tools/build_final_gas.py all --edition demand-scoped
-python3 tools/release.py assets --edition demand-scoped --output build/release-demand
-```
-
-The second command uses the same isolated rebuilt candidate. A change to shared
-business source requires the full build first. Interface changes require updating
-the explicit Demand overlay and its declared expected Access Events configuration;
-they are never silently discarded. The release workflow prepares Access Events
-assets by default and separately checks the explicit Demand archive closure and
-reference models. Java behavior qualification is a separate local/Core gate.
+Demand build, release preparation and automatic reference-model gates are
+currently deferred. There is no active Demand CLI selector or parallel build
+tree. Preserve the historical bytes and follow [reactivation provenance](demand-reactivation.md)
+when Demand is enabled again. Current Java behavior qualification uses Access
+Events and remains a separate local/Core gate.

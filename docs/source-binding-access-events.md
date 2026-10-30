@@ -1,5 +1,12 @@
 # Preserve exact source references in both package editions
 
+> Historical implementation and validation record. The subsequent user decision
+> defers all Demand builds until reactivation. The parallel Demand snapshot,
+> selector and newly generated `.demandscoped.10` candidates described below have
+> been removed; they are not current supported build/release paths. Access Events
+> publications and their validated business fixes are unchanged. See
+> [current Demand status and retained provenance](demand-reactivation.md).
+
 Baseline: `97b00234140bec8dcbdfc5b4600adb8dec1cf70f`. Selectively integrated
 source fix `5d81c077fcd27a95b50daf28e8a53a13e0494391`; no generated publication
 was imported from that branch. Core validation uses

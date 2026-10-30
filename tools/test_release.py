@@ -175,7 +175,12 @@ class ReleaseTests(unittest.TestCase):
         self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments'} <= {row['name'] for row in rows})
         self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-tasks' for row in rows))
-        self.assertTrue((release.ROOT / 'editions/demand-scoped/edition.json').is_file())
+        historical = json.loads((release.ROOT / 'retained/demand-scoped-baseline/publications.json').read_text())
+        self.assertEqual('4ca6a0a26c233a25e605fa67189c9b428f66af10', historical['sourceCommit'])
+        self.assertEqual(35, len(historical['packages']))
+        for publication in historical['packages']:
+            self.assertEqual(publication['archiveSha256'],
+                             release.digest((release.ROOT / publication['path']).read_bytes()))
         self.assertEqual({row['directory'] for row in rows},
                          {row['path'].split('/')[0] for row in rows})
 

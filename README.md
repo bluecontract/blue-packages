@@ -13,13 +13,11 @@ Contracts and Coordination retain the exact Access Events native identities.
 Compatible business fixes are rebuilt from current authored sources; see the
 [publication comparison](docs/access-events-default.md).
 
-Demand remains explicit: pass `--edition demand-scoped` to the builder, release
-preparation or operation qualification. Its exact native sources, configurations
-and previous archives are preserved under `editions/demand-scoped`; tools
-materialize an isolated candidate in `build/demand-scoped`. Shared business source
-changes require a full Demand rebuild before release preparation. Changes to
-shared package interfaces fail until their explicit Demand overlays are updated.
-No command uploads or deploys a runtime. Existing documents keep their runtime.
+Demand builds and release preparation are deferred until Demand is enabled again.
+The build, release and qualification commands operate only on Access Events.
+Historical Demand publication bytes are preserved without a parallel source tree;
+see [reactivation provenance](docs/demand-reactivation.md). No command uploads or
+deploys a runtime. Existing documents keep their runtime.
 
 ## Build and verify
 
@@ -28,9 +26,6 @@ No command uploads or deploys a runtime. Existing documents keep their runtime.
 BLUE_JAVA_CLASSPATH=... python3 tools/build_final_gas.py all
 python3 tools/sync_catalogues.py
 python3 tools/release.py check
-# Explicit alternative; outputs remain isolated from the standard Access Events set.
-BLUE_JAVA_CLASSPATH=... python3 tools/build_final_gas.py all --edition demand-scoped
-python3 tools/release.py check --edition demand-scoped
 python3 tools/check_payment_family.py
 python3 tools/check_clause_tutorial.py
 python3 -m unittest discover -s tools -p 'test_release.py'

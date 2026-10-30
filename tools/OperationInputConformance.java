@@ -162,8 +162,7 @@ public final class OperationInputConformance {
   }
   public static void main(String[] args)throws Exception {
     if(args[0].equals("native")) {
-      nativeInputs(RuntimeBindings.finalGas(), "final-gas");
-      nativeInputs(RuntimeBindings.demandScopedEdition(), "demand-scoped");
+      nativeInputs(QualificationRuntime.bindings(), "access-events");
     }
     else publication(Path.of(args[1]),args[0].equals("payment"));
   }

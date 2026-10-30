@@ -113,7 +113,7 @@ public final class SourceBindingConformance {
   }
   public static void main(String[] args)throws Exception {
     var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    boolean accessEvents=System.getProperty("blue.packages.edition", "access-events").equals("access-events");
+    boolean accessEvents=QualificationRuntime.bindings().timelineAccessEvents();
     boolean publicWrapper=Arrays.asList(args).contains("public");
     boolean cyclic=Arrays.asList(args).contains("cyclic");
     var bindings=QualificationRuntime.bindings();
