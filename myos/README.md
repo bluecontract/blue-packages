@@ -17,8 +17,9 @@ paymentTerms:
 
 These are additional terms, not a complete instruction. Keep the amount, currency,
 limit, financial roles, allowed payees and recipient-approval policy alongside
-them. The instruction itself validates the policy on `Clauses Initialized`, before
-its payment ledger initializes:
+them. The instruction validates the policy on `Document Processing Initiated`,
+before clause installation and its Activation dispatch gate. This rejects invalid
+terms even when commercial consent is still pending.
 
 - `allowedProviders` must be a nonempty list of nonempty text identifiers.
 - `provider` must be nonempty text and belong to that list.
