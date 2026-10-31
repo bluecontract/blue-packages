@@ -47,3 +47,27 @@ through the normal clause bindings. Standard `parameters` contain only Payment
 builder fields such as amount, currency and recipient. The builder copies the
 configured terms into the child's same canonical path before creating it.
 See example 21 for this setup. No dynamic clause subtype is needed.
+
+## Expired Stripe authorizations (new documents)
+
+The additive `MyOS Expiry-Aware Customer Payment Instruction` retains the existing
+Order/bootstrap base. The separate `MyOSExpiryDirect/MyOS Expiry-Aware Direct Customer Payment Instruction`
+publication retains the exact stage-one direct base and its coherent dependency family.
+Existing Customer Payment Instruction identities and documents gain no operation.
+New Order documents may use the additive type with either payment provider; the
+expiry operation itself rejects every provider except Stripe.
+
+The guarantor-only `requestExpiredAuthorizationVoid` accepts `sessionId`,
+`secureRequestId`, and `requestId`. The guarantor adapter must first verify that the
+same bound Stripe authorization expired and is canceled. The native document does
+not independently know Stripe's `capture_before`. It verifies the session and
+successful original SECURE, rejects completed payments and unresolved financial
+requests, and derives the entire remaining authorization amount without a caller
+amount. The operation initiates the existing VOID protocol; only the existing
+`cancelBeforeCompletion` outcome closes the authorization. Neither operation pays
+an Order or creates another charge/attempt. Exact request replay remains inert
+after closure; a reused request identifier with different intent is rejected.
+
+Select this bootstrap publication for Order documents and the separate direct
+publication for direct documents; do not combine their historical alias families.
+No existing document migration is implied.

@@ -36,6 +36,7 @@ CASES = {
     'payment-effects': ('blue.core.PaymentExecutionConformance',),
     'providers': ('ProviderInputConformance', 'all'),
     'customer-session': ('CustomerSessionConformance',),
+    'customer-expiry': ('CustomerExpiryConformance',),
     'customer-capture-policy': ('CustomerSessionConformance', 'capture-policy'),
     'customer-session-legacy': ('ProviderInputConformance', 'myos-legacy'),
     'manual-payment': ('ProviderInputConformance', 'manual'),
@@ -78,7 +79,7 @@ def main():
         sources.add(CASES[key][0].split('.')[-1])
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
-    if {'CustomerSessionConformance', 'ProviderInputConformance'} & sources:
+    if {'CustomerExpiryConformance', 'CustomerSessionConformance', 'ProviderInputConformance'} & sources:
         sources.update({'ProviderInputConformance', 'CustomerSessionConformance'})
     if 'PaymentExecutionConformance' in sources:
         sources.add('CurrentOperationScenarios')
