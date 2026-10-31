@@ -34,6 +34,10 @@ CASES = {
     'payment-inputs': ('PaymentInputConformance',),
     'payment-effects': ('blue.core.PaymentExecutionConformance',),
     'providers': ('ProviderInputConformance', 'all'),
+    'customer-session': ('CustomerSessionConformance',),
+    'customer-capture-policy': ('CustomerSessionConformance', 'capture-policy'),
+    'customer-session-legacy': ('ProviderInputConformance', 'myos-legacy'),
+    'manual-payment': ('ProviderInputConformance', 'manual'),
     'actions': ('ActionInputConformance',),
     **{'documents-' + mode: ('DocumentInputConformance', mode)
        for mode in ('source', 'inputs', 'consent', 'access', 'reference', 'representation', 'connection', 'preparation', 'accessGuards', 'paymentPreparation', 'attachmentValues', 'documentPreparationFields', 'documentPreparationValues')},
@@ -73,6 +77,8 @@ def main():
         sources.add(CASES[key][0].split('.')[-1])
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
+    if {'CustomerSessionConformance', 'ProviderInputConformance'} & sources:
+        sources.update({'ProviderInputConformance', 'CustomerSessionConformance'})
     if 'PaymentExecutionConformance' in sources:
         sources.add('CurrentOperationScenarios')
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:

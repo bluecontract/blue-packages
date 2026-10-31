@@ -146,6 +146,21 @@ functions:
             - /clauses/
             - $const: clauseKey
             - /paymentMethod
+    - $let:
+        name: customerTerms
+        expr:
+          $choose:
+            cond:
+              $eq:
+              - $var: method
+              - myos-customer
+            then:
+              $object:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /customerPaymentTerms
+            else: {}
     - $failIf:
         cond:
           $not:
@@ -257,10 +272,26 @@ functions:
           - $var: method
           - myos-customer
         then:
-        - $set:
-            name: methodTerms
-            expr:
-              initiationGate: /customerSession/funded
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: customerTerms
+                        path: /recipientPaymentAccountId
+                        default: ''
+                    kind: text
+                - $ne:
+                  - $pointerGet:
+                      object:
+                        $var: customerTerms
+                      path: /recipientPaymentAccountId
+                      default: ''
+                  - ''
+            message: CUSTOMER_PAYMENT_ACCOUNT_REQUIRED
     - $let:
         name: result
         expr:
@@ -270,10 +301,38 @@ functions:
               configOverride:
                 $var: patch
               details:
-                method:
-                  $var: method
-                parties:
-                  $var: snapshots
+                $merge:
+                -
+                  method:
+                    $var: method
+                  parties:
+                    $var: snapshots
+                - $choose:
+                    cond:
+                      $eq:
+                      - $var: method
+                      - myos-customer
+                    then:
+                      customerPaymentTerms:
+                        provider:
+                          $pointerGet:
+                            object:
+                              $var: customerTerms
+                            path: /provider
+                            default: test
+                        recipientPaymentAccountId:
+                          $pointerGet:
+                            object:
+                              $var: customerTerms
+                            path: /recipientPaymentAccountId
+                            default: ''
+                        paymentWindowDays:
+                          $pointerGet:
+                            object:
+                              $var: customerTerms
+                            path: /paymentWindowDays
+                            default: 30
+                    else: {}
               methodClauses:
                 $var: methodClauses
               termsOverride:

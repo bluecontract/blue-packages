@@ -4,4 +4,46 @@ MyOS Party specializes Party with myosAccountId. MyOS Customer Payment requires 
 
 The package emits adapter requests. It does not call a bank, move real funds, or implement a checkout website.
 
+## Customer payment session publication
+
+`0.8.0-preview.10.customer-payment.1` adds correlated preparation to Customer PI.
+The prior `0.8.0-preview.7.access-events.2` archive is retained under `releases/`;
+existing Core publications and documents must keep their exact identities.
+
+Set `paymentDetails.customerPaymentTerms.provider`, `recipientPaymentAccountId`, and optionally
+`paymentWindowDays` (default 30, integral days from 1 to 3650). The Customer
+Payment builder accepts the same parameters. After acceptance the PI emits one
+`Customer Payment Session Requested` for `customer-session-1`, scoped to that PI,
+and records `customerSession.paymentDueAt`. Repeated acceptance does not renew it.
+
+The guarantor supplies `provideSession(requestId, sessionId, expiresAt)`, with
+expiry exactly equal to that deadline. Identical responses are idempotent;
+conflicting responses fail. `failSessionPreparation(requestId, reason)` records
+a known terminal preparation failure. An uncertain result must reconcile the
+same request, without calling this failure operation or creating a replacement.
+
+`requestCustomerPayment(sessionId, requestId)` is guarantor-only and creates the
+standard Secure Funds Requested using the PI amount. It requires a ready session,
+an accepted/initiated PI, and a start before the deadline. One durable financial
+attempt belongs to the session; retries reuse its requestId, including after the
+deadline. Existing financial outcome operations still reconcile that attempt.
+Session readiness does not move money. Capture remains governed by the existing
+Payment Process Clause and mandatory capture policy.
+
+The new Customer PI and builder do not require `customerSession.funded`,
+`requestCustomerFunding`, or `confirmFunding`. Its `paymentAction.kind` is
+`customer-payment` and the action is removed after accepting the attempt.
+The retained publication keeps its original funding operations. Account to Account
+and Manual Bank Payment remain separate methods; this publication adds no provider
+implementation, payment-account storage, public endpoint, or deployment.
+
 Unpublished candidate. Authored Blue/BEX definitions are authoritative. See ../docs/payment-family.md for the tested package selection and integration boundaries.
+
+For the embedded Customer Payment example, configure the host's
+`paymentDetails.customerPaymentTerms`. The Customer Payment clause reads this
+through its declared `customerPaymentTerms` pointer binding, whose default is
+`/paymentDetails/customerPaymentTerms`; a different host path may be supplied
+through the normal clause bindings. Standard `parameters` contain only Payment
+builder fields such as amount, currency and recipient. The builder copies the
+configured terms into the child's same canonical path before creating it.
+See example 21 for this setup. No dynamic clause subtype is needed.
