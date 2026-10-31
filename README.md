@@ -6,6 +6,19 @@ Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [exe
 
 The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,000 maximum), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 
+## Runtime editions
+
+The standard source tree, build and release preparation use **Access Events**.
+Contracts and Coordination retain the exact Access Events native identities.
+Compatible business fixes are rebuilt from current authored sources; see the
+[publication comparison](docs/access-events-default.md).
+
+Demand builds and release preparation are deferred until Demand is enabled again.
+The build, release and qualification commands operate only on Access Events.
+Historical Demand publication bytes are preserved without a parallel source tree;
+see [reactivation provenance](docs/demand-reactivation.md). No command uploads or
+deploys a runtime. Existing documents keep their runtime.
+
 ## Build and verify
 
 ```sh
@@ -24,10 +37,12 @@ The final-gas edition enforces every charge but omits per-charge receipt histori
 It has new exact identities; existing documents must keep their original runtime.
 See [Contracts migration](blue-contracts/MIGRATION.md).
 
-For the matching Core branch, run its `scripts/import-final-gas.py --packages
-/path/to/blue-packages` after validation. This preserves Core's authored examples
-and retained 10M publications, builds its internal Coordination bridge and Task
-fixture, and updates the new default pins. The general example exporter should
-only be used when intentionally replacing Core's example sources.
+[Semantic cards](docs/semantic-cards.md) can be prepared locally and committed with
+package changes. GitHub generates only exact type BlueIds missing from both the
+repo and S3, then publishes committed cards independently of package releases.
+
+Core integration must explicitly select the matching Access Events or Demand
+runtime and catalogue. Package build and release preparation do not import into
+Core, change deployed defaults, or qualify a production rollout.
 
 These are unpublished candidates, not a production certification or a live financial service. See the tutorial for execution boundaries and the distinction between protocol requests and confirmed external outcomes.

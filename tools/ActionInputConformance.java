@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.contracts.*;
 import blue.core.CompositionPackages;
 import blue.language.next.*;
@@ -75,7 +76,7 @@ public final class ActionInputConformance {
     require(input.containsKey("amountMinor"),"Balance setTarget must declare native input constraints");
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language()){
-      runtime=new NativeRuntime(blue);values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      runtime=new NativeRuntime(blue);values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       check("Ledger/Balance Functions","setTarget",m("key","invoice-1","amountMinor",0),List.of("key","amountMinor"));
       check("Ledger/Balance Functions","reserve",m("key","invoice-1","amountMinor",1),List.of("key","amountMinor"));
       check("Ledger/Balance Functions","settle",m("key","invoice-1"),List.of("key"));

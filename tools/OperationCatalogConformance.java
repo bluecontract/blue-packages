@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.contracts.*;
 import blue.coordination.AuthoringRuntime;
 import blue.core.CompositionPackages;
@@ -26,9 +27,9 @@ public final class OperationCatalogConformance {
       @SuppressWarnings("unchecked") var parameters=(Map<String,Object>)clause.get("parameters");
       parameters.put("negotiation",m("allowedPaths",List.of("/price")));
     }
-    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    try(var runtime=new AuthoringRuntime(QualificationRuntime.bindings())) {
       var processor=runtime.processor(packages.language());var initialized=processor.initialize(source);
-      require(initialized.status().equals("APPLIED"),"Native initialization: "+initialized.status());
+      require(initialized.status().equals("APPLIED"),"Native initialization: "+OperationInputConformance.initializationDiagnostic(processor,initialized));
       require(processor.read(initialized.document(),"/operationPreparation")==blue.bex.Values.UNDEFINED,
           "New documents must not contain operationPreparation: "+processor.read(initialized.document(),"/operationPreparation"));
       var execution=processor.execution();var declaration=execution.declarations(new Exact.Ref(initialized.document().blueId())).get("approve_owner");
@@ -75,7 +76,7 @@ public final class OperationCatalogConformance {
       var definition=blue.admitDefinition(WireData.write(m("type","Shipping/Shipping Instruction")));
       var selected=NativeRuntime.recipe(NativeRuntime.exactOf(definition));
       selected=NativeRuntime.head(selected,runtime).contracts;
-      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
       var input=m("type","Shipping/Shipping Response Input","requestId","shipment-1");
       for(String operation:List.of("confirmShipment","rejectShipment","recordDispatched","confirmDelivery","failShipment",
           "confirmCancellation","rejectCancellation","confirmAddressChange","rejectAddressChange")) {
@@ -116,7 +117,7 @@ public final class OperationCatalogConformance {
           var explicit=m("on","workflow","party","seller","params",m("$object",m("$var","trigger")));
           requestClause.put("bindings",m("requestShipment",m("bookShipment",explicit)));
         }
-        try(var authoring=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+        try(var authoring=new AuthoringRuntime(QualificationRuntime.bindings())) {
           var processor=authoring.processor(blue);var initialized=processor.initialize(defaultsSource);
           require(initialized.status().equals("APPLIED"),"Default-binding initialization "+initialized.status());
           var declarations=processor.execution().declarations(new Exact.Ref(initialized.document().blueId()));
@@ -125,7 +126,7 @@ public final class OperationCatalogConformance {
           require(declarations.get("cancelShipment").containsKey("request"),"Inherited default request must survive");
         }
       }
-      try(var authoring=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      try(var authoring=new AuthoringRuntime(QualificationRuntime.bindings())) {
         var processor=authoring.processor(blue);var initialized=processor.initialize(source);
         require(initialized.status().equals("APPLIED"),"Shipping initialization "+initialized.status());
         var requests=processor.execution().declarations(new Exact.Ref(initialized.document().blueId()));
@@ -163,7 +164,7 @@ public final class OperationCatalogConformance {
           "contracts",m("owner",channel),"clauses",m("activation",m("type","Activation/Activation Clause",
           "parameters",m("parties",m("owner",m("type","Parties/Party","lead",m("channel",channel),"readerKeys",List.of("reader-owner"))))),
           "record",clause));
-      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1());var blue=packages.language()) {
+      try(var runtime=new AuthoringRuntime(QualificationRuntime.bindings());var blue=packages.language()) {
         var processor=runtime.processor(blue);var initial=processor.initialize(source);
         require(initial.status().equals("APPLIED"),"Automatic initialization "+initial.status());
         var declarations=processor.execution().declarations(new Exact.Ref(initial.document().blueId()));

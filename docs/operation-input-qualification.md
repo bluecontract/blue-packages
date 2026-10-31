@@ -6,9 +6,10 @@ The cross-repository implementation plan is maintained in Business at
 
 ## Native deterministic suite
 
-Build the complete unpublished candidate before testing. Set `JAVA_HOME` to Java21
+Build the complete unpublished Access Events candidate before testing. Demand
+qualification is deferred until reactivation; there is no edition selector. Set `JAVA_HOME` to Java21
 and `BLUE_JAVA_CLASSPATH` to the qualified Core native runtime/test classpath. The
-classpath must include the Core composition fixtures and the explicitly selected
+classpath must include freshly built runtime JARs and the Core composition fixtures and the explicitly selected
 DefinitionReadV1 implementation. The runtime selection is accessEvents plus that
 capability; selecting finalGas as a test workaround is not supported.
 
@@ -21,6 +22,10 @@ For an iteration, select an actual named case, for example:
 ```sh
 python3 tools/check_operation_inputs.py --case shipping --case activation-effects
 ```
+
+The default suite also runs `access-events-behavior`: actual native Activation consent,
+access denial/recovery, observation gating, Clauses recomposition and the removed
+admission-timestamp cutoff regression. All selected native cases use Access Events.
 
 The full suite runs both authoring builders, native argument semantics, generated
 Activation inputs and effects, all Payment response/request-action effects,
@@ -106,5 +111,12 @@ abstract optional fields do not become supplied values. It retains the exact
 source publication and does not mutate the test input object. This native gate does
 not establish HTTP transport byte preservation. Document-reference prose belongs
 on the enclosing input: adding a child description can decorate an otherwise
-unchanged referenced document and change its effective native identity. The
-initialized-document constraint remains on the document field.
+unchanged referenced document and change its effective native identity. Initialization is checked by the execution validator; the input document field
+must not structurally intersect and change the supplied reference identity.
+
+The expanded `source-binding` suite covers cyclic exact references, history,
+replay, guard rejection and routing. Focused cases are `source-binding-cyclic`,
+`source-binding-public`, `source-binding-history`, `source-binding-replay`,
+`source-binding-guards` and `source-binding-routing`. The public case uses actual
+DocumentClause prepare/configureSources and the generated requestFrom matcher,
+then binds the supplied cyclic source; it does not substitute a handwritten matcher.

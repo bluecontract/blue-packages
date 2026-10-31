@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.contracts.*;
 import blue.coordination.AuthoringRuntime;
 import blue.core.CompositionPackages;
@@ -22,7 +23,7 @@ public final class ProvisionInputConformance {
   }
   public static void main(String[] args)throws Exception {
     var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
-    for(String mode:List.of("omitted","explicit","inherited","reference","inherited-wrong-key","wrong-request","wrong-requirement","changed-terms"))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+    for(String mode:List.of("omitted","explicit","inherited","reference","inherited-wrong-key","wrong-request","wrong-requirement","changed-terms"))try(var runtime=new AuthoringRuntime(QualificationRuntime.bindings())) {
       var p=runtime.processor(packages.language());var values=p.execution().values();
       var host=applied(p.initialize(source()));host=applied(p.process(host.document(),event(host.document(),"approve_owner",m("revision",1)),1));
       host=applied(p.process(host.document(),event(host.document(),"prepareWork",m()),2));

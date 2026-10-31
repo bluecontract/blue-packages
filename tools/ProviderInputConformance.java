@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.contracts.*;
 import blue.core.CompositionPackages;
 import blue.language.next.*;
@@ -164,7 +165,7 @@ public final class ProviderInputConformance {
     Path root=Path.of(args[0]).toAbsolutePath();
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var language=packages.language()) {
-      blue=language;values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();runtime=new NativeRuntime(blue);
+      blue=language;values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();runtime=new NativeRuntime(blue);
       String mode=args.length<2?"all":args[1];
       require(Set.of("all","acme","manual","myos").contains(mode),"Unknown provider mode "+mode);
       if(mode.equals("all")||mode.equals("acme"))acme();

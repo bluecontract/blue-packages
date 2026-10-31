@@ -1,3 +1,4 @@
+import blue.packages.QualificationRuntime;
 import blue.language.next.*;
 import blue.contracts.*;
 import blue.bex.*;
@@ -12,9 +13,20 @@ public final class OperationInputConformance {
     return result;
   }
   static void require(boolean value,String message) {if(!value)throw new AssertionError(message);}
-  static void nativeInputs() {
+  static String initializationDiagnostic(Contracts processor, Contracts.Result result) {
+    if(result.status().equals("APPLIED"))return result.status();
+    var summary=new LinkedHashMap<String,Object>();summary.put("status",result.status());
+    Object raw=processor.execution().outcome(result).diagnostic;
+    if(raw instanceof Map<?,?> diagnostic)for(String key:List.of("code","required","requiredHistory","path","location","document","member")) {
+      Object value=diagnostic.get(key);
+      if(value instanceof String text)summary.put(key,text.substring(0,Math.min(text.length(),256)));
+      else if(value instanceof List<?> list)summary.put(key,list.stream().filter(String.class::isInstance).limit(16).toList());
+    }
+    return summary.toString();
+  }
+  static void nativeInputs(RuntimeBindings bindings, String edition) {
     try(var blue=Blue.builder().build()) {
-      var values=new Contracts(blue,RuntimeBindings.finalGas()).execution().values();
+      var values=new Contracts(blue,bindings).execution().values();
       var parent=values.source(m("name","Optional input","description","An input description",
           "optional",m("type","Text","description","May be omitted")),"definition");
       String id=NativeRuntime.identity(parent);
@@ -42,7 +54,7 @@ public final class OperationInputConformance {
       boolean rejected=false;
       try {bex.execute(bex.compile(source),context,100000);}catch(BexError invalid){rejected=true;}
       require(rejected,"Native BEX must reject a missing required argument field");
-      System.out.println("PASS native presence, labels, scalar/list/reference and BEX argument validation");
+      System.out.println("PASS "+edition+" native presence, labels, scalar/list/reference and BEX argument validation");
     }
   }
   static void publication(Path source,boolean payment)throws Exception {
@@ -103,7 +115,7 @@ public final class OperationInputConformance {
       if(payment)BuildPaymentFamily.main(new String[]{root.toString()});else BuildFinalGas.main(new String[]{root.toString(),"fixture"});
       var pkg=BluePackage.open(fixture.resolve("dist/package.bluepkg"));
       try(var blue=Blue.builder().packages(PackageBundle.builder().mount("Fixture",pkg).build()).build()) {
-        var values=new Contracts(blue,RuntimeBindings.finalGas()).execution().values();
+        var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
         var document=new Exact.Ref(pkg.exportId("Fixture"));
         var request=values.select(document,"/contracts/differentPublicName/request");
         require(request!=null,"Builder must publish requestFrom function input as contract.request");
@@ -149,7 +161,9 @@ public final class OperationInputConformance {
     } finally {BuildPaymentFamily.removeGenerated(root);}
   }
   public static void main(String[] args)throws Exception {
-    if(args[0].equals("native"))nativeInputs();
+    if(args[0].equals("native")) {
+      nativeInputs(QualificationRuntime.bindings(), "access-events");
+    }
     else publication(Path.of(args[1]),args[0].equals("payment"));
   }
 }
