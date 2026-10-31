@@ -1,0 +1,63 @@
+name: Usage Limit Clause
+type: Connections/Connected Clause
+description: >-
+  Maintain a shared successful-use counter. Connect record to a committed effect
+  from an observed document. Count only the actual authorized Agent acting under
+  this exact Mandate; direct owner actions and other Mandates do not count.
+  The configured key deduplicates the same business effect. Registration is free.
+bindingTypes:
+  usage: pointer
+actions:
+  initialize:
+    automatic: {on: initialized}
+    do:
+    - $let: {name: limit, expr: {$const: {name: parameters, path: /limit}}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: limit}, kind: integer}}}
+        message: MANDATE_USAGE_LIMIT_REQUIRED
+    - $failIf:
+        cond: {$lte: [{$var: limit}, 0]}
+        message: MANDATE_USAGE_LIMIT_MUST_BE_POSITIVE
+    - $appendChange:
+        op: add
+        path: {$const: {name: bindings, path: /usage}}
+        val: {limit: {$var: limit}, used: 0, seen: {}}
+  record:
+    defaults:
+      key: {$nodeBlueId: {$binding: processingEventSource}}
+    do:
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$document: /status}, Active]}
+            - {$eq: [{$binding: processingEvent/actor}, {$document: /contracts/authorizedActorChannel/actor}]}
+            - {$exists: {$binding: processingEventSource/onBehalfOf/mandate}}
+            - {$eq: [{$nodeBlueId: {$binding: processingEventSource/onBehalfOf/mandate}}, {$nodeBlueId: {$document: /contracts/initialized/document}}]}
+        then: [{$return: {}}]
+    - $let: {name: path, expr: {$const: {name: bindings, path: /usage}}}
+    - $let: {name: usage, expr: {$resultValue: {$var: path}}}
+    - $let: {name: key, expr: {$var: {name: params, path: /key}}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: key}, kind: text}}}
+        message: MANDATE_USAGE_KEY_REQUIRED
+    - $if:
+        cond: {$hasKey: {object: {$var: {name: usage, path: /seen}}, key: {$var: key}}}
+        then: [{$return: {}}]
+    - $appendChange:
+        op: replace
+        path: {$var: path}
+        val:
+          limit: {$var: {name: usage, path: /limit}}
+          used: {$add: [{$var: {name: usage, path: /used}}, 1]}
+          seen:
+            $objectSet:
+              object: {$var: {name: usage, path: /seen}}
+              key: {$var: key}
+              val: true
+    - $appendEvent:
+        $merge:
+        - {type: MandateClauses/Usage Recorded}
+        - clause: {$const: clauseKey}
+          key: {$var: key}
+          used: {$add: [{$var: {name: usage, path: /used}}, 1]}

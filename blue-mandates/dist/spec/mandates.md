@@ -177,6 +177,36 @@ bindings, future grant configuration, and provider-gating settings—not only th
 currently visible scope. Adding a workflow remains a real authority-program choice
 for the holder to review; a structural type match is not an external security audit.
 
+### First-initialization installation boundary (edition 2)
+
+This edition permits additional declarations to be installed only during the
+member's first genuine native initialization. Core MUST establish this boundary
+from native completion evidence (`turnInput.lifecycle.kind == INITIALIZE` and
+its actual initial document identity), with no previously established Mandate
+program. A Pending status, an authored flag, a lookalike event, or a missing local
+head alone MUST NOT open the installation window. A child initialized within a
+parent operation has the same member-local boundary.
+
+The exact Mandate type, base lifecycle and housekeeping declarations, authority
+protocol, and holder/delegate/evidence-provider actor and timeline bindings MUST
+remain unchanged at every intermediate write. Protected lifecycle fields retain
+their original writer rules. Initialization cannot establish approval. Additional
+declarations and temporary installation helpers may be added or removed.
+
+The successfully initialized complete program is frozen before publication of the
+Pending head. Every later write, including while Pending, MUST preserve that
+program; a temporary edit followed by restoration is still invalid. This edition
+also protects `clauses` as immutable configuration after initialization, including
+all clause parameters and bindings. Store mutable counters, qualified documents,
+and scope state separately; installed workflows may update them. There is no
+post-initialization amendment exception.
+
+Incomplete or failed initialization MUST NOT publish a usable Pending authority.
+Retry or replay MUST preserve the same boundary and never import approval. The
+owner approves the exact final installed program using the existing operation.
+This rule is selected by this edition's exact Authority Protocol identity. Earlier
+editions retain their pre/post-write program equality rule during initialization.
+
 ## 5. Lifecycle and emitted events
 
 A fresh initialized Mandate is Pending. Initialization resets supplied status and
