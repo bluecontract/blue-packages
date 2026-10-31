@@ -28,6 +28,7 @@ CASES = {
     'source-binding-replay': ('SourceBindingConformance', 'cyclic', 'replay'),
     'source-binding-guards': ('SourceBindingConformance', 'guards'),
     'source-binding-routing': ('SourceBindingConformance', 'routing'),
+    'bootstrap-preparation': ('BootstrapPreparationConformance',),
     'document-provision': ('ProvisionInputConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),

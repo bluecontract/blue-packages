@@ -164,6 +164,29 @@ functions:
       accessPaths: []
     do:
     - $let:
+        name: accessDocuments
+        expr: []
+    - $forEach:
+        item: path
+        in: {$var: accessPaths}
+        do:
+        - $set:
+            name: accessDocuments
+            expr: {$listConcat: [{$var: accessDocuments}, [{$document: {$var: path}}]]}
+    - $return:
+        $call:
+          function: accessRecordsValid
+          args:
+            roster: {$var: roster}
+            readers: {$var: readers}
+            accessDocuments: {$var: accessDocuments}
+  accessRecordsValid:
+    args:
+      roster: {}
+      readers: {}
+      accessDocuments: []
+    do:
+    - $let:
         name: groups
         expr:
           $call:
@@ -211,15 +234,10 @@ functions:
                 name: matched
                 expr: false
             - $forEach:
-                item: path
+                item: access
                 in:
-                  $var: accessPaths
+                  $var: accessDocuments
                 do:
-                - $let:
-                    name: access
-                    expr:
-                      $document:
-                        $var: path
                 - $failIf:
                     cond:
                       $not:
