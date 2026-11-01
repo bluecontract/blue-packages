@@ -66,7 +66,14 @@ untouched target sections. It never strips metadata from actual executable defin
 Only native initialized document/timeline references and the two reconstructed payment-template
 snapshots are non-scalar substitutions. A fresh expected root uses the fixed key roster,
 canonical Order type and primitive scalar leaves, so root or scalar metadata cannot hide
-outside section checks. Embedded timeline-access documents have their own exact section check. Unknown operations, channels, clauses and metadata
+outside section checks. The expected root type is the exact public Order with Clauses
+reference `DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS`. The approved
+`expectedProgram.orderType` retains its inherited `schema.required: true`; its exact identity
+is `FNLBDR37nGH2WGTw8r53RvF2HpAza34xBcy1ygcztG3z`. This identity is reproducible
+by refining that public Order definition with only the required-field schema. It does not
+depend on the seller mandate package root. Copying the refined field into a target type
+would incorrectly change the expected program, so actual and expected field contexts are
+checked separately without stripping either operand. Embedded timeline-access documents have their own exact section check. Unknown operations, channels, clauses and metadata
 therefore remain part of the comparison. Supported initial profiles use the canonical two-
 or three-party roster with one built-in Agent representative per party. Other profiles are
 manual; this policy is not an Agreement-origin proof or a cumulative spending budget.

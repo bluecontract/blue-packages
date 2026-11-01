@@ -27,6 +27,7 @@ public final class SellerPaymentPolicyConformance {
           "expectedProgram",map("orderType","DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS",
               "contracts",section,"clauses",section,"paymentTemplate",section,"timelineAccess",section,"rootKeys",List.of()),
           "contracts",map("authorityHolderChannel",owner.channel(),"authorizedActorChannel",agent.channel()));
+      if(args.length>3) source.put("expectedProgram",WireData.parse(Files.readString(Path.of(args[3])),"json"));
       if(args.length>2&&args[2].equals("baseline"))
         source.put("type",map("blueId","GqUCrevmNkQt2p4mAM9G5oBynDXiZE7fiqDDgZhezZKb"));
       if(negative!=null) {
