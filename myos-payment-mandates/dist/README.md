@@ -63,8 +63,15 @@ The fixed decoder reconstructs source data before substitutions, preserving sche
 typed-only fields without traversing them as live Blue objects. The fixed native predicate reconstructs expected
 sections using checked primitive scalar replacements and compares their identities with
 untouched target sections. It never strips metadata from actual executable definitions.
-Only native initialized document/timeline references and the two reconstructed payment-template
-snapshots are non-scalar substitutions. A fresh expected root uses the fixed key roster,
+Native initialized document/timeline references and the two reconstructed payment-template
+snapshots are non-scalar substitutions. After native event consumption, the expected
+contracts also reconstruct the processor-owned Channel Event Checkpoint with its fixed
+public type, integer timestamps and exact event references. Root entries are restricted
+to the canonical external party-channel roster; embedded timeline-access entries are
+restricted to `provider`. The complete contracts and timeline-access identities still
+compare against untouched actual nodes, including checkpoint metadata and row structure.
+This follows the protected checkpoint contract in `blue-contracts/spec/contracts-final-gas.md`;
+it does not accept caller-authored checkpoints or remove them from identity comparisons. A fresh expected root uses the fixed key roster,
 canonical Order type and primitive scalar leaves, so root or scalar metadata cannot hide
 outside section checks. The expected root type is the exact public Order with Clauses
 reference `DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS`. The approved
