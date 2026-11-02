@@ -29,6 +29,7 @@ runtime without this capability must reject the package before execution.
 | Document Scope Clause | Qualifies an initialized document against `parameters.documentPattern` or a snapshotted `bindings.pattern`; registers it in the collection at `bindings.documents`; adds exact operation scopes from `parameters.grants`. Each scope rechecks the document pattern at execution. When `bindings.budget` is supplied it also checks that shared usage limit; an omitted budget means no usage cap. |
 | Usage Limit Clause | Initializes the counter at `bindings.usage` with `parameters.limit`. Its `record` connection observes the chosen successful effect and counts only this Agent using this exact Mandate. The configurable key deduplicates effects; the default identifies the original processing event. |
 | Mandate Termination Clause | Its `terminate` connection emits native termination when the approved workflow, local change or embedded event condition holds. Termination clears scope immediately, without draining in-flight work. |
+| Registration Scope Clause | The authorized actor reports scalar document identities and request constraints. Each new registration consumes one slot and installs the configured exact scopes. It neither imports nor observes the reported documents. |
 
 For example, an Order Mandate can use a pattern with shoe size 40 or 41, grant
 `owner/approve` on each qualified Order, and share a limit of ten across all those
@@ -86,3 +87,33 @@ effects. Existing bounded research/send compositions keep their explicit binding
 This is not a new child-provenance mechanism. Producer observation already supplies
 the exact initialized document; `requireAttributed` independently determines whether
 the producing Agent and Mandate must match this authorization.
+
+## Registration without private dependencies
+
+Preview edition 0.1.0-preview.4 adds `Registration Scope Clause` for Mandates
+whose execution must be verifiable by parties that cannot read a private producer.
+It does not change Document Scope Clause or Usage Limit Clause.
+
+For example, an Agent registers a newly prepared Email Delivery document and its
+recipient before requesting a send. `parameters.limit: 10` permits ten immutable
+registrations. `parameters.registrationPattern` declares the required scalar
+fields using native types and schemas. Each entry in `parameters.grants` contains
+a frozen `grant` and `fields`, a mapping from JSON pointers in that grant to
+JSON pointers in the submitted scalar values. The clause adds the completed
+grant to `scope`. `bindings.registry` selects the local counter/registry field;
+`bindings.register` exposes registration on `authorizedActorChannel`.
+
+An identical registration key and values is a no-op; rebinding an existing key
+is rejected. The eleventh registration is rejected. The Agent cannot supply
+grant code, change the approved mapping, or retain a document snapshot. Native
+scope validation still checks the actual target and request at execution time.
+Only the assigned actor can register, and only while the Mandate is Active.
+
+The counter measures registrations, not successful operations. An unused grant
+still consumes its slot, and slots are not refunded. The clause does not prove
+that a reported identity came from a particular Task or private parent. It does
+not count sends or disable other scopes after a registration. Those guarantees
+must not be claimed by a caller. Independently bounded creation requests can
+coexist with registration scopes when the producer's native operation provides
+immutable, idempotent creation keys. No Business validation substitutes for
+these native limits.
