@@ -13,6 +13,7 @@ public final class PaymentPreparationCorrelationConformance {
   public static void main(String[] args)throws Exception {
     Path root=Path.of(args[0]);boolean baseline=args.length>1&&args[1].equals("baseline");
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    if(args.length>1&&args[1].equals("activated")){activated(root,packages);return;}
     var origins=new ArrayList<String>();var requirements=new ArrayList<Object>();
     for(String name:List.of("first","second","default-key"))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
       var processor=runtime.processor(packages.language());
@@ -51,4 +52,32 @@ public final class PaymentPreparationCorrelationConformance {
     require(!requirements.get(0).equals(requirements.get(1)),"Correlation participates in requirementRef identity");
     System.out.println("PASS native correlation, forged-input isolation, distinct source identity and retry");
   }
+  static void activated(Path root, CompositionPackages packages)throws Exception {
+    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      var processor=runtime.processor(packages.language());
+      var source=BootstrapPreparationConformance.source("bootstrap");
+      var clauses=obj(source.get("clauses"));var clause=obj(clauses.remove("orders"));clauses.put("payment",clause);
+      var parameters=obj(clause.get("parameters"));
+      obj(parameters.get("fieldPaths")).put("paymentPreparation","/paymentPreparation");
+      obj(parameters.get("template")).put("paymentPreparation",m("type","MyOSPaymentMandates/Payment Preparation Correlation"));
+      var params=obj(WireData.parse(Files.readString(root.resolve("myos-payment-mandates/examples/activated-prepare-params.blue")),"yaml"));
+      obj(params.get("values")).put("size",42);
+      var bindings=obj(clause.get("bindings"));
+      bindings.put("prepare",m("preparePayment",m("on","activated","once",true,"params",params)));
+      String initialId=NativeRuntime.identity(processor.execution().values().source(source));
+      var initialized=BootstrapPreparationConformance.applied(processor.initialize(source));
+      require(obj(processor.read(initialized.document(),"/process_payment/entries")).isEmpty(),"Incomplete consent must not prepare a payment");
+      var host=BootstrapPreparationConformance.applied(processor.process(initialized.document(),BootstrapPreparationConformance.event(initialized.document(),"approve_merchant",m("revision",1)),1));
+      var entries=obj(processor.read(host.document(),"/process_payment/entries"));
+      require(entries.size()==1,"Activation alone prepares one requirement");
+      var item=obj(entries.values().iterator().next());
+      var actual=obj(processor.read(host.document(),item.get("itemPath")+"/prepared/paymentPreparation"));
+      require(actual.equals(m("orderDocumentId",initialId,"clauseId","payment","itemKey","single","requestId","single")),"Exact native activation correlation without caller request fields");
+      require(processor.read(host.document(),"/contracts/cx.payment.prepare.preparePayment/steps/0/functions/connectionSnapshots/expr/$literal/template")!=null,"Exact event-handler template snapshot path");
+      var repeated=BootstrapPreparationConformance.applied(processor.process(host.document(),BootstrapPreparationConformance.event(host.document(),"approve_merchant",m("revision",1)),2));
+      require(obj(processor.read(repeated.document(),"/process_payment/entries")).equals(entries),"Approval replay preserves the requirement/source");
+      System.out.println("PASS native activation-only preparation, incomplete-consent guard, exact correlation, event-handler snapshot and approval replay");
+    }
+  }
+
 }

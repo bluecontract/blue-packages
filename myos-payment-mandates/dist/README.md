@@ -1,5 +1,24 @@
 # Seller policy and correlated Order payment preparation
 
+## Activation-driven profile
+
+The `0.2.0-preview.1` candidate uses the acceptance-driven MyOS session family.
+The new Order connection is named `preparePayment`, with `on: activated`,
+`once: true`, and explicit parameters from `examples/activated-prepare-params.blue`.
+It does not consume a client prepare request. The exact policy snapshot path is
+`/cx.payment.prepare.preparePayment/steps/0/functions/connectionSnapshots/expr/$literal/template`
+inside the contracts blueprint. The `providePayment` snapshot is unchanged.
+New recipe approval is required: an old mandate does not acquire this program.
+The old package is retained byte-for-byte under `releases/0.1.0-preview.1/`.
+
+`PaymentPreparationCorrelationConformance <repository> activated` checks native
+activation-only preparation, incomplete consent, exact correlation, generated
+snapshot location and approval replay. This is preparation evidence, not hosted
+bootstrap or checkout acceptance. The historical workflow profile remains tested
+by the default mode.
+
+## Historical correlated profile
+
 This additive candidate retains the current expiry-aware bootstrap PI semantics and adds
 `paymentPreparation`: `orderDocumentId`, `clauseId`, `itemKey`, and `requestId`.
 `orderDocumentId` is the native initial Order identity, not its changing state identity.

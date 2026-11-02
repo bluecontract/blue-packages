@@ -14,6 +14,7 @@ import java.util.*;
 
 /** Published session correlation and native BEX effects. Hosted writer authorization is tested in Core. */
 public final class CustomerSessionConformance {
+  static boolean legacySessionRequest;
   static final String TYPE="MyOS/MyOS Customer Payment Instruction";
   static Map<String,Object> m(Object... pairs){return ProviderInputConformance.m(pairs);}
   static void require(boolean ok,String message){ProviderInputConformance.require(ok,message);}
@@ -31,6 +32,7 @@ public final class CustomerSessionConformance {
     require(failed,why);
   }
   public static void main(String[] args)throws Exception {
+    legacySessionRequest = Arrays.asList(args).contains("legacy-session-request");
     var root=Path.of(args[0]).toAbsolutePath();
     var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language()){
@@ -106,7 +108,10 @@ public final class CustomerSessionConformance {
     var first=ProviderInputConformance.execute(TYPE,"__customerPrepareSession",m(),doc,"__customerAccepted");
     long deadline=100L+30L*86400000000L;
     ProviderInputConformance.change(first,"/customerSession/paymentDueAt",BigInteger.valueOf(deadline));
-    event(first,"Customer Payment Session Requested",m("requestId","customer-session-1","amountMinor",100,"currency","USD","provider","test","recipientPaymentAccountId","account-1","paymentDueAt",BigInteger.valueOf(deadline)));
+    ProviderInputConformance.change(first,"/customerSession/requestId","customer-session-1");
+    ProviderInputConformance.change(first,"/customerSession/status","requested");
+    if (legacySessionRequest) event(first,"Customer Payment Session Requested",m("requestId","customer-session-1","amountMinor",100,"currency","USD","provider","test","recipientPaymentAccountId","account-1","paymentDueAt",BigInteger.valueOf(deadline)));
+    else require(first.events().isEmpty(),"New PI prepares session state without Customer Payment Session Requested emission");
     var repeated=ProviderInputConformance.execute(TYPE,"__customerPrepareSession",m(),pending(),"__customerAccepted");
     require(repeated.changeset().isEmpty()&&repeated.events().isEmpty(),"Repeated acceptance does not prepare a second session or extend deadline");
   }

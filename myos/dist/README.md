@@ -4,7 +4,18 @@ MyOS Party specializes Party with myosAccountId. MyOS Customer Payment requires 
 
 The package emits adapter requests. It does not call a bank, move real funds, or implement a checkout website.
 
-## Customer payment session publication
+## Acceptance-driven session publication
+
+`0.8.0-preview.11.payment-flow.1` keeps the accepted-event session initializer,
+`customer-session-1`, the requested state, fixed payment deadline and all session
+response operations. It no longer emits `Customer Payment Session Requested`.
+The guarantor's acceptance task must continue session preparation using that stored
+state. A session is still not a financial authorization or capture. Historical
+publications retain their original emission and require their existing consumer.
+The previous bootstrap family is retained byte-for-byte under
+`releases/0.8.0-preview.10.customer-payment.1.bootstrap.2/`.
+
+## Historical customer payment session publication
 
 `0.8.0-preview.10.customer-payment.1` adds correlated preparation to Customer PI.
 The prior `0.8.0-preview.7.access-events.2` archive is retained under `releases/`;
