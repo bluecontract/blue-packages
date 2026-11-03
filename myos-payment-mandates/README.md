@@ -2,7 +2,7 @@
 
 ## Activation-driven profile
 
-The `0.2.0-preview.1` candidate uses the acceptance-driven MyOS session family.
+The `0.2.0-preview.2` candidate uses the acceptance-driven MyOS session family.
 The new Order connection is named `preparePayment`, with `on: activated`,
 `once: true`, and explicit parameters from `examples/activated-prepare-params.blue`.
 It does not consume a client prepare request. The exact policy snapshot path is
@@ -146,3 +146,14 @@ checks deterministic package reconstruction; catalogue/release integrity checks 
 The package root and dependency closure remain provisional until the seller policy
 composition completes its native initialization, revocation and actual-Order qualification. Consumers must not treat this
 partial candidate as a final runtime selection or automation release.
+
+## Activated policy type correction
+
+Policy version `seller-payment-policy/2` fixes `preparedInstructionType` to the
+exact activated correlated Customer PI (`9tNEUx…`). The native type equality
+predicate remains unchanged. The earlier `0.2.0-preview.1` policy used the
+historical `JBYxw…` type and could not authorize the new activated Order program.
+Its distribution is retained byte-for-byte in `releases/0.2.0-preview.1/`.
+Existing mandates keep their original scope; the corrected policy requires a
+new explicit holder approval. This local preview does not publish or migrate
+existing documents, and grants no refund or Order-approval permission.
