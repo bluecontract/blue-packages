@@ -1,0 +1,145 @@
+name: Document Scope Clause
+type: Connections/Connected Clause
+description: >-
+  Qualify an initialized document against an approved Blue pattern and add exact
+  operation grants for its initial identity. Registration does not consume usage.
+  A source-event connection can require attribution to this Mandate and its Agent.
+  Each installed grant rechecks the pattern at execution. An optional budget
+  binding also enforces its shared usage limit; omitting it grants no usage cap.
+  By default registered documents are embedded; set parameters.embedDocuments to
+  false when an already embedded producer supplies their live events instead.
+bindingTypes:
+  documents: pointer
+  budget: pointer
+  pattern: pointer
+optionalBindings: [pattern, budget]
+snapshotBindings: [pattern]
+hookDefinition:
+  type: MandateClauses/Document Scope Plan
+actions:
+  register:
+    defaults:
+      document: {$var: {name: trigger, path: /document}}
+    do:
+    - $if:
+        cond: {$ne: [{$document: /status}, Active]}
+        then: [{$return: {}}]
+    - $if:
+        cond: {$eq: [{$const: {name: parameters, path: /requireAttributed}}, true]}
+        then:
+        - $if:
+            cond:
+              $not:
+                $and:
+                - $eq: [{$binding: processingEvent/actor}, {$document: /contracts/authorizedActorChannel/actor}]
+                - $exists: {$binding: processingEventSource/onBehalfOf/mandate}
+                - $eq: [{$nodeBlueId: {$binding: processingEventSource/onBehalfOf/mandate}}, {$nodeBlueId: {$document: /contracts/initialized/document}}]
+            then: [{$return: {}}]
+    - $let: {name: candidate, expr: {$var: {name: params, path: /document}}}
+    - $let:
+        name: pattern
+        expr:
+          $coalesce:
+          - {$pointerGet: {object: {$call: {function: connectionSnapshots, args: {}}}, path: /pattern}}
+          - {$const: {name: parameters, path: /documentPattern}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: pattern}, kind: object}}}
+        message: MANDATE_DOCUMENT_PATTERN_REQUIRED
+    - $failIf:
+        cond: {$not: {$call: {function: qualifiesMandateDocument, args: {candidate: {$var: candidate}}}}}
+        message: MANDATE_DOCUMENT_NOT_QUALIFIED
+    - $let:
+        name: initial
+        expr: {$pointerGet: {object: {$var: candidate}, path: /contracts/initialized/document}}
+    - $failIf:
+        cond: {$not: {$exists: {$var: initial}}}
+        message: MANDATE_INITIALIZED_DOCUMENT_REQUIRED
+    - $let: {name: identity, expr: {$nodeBlueId: {$var: initial}}}
+    - $let:
+        name: documents
+        expr: {$const: {name: bindings, path: /documents}}
+    - $let: {name: budget, expr: {$const: {name: bindings, path: /budget}}}
+    - $failIf:
+        cond:
+          $and:
+          - {$exists: {$var: budget}}
+          - {$not: {$isKind: {val: {$document: {$concat: [{$var: budget}, /limit]}}, kind: integer}}}
+        message: MANDATE_USAGE_BUDGET_REQUIRED
+    - $if:
+        cond: {$exists: {$document: {$concat: [{$var: documents}, '/', {$var: identity}]}}}
+        then: [{$return: {}}]
+    - $appendChange:
+        op: add
+        path: {$var: documents}
+        val:
+          $objectSet:
+            object: {$coalesce: [{$document: {$var: documents}}, {}]}
+            key: {$var: identity}
+            val: {$var: candidate}
+    - $forEach:
+        key: grantKey
+        item: grant
+        in: {$const: {name: parameters, path: /grants}}
+        do:
+        - $failIf:
+            cond:
+              $or:
+              - {$not: {$isKind: {val: {$var: {name: grant, path: /target/channel}}, kind: text}}}
+              - {$not: {$isKind: {val: {$var: {name: grant, path: /target/operation}}, kind: text}}}
+            message: MANDATE_OPERATION_GRANT_REQUIRED
+        - $let:
+            name: scopeKey
+            expr: {$concat: [{$const: clauseKey}, ':', {$var: identity}, ':', {$var: grantKey}]}
+        - $let:
+            name: budgetPredicate
+            expr:
+              $objectSet:
+                object: {}
+                key: $and
+                val:
+                  $listConcat:
+                  - - $literal: {$eq: [{$document: /status}, Active]}
+                  - $choose:
+                      cond: {$exists: {$var: budget}}
+                      then:
+                      - $objectSet:
+                          object: {}
+                          key: $lt
+                          val:
+                          - {$objectSet: {object: {}, key: $document, val: {$concat: [{$var: budget}, /used]}}}
+                          - {$objectSet: {object: {}, key: $document, val: {$concat: [{$var: budget}, /limit]}}}
+                      else: []
+                  - - $coalesce:
+                      - {$var: {name: grant, path: /target/documentValidation/function/expr}}
+                      - true
+        - $let:
+            name: scoped
+            expr:
+              $pointerSet:
+                object:
+                  $pointerSet:
+                    object:
+                      $pointerSet:
+                        object: {$var: grant}
+                        path: /target/initialDocument
+                        val: {$var: initial}
+                    path: /target/documentValidation
+                    val:
+                      document: {$var: pattern}
+                      function:
+                        expr: {$var: budgetPredicate}
+                path: /target/documentValidation/function/expr
+                val: {$var: budgetPredicate}
+        - $appendChange:
+            op: replace
+            path: /scope
+            val:
+              $objectSet:
+                object: {$resultValue: /scope}
+                key: {$var: scopeKey}
+                val: {$var: scoped}
+    - $appendEvent:
+        $merge:
+        - {type: MandateClauses/Document Qualified}
+        - document: {$var: initial}
+          clause: {$const: clauseKey}

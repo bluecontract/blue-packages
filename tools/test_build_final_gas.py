@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 import tempfile
 import unittest
-from build_final_gas import dependency_order
+from build_final_gas import dependency_order, export_sources
 
 
 class DependencyOrderTest(unittest.TestCase):
@@ -54,6 +54,52 @@ class DependencyOrderTest(unittest.TestCase):
         }))
         with self.assertRaisesRegex(ValueError, 'Unsupported package import path'):
             dependency_order(self.root, ['payment'])
+
+
+    def test_undeclared_retained_execution_archive_is_not_an_active_dependency(self):
+        self.package('representation')
+        manifest = self.root / 'representation/blue-package.yaml'
+        manifest.write_text(json.dumps({'imports': {'Mandates': {
+            'path': '../verification/publications/mandates-v1/dist/package.bluepkg',
+            'packageBlueId': 'retained-test-identity', 'archiveSha256': 'sha256:' + '0' * 64,
+        }}, 'executionRequires': ['Mandates']}))
+        with self.assertRaisesRegex(ValueError, 'Unsupported package import path'):
+            dependency_order(self.root, ['representation'])
+
+class SharedExportSourcesTest(unittest.TestCase):
+    def test_only_declared_shared_file_is_selected_with_exact_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / 'direct'
+            source.mkdir()
+            shared = root / 'myos/types/helper.blue'
+            shared.parent.mkdir(parents=True)
+            shared.write_bytes(b'name: shared\n')
+            (shared.parent / 'unrelated.blue').write_text('excluded')
+            selected = export_sources(root, source, {'exports': [{'path': '../myos/types/helper.blue'}]})
+            self.assertEqual([(shared, Path('myos/types/helper.blue'))], selected)
+            self.assertEqual(b'name: shared\n', selected[0][0].read_bytes())
+
+    def test_outside_traversal_and_symlink_are_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / 'repo'
+            source = root / 'direct'
+            source.mkdir(parents=True)
+            outside = parent / 'outside.blue'
+            outside.write_text('outside')
+            (source / 'link.blue').symlink_to(outside)
+            for path in ('../../outside.blue', 'link.blue'):
+                with self.subTest(path=path), self.assertRaises(ValueError):
+                    export_sources(root, source, {'exports': [{'path': path}]})
+
+    def test_internal_symlink_is_explicitly_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'helper.blue').write_text('shared')
+            (root / 'link.blue').symlink_to(root / 'helper.blue')
+            with self.assertRaisesRegex(ValueError, 'Symlink export'):
+                export_sources(root, root, {'exports': [{'path': 'link.blue'}]})
 
 
 if __name__ == '__main__':

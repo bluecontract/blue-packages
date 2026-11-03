@@ -1,0 +1,17 @@
+name: Mandate Termination Clause
+type: Connections/Connected Clause
+description: >-
+  Terminate immediately when the approved connection's condition is satisfied.
+  Use a document event, usage-state change or owner workflow. Native termination
+  clears scope and ends processing; there is no reservation or drain phase.
+actions:
+  terminate:
+    defaults: {reason: Approved termination condition reached}
+    do:
+    - $if:
+        cond: {$eq: [{$document: /status}, Active]}
+        then:
+        - $appendEvent:
+            $merge:
+            - {type: Mandates/Mandate Termination Requested, reason: Approved termination condition reached}
+            - reason: {$var: {name: params, path: /reason}}

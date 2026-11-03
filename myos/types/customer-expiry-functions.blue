@@ -1,0 +1,146 @@
+name: Customer Authorization Expiry Functions
+type: MyOS/Customer Session Functions
+description: Correlated guarantor initiation of the existing full-void protocol. No new charge and no
+  completed outcome. Current external expiry/cancellation evidence is checked by the guarantor adapter.
+functions:
+  requestExpiredAuthorizationVoid:
+    args:
+      input:
+        description: Guarantor assertion that the same Stripe authorization expired and is canceled.
+        sessionId:
+          type: Text
+          schema:
+            minLength: 1
+        secureRequestId:
+          type: Text
+          schema:
+            minLength: 1
+        requestId:
+          type: Text
+          schema:
+            minLength: 1
+    do:
+    - $call:
+        function: guarantor
+        args: {}
+    - $forEach:
+        item: field
+        in:
+          $entries:
+            $var: input
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list: [type, sessionId, secureRequestId, requestId]
+                  val:
+                    $var:
+                      name: field
+                      path: /key
+            message: EXPIRY_INPUT_FIELD_UNSUPPORTED
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /paymentDetails/customerPaymentTerms/provider
+          - stripe
+        message: STRIPE_PAYMENT_REQUIRED
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $document: /customerSession/id
+            - ''
+          - $ne:
+            - $var:
+                name: input
+                path: /sessionId
+            - $document: /customerSession/id
+        message: SESSION_ID_MISMATCH
+    - $let:
+        name: secure
+        expr:
+          $get:
+            object:
+              $document: /payment/requests
+            key:
+              $var:
+                name: input
+                path: /secureRequestId
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $var:
+                  name: input
+                  path: /secureRequestId
+              - $document: /customerSession/paymentAttemptId
+            - $eq:
+              - $pointerGet:
+                  object:
+                    $var: secure
+                  path: /intent/action
+                  default: ''
+              - secure
+            - $eq:
+              - $pointerGet:
+                  object:
+                    $var: secure
+                  path: /status
+                  default: ''
+              - succeeded
+        message: SECURE_REQUEST_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/completed
+          - 0
+        message: PAYMENT_ALREADY_COMPLETED
+    - $let:
+        name: amount
+        expr:
+          $var:
+            name: secure
+            path: /intent/amountMinor
+    - $failIf:
+        cond:
+          $lte:
+          - $var: amount
+          - 0
+        message: SECURED_AMOUNT_REQUIRED
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $document: /payment/requests
+            key:
+              $var:
+                name: input
+                path: /requestId
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $var: previous
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /customerSession/status
+              - ready
+            message: SESSION_NOT_READY
+    - $return:
+        $call:
+          function: request
+          args:
+            action: void
+            input:
+              requestId:
+                $var:
+                  name: input
+                  path: /requestId
+              amountMinor:
+                $var: amount
+              reason: stripe_authorization_expired

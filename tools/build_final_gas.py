@@ -14,6 +14,22 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def export_sources(root, source, config):
+    """Validate explicit shared export files before staging an isolated rebuild."""
+    root = root.resolve()
+    result = []
+    for export in config['exports']:
+        original = Path(os.path.abspath(source / export['path']))
+        resolved = original.resolve()
+        relative = resolved.relative_to(root)
+        if original != resolved:
+            raise ValueError('Symlink export paths are unsupported: ' + export['path'])
+        if not resolved.is_file():
+            raise ValueError('Export is not a file: ' + export['path'])
+        result.append((resolved, relative))
+    return result
+
+
 def source_dependency(root, folder, prefix, declaration, config, retained, selected):
     from release import retained_import
     if retained_import(root, folder, prefix, declaration, config, retained) is not None:
@@ -96,10 +112,15 @@ def build(package, check=False, root=None):
         if check:
             selected = work / 'packages'
             selected.mkdir()
-            shutil.copytree(source, selected/package, ignore=shutil.ignore_patterns('dist', '__pycache__', '.pytest_cache'))
-            # Dependencies are pinned archives; preserve the manifest's relative paths.
             import yaml
             cfg = yaml.safe_load((source/'blue-package.yaml').read_text())
+            exports = export_sources(root, source, cfg)
+            shutil.copytree(source, selected/package, ignore=shutil.ignore_patterns('dist', '__pycache__', '.pytest_cache'))
+            for original, relative in exports:
+                destination = selected/relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(original, destination)
+            # Dependencies are pinned archives; preserve the manifest's relative paths.
             for value in cfg['imports'].values():
                 original = (source/value['path']).resolve()
                 relative = original.relative_to(root.resolve())

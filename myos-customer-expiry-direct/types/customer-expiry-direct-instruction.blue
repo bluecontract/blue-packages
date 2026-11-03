@@ -1,0 +1,30 @@
+name: MyOS Expiry-Aware Direct Customer Payment Instruction
+type: MyOS/MyOS Customer Payment Instruction
+description: Additive customer PI for new documents. The configured guarantor may request a full void after
+  verifying that the bound Stripe authorization expired and is canceled. Stripe evidence remains the
+  guarantor's responsibility; the document does not independently verify capture_before.
+contracts:
+  requestExpiredAuthorizationVoid:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: MyOSExpiryDirect/Customer Authorization Expiry Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $return:
+          $call:
+            function: requestExpiredAuthorizationVoid
+            args:
+              input:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: MyOSExpiryDirect/Customer Authorization Expiry Functions
+      function: requestExpiredAuthorizationVoid
+      argument: input

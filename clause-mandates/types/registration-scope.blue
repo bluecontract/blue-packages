@@ -1,0 +1,126 @@
+name: Registration Scope Clause
+type: Connections/Connected Clause
+description: >-
+  Register bounded, immutable groups of exact document identities and scalar
+  request constraints supplied by the authorized actor. Each new key consumes
+  one registration, even if the authorized action never succeeds. Duplicate
+  identical registration is idempotent; replacing it is forbidden. No document
+  is embedded, retained as a snapshot or observed. Registration does not prove
+  document origin or relationships; grants validate their actual target and
+  request at execution using the approved native scope rules.
+bindingTypes:
+  registry: pointer
+hookDefinition:
+  type: MandateClauses/Registration Scope Plan
+actions:
+  initialize:
+    automatic: {on: initialized}
+    do:
+    - $let: {name: limit, expr: {$const: {name: parameters, path: /limit}}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: limit}, kind: integer}}}
+        message: MANDATE_REGISTRATION_LIMIT_REQUIRED
+    - $failIf:
+        cond: {$lte: [{$var: limit}, 0]}
+        message: MANDATE_REGISTRATION_LIMIT_MUST_BE_POSITIVE
+    - $appendChange:
+        op: add
+        path: {$const: {name: bindings, path: /registry}}
+        val: {limit: {$var: limit}, used: 0, entries: {}}
+  register:
+    defaults:
+      key: {$var: {name: trigger, path: /key}}
+      values: {$var: {name: trigger, path: /values}}
+    args:
+      key: {type: Text, schema: {required: true, minLength: 1, maxLength: 200}}
+      values: {schema: {required: true}}
+    do:
+    - $failIf:
+        cond: {$ne: [{$document: /status}, Active]}
+        message: MANDATE_NOT_ACTIVE
+    - $failIf:
+        cond: {$ne: [{$binding: processingEvent/actor}, {$document: /contracts/authorizedActorChannel/actor}]}
+        message: MANDATE_REGISTRATION_ACTOR_REQUIRED
+    - $let: {name: values, expr: {$var: {name: params, path: /values}}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: values}, kind: object}}}
+        message: MANDATE_REGISTRATION_VALUES_REQUIRED
+    - $failIf:
+        cond: {$not: {$call: {function: qualifiesRegistration, args: {candidate: {$var: values}}}}}
+        message: MANDATE_REGISTRATION_NOT_QUALIFIED
+    - $forEach:
+        key: field
+        item: fieldValue
+        in: {$var: values}
+        do:
+        - $failIf:
+            cond:
+              $or:
+              - $not:
+                  $some:
+                    in: {$const: {name: parameters, path: /grants}}
+                    item: configuredGrant
+                    where:
+                      $some:
+                        in: {$var: {name: configuredGrant, path: /fields}}
+                        item: configuredPath
+                        where: {$eq: [{$var: configuredPath}, {$concat: ['/', {$var: field}]}]}
+              - {$not: {$isKind: {val: {$var: fieldValue}, kind: text}}}
+            message: MANDATE_REGISTRATION_SCALAR_FIELDS_ONLY
+    - $let: {name: path, expr: {$const: {name: bindings, path: /registry}}}
+    - $let: {name: registry, expr: {$document: {$var: path}}}
+    - $let: {name: key, expr: {$var: {name: params, path: /key}}}
+    - $if:
+        cond: {$hasKey: {object: {$var: {name: registry, path: /entries}}, key: {$var: key}}}
+        then:
+        - $failIf:
+            cond: {$ne: [{$get: {object: {$var: {name: registry, path: /entries}}, key: {$var: key}}}, {$var: values}]}
+            message: MANDATE_REGISTRATION_CONFLICT
+        - $return: {}
+    - $failIf:
+        cond: {$gte: [{$var: {name: registry, path: /used}}, {$var: {name: registry, path: /limit}}]}
+        message: MANDATE_REGISTRATION_LIMIT_REACHED
+    - $forEach:
+        key: grantKey
+        item: definition
+        in: {$const: {name: parameters, path: /grants}}
+        do:
+        - $let: {name: grant, expr: {$var: {name: definition, path: /grant}}}
+        - $forEach:
+            key: destination
+            item: field
+            in: {$var: {name: definition, path: /fields}}
+            do:
+            - $let: {name: fieldValue, expr: {$pointerGet: {object: {$var: values}, path: {$var: field}}}}
+            - $failIf:
+                cond: {$not: {$isKind: {val: {$var: fieldValue}, kind: text}}}
+                message: MANDATE_REGISTRATION_FIELD_REQUIRED
+            - $set:
+                name: grant
+                expr: {$pointerSet: {object: {$var: grant}, path: {$var: destination}, val: {$var: fieldValue}}}
+        - $failIf:
+            cond:
+              $or:
+              - {$not: {$isKind: {val: {$var: {name: grant, path: /target/initialDocument/blueId}}, kind: text}}}
+              - {$not: {$isKind: {val: {$var: {name: grant, path: /target/channel}}, kind: text}}}
+              - {$not: {$isKind: {val: {$var: {name: grant, path: /target/operation}}, kind: text}}}
+            message: MANDATE_OPERATION_GRANT_REQUIRED
+        - $appendChange:
+            op: replace
+            path: /scope
+            val:
+              $objectSet:
+                object: {$resultValue: /scope}
+                key: {$concat: [{$const: clauseKey}, ':', {$var: {name: registry, path: /used}}, ':', {$var: grantKey}]}
+                val: {$var: grant}
+    - $appendChange:
+        op: replace
+        path: {$var: path}
+        val:
+          limit: {$var: {name: registry, path: /limit}}
+          used: {$add: [{$var: {name: registry, path: /used}}, 1]}
+          entries:
+            $objectSet:
+              object: {$var: {name: registry, path: /entries}}
+              key: {$var: key}
+              val: {$var: values}

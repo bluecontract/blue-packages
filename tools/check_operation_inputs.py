@@ -28,12 +28,18 @@ CASES = {
     'source-binding-replay': ('SourceBindingConformance', 'cyclic', 'replay'),
     'source-binding-guards': ('SourceBindingConformance', 'guards'),
     'source-binding-routing': ('SourceBindingConformance', 'routing'),
+    'bootstrap-preparation': ('BootstrapPreparationConformance',),
     'document-provision': ('ProvisionInputConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
     'payment-effects': ('blue.core.PaymentExecutionConformance',),
     'providers': ('ProviderInputConformance', 'all'),
+    'customer-session': ('CustomerSessionConformance',),
+    'customer-expiry': ('CustomerExpiryConformance',),
+    'customer-capture-policy': ('CustomerSessionConformance', 'capture-policy'),
+    'customer-session-legacy': ('ProviderInputConformance', 'myos-legacy'),
+    'manual-payment': ('ProviderInputConformance', 'manual'),
     'actions': ('ActionInputConformance',),
     **{'documents-' + mode: ('DocumentInputConformance', mode)
        for mode in ('source', 'inputs', 'consent', 'access', 'reference', 'representation', 'connection', 'preparation', 'accessGuards', 'paymentPreparation', 'attachmentValues', 'documentPreparationFields', 'documentPreparationValues')},
@@ -73,6 +79,8 @@ def main():
         sources.add(CASES[key][0].split('.')[-1])
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
+    if {'CustomerExpiryConformance', 'CustomerSessionConformance', 'ProviderInputConformance'} & sources:
+        sources.update({'ProviderInputConformance', 'CustomerSessionConformance'})
     if 'PaymentExecutionConformance' in sources:
         sources.add('CurrentOperationScenarios')
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:
