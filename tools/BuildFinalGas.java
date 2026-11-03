@@ -20,7 +20,7 @@ public final class BuildFinalGas {
     for (var e:map(c.get("imports")).entrySet()) {
       String rel=map(e.getValue()).get("path").toString();Path path=p.resolve(rel).normalize();
       if(!path.startsWith(root)) throw new IllegalArgumentException("Dependency escapes source root");
-      var dep=BluePackage.open(path);builder.importPackage(e.getKey(),dep);
+      var dep=BluePackage.open(path);BuildPaymentFamily.verifyImport(map(e.getValue()),path,dep);builder.importPackage(e.getKey(),dep);
       importedPackages.put(e.getKey(),dep);
       if(e.getKey().equals(c.get("language"))) builder.language(e.getKey(),dep);
       locks.put(e.getKey(),Map.of("path",rel,"packageBlueId",dep.blueId(),"archiveSha256",sha(path),"name",dep.name(),"version",dep.version()));

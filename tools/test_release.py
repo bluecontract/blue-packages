@@ -189,10 +189,11 @@ class ReleaseTests(unittest.TestCase):
 
     def test_current_catalogue_and_generated_views_are_consistent(self):
         rows = release.selections(release.ROOT)
-        self.assertEqual(38, len(rows))
+        self.assertEqual(41, len(rows))
         self.assertEqual(1, sum(row['name'] == 'myos-customer-expiry-direct' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-definition-read' for row in rows))
-        self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments', 'blue-offers', 'myos-business'} <= {row['name'] for row in rows})
+        self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments', 'blue-offers', 'myos-business',
+                         'clause-mandates', 'blue-processing-event-source', 'myos-payment-mandates'} <= {row['name'] for row in rows})
         self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-tasks' for row in rows))
         historical = json.loads((release.ROOT / 'retained/demand-scoped-baseline/publications.json').read_text())

@@ -51,7 +51,7 @@ seller-policy authorization remain Core responsibilities. No account runtime def
 
 ## Seller policy mandate
 
-`Seller Payment Policy Mandate` extends the retained Initializable Mandates operation mandate.
+`Seller Payment Policy Mandate` extends the current Mandates v2 operation mandate.
 Its fixed lifecycle initializer constructs one `seller/providePayment` grant as literal source
 and installs it in `grantTemplates.payment` and `scope.payment`. Inherited holder approval is still required; revocation
 empties the runtime scope. The policy identifies the seller, its Agent, exact Order profile,
@@ -104,11 +104,14 @@ therefore remain part of the comparison. Supported initial profiles use the cano
 or three-party roster with one built-in Agent representative per party. Other profiles are
 manual; this policy is not an Agreement-origin proof or a cumulative spending budget.
 
-The retained Initializable Mandates archive is copied verbatim from Core's
+The target imports the active `blue-mandates` publication with the exact identity
+and bytes previously retained from Core's
 `runtime/blue-coordination-core/src/main/resources/mandate-initialization/mandates.bluepkg`:
 root `4kaMxybWTTeTpkzUtoYVUPk8dUo3HxKM5MG5joxN6LFL`, archive SHA-256
 `5dc771ff47b6e2cc59b4043cfb8fb1c8b8bfab288712e693e01b07da9fb8c588`.
-It is a retained import, not an editable foundation or a replaced historical publication.
+The dependency is pinned by identity and SHA-256. The former retained copy remains
+on disk for provenance; it is not also selected in the current catalogue. Consolidating
+the alias does not change the native operation mandate or grant semantics.
 The manifest declares Contracts execution and preserves the imported Mandates specification
 closure. Running the mandate additionally requires the matching explicit MandateInitializationV2
 execution selection and exact native predicate identity callbacks; this package changes no defaults.

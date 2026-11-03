@@ -3360,24 +3360,6 @@ clauses:
         startPayment:
           'on': workflow
           party: customer
-      requestAuthorize:
-        authorize:
-          'on': workflow
-          party: customer
-          params:
-            $pointerSet:
-              object:
-                $object:
-                  $var: trigger
-              path: /type
-              op: remove
-          request:
-            type: PaymentInstruction/Payment Request Input
-            description: Input for this configured financial request. Amount may be supplied by the configured
-              action defaults.
-            requestId:
-              type: Text
-              description: Unique identifier for this requested financial action.
       requestCapture:
         confirmSatisfaction:
           'on': workflow
@@ -3401,8 +3383,8 @@ clauses:
               - kind: Customer Satisfaction
                 satisfied: true
           request:
-            description: This configured operation uses its declared request identifier and amount; no
-              input fields.
+            description: This configured operation uses its declared request identifier and amount; no input
+              fields.
       requestRefund:
         refund:
           'on': workflow
@@ -3438,6 +3420,11 @@ clauses:
           event:
             type: Payment/Payment Event Received
             kind: Customer Satisfaction
+paymentDetails:
+  customerPaymentTerms:
+    provider: test
+    recipientPaymentAccountId: test-seller-account
+    paymentWindowDays: 30
 ```
 
 Walkthrough: [`21-myos-customer.case.yaml`](../examples/apps/21-myos-customer.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -3449,16 +3436,15 @@ Walkthrough: [`21-myos-customer.case.yaml`](../examples/apps/21-myos-customer.ca
 | 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
 | 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 6 | guarantor | /payment | provideSession | `{"sessionId":"test-session"}` | Processed |
-| 7 | guarantor | /payment | confirmFunding | `{"sessionId":"test-session"}` | Processed |
-| 8 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
-| 9 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 10 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
-| 11 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
-| 12 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
-| 13 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
-| 14 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
-| 15 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+| 6 | guarantor | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 7 | guarantor | /payment | provideSession | `{"type":"MyOS/Customer Session Input","sessionId":"test-session","requestId":"customer-session-1","expiresAt":2592005000000}` | Processed |
+| 8 | guarantor | /payment | requestCustomerPayment | `{"sessionId":"test-session","requestId":"auth-1"}` | Processed |
+| 9 | guarantor | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
+| 10 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
+| 11 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
+| 12 | guarantor | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 13 | seller | /payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-1","amountMinor":2500}` | Processed |
+| 14 | guarantor | /payment | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
 
 ### 22-myos-account
 
