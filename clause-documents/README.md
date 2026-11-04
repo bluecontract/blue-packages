@@ -9,9 +9,10 @@ adapters are separate follow-on integrations, not qualified by the generic examp
 
 A receiving template declares its own Activation parties and commercial approval
 requirements. The containing clause maps each receiving role to one of its own roles
-or to an explicit Party. Role names do not establish identity. Main channels and
+or to an explicit Party. Role names do not establish identity. In the default inherited mode, main channels and
 nonempty reader-key sets must match; representative differences do not replace the
-main identity. Every existing main party, including observers, must be represented.
+main identity. The explicit bootstrap variant below permits fresh channels while
+preserving mapped actors and reader sets. Every existing main party, including observers, must be represented.
 
 ```yaml
 work:
@@ -42,6 +43,55 @@ the local child. It preserves the child's declared approvals. `obtain: provide`
 retains a prepared requirement and accepts an independently initialized instance.
 Provision requires its exact `inResponseTo` request ID and `requirementRef`.
 The instance's native origin and execution history are preserved.
+
+### Preparation for independent bootstrap
+
+The explicit `parameters.prepareFor: bootstrap` variant was qualified locally on
+27 October 2026 for `obtain: provide`. Omit `prepareFor` to retain the existing
+inherited-transport behavior; `bootstrap` is the only accepted explicit value.
+An explicit `inherited` value, unknown values and nonempty `inheritChannels` are rejected. This option does not change
+activation, approvals, source binding or readiness rules.
+
+In this variant, mapped main parties retain their reader keys and identity, but
+the prepared child does not copy their parent channels or Timeline Access
+documents. Ordinary Core bootstrap supplies fresh child channels, grants and
+the declared customer identity, including enrollment of a new reader key.
+`provide` compares the resulting native document against the frozen preparation,
+checks the mapped actors/readers and child access, then follows the existing
+activation and selection lifecycle. The mode is frozen with the preparation;
+changing configuration cannot reinterpret an outstanding request.
+
+The customer-facing form can derive its named inputs from `fieldPaths` and the
+typed fields in the template. Browsing, editing and reviewing that form does
+not call `prepare`. Actual submission starts preparation, bootstrap and provision
+under a durable caller-owned request identity. Bootstrap and delivery are host
+orchestration, not new activation behavior inside this clause.
+
+Qualification: `tools/check_operation_inputs.py --case bootstrap-preparation`
+checks native preparation and rejected inputs. Signed Core
+`BootstrappedPreparationTest` subsequently passed both three-account variants
+(with/without ordinary Agent representatives): fresh-customer bootstrap, normal
+approval gates, provision of the same Order, later child observation, duplicate
+provision and denial of customer access to parent timelines. Business's local
+browser journey also passed; email delivery and release gates are separate.
+The [Core qualification record](https://github.com/bluecontract/myos-core/blob/0b1980346421f70598c1e73a82c2d3db4ffd4d51/docs/bootstrap-compatible-preparation.md)
+contains reproduction, provenance, measurements and remaining scope.
+
+Implemented source changes are `Bootstrap Preparation Functions`, Factory Functions'
+mode-aware delegation, Preparation Functions' frozen mode/identity/source validation,
+and Parties' `accessRecordsValid` helper. Bootstrap access validation requires
+canonical paths, initialized proofs, correct provider/timeline and required reader
+coverage. This helper validates evidence; it does not grant access. Ordinary Core
+bootstrap supplies the fresh transports; no new production Core bootstrap endpoint
+or activation option was added. Mapped representatives retain their actor/readers
+while obtaining new child channels. Having a representative is not proof of Agent
+approval. Later access revocation can still interrupt parent observation.
+
+Packages `a0e1a09` and `6161c99` contain this change; Documents is
+`0.8.0-preview.9`. Dependent archive/type IDs were rebuilt, including Activation
+`0.8.0-preview.5`, without changing Activation's source behavior in those commits.
+These remain unpublished candidate archives. Existing immutable versions and omitted
+`prepareFor` behavior remain available; this is not an in-place document migration.
 
 `parameters.fieldPaths` maps named `prepare.values` to typed data fields in the
 child template. `parameters.suppliedParties` declares roles the supplier may fill;

@@ -56,5 +56,15 @@ class DependencyOrderTest(unittest.TestCase):
             dependency_order(self.root, ['payment'])
 
 
+    def test_undeclared_retained_execution_archive_is_not_an_active_dependency(self):
+        self.package('representation')
+        manifest = self.root / 'representation/blue-package.yaml'
+        manifest.write_text(json.dumps({'imports': {'Mandates': {
+            'path': '../verification/publications/mandates-v1/dist/package.bluepkg',
+            'packageBlueId': 'retained-test-identity', 'archiveSha256': 'sha256:' + '0' * 64,
+        }}, 'executionRequires': ['Mandates']}))
+        with self.assertRaisesRegex(ValueError, 'Unsupported package import path'):
+            dependency_order(self.root, ['representation'])
+
 if __name__ == '__main__':
     unittest.main()

@@ -29,6 +29,7 @@ CASES = {
     'source-binding-guards': ('SourceBindingConformance', 'guards'),
     'source-binding-routing': ('SourceBindingConformance', 'routing'),
     'document-provision': ('ProvisionInputConformance',),
+    'bootstrap-preparation': ('BootstrapPreparationConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
