@@ -1,0 +1,100 @@
+name: Commission Payout Payment Clause
+type: Payment/Payment Base
+actionDefinition:
+  type:
+    type: Payment/Payment Setup
+    functions:
+      build:
+        args: {}
+        do:
+        - $let:
+            name: p
+            expr:
+              $document:
+                $concat:
+                - /clauses/
+                - $const: clauseKey
+                - /parameters
+        - $let:
+            name: recipient
+            expr:
+              $pointerGet:
+                object:
+                  $var: p
+                path: /payee
+                default: seller
+        - $let:
+            name: result
+            expr:
+              $call:
+                function: buildInstruction
+                args:
+                  configOverride:
+                    guarantor:
+                      $var: recipient
+                  details:
+                    method: manual-bank-transfer
+                    confirmation: recipient
+                  methodClauses:
+                    $literal:
+                      settlementPolicy:
+                        type: Features/Feature Clause
+                        parameters:
+                          actions:
+                            initialize:
+                              automatic:
+                                'on': initialized
+                                once: true
+                              do:
+                              - $appendChange:
+                                  op: add
+                                  path: /settlementOpen
+                                  val: true
+                            retire:
+                              do:
+                              - $forEach:
+                                  item: financialRequest
+                                  in:
+                                    $document: /payment/requests
+                                  do:
+                                  - $failIf:
+                                      cond:
+                                        $includes:
+                                          list:
+                                          - pending
+                                          - unknown
+                                          val:
+                                            $var:
+                                              name: financialRequest
+                                              path: /status
+                                      message: PAYOUT_OUTCOME_UNRESOLVED
+                              - $failIf:
+                                  cond:
+                                    $ne:
+                                    - $add:
+                                      - $document: /payment/reserved/secure
+                                      - $document: /payment/reserved/capture
+                                      - $document: /payment/reserved/void
+                                      - $document: /payment/reserved/refund
+                                    - 0
+                                  message: PAYOUT_OUTCOME_UNRESOLVED
+                              - $appendChange:
+                                  op: replace
+                                  path: /settlementOpen
+                                  val: false
+                              - $appendEvent:
+                                  $merge:
+                                  - type: Events/Event
+                                  - kind: Payout Retired
+                        bindings:
+                          retire:
+                            retirePayout:
+                              'on': workflow
+                              party: partner
+                  termsOverride:
+                    captureGate: /settlementOpen
+                  instructionPatch: {}
+        - $return:
+            $var: result
+description: Manual commission payout whose recipient confirms receipt. Retiring the payout is guarded by unresolved
+  requests and reserved funds.

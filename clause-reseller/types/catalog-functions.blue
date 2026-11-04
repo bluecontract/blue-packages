@@ -1,0 +1,1546 @@
+name: Catalog Functions
+description: Flat single-supplier prices, per-line half-up guest discounts and immutable exact quotes.
+type: Money/Rounding
+functions:
+  connectionConfiguration:
+    args: {}
+  configurationParameters:
+    args: {}
+    expr:
+      $pointerGet:
+        object:
+          $call:
+            function: connectionConfiguration
+            args: {}
+        path: /parameters
+        default: {}
+  validateFields:
+    args:
+      candidate: {}
+      allowed: []
+      required: []
+      error:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: candidate
+              kind: object
+        message:
+          $var: error
+    - $forEach:
+        in:
+          $keys:
+            $var: candidate
+        item: fieldKey
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: allowed
+                  val:
+                    $var: fieldKey
+            message:
+              $var: error
+    - $forEach:
+        in:
+          $var: required
+        item: fieldKey
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: candidate
+                  key:
+                    $var: fieldKey
+            message:
+              $var: error
+    - $return: true
+  validateInteger:
+    args:
+      candidate:
+        type:
+          blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+      minimum:
+        type:
+          blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+      maximum:
+        type:
+          blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+      error:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: candidate
+                kind: integer
+            - $gte:
+              - $var: candidate
+              - $var: minimum
+            - $lte:
+              - $var: candidate
+              - $var: maximum
+        message:
+          $var: error
+    - $return: true
+  validateIdentifier:
+    args:
+      candidate:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+      error:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $and:
+              - $isKind:
+                  val:
+                    $var: candidate
+                  kind: text
+              - $is:
+                  node:
+                    $var: candidate
+                  pattern:
+                    type:
+                      blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                    schema:
+                      minLength: 1
+                      maxLength: 64
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: /
+              - 1
+            - $eq:
+              - $size:
+                  $split:
+                    text:
+                      $var: candidate
+                    separator: '~'
+              - 1
+            - $not:
+                $startsWith:
+                - $var: candidate
+                - $
+            - $not:
+                $includes:
+                  list:
+                  - name
+                  - description
+                  - type
+                  - itemType
+                  - keyType
+                  - valueType
+                  - value
+                  - items
+                  - blueId
+                  - blue
+                  - schema
+                  - constraints
+                  - mergePolicy
+                  - properties
+                  - contracts
+                  val:
+                    $var: candidate
+        message:
+          $var: error
+    - $return: true
+  validateCalendarDate:
+    args:
+      candidate:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: candidate
+                kind: text
+            - $is:
+                node:
+                  $var: candidate
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 10
+                    maxLength: 10
+        message: INVALID_CALENDAR_DATE
+    - $let:
+        name: parts
+        expr:
+          $split:
+            text:
+              $var: candidate
+            separator: '-'
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $size:
+                $var: parts
+            - 3
+        message: INVALID_CALENDAR_DATE
+    - $let:
+        name: yearPart
+        expr:
+          $listGet:
+            list:
+              $var: parts
+            index: 0
+    - $let:
+        name: monthPart
+        expr:
+          $listGet:
+            list:
+              $var: parts
+            index: 1
+    - $let:
+        name: dayPart
+        expr:
+          $listGet:
+            list:
+              $var: parts
+            index: 2
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - '2000'
+              - '2001'
+              - '2002'
+              - '2003'
+              - '2004'
+              - '2005'
+              - '2006'
+              - '2007'
+              - '2008'
+              - '2009'
+              - '2010'
+              - '2011'
+              - '2012'
+              - '2013'
+              - '2014'
+              - '2015'
+              - '2016'
+              - '2017'
+              - '2018'
+              - '2019'
+              - '2020'
+              - '2021'
+              - '2022'
+              - '2023'
+              - '2024'
+              - '2025'
+              - '2026'
+              - '2027'
+              - '2028'
+              - '2029'
+              - '2030'
+              - '2031'
+              - '2032'
+              - '2033'
+              - '2034'
+              - '2035'
+              - '2036'
+              - '2037'
+              - '2038'
+              - '2039'
+              - '2040'
+              - '2041'
+              - '2042'
+              - '2043'
+              - '2044'
+              - '2045'
+              - '2046'
+              - '2047'
+              - '2048'
+              - '2049'
+              - '2050'
+              - '2051'
+              - '2052'
+              - '2053'
+              - '2054'
+              - '2055'
+              - '2056'
+              - '2057'
+              - '2058'
+              - '2059'
+              - '2060'
+              - '2061'
+              - '2062'
+              - '2063'
+              - '2064'
+              - '2065'
+              - '2066'
+              - '2067'
+              - '2068'
+              - '2069'
+              - '2070'
+              - '2071'
+              - '2072'
+              - '2073'
+              - '2074'
+              - '2075'
+              - '2076'
+              - '2077'
+              - '2078'
+              - '2079'
+              - '2080'
+              - '2081'
+              - '2082'
+              - '2083'
+              - '2084'
+              - '2085'
+              - '2086'
+              - '2087'
+              - '2088'
+              - '2089'
+              - '2090'
+              - '2091'
+              - '2092'
+              - '2093'
+              - '2094'
+              - '2095'
+              - '2096'
+              - '2097'
+              - '2098'
+              - '2099'
+              val:
+                $var: yearPart
+        message: CALENDAR_YEAR_OUT_OF_RANGE
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - '01'
+              - '02'
+              - '03'
+              - '04'
+              - '05'
+              - '06'
+              - '07'
+              - 08
+              - 09
+              - '10'
+              - '11'
+              - '12'
+              val:
+                $var: monthPart
+        message: INVALID_CALENDAR_DATE
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - '01'
+              - '02'
+              - '03'
+              - '04'
+              - '05'
+              - '06'
+              - '07'
+              - 08
+              - 09
+              - '10'
+              - '11'
+              - '12'
+              - '13'
+              - '14'
+              - '15'
+              - '16'
+              - '17'
+              - '18'
+              - '19'
+              - '20'
+              - '21'
+              - '22'
+              - '23'
+              - '24'
+              - '25'
+              - '26'
+              - '27'
+              - '28'
+              - '29'
+              - '30'
+              - '31'
+              val:
+                $var: dayPart
+        message: INVALID_CALENDAR_DATE
+    - $let:
+        name: monthDays
+        expr:
+          $get:
+            object:
+              '01': 31
+              '02': 28
+              '03': 31
+              '04': 30
+              '05': 31
+              '06': 30
+              '07': 31
+              08: 31
+              09: 30
+              '10': 31
+              '11': 30
+              '12': 31
+            key:
+              $var: monthPart
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: monthPart
+            - '02'
+          - $includes:
+              list:
+              - '2000'
+              - '2004'
+              - '2008'
+              - '2012'
+              - '2016'
+              - '2020'
+              - '2024'
+              - '2028'
+              - '2032'
+              - '2036'
+              - '2040'
+              - '2044'
+              - '2048'
+              - '2052'
+              - '2056'
+              - '2060'
+              - '2064'
+              - '2068'
+              - '2072'
+              - '2076'
+              - '2080'
+              - '2084'
+              - '2088'
+              - '2092'
+              - '2096'
+              val:
+                $var: yearPart
+        then:
+        - $set:
+            name: monthDays
+            expr: 29
+    - $failIf:
+        cond:
+          $not:
+            $lte:
+            - $get:
+                object:
+                  '01': 1
+                  '02': 2
+                  '03': 3
+                  '04': 4
+                  '05': 5
+                  '06': 6
+                  '07': 7
+                  08: 8
+                  09: 9
+                  '10': 10
+                  '11': 11
+                  '12': 12
+                  '13': 13
+                  '14': 14
+                  '15': 15
+                  '16': 16
+                  '17': 17
+                  '18': 18
+                  '19': 19
+                  '20': 20
+                  '21': 21
+                  '22': 22
+                  '23': 23
+                  '24': 24
+                  '25': 25
+                  '26': 26
+                  '27': 27
+                  '28': 28
+                  '29': 29
+                  '30': 30
+                  '31': 31
+                key:
+                  $var: dayPart
+            - $var: monthDays
+        message: INVALID_CALENDAR_DATE
+    - $return: true
+  validateItems:
+    args:
+      entries: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: entries
+                kind: object
+            - $gte:
+              - $size:
+                  $var: entries
+              - 1
+            - $lte:
+              - $size:
+                  $var: entries
+              - 100
+        message: INVALID_ITEMS
+    - $forEach:
+        in:
+          $var: entries
+        item: item
+        do:
+        - $call:
+            function: validateIdentifier
+            args:
+              candidate:
+                $var: itemKey
+              error: INVALID_ITEM_ID
+        - $call:
+            function: validateFields
+            args:
+              candidate:
+                $var: item
+              allowed:
+              - label
+              - description
+              - pricingUnit
+              - dateRequired
+              - maxQuantity
+              - allowedDurationHours
+              - unitAmountMinor
+              - guestDiscountPercent
+              - dateSelectionHint
+              required:
+              - label
+              - pricingUnit
+              - dateRequired
+              - maxQuantity
+              - unitAmountMinor
+              error: INVALID_ITEM_FIELDS
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: item
+                        path: /label
+                    kind: text
+                - $is:
+                    node:
+                      $var:
+                        name: item
+                        path: /label
+                    pattern:
+                      type:
+                        blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                      schema:
+                        minLength: 1
+                        maxLength: 120
+            message: INVALID_ITEM_LABEL
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: item
+                key: description
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: item
+                            path: /description
+                        kind: text
+                    - $is:
+                        node:
+                          $var:
+                            name: item
+                            path: /description
+                        pattern:
+                          type:
+                            blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                          schema:
+                            minLength: 1
+                            maxLength: 2000
+                message: INVALID_ITEM_DESCRIPTION
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - per_unit
+                  - per_selected_hour
+                  val:
+                    $var:
+                      name: item
+                      path: /pricingUnit
+            message: UNSUPPORTED_PRICING_UNIT
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var:
+                      name: item
+                      path: /dateRequired
+                  kind: boolean
+            message: INVALID_DATE_REQUIRED
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: item
+                key: dateSelectionHint
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $var:
+                      name: item
+                      path: /dateRequired
+                message: DATE_HINT_REQUIRES_DATE
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: item
+                            path: /dateSelectionHint
+                        kind: text
+                    - $is:
+                        node:
+                          $var:
+                            name: item
+                            path: /dateSelectionHint
+                        pattern:
+                          type:
+                            blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                          schema:
+                            minLength: 1
+                            maxLength: 500
+                message: INVALID_DATE_SELECTION_HINT
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var:
+                  name: item
+                  path: /maxQuantity
+              minimum: 1
+              maximum: 1000
+              error: INVALID_MAX_QUANTITY
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var:
+                  name: item
+                  path: /unitAmountMinor
+              minimum: 0
+              maximum: 100000000
+              error: INVALID_UNIT_AMOUNT
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: item
+                key: guestDiscountPercent
+            then:
+            - $call:
+                function: validateInteger
+                args:
+                  candidate:
+                    $var:
+                      name: item
+                      path: /guestDiscountPercent
+                  minimum: 0
+                  maximum: 100
+                  error: INVALID_GUEST_DISCOUNT_PERCENT
+        - $let:
+            name: hours
+            expr:
+              $pointerGet:
+                object:
+                  $var: item
+                path: /allowedDurationHours
+                default: []
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: hours
+                  kind: list
+            message: INVALID_DURATION_CHOICES
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: item
+                  path: /pricingUnit
+              - per_unit
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $eq:
+                    - $size:
+                        $var: hours
+                    - 0
+                message: DURATION_CHOICES_NOT_ALLOWED
+            else:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $gte:
+                      - $size:
+                          $var: hours
+                      - 1
+                    - $lte:
+                      - $size:
+                          $var: hours
+                      - 24
+                message: INVALID_DURATION_CHOICES
+            - $let:
+                name: seenHours
+                expr: []
+            - $forEach:
+                in:
+                  $var: hours
+                item: hourChoice
+                do:
+                - $call:
+                    function: validateInteger
+                    args:
+                      candidate:
+                        $var: hourChoice
+                      minimum: 1
+                      maximum: 168
+                      error: INVALID_DURATION_CHOICE
+                - $failIf:
+                    cond:
+                      $includes:
+                        list:
+                          $var: seenHours
+                        val:
+                          $var: hourChoice
+                    message: DUPLICATE_DURATION_CHOICE
+                - $set:
+                    name: seenHours
+                    expr:
+                      $listConcat:
+                      - $var: seenHours
+                      - - $var: hourChoice
+        key: itemKey
+    - $return: true
+  validateCatalogState:
+    args:
+      catalogState: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: catalogState
+          allowed:
+          - revision
+          - supplierId
+          - currency
+          - entries
+          required:
+          - revision
+          - supplierId
+          - currency
+          - entries
+          error: INVALID_CATALOG_FIELDS
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var:
+              name: catalogState
+              path: /revision
+          minimum: 1
+          maximum: 1000000
+          error: INVALID_CATALOG_REVISION
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: catalogState
+              path: /supplierId
+          error: INVALID_SUPPLIER_ID
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: catalogState
+                    path: /currency
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: catalogState
+                    path: /currency
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 3
+                    maxLength: 3
+        message: INVALID_CURRENCY
+    - $call:
+        function: validateItems
+        args:
+          entries:
+            $var:
+              name: catalogState
+              path: /entries
+    - $return: true
+  validateInitialCatalog:
+    args: {}
+    do:
+    - $call:
+        function: validateCatalogState
+        args:
+          catalogState:
+            $document:
+              $const:
+                name: bindings
+                path: /state
+    - $if:
+        cond:
+          $exists:
+            $document:
+              $const:
+                name: bindings
+                path: /quotes
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /quotes
+                    kind: object
+                - $eq:
+                  - $size:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /quotes
+                  - 0
+            message: INITIAL_QUOTES_MUST_BE_EMPTY
+    - $return:
+        outcome: acceptedNew
+  publishCatalog:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: input
+          allowed:
+          - expectedRevision
+          - entries
+          required:
+          - expectedRevision
+          - entries
+          error: INVALID_CATALOG_PUBLICATION_FIELDS
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /expectedRevision
+          minimum: 1
+          maximum: 1000000
+          error: INVALID_EXPECTED_REVISION
+    - $let:
+        name: currentCatalog
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /state
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: input
+                path: /expectedRevision
+            - $var:
+                name: currentCatalog
+                path: /revision
+        message: STALE_CATALOG_REVISION
+    - $failIf:
+        cond:
+          $not:
+            $lt:
+            - $var:
+                name: currentCatalog
+                path: /revision
+            - 1000000
+        message: REVISION_LIMIT
+    - $call:
+        function: validateItems
+        args:
+          entries:
+            $var:
+              name: input
+              path: /entries
+    - $let:
+        name: nextCatalog
+        expr:
+          $merge:
+          - $var: currentCatalog
+          - revision:
+              $add:
+              - $var:
+                  name: currentCatalog
+                  path: /revision
+              - 1
+            entries:
+              $var:
+                name: input
+                path: /entries
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          $var: nextCatalog
+    - $appendEvent:
+        $merge:
+        - type:
+            blueId: HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9
+        - clause:
+            $const: clauseKey
+          kind: Catalog Published
+          revision:
+            $var:
+              name: nextCatalog
+              path: /revision
+    - $return:
+        outcome: acceptedNew
+        revision:
+          $var:
+            name: nextCatalog
+            path: /revision
+  priceLine:
+    args:
+      selection: {}
+      catalogState: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: selection
+          allowed:
+          - itemId
+          - quantity
+          - serviceDate
+          - durationHours
+          required:
+          - itemId
+          - quantity
+          error: INVALID_QUOTE_LINE_FIELDS
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: selection
+              path: /itemId
+          error: INVALID_ITEM_ID
+    - $let:
+        name: item
+        expr:
+          $get:
+            object:
+              $var:
+                name: catalogState
+                path: /entries
+            key:
+              $var:
+                name: selection
+                path: /itemId
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: item
+        message: UNKNOWN_ITEM
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var:
+              name: selection
+              path: /quantity
+          minimum: 1
+          maximum:
+            $var:
+              name: item
+              path: /maxQuantity
+          error: INVALID_QUANTITY
+    - $if:
+        cond:
+          $var:
+            name: item
+            path: /dateRequired
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: selection
+                  key: serviceDate
+            message: SERVICE_DATE_REQUIRED
+        - $call:
+            function: validateCalendarDate
+            args:
+              candidate:
+                $var:
+                  name: selection
+                  path: /serviceDate
+        else:
+        - $failIf:
+            cond:
+              $hasKey:
+                object:
+                  $var: selection
+                key: serviceDate
+            message: SERVICE_DATE_NOT_ALLOWED
+    - $let:
+        name: billableUnits
+        expr:
+          $var:
+            name: selection
+            path: /quantity
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: item
+              path: /pricingUnit
+          - per_selected_hour
+        then:
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var:
+                  name: selection
+                  path: /durationHours
+              minimum: 1
+              maximum: 168
+              error: INVALID_DURATION_HOURS
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var:
+                      name: item
+                      path: /allowedDurationHours
+                  val:
+                    $var:
+                      name: selection
+                      path: /durationHours
+            message: DURATION_NOT_OFFERED
+        - $set:
+            name: billableUnits
+            expr:
+              $multiply:
+              - $var:
+                  name: selection
+                  path: /quantity
+              - $var:
+                  name: selection
+                  path: /durationHours
+        else:
+        - $failIf:
+            cond:
+              $hasKey:
+                object:
+                  $var: selection
+                key: durationHours
+            message: DURATION_NOT_ALLOWED
+    - $let:
+        name: subtotalMinor
+        expr:
+          $multiply:
+          - $var:
+              name: item
+              path: /unitAmountMinor
+          - $var: billableUnits
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var: subtotalMinor
+          minimum: 0
+          maximum: 1000000000000
+          error: LINE_TOTAL_LIMIT
+    - $let:
+        name: discountPercent
+        expr:
+          $pointerGet:
+            object:
+              $var: item
+            path: /guestDiscountPercent
+            default: 0
+    - $let:
+        name: discountMinor
+        expr:
+          $call:
+            function: roundBps
+            args:
+              basis:
+                $var: subtotalMinor
+              bps:
+                $multiply:
+                - $var: discountPercent
+                - 100
+    - $let:
+        name: lineTotalMinor
+        expr:
+          $subtract:
+          - $var: subtotalMinor
+          - $var: discountMinor
+    - $return:
+        $merge:
+        - itemId:
+            $var:
+              name: selection
+              path: /itemId
+          itemLabel:
+            $var:
+              name: item
+              path: /label
+          quantity:
+            $var:
+              name: selection
+              path: /quantity
+          pricingUnit:
+            $var:
+              name: item
+              path: /pricingUnit
+          unitAmountMinor:
+            $var:
+              name: item
+              path: /unitAmountMinor
+          billableUnits:
+            $var: billableUnits
+          guestDiscountPercent:
+            $var: discountPercent
+          subtotalMinor:
+            $var: subtotalMinor
+          discountMinor:
+            $var: discountMinor
+          lineTotalMinor:
+            $var: lineTotalMinor
+        - $choose:
+            cond:
+              $hasKey:
+                object:
+                  $var: item
+                key: description
+            then:
+              itemDescription:
+                $get:
+                  object:
+                    $var: item
+                  key: description
+            else: {}
+        - $choose:
+            cond:
+              $hasKey:
+                object:
+                  $var: item
+                key: dateSelectionHint
+            then:
+              dateSelectionHint:
+                $get:
+                  object:
+                    $var: item
+                  key: dateSelectionHint
+            else: {}
+        - $choose:
+            cond:
+              $var:
+                name: item
+                path: /dateRequired
+            then:
+              serviceDate:
+                $var:
+                  name: selection
+                  path: /serviceDate
+            else: {}
+        - $choose:
+            cond:
+              $eq:
+              - $var:
+                  name: item
+                  path: /pricingUnit
+              - per_selected_hour
+            then:
+              durationHours:
+                $var:
+                  name: selection
+                  path: /durationHours
+            else: {}
+  createQuote:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: input
+          allowed:
+          - key
+          - catalogRevision
+          - lines
+          required:
+          - key
+          - catalogRevision
+          - lines
+          error: INVALID_QUOTE_FIELDS
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /key
+          error: INVALID_QUOTE_KEY
+    - $let:
+        name: quoteKey
+        expr:
+          $var:
+            name: input
+            path: /key
+    - $let:
+        name: previousQuote
+        expr:
+          $get:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /quotes
+            key:
+              $var: quoteKey
+    - $if:
+        cond:
+          $exists:
+            $var: previousQuote
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var:
+                    name: previousQuote
+                    path: /intent
+                - $var: input
+            message: QUOTE_KEY_CONFLICT
+        - $return:
+            outcome: duplicate
+            key:
+              $var: quoteKey
+    - $failIf:
+        cond:
+          $not:
+            $lt:
+            - $size:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /quotes
+            - 200
+        message: QUOTE_LIMIT_REACHED
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /catalogRevision
+          minimum: 1
+          maximum: 1000000
+          error: INVALID_CATALOG_REVISION
+    - $let:
+        name: catalogState
+        expr:
+          $document:
+            $const:
+              name: bindings
+              path: /state
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: input
+                path: /catalogRevision
+            - $var:
+                name: catalogState
+                path: /revision
+        message: STALE_CATALOG_REVISION
+    - $let:
+        name: snapshot
+        expr:
+          $call:
+            function: priceSelections
+            args:
+              input:
+                $var: input
+              catalogState:
+                $var: catalogState
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $const:
+              name: bindings
+              path: /quotes
+          - /
+          - $var: quoteKey
+        val:
+          $var: snapshot
+    - $appendEvent:
+        $merge:
+        - type:
+            blueId: HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9
+        - clause:
+            $const: clauseKey
+          kind: Quote Created
+          quoteKey:
+            $var: quoteKey
+          totalMinor:
+            $var:
+              name: snapshot
+              path: /totalMinor
+          catalogRevision:
+            $var:
+              name: catalogState
+              path: /revision
+    - $return:
+        outcome: acceptedNew
+        key:
+          $var: quoteKey
+  priceSelections:
+    args:
+      input: {}
+      catalogState: {}
+    do:
+    - $let:
+        name: selections
+        expr:
+          $var:
+            name: input
+            path: /lines
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: selections
+                kind: list
+            - $gte:
+              - $size:
+                  $var: selections
+              - 1
+            - $lte:
+              - $size:
+                  $var: selections
+              - 20
+        message: INVALID_QUOTE_LINES
+    - $let:
+        name: pricedLines
+        expr: []
+    - $let:
+        name: seenSelections
+        expr: []
+    - $let:
+        name: subtotalMinor
+        expr: 0
+    - $let:
+        name: discountMinor
+        expr: 0
+    - $let:
+        name: totalMinor
+        expr: 0
+    - $forEach:
+        in:
+          $var: selections
+        item: selection
+        do:
+        - $let:
+            name: pricedLine
+            expr:
+              $call:
+                function: priceLine
+                args:
+                  selection:
+                    $var: selection
+                  catalogState:
+                    $var: catalogState
+        - $let:
+            name: selectionIdentity
+            expr:
+              itemId:
+                $var:
+                  name: selection
+                  path: /itemId
+              serviceDate:
+                $pointerGet:
+                  object:
+                    $var: selection
+                  path: /serviceDate
+                  default: ''
+              durationHours:
+                $pointerGet:
+                  object:
+                    $var: selection
+                  path: /durationHours
+                  default: 0
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                  $var: seenSelections
+                val:
+                  $var: selectionIdentity
+            message: DUPLICATE_QUOTE_SELECTION
+        - $set:
+            name: seenSelections
+            expr:
+              $listConcat:
+              - $var: seenSelections
+              - - $var: selectionIdentity
+        - $set:
+            name: pricedLines
+            expr:
+              $listConcat:
+              - $var: pricedLines
+              - - $var: pricedLine
+        - $set:
+            name: subtotalMinor
+            expr:
+              $add:
+              - $var: subtotalMinor
+              - $var:
+                  name: pricedLine
+                  path: /subtotalMinor
+        - $set:
+            name: discountMinor
+            expr:
+              $add:
+              - $var: discountMinor
+              - $var:
+                  name: pricedLine
+                  path: /discountMinor
+        - $set:
+            name: totalMinor
+            expr:
+              $add:
+              - $var: totalMinor
+              - $var:
+                  name: pricedLine
+                  path: /lineTotalMinor
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var: subtotalMinor
+              minimum: 0
+              maximum: 1000000000000
+              error: QUOTE_TOTAL_LIMIT
+    - $let:
+        name: snapshot
+        expr:
+          intent:
+            $var: input
+          supplierId:
+            $var:
+              name: catalogState
+              path: /supplierId
+          currency:
+            $var:
+              name: catalogState
+              path: /currency
+          catalogRevision:
+            $var:
+              name: catalogState
+              path: /revision
+          catalogBlueId:
+            $nodeBlueId:
+              $var: catalogState
+          lines:
+            $var: pricedLines
+          subtotalMinor:
+            $var: subtotalMinor
+          discountMinor:
+            $var: discountMinor
+          totalMinor:
+            $var: totalMinor
+    - $return:
+        $var: snapshot

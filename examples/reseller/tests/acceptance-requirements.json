@@ -1,0 +1,634 @@
+{
+  "format": "myos-clause-handoff-test-plan/1",
+  "status": "planned_not_executed",
+  "executableByBaselineHarness": false,
+  "note": "These are acceptance requirements. Codex must implement native Blue fixtures and operations, then execute and report them. Future operation/state names here are semantic placeholders.",
+  "profile": "proposed-demo-profile-not-approved-as-universal-commercial-terms",
+  "timeUnit": "microseconds",
+  "exampleTime": {
+    "startLocal": "2026-11-14T14:00:00+01:00",
+    "confirmedStartMicros": 1794661200000000,
+    "cutoff24HoursMicros": 1794574800000000
+  },
+  "cases": [
+    {
+      "id": "F01",
+      "stage": "T1",
+      "title": "Tekst w zamówieniu pochodzi z przyjętej wersji warunków",
+      "given": {
+        "approvedText": "Miejsce A; kaucja u operatora.",
+        "quoteVersion": "computed exact native version"
+      },
+      "when": "Create and accept the order snapshot.",
+      "expected": {
+        "frozenText": "Miejsce A; kaucja u operatora.",
+        "sellerFromStructuredParty": true
+      }
+    },
+    {
+      "id": "F02",
+      "stage": "T1",
+      "title": "Aktualizacja warunków nie zmienia starego Ordera",
+      "given": {
+        "existingOrderText": "Miejsce A",
+        "agreementNewText": "Miejsce B"
+      },
+      "when": "Publish revised agreement text; read old order and create a new one.",
+      "expected": {
+        "oldOrderText": "Miejsce A",
+        "newOrderText": "Miejsce B"
+      }
+    },
+    {
+      "id": "F03",
+      "stage": "T1",
+      "title": "Kaucja w tekście nie tworzy dodatkowej należności MyOS",
+      "given": {
+        "serviceAmountMinor": 10000,
+        "currency": "USD",
+        "text": "Operator holds 500 USD on arrival."
+      },
+      "when": "Snapshot terms and calculate order total/cancellation basis.",
+      "expected": {
+        "serviceAmountMinor": 10000,
+        "depositPaymentInstructionCreated": false,
+        "depositInCancellationBasis": false
+      }
+    },
+    {
+      "id": "C01",
+      "stage": "T2",
+      "title": "Dostawca potwierdza dokładną aktualną propozycję",
+      "given": {
+        "state": "pending_supplier",
+        "proposedStartMicros": 1794661200000000,
+        "eventTimestampMicros": 1794574799999999
+      },
+      "when": "Authorized seller confirms the current exact proposal.",
+      "expected": {
+        "state": "confirmed",
+        "confirmedStartMicros": 1794661200000000
+      }
+    },
+    {
+      "id": "C02",
+      "stage": "T2",
+      "title": "Alternatywny termin czeka na zgodę klienta",
+      "given": {
+        "state": "pending_supplier",
+        "proposedStartMicros": 1794661200000000
+      },
+      "when": "Seller proposes a different start; then customer accepts that exact proposal.",
+      "expected": {
+        "afterSeller": "pending_customer",
+        "confirmedBeforeCustomerAcceptance": false,
+        "afterCustomer": "confirmed",
+        "finalTimeEqualsAcceptedAlternative": true
+      }
+    },
+    {
+      "id": "C03",
+      "stage": "T2",
+      "title": "Stara akceptacja nie zatwierdza nowszej propozycji",
+      "given": {
+        "proposalA": "native exact version A",
+        "currentProposal": "native exact version B"
+      },
+      "when": "Customer or seller submits approval targeting proposal A.",
+      "expected": {
+        "rejected": true,
+        "stateUnchanged": true,
+        "effectsEmpty": true
+      }
+    },
+    {
+      "id": "C04",
+      "stage": "T2",
+      "title": "Partner nie potwierdza realizacji jako seller",
+      "given": {
+        "state": "pending_supplier",
+        "actor": "hotel partner"
+      },
+      "when": "Attempt seller confirmation.",
+      "expected": {
+        "rejected": true,
+        "stateUnchanged": true,
+        "noRealizationConfirmation": true
+      }
+    },
+    {
+      "id": "C05",
+      "stage": "T2",
+      "title": "Automatic wymaga przyjętej finalnej propozycji i podstawy potwierdzenia",
+      "given": {
+        "mode": "automatic",
+        "finalTermsAccepted": true,
+        "trustedReadinessEvidence": "explicit test fixture"
+      },
+      "when": "Submit the accepted final proposal through the correct role.",
+      "expected": {
+        "state": "confirmed",
+        "supplierManualWaitRequired": false,
+        "testDoesNotProveLiveInventory": true
+      }
+    },
+    {
+      "id": "C06",
+      "stage": "T2",
+      "title": "Późne potwierdzenie wymaga jawnej zgody na natychmiastową opłatę",
+      "given": {
+        "state": "pending_supplier",
+        "startMicros": 1794661200000000,
+        "hostTimestampMicros": 1794589200000000,
+        "chargePercent": 100
+      },
+      "when": "Seller responds 20 hours before the service under a 24h policy, without prior explicit acceptance of this immediate charge.",
+      "expected": {
+        "state": "pending_customer",
+        "confirmedWithoutConsent": false,
+        "customerMustSeeFinalStartAndCharge": true
+      }
+    },
+    {
+      "id": "C07",
+      "stage": "T2",
+      "title": "Sama data nie wystarcza do godzinowej polityki",
+      "given": {
+        "preferredDate": "2026-11-14",
+        "exactStart": null,
+        "policyHours": 24
+      },
+      "when": "Attempt final confirmation with hourly cancellation cutoff.",
+      "expected": {
+        "exactStartRequired": true,
+        "inventedMidnight": false,
+        "noComputedCutoffFromDateAlone": true
+      }
+    },
+    {
+      "id": "C08",
+      "stage": "T2",
+      "title": "Spóźnione potwierdzenie nie przywraca wygasłego zgłoszenia",
+      "given": {
+        "explicitDeadlineMicros": 1794574800000000,
+        "state": "pending_supplier"
+      },
+      "when": "Apply expiry using trusted time, then submit the old seller confirmation.",
+      "expected": {
+        "state": "expired",
+        "oldConfirmationRejected": true,
+        "newRefundOrBookingCreated": false
+      }
+    },
+    {
+      "id": "C09",
+      "stage": "T2",
+      "title": "Potwierdzenie minionego terminu jest odrzucone",
+      "given": {
+        "proposedStartMicros": 1794661200000000,
+        "hostTimestampMicros": 1794661200000001,
+        "state": "pending_supplier"
+      },
+      "when": "Seller attempts to confirm that proposal.",
+      "expected": {
+        "rejected": true,
+        "confirmedStartStillUnset": true
+      }
+    },
+    {
+      "id": "C10",
+      "stage": "T2",
+      "title": "Agent używa uprawnienia dostawcy, bez osobnego trybu AI",
+      "given": {
+        "mode": "supplier",
+        "agentAuthority": "valid bounded seller delegation in the chosen host/test profile"
+      },
+      "when": "Invoke the same seller confirmation operation through delegated authority.",
+      "expected": {
+        "sameBusinessOutcomeAsSeller": true,
+        "aiModeAdded": false,
+        "missingMandateCaseRejected": true,
+        "fixtureAuthorityNotClaimedAsHostedProof": true
+      }
+    },
+    {
+      "id": "X01",
+      "stage": "T3",
+      "title": "Granica 24h: X01",
+      "given": {
+        "state": "confirmed",
+        "confirmedStartMicros": 1794661200000000,
+        "paidMinor": 10000,
+        "serviceAmountMinor": 10000,
+        "policyHours": 24,
+        "chargePercent": 100
+      },
+      "when": {
+        "action": "customer cancellation",
+        "hostTimestampMicros": 1794574799999999
+      },
+      "expected": {
+        "cancellationChargeMinor": 0,
+        "refundDueMinorForFullPrepayment": 10000,
+        "refundCompletedWithoutPaymentEvidence": false
+      }
+    },
+    {
+      "id": "X02",
+      "stage": "T3",
+      "title": "Granica 24h: X02",
+      "given": {
+        "state": "confirmed",
+        "confirmedStartMicros": 1794661200000000,
+        "paidMinor": 10000,
+        "serviceAmountMinor": 10000,
+        "policyHours": 24,
+        "chargePercent": 100
+      },
+      "when": {
+        "action": "customer cancellation",
+        "hostTimestampMicros": 1794574800000000
+      },
+      "expected": {
+        "cancellationChargeMinor": 0,
+        "refundDueMinorForFullPrepayment": 10000,
+        "refundCompletedWithoutPaymentEvidence": false
+      }
+    },
+    {
+      "id": "X03",
+      "stage": "T3",
+      "title": "Granica 24h: X03",
+      "given": {
+        "state": "confirmed",
+        "confirmedStartMicros": 1794661200000000,
+        "paidMinor": 10000,
+        "serviceAmountMinor": 10000,
+        "policyHours": 24,
+        "chargePercent": 100
+      },
+      "when": {
+        "action": "customer cancellation",
+        "hostTimestampMicros": 1794574800000001
+      },
+      "expected": {
+        "cancellationChargeMinor": 10000,
+        "refundDueMinorForFullPrepayment": 0,
+        "refundCompletedWithoutPaymentEvidence": false
+      }
+    },
+    {
+      "id": "X04",
+      "stage": "T3",
+      "title": "Wycofanie przed potwierdzeniem jest bez opłaty w proponowanym profilu",
+      "given": {
+        "state": "pending_supplier",
+        "proposedStartMicros": 1794661200000000,
+        "hostTimestampMicros": 1794574800000001,
+        "paidMinor": 10000
+      },
+      "when": "Customer withdraws the request.",
+      "expected": {
+        "state": "cancelled",
+        "cancellationChargeMinor": 0,
+        "refundDueMinorForFullPrepayment": 10000
+      }
+    },
+    {
+      "id": "X05",
+      "stage": "T3",
+      "title": "50% naliczane od zaakceptowanej ceny po rabacie",
+      "given": {
+        "state": "confirmed",
+        "baseBeforeGuestDiscountMinor": 10000,
+        "agreedAfterDiscountMinor": 9500,
+        "chargePercent": 50,
+        "hostTimestampMicros": 1794574800000001
+      },
+      "when": "Customer cancels inside the penalty window.",
+      "expected": {
+        "cancellationChargeMinor": 4750,
+        "refundDueMinorForFullPrepayment": 4750
+      }
+    },
+    {
+      "id": "X06",
+      "stage": "T3",
+      "title": "Odwołanie niewykonanej usługi przez dostawcę",
+      "given": {
+        "state": "confirmed",
+        "paidMinor": 10000,
+        "hostTimestampMicros": 1794574800000001
+      },
+      "when": "Authorized seller cancels the unfulfilled service.",
+      "expected": {
+        "cancellationChargeMinor": 0,
+        "refundDueMinorForFullPrepayment": 10000,
+        "noAssumedPSPDeduction": true
+      }
+    },
+    {
+      "id": "X07",
+      "stage": "T3",
+      "title": "No-show zgłasza wykonawca po nadejściu terminu",
+      "given": {
+        "state": "confirmed",
+        "confirmedStartMicros": 1794661200000000,
+        "hostTimestampMicros": 1794661200000001,
+        "serviceAmountMinor": 10000,
+        "chargePercent": 100
+      },
+      "when": "Authorized seller records actual no-show.",
+      "expected": {
+        "state": "no_show",
+        "cancellationChargeMinor": 10000,
+        "clockAloneDoesNotCreateNoShow": true
+      }
+    },
+    {
+      "id": "X08",
+      "stage": "T3",
+      "title": "Oczekiwanie albo zbyt wczesne zgłoszenie nie są no-show",
+      "given": {
+        "cases": [
+          "pending_supplier",
+          "pending_customer",
+          "confirmed before start"
+        ]
+      },
+      "when": "Attempt to record no-show.",
+      "expected": {
+        "rejected": true,
+        "noPenaltyCreated": true,
+        "stateUnchanged": true
+      }
+    },
+    {
+      "id": "X09",
+      "stage": "T3",
+      "title": "Zwykłe anulowanie po wykonaniu jest zamknięte",
+      "given": {
+        "state": "fulfilled"
+      },
+      "when": "Customer invokes ordinary cancellation.",
+      "expected": {
+        "rejected": true,
+        "noAutomaticRefund": true
+      }
+    },
+    {
+      "id": "X10",
+      "stage": "T3",
+      "title": "Anulowanie przez klienta po początku nie tworzy automatycznego refundu",
+      "given": {
+        "state": "confirmed",
+        "confirmedStartMicros": 1794661200000000,
+        "hostTimestampMicros": 1794661200000001
+      },
+      "when": "Customer invokes the simple pre-start cancellation operation.",
+      "expected": {
+        "notProcessedAsFreeCancellation": true,
+        "separateRealizationHandlingRequired": true,
+        "noAutomaticRefund": true
+      }
+    },
+    {
+      "id": "X11",
+      "stage": "T3",
+      "title": "Klient nie podstawia własnego czasu ani wyliczonej opłaty",
+      "given": {
+        "trueHostTimestampMicros": 1794574800000001,
+        "requestNowMicros": 1794574799999999,
+        "requestChargeMinor": 0
+      },
+      "when": "Submit forged timing/money fields or try to make them control calculation.",
+      "expected": {
+        "unrecognizedFieldsRejected": true,
+        "trustedTimestampRequired": true,
+        "callerChargeNotTrusted": true
+      }
+    },
+    {
+      "id": "X12",
+      "stage": "T3",
+      "title": "Zero godzin i zero procentów mają jawne znaczenie",
+      "given": {
+        "policyHours": 0,
+        "chargePercent": 100,
+        "hostTimestampMicros": 1794661200000000
+      },
+      "when": "Cancel exactly at start; separately evaluate a configured zero-percent late charge before start.",
+      "expected": {
+        "atStartCancellationChargeMinor": 0,
+        "zeroPercentChargeMinor": 0
+      }
+    },
+    {
+      "id": "X13",
+      "stage": "T3",
+      "title": "Half-up przy naliczaniu opłaty",
+      "given": {
+        "serviceAmountMinor": 5,
+        "chargePercent": 50,
+        "hostTimestampMicros": 1794574800000001,
+        "state": "confirmed"
+      },
+      "when": "Calculate late cancellation charge.",
+      "expected": {
+        "cancellationChargeMinor": 3,
+        "remainingServiceAmountMinor": 2
+      }
+    },
+    {
+      "id": "X14",
+      "stage": "T4",
+      "title": "Niepobrana płatność nie tworzy gotówkowego refundu",
+      "given": {
+        "serviceAmountMinor": 10000,
+        "capturedMinor": 0,
+        "authorizationMayExist": true,
+        "cancellationChargeMinor": 0
+      },
+      "when": "Translate the cancellation decision to the actual payment state.",
+      "expected": {
+        "cashRefundDueMinor": 0,
+        "voidOnlyIfAppropriateToPaymentState": true,
+        "refundCompleted": false
+      }
+    },
+    {
+      "id": "I01",
+      "stage": "T4",
+      "title": "Zmiany źródeł nie zmieniają starego rozliczenia",
+      "given": {
+        "orderTerms": "frozen original",
+        "agreementCatalogAndPolicy": "updated after order"
+      },
+      "when": "Cancel the old order and read descriptions.",
+      "expected": {
+        "originalPriceDescriptionHintPolicyUsed": true,
+        "latestAgreementNotUsedImplicitly": true
+      }
+    },
+    {
+      "id": "I02",
+      "stage": "T4",
+      "title": "Nowa cena alternatywy nie podmienia automatycznie pozostałych warunków",
+      "given": {
+        "pendingOrderPolicy": "original",
+        "pendingOrderText": "original",
+        "newQuote": "different item/price"
+      },
+      "when": "Propose alternative, accept it, then cancel.",
+      "expected": {
+        "customerAcceptedNewPrice": true,
+        "originalTextAndPolicyKeptUnlessExplicitlyChangedAndAccepted": true
+      }
+    },
+    {
+      "id": "I03",
+      "stage": "T4",
+      "title": "Dwa terminy w jednym Orderze są niezależne",
+      "given": {
+        "groupA": "date A",
+        "groupB": "date B",
+        "sameSeller": true
+      },
+      "when": "Confirm both groups, cancel only group A.",
+      "expected": {
+        "groupBStateAndAmountsUnchanged": true,
+        "groupAPriceOnlyInDecision": true
+      }
+    },
+    {
+      "id": "I04",
+      "stage": "T1",
+      "title": "Pozycja nie może trafić do dwóch grup ani do obcego sellera",
+      "given": {
+        "invalidAssignments": [
+          "same quote line in two groups",
+          "foreign seller line"
+        ]
+      },
+      "when": "Create order fulfilment groups.",
+      "expected": {
+        "rejected": true,
+        "noPartialOrderOrDecision": true
+      }
+    },
+    {
+      "id": "I05",
+      "stage": "T4",
+      "title": "Retry po cold restore nie tworzy drugiej decyzji lub refundu",
+      "given": {
+        "existingCancellation": "native accepted business result",
+        "laterCatalogUpdate": true
+      },
+      "when": "Export native snapshot, open fresh runtime, import, retry identical request.",
+      "expected": {
+        "sameBusinessDecisionAndIdentity": true,
+        "additionalFinancialInstructionCount": 0
+      }
+    },
+    {
+      "id": "I06",
+      "stage": "T4",
+      "title": "Zmienione żądanie pod starym kluczem jest konfliktem",
+      "given": {
+        "acceptedCancellationKey": "cancel-1"
+      },
+      "when": "Reuse that key with another group, reason or financial intent.",
+      "expected": {
+        "rejected": true,
+        "priorResultUnchanged": true
+      }
+    },
+    {
+      "id": "I07",
+      "stage": "T4",
+      "title": "Cancel i confirm w obu kolejnościach",
+      "given": {
+        "initialState": "pending_supplier",
+        "hostOrdering": "explicit deterministic order"
+      },
+      "when": "Run cancellation-before-confirmation and confirmation-before-cancellation as separate histories.",
+      "expected": {
+        "cancelFirstCannotBeResurrected": true,
+        "confirmFirstUsesConfirmedPolicyAndConsent": true,
+        "eachHistoryHasOneCoherentDecision": true
+      }
+    },
+    {
+      "id": "I08",
+      "stage": "T4",
+      "title": "Należny zwrot i wynik Payment Instruction są oddzielone",
+      "given": {
+        "refundDecision": "created",
+        "paymentEvents": [
+          "requested",
+          "failed",
+          "unknown",
+          "completed"
+        ]
+      },
+      "when": "Apply valid payment feedback and replay duplicates.",
+      "expected": {
+        "onlyVerifiedCompletedMarksCashRefundCompleted": true,
+        "duplicateCompletionCannotDoubleRefund": true,
+        "failureOrUnknownDoesNotPretendSuccess": true
+      }
+    },
+    {
+      "id": "I09",
+      "stage": "T4",
+      "title": "Produkty bez terminu nie otrzymują sztucznej daty",
+      "given": {
+        "itemDateRequired": false,
+        "catalogCanPriceItem": true
+      },
+      "when": "Create/read purchase data and attempt attaching the timed cancellation policy without exact start.",
+      "expected": {
+        "catalogPricingStillWorks": true,
+        "noInventedStart": true,
+        "timedCancellationNotSilentlyApplied": true
+      }
+    },
+    {
+      "id": "I10",
+      "stage": "T3",
+      "title": "Ten sam instant przy innym zapisie offsetu",
+      "given": {
+        "confirmedStartRepresentations": [
+          "2026-11-14T14:00:00+01:00",
+          "2026-11-14T13:00:00+00:00"
+        ]
+      },
+      "when": "Normalize an explicitly agreed instant and calculate the 24-hour cutoff.",
+      "expected": {
+        "sameConfirmedStartMicros": 1794661200000000,
+        "sameCutoffMicros": 1794574800000000,
+        "viewerTimezoneCannotChangeFee": true
+      }
+    },
+    {
+      "id": "U01",
+      "stage": "T5",
+      "title": "Opis UI wynika z rzeczywistego stanu i polityki",
+      "given": {
+        "states": [
+          "pending_supplier",
+          "pending_customer",
+          "confirmed",
+          "cancelled awaiting payment refund"
+        ]
+      },
+      "when": "Render semantic summaries/actions for the new clause definitions.",
+      "expected": {
+        "proposedVsConfirmedClearlyDistinguished": true,
+        "exactCutoffShownOnlyWhenKnown": true,
+        "refundDueNotDisplayedAsRefundCompleted": true,
+        "noPrivateCommissionLeak": true
+      }
+    }
+  ]
+}

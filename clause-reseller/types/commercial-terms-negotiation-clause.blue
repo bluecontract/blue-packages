@@ -1,0 +1,103 @@
+name: Commercial Terms Negotiation Clause
+type: Connections/Connected Clause
+description: Allow configured parties to propose commission and exclusivity before activation; require exact
+  review and renewed approvals.
+actions:
+  propose:
+    observation: true
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/requireExactDocumentVersion
+          - true
+        message: EXACT_TERMS_REQUIRED
+    - $failIf:
+        cond:
+          $or:
+          - $eq:
+            - $document: /activation/active
+            - true
+          - $eq:
+            - $document: /activation/frozen
+            - true
+        message: NEGOTIATION_CLOSED
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/request/revision
+          - $document: /activation/revision
+        message: TERMS_REVISION_CHANGED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $binding: call/request/commissionBps
+                kind: integer
+            - $gte:
+              - $binding: call/request/commissionBps
+              - 0
+            - $lte:
+              - $binding: call/request/commissionBps
+              - 10000
+            - $isKind:
+                val:
+                  $binding: call/request/exclusive
+                kind: boolean
+        message: INVALID_PARTNERSHIP_TERMS
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $const:
+              name: bindings
+              path: /terms
+          - /commissionBps
+        val:
+          $binding: call/request/commissionBps
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $const:
+              name: bindings
+              path: /terms
+          - /exclusive
+        val:
+          $binding: call/request/exclusive
+    - $appendChange:
+        op: replace
+        path: /activation/approved
+        val: {}
+    - $appendChange:
+        op: replace
+        path: /activation/revision
+        val:
+          $add:
+          - $document: /activation/revision
+          - 1
+    - $appendEvent:
+        $merge:
+        - type: Events/Event
+        - kind: Partnership Terms Proposed
+          previousCommissionBps:
+            $document:
+              $concat:
+              - $const:
+                  name: bindings
+                  path: /terms
+              - /commissionBps
+          commissionBps:
+            $binding: call/request/commissionBps
+          exclusive:
+            $binding: call/request/exclusive
+          revision:
+            $add:
+            - $document: /activation/revision
+            - 1
+bindingTypes:
+  terms: pointer
+defaultBindings:
+  terms: /terms

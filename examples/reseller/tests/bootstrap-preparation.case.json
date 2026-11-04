@@ -1,0 +1,1683 @@
+{
+  "scenarios": [
+    {
+      "name": "Multiple catalog items prepare one independent order",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/clauses/catalog/bindings": {
+          "state": "/products",
+          "publish": {
+            "publishCatalog": {
+              "on": "workflow",
+              "party": "seller",
+              "params": {
+                "$var": "trigger"
+              }
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders": {},
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/amountMinor": 9310,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/subtotalMinor": 9800,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/discountMinor": 490,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/lines/0/quantity": 2,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/lines/1/quantity": 1,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/required": [],
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/status": "awaiting_provider"
+          },
+          "expectProvisionRequested": "/process_orders",
+          "capture": "prepared-multiple-products",
+          "capturePaths": [
+            "/process_orders"
+          ],
+          "provisionClause": "orders",
+          "provisionParty": "partner",
+          "absent": [
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/seller/lead/channel",
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/partner/lead/channel",
+            "/quotes"
+          ]
+        },
+        {
+          "operation": "publishCatalog",
+          "channel": "seller",
+          "request": {
+            "expectedRevision": 1,
+            "entries": {
+              "dolphin-cruise-child": {
+                "label": "Dziecko w wieku 4–12 lat",
+                "description": "Bilet dziecięcy na rejs trwający około 1,5 godziny.",
+                "pricingUnit": "per_unit",
+                "dateRequired": false,
+                "maxQuantity": 20,
+                "unitAmountMinor": 6000,
+                "guestDiscountPercent": 5
+              },
+              "dolphin-cruise-under-4": {
+                "label": "Dziecko do 3 lat",
+                "description": "Udział bezpłatny. Dziecko trzeba uwzględnić w liczbie pasażerów.",
+                "pricingUnit": "per_unit",
+                "dateRequired": false,
+                "maxQuantity": 20,
+                "unitAmountMinor": 0,
+                "guestDiscountPercent": 5
+              }
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/products/revision": 2
+          },
+          "absent": [
+            "/quotes"
+          ]
+        },
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "expectNoEffects": true,
+          "restore": true,
+          "absent": [
+            "/quotes"
+          ],
+          "expect": {
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/amountMinor": 9310
+          }
+        },
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Changed description",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "restore": true,
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true,
+          "absent": [
+            "/quotes"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Caller cannot supply private order channels",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "orderAccess": {
+                "customerReaderKey": "forged"
+              },
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true,
+          "absent": [
+            "/quotes"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Customer must differ from seller",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "seller",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true,
+          "absent": [
+            "/quotes"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Unknown product rejects the complete preparation",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "missing",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    },
+    {
+      "name": "Quantity above the catalog limit rejects preparation",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 21
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    },
+    {
+      "name": "Stale catalog revision rejects preparation",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 2,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    },
+    {
+      "name": "Caller amount cannot replace calculated prices",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ],
+              "amountMinor": 1
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    },
+    {
+      "name": "Caller line price cannot replace catalog prices",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2,
+                  "unitAmountMinor": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    },
+    {
+      "name": "Stored quote key is not accepted by direct preparation",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ],
+              "quoteKey": "old"
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    },
+    {
+      "name": "Duplicate selections are rejected",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 1
+                },
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    },
+    {
+      "name": "Preparation uses the selected current catalog price",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/products/revision": 2,
+        "/products/entries/dolphin-cruise-child/unitAmountMinor": 6000
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 2,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders": {},
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/amountMinor": 11400,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/subtotalMinor": 12000,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/discountMinor": 600,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/lines/0/quantity": 2,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/lines/1/quantity": 1,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/required": [],
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/status": "awaiting_provider"
+          },
+          "expectProvisionRequested": "/process_orders",
+          "capture": "prepared-current-prices",
+          "capturePaths": [
+            "/process_orders"
+          ],
+          "provisionClause": "orders",
+          "provisionParty": "partner",
+          "absent": [
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/seller/lead/channel",
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/partner/lead/channel",
+            "/quotes"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Without fulfilment clause direct preparation needs no date or confirmation",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "sourceRemove": [
+        "/clauses/fulfilment"
+      ],
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders": {},
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/amountMinor": 9310,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/subtotalMinor": 9800,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/discountMinor": 490,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/lines/0/quantity": 2,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/lines/1/quantity": 1,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/required": [],
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/status": "awaiting_provider"
+          },
+          "expectProvisionRequested": "/process_orders",
+          "capture": "prepared-without-fulfilment",
+          "capturePaths": [
+            "/process_orders"
+          ],
+          "provisionClause": "orders",
+          "provisionParty": "partner",
+          "absent": [
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/seller/lead/channel",
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/partner/lead/channel",
+            "/quotes",
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/orderSnapshot",
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/confirmation"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Free catalog selection prepares no payment instruction",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input"
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/amountMinor": 0,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/totalMinor": 0,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/discountMinor": 0,
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/quote/lines/0/quantity": 1
+          },
+          "expectProvisionRequested": "/process_orders",
+          "capture": "prepared-free",
+          "capturePaths": [
+            "/process_orders"
+          ],
+          "provisionClause": "orders",
+          "provisionParty": "partner",
+          "absent": [
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/seller/lead/channel",
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/activation/parameters/parties/partner/lead/channel",
+            "/quotes",
+            "/process_orders/entries/4YqKW373qXDUC8rZqE4qsxvsjzB2QsnPgtZXHGLPeMRi/prepared/clauses/payment"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Caller cannot inject prepared monetary fields",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ],
+                "myosAccountId": "seller"
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ],
+                "myosAccountId": "partner"
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "prepareOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "requestId": "checkout-o1",
+            "values": {
+              "customer": "guest",
+              "description": "Rejs dla trojga dzieci",
+              "groups": [
+                {
+                  "id": "visit",
+                  "lineIndices": [
+                    0,
+                    1
+                  ],
+                  "proposedStartMicros": 1794679200000000
+                }
+              ],
+              "catalogRevision": 1,
+              "lines": [
+                {
+                  "itemId": "dolphin-cruise-child",
+                  "quantity": 2
+                },
+                {
+                  "itemId": "dolphin-cruise-under-4",
+                  "quantity": 1
+                }
+              ]
+            },
+            "type": "Documents/Preparation Input",
+            "fields": {
+              "amountMinor": 1
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "absent": [
+            "/quotes"
+          ],
+          "status": "FAILED",
+          "diagnosticContains": "BEX_EXECUTION_REJECTED",
+          "expectNoEffects": true
+        }
+      ]
+    }
+  ]
+}

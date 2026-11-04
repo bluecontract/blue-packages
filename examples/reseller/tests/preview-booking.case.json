@@ -1,0 +1,717 @@
+{
+  "format": "blue-native-reseller-scenarios/1",
+  "scenarios": [
+    {
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/orderTemplate/clauses/payment/bindings/parties/guarantor": {
+          "type": "Parties/Party",
+          "lead": {
+            "channel": {
+              "type": "Contracts/External Channel",
+              "event": {
+                "source": "guarantor"
+              }
+            }
+          },
+          "readerKeys": [
+            "reader-guarantor"
+          ]
+        }
+      },
+      "name": "Booking clause requires a proposed date and seller confirmation",
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-child",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ]
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "diagnosticContains": "BEX_BEX_RUNTIME_ERROR",
+          "status": "FAILED",
+          "unchangedPaths": [
+            "/orders"
+          ]
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794679200000000
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders/o1/amountMinor": 4655,
+            "/orders/o1/reservations/cruise/status": "pending_supplier"
+          },
+          "capture": "pending-confirmation",
+          "capturePaths": [
+            "/orders/o1"
+          ]
+        },
+        {
+          "operation": "approve_customer",
+          "channel": "customer",
+          "request": {},
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "source": "guest",
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/orders/o1/activation/revision"
+          },
+          "expect": {
+            "/orders/o1/activation/active": true,
+            "/orders/o1/activation/approved/customer": true
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "partner",
+          "request": {
+            "key": "confirm1",
+            "groupId": "cruise"
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/cruise/proposalBlueId"
+          },
+          "unchangedPaths": [
+            "/orders/o1"
+          ],
+          "expectNoEffects": true,
+          "status": "FAILED",
+          "diagnosticContains": "INVALID_TARGET_OPERATION"
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm1",
+            "groupId": "cruise"
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/cruise/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/cruise/status": "confirmed",
+            "/orders/o1/reservations/cruise/confirmedStartMicros": 1794679200000000
+          },
+          "absent": [
+            "/orders/o1/reservations/cruise/freeCancellationUntilMicros"
+          ],
+          "capture": "confirmed",
+          "capturePaths": [
+            "/orders/o1"
+          ]
+        }
+      ]
+    },
+    {
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/orderTemplate/clauses/payment/bindings/parties/guarantor": {
+          "type": "Parties/Party",
+          "lead": {
+            "channel": {
+              "type": "Contracts/External Channel",
+              "event": {
+                "source": "guarantor"
+              }
+            }
+          },
+          "readerKeys": [
+            "reader-guarantor"
+          ]
+        }
+      },
+      "name": "Without the clause the same catalogue order needs neither date nor confirmation",
+      "sourceRemove": [
+        "/clauses/fulfilment"
+      ],
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-child",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders/o1/amountMinor": 4655
+          },
+          "absent": [
+            "/orders/o1/clauses/confirmation",
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "capture": "no-booking-requirement",
+          "capturePaths": [
+            "/orders/o1"
+          ]
+        },
+        {
+          "operation": "approve_customer",
+          "channel": "customer",
+          "request": {},
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "source": "guest",
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/orders/o1/activation/revision"
+          },
+          "expect": {
+            "/orders/o1/activation/active": true,
+            "/orders/o1/activation/approved/customer": true
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm1",
+            "groupId": "cruise"
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "unchangedPaths": [
+            "/orders/o1"
+          ],
+          "expectNoEffects": true,
+          "status": "FAILED",
+          "diagnosticContains": "INVALID_TARGET_OPERATION"
+        }
+      ]
+    },
+    {
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/orderTemplate/clauses/payment/bindings/parties/guarantor": {
+          "type": "Parties/Party",
+          "lead": {
+            "channel": {
+              "type": "Contracts/External Channel",
+              "event": {
+                "source": "guarantor"
+              }
+            }
+          },
+          "readerKeys": [
+            "reader-guarantor"
+          ]
+        }
+      },
+      "name": "Supplier alternative date still requires customer acceptance",
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-child",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794679200000000
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "approve_customer",
+          "channel": "customer",
+          "request": {},
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "source": "guest",
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/orders/o1/activation/revision"
+          },
+          "expect": {
+            "/orders/o1/activation/active": true,
+            "/orders/o1/activation/approved/customer": true
+          }
+        },
+        {
+          "operation": "proposeAlternative",
+          "channel": "seller",
+          "request": {
+            "key": "later",
+            "groupId": "cruise",
+            "catalog": {
+              "revision": 1,
+              "supplierId": "seller",
+              "currency": "USD",
+              "entries": {
+                "dolphin-cruise-child": {
+                  "label": "Dziecko w wieku 4–12 lat",
+                  "description": "Bilet dziecięcy na rejs trwający około 1,5 godziny.",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": false,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 4900,
+                  "guestDiscountPercent": 5
+                },
+                "dolphin-cruise-under-4": {
+                  "label": "Dziecko do 3 lat",
+                  "description": "Udział bezpłatny. Dziecko trzeba uwzględnić w liczbie pasażerów.",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": false,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 0,
+                  "guestDiscountPercent": 5
+                }
+              }
+            },
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-child",
+                "quantity": 1
+              }
+            ],
+            "proposedStartMicros": 1794765600000000
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/cruise/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/cruise/status": "pending_customer"
+          }
+        },
+        {
+          "operation": "acceptProposal",
+          "channel": "customer",
+          "request": {
+            "key": "accept-later",
+            "groupId": "cruise"
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/cruise/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/cruise/status": "confirmed",
+            "/orders/o1/reservations/cruise/confirmedStartMicros": 1794765600000000
+          },
+          "source": "guest"
+        }
+      ]
+    },
+    {
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/orderTemplate/clauses/payment/bindings/parties/guarantor": {
+          "type": "Parties/Party",
+          "lead": {
+            "channel": {
+              "type": "Contracts/External Channel",
+              "event": {
+                "source": "guarantor"
+              }
+            }
+          },
+          "readerKeys": [
+            "reader-guarantor"
+          ]
+        }
+      },
+      "name": "Free variant remains bookable with confirmation and without a payment instruction",
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-under-4",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794679200000000
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders/o1/amountMinor": 0,
+            "/orders/o1/reservations/cruise/status": "pending_supplier"
+          },
+          "absent": [
+            "/orders/o1/clauses/payment"
+          ]
+        },
+        {
+          "operation": "approve_customer",
+          "channel": "customer",
+          "request": {},
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "source": "guest",
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/orders/o1/activation/revision"
+          },
+          "expect": {
+            "/orders/o1/activation/active": true,
+            "/orders/o1/activation/approved/customer": true
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm1",
+            "groupId": "cruise"
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/cruise/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/cruise/status": "confirmed"
+          }
+        }
+      ]
+    }
+  ]
+}

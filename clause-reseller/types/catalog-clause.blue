@@ -1,0 +1,56 @@
+name: Catalog Clause
+description: One offer with optional authored title, description and descriptive groups, alongside one
+  supplier's catalog, item prices and buyer discounts. Immutable keyed quotes. The offer content is
+  descriptive only; it does not create booking, date, availability or payment requirements.
+type: Connections/Connected Clause
+parameters:
+  offer:
+    title:
+      type: Text
+    text:
+      type: Text
+    sections:
+      type: List
+actionDefinition:
+  type: Reseller/Catalog Functions
+actions:
+  validate:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: validateInitialCatalog
+            args: {}
+    automatic:
+      'on': initialized
+      once: true
+  publish:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: publishCatalog
+            args:
+              input:
+                $var: params
+  quote:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: createQuote
+            args:
+              input:
+                $var: params
+bindingTypes:
+  state: pointer
+  quotes: pointer
+defaultBindings:
+  state: /catalog
+  quotes: /quotes

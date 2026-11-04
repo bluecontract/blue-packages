@@ -2,9 +2,212 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["blueId", "semanticText"],
+  "required": [
+    "blueId",
+    "semanticText",
+    "metadata"
+  ],
   "properties": {
-    "blueId": {"type": "string", "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$"},
-    "semanticText": {"type": "string", "minLength": 1, "maxLength": 20000}
+    "blueId": {
+      "type": "string",
+      "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$"
+    },
+    "semanticText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20000
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "displayLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "parameterRefs": {
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        },
+        "covers": {
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$"
+          }
+        },
+        "dependencies": {
+          "maxItems": 128,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[1-9A-HJ-NP-Za-km-z]{32,64}$"
+          }
+        },
+        "stateFacts": {
+          "maxItems": 32,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-zA-Z0-9]{0,47}$"
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "binding",
+                  "document",
+                  "clause"
+                ]
+              },
+              "path": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^\\/[^\\s]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "binding": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "defaultPath": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 256,
+                    "pattern": "^\\/[^\\s]*$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "suffix": {
+                "type": "string",
+                "maxLength": 256
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "boolean",
+                  "number",
+                  "string",
+                  "money-minor",
+                  "currency",
+                  "date",
+                  "date-micros",
+                  "count"
+                ]
+              },
+              "absent": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "meaning": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "evidence": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 400
+              },
+              "aggregate": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "over": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 400
+                      },
+                      "operation": {
+                        "type": "string",
+                        "enum": [
+                          "count",
+                          "sum",
+                          "balance"
+                        ]
+                      },
+                      "unit": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 300
+                      }
+                    },
+                    "required": [
+                      "over",
+                      "operation",
+                      "unit"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "binding",
+              "defaultPath",
+              "suffix",
+              "type",
+              "absent",
+              "meaning",
+              "evidence",
+              "scope",
+              "path",
+              "aggregate"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "limitations": {
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        }
+      },
+      "required": [
+        "displayLabel",
+        "parameterRefs",
+        "covers",
+        "dependencies",
+        "stateFacts",
+        "limitations"
+      ],
+      "additionalProperties": false
+    }
   }
 }

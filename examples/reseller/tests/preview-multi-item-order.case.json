@@ -1,0 +1,182 @@
+{
+  "format": "blue-reseller-scenarios/1",
+  "scenarios": [
+    {
+      "name": "Multiple catalogue variants become one customer order after bilateral agreement acceptance",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [
+              "seller",
+              "partner"
+            ],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/orderTemplate/clauses/payment/bindings/parties/guarantor": {
+          "type": "Parties/Party",
+          "lead": {
+            "channel": {
+              "type": "Contracts/External Channel",
+              "event": {
+                "source": "guarantor"
+              }
+            }
+          },
+          "readerKeys": [
+            "reader-guarantor"
+          ]
+        }
+      },
+      "steps": [
+        {
+          "operation": "approve_seller",
+          "channel": "seller",
+          "request": {},
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/activation/revision"
+          },
+          "timestampMicros": 1793743200000000
+        },
+        {
+          "operation": "approve_partner",
+          "channel": "partner",
+          "request": {},
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/activation/revision"
+          },
+          "timestampMicros": 1793743200000000,
+          "expect": {
+            "/activation/active": true,
+            "/activation/approved/seller": true,
+            "/activation/approved/partner": true
+          }
+        },
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "family-quote",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-child",
+                "quantity": 2
+              },
+              {
+                "itemId": "dolphin-cruise-under-4",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1793743200000000,
+          "expect": {
+            "/quotes/family-quote/subtotalMinor": 9800,
+            "/quotes/family-quote/discountMinor": 490,
+            "/quotes/family-quote/totalMinor": 9310
+          }
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "family-cruise",
+            "quoteKey": "family-quote",
+            "customer": "guest",
+            "description": "Rejs dla 3 dzieci: 2 bilety dla dzieci 4–12 lat i 1 bezpłatny bilet dla dziecka do 3 lat.",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0,
+                  1
+                ],
+                "proposedStartMicros": 1794074400000000
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793743200000000,
+          "expect": {
+            "/orders/family-cruise/amountMinor": 9310,
+            "/orders/family-cruise/activation/active": false,
+            "/orders/family-cruise/reservations/cruise/status": "pending_supplier",
+            "/orders/family-cruise/orderSnapshot/quote/lines/0/quantity": 2,
+            "/orders/family-cruise/orderSnapshot/quote/lines/1/quantity": 1
+          },
+          "absent": [
+            "/orders/family-cruise/payment"
+          ],
+          "expectProvisionRequested": "/orders/family-cruise/process_payment",
+          "capture": "created-multi-item-order",
+          "capturePaths": [
+            "/activation/active",
+            "/orders/family-cruise/activation",
+            "/orders/family-cruise/amountMinor",
+            "/orders/family-cruise/orderSnapshot",
+            "/orders/family-cruise/reservations"
+          ],
+          "captureExact": [
+            "",
+            "/orders/family-cruise"
+          ]
+        }
+      ]
+    }
+  ]
+}

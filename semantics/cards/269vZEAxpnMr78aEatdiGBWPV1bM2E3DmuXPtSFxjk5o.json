@@ -1,0 +1,317 @@
+{
+  "blueId": "269vZEAxpnMr78aEatdiGBWPV1bM2E3DmuXPtSFxjk5o",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "B7QxZmj9jgwqJewHFcAS7DbGo9jo6Y6xYY3rkgdYDfch",
+      "9Dm5rGc7XGnWT85N7vzF6syU4hbNbW9GWkdrYmXq8ZrH",
+      "HRx6KxSKGWJjrNnLiMc7xrgnhiin9XfPv5xuXHJsMsit",
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde",
+      "8SyArpLrA57CwG1jdVJWxEMdtKDgnAcrnNM1sMs7LJoS",
+      "791CtNxSJCV9AV9QR7UnWM7Vmvm9n88xjjpcuk72jXAN",
+      "E7m8RtheNfKZXAjx92n93gC4DFujakWrZDQkffrHvG3x"
+    ],
+    "displayLabel": "Commission Payout",
+    "limitations": [
+      "The parent clause definition is omitted, so the build trigger and complete inherited action exposure are not established.",
+      "Instruction startup and base public-workflow definitions are omitted; supplied functions establish ledger rules, not full invocation wiring.",
+      "requireActive is called but its implementation is omitted. Custom instructionClauses.settlementPolicy can replace the described retirement policy."
+    ],
+    "parameterRefs": [
+      "bindings.amount",
+      "bindings.instruction"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; true only after policy initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "B7QxZmj9jgwqJewHFcAS7DbGo9jo6Y6xYY3rkgdYDfch: build, settlementPolicy",
+        "id": "settlementOpen",
+        "meaning": "Child capture gate: true permits this gate; partner retirement sets false after unresolved-funds checks.",
+        "path": "/settlementOpen",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialized false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, accept; payout build.configOverride",
+        "id": "accepted",
+        "meaning": "Child instruction accepted by the recipient acting as guarantor; does not establish payment completion.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialized false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, accept",
+        "id": "rejected",
+        "meaning": "Guarantor rejected the child instruction with a reason; later acceptance is prohibited.",
+        "path": "/payment/rejected",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialized empty means unattached.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, initiate",
+        "id": "transactionId",
+        "meaning": "Guarantor-attached transaction identifier in the child; one instruction represents one transaction.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialized from paymentTerms.amountMinor.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(finalAmount), request",
+        "id": "target",
+        "meaning": "Child capture target in /paymentTerms/currency minor units; may change through final-amount resolution.",
+        "path": "/payment/targetMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(finalAmount)",
+        "id": "finalResolved",
+        "meaning": "Guarantor has resolved the child target; a subsequent different final amount is prohibited.",
+        "path": "/payment/finalResolved",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; do not infer EUR from missing state.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction; Payment Functions.initialize, emit",
+        "id": "currency",
+        "meaning": "Child financial amounts' currency; builder defaults configuration to EUR and requires nonempty text.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; initialized zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Child successful secure, capture and void requests",
+          "unit": "paymentTerms.currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm",
+        "id": "secured",
+        "meaning": "Remaining confirmed authorization, after captures and voids; minor units of child /paymentTerms/currency.",
+        "path": "/payment/secured",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Child succeeded capture requests",
+          "unit": "paymentTerms.currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(capture)",
+        "id": "completed",
+        "meaning": "Cumulative confirmed captures, not net of refunds; minor units of child /paymentTerms/currency.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Child succeeded refund requests",
+          "unit": "paymentTerms.currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(refund)",
+        "id": "reversed",
+        "meaning": "Cumulative confirmed refunds, excluding voids; minor units of child /paymentTerms/currency.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Child pending or unknown secure requests",
+          "unit": "paymentTerms.currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request, confirm",
+        "id": "reservedSecure",
+        "meaning": "Capacity held for pending or unknown secure requests; minor units of child /paymentTerms/currency.",
+        "path": "/payment/reserved/secure",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Child pending or unknown capture requests",
+          "unit": "paymentTerms.currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request, confirm",
+        "id": "reservedCapture",
+        "meaning": "Capacity held for pending or unknown captures, not completed funds; child /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/capture",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Child pending or unknown refund requests",
+          "unit": "paymentTerms.currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request, confirm",
+        "id": "reservedRefund",
+        "meaning": "Capacity held for pending or unknown refunds, not reversed funds; child /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/refund",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Child pending or unknown void requests",
+          "unit": "paymentTerms.currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request(void), confirm",
+        "id": "reservedVoid",
+        "meaning": "Authorization reserved for unresolved void; may be zero despite pending cancellation. Child currency minor units.",
+        "path": "/payment/reserved/void",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request(void), confirm",
+        "id": "cancellationPending",
+        "meaning": "Child void awaits a terminal guarantor outcome; unknown retains this flag and blocks securing and capture.",
+        "path": "/payment/cancellationPending",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialized false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(void), request",
+        "id": "closed",
+        "meaning": "Successful void closed further charges in the child; refunds remain possible. Separate from retirement.",
+        "path": "/payment/closed",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialized false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.approveRecipient, configure(payee), request",
+        "id": "recipientApproved",
+        "meaning": "Current payee approved through its workflow; required for capture only if recipientApprovalRequired is true.",
+        "path": "/payment/recipientApproved",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; empty means no selected recipient.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(payee), request",
+        "id": "payee",
+        "meaning": "Selected child recipient channel; capture requires selection and assignment is constrained before capture.",
+        "path": "/payment/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no inferred request or outcome.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Functions.request, confirm",
+        "id": "financialRequestStatus",
+        "meaning": "pending/unknown await guarantor resolution; succeeded/declined/failed are terminal financial outcomes.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/requests/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no inferred proposal or decision.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Protocol Functions.requestControl, decideControl",
+        "id": "controlRequestStatus",
+        "meaning": "pending awaits guarantor; mapped outcomes are succeeded, declined or failed depending on the control action.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/controlRequests/*/status",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Commission Payout Payment Clause\n\nCreates a payment instruction for a manual commission payout whose recipient reports receipt as the guarantor. Creation and payment requests do not establish that money has moved. Confirmed financial outcomes are recorded separately from requests and reservations.\n\n## Configuration and creation\n\n- `bindings.amount` defaults to `/product/totalMinor`. A positive `amountMinor` parameter overrides this source; otherwise the builder reads the binding. The resulting amount must be an integer from 1 through 1,000,000,000,000 in minor currency units. It becomes both the instruction's initial `amountMinor` and `limitMinor`.\n- `bindings.instruction` defaults to `/payment` and identifies the destination for the child instruction, not its financial ledger. The child's ledger is its own `/payment`.\n- `currency` defaults to `EUR` and must be nonempty text. `payer` defaults to `customer`; `payee` defaults to `seller`. The builder overrides `guarantor` with the selected `payee` and maps that participant to the child's `guarantor` channel. The initial payee is also the sole `allowedPayees` entry.\n- `recipientApprovalRequired` defaults to `false`. If true, capture additionally requires approval through the current recipient's workflow channel. This approval is distinct from confirming payment receipt.\n- `parties` defaults to `[]`, selecting all parent activation parties; an explicit list selects a subset that must retain the payer, payee and guarantor. `readers` defaults to `[]` and selects named parent readers. Participant names must be nonempty and contain no dot, slash or tilde.\n- `instructionClauses` defaults to `{}` and adds child clauses; `activation` and `payment` are reserved keys. An entry named `settlementPolicy` replaces the supplied retirement policy, so its behavior must then be interpreted from that replacement. `recipient` is accepted by the shared builder but has no demonstrated effect here.\n\nThe builder checks active participation through `requireActive`, writes `paymentDetails.method = manual-bank-transfer` and `paymentDetails.confirmation = recipient`, and prepares child activation with `frozen = true`. A stored `instructionIdentity` associates the clause with its child. An existing destination with that identity is a duplicate; a different identity is rejected.\n\nRequest connections execute in the instruction by default (`in: instruction`). Explicit `in: agreement` supports event, change, embedded and collection sources through an agreement back-reference; request workflows remain in the instruction. Connections determine triggers, actors and argument mappings. A callable workflow alone establishes neither a personal obligation nor the current viewer's permission.\n\n## Requests and confirmed outcomes\n\nThe supplied payment functions initialize acceptance flags and balances, then emit an acceptance request. Only the guarantor workflow can accept or reject the instruction, attach its transaction, or report financial outcomes. Rejection requires a reason; an acceptance decision cannot subsequently switch sides. Acceptance and transaction attachment do not confirm payout completion.\n\n`requestAuthorize`, `requestCapture`, `requestRefund` and `requestVoid` create financial requests for `secure`, `capture`, `refund` and `void`. Each records `intent.action`, `intent.amountMinor`, `intent.reason` and `status`. A nonempty `requestId` cannot contain slash or tilde or collide with a control request. Identical repeated requests are duplicates; conflicting reuse is rejected. `amount` takes precedence over `amountMinor`; void can default to the entire remaining secured amount. Amounts must be positive integers within the supported bound, except a zero-amount void is allowed.\n\nNew financial requests require acceptance and an attached transaction. Securing respects the target and existing commitments. Capture requires a selected recipient, any required recipient approval, an unlocked capture action, sufficient unreserved secured funds and room within the target. Refunds require unlocked refund capacity remaining from completed captures after reversals and pending refunds. A pending void blocks new securing and capture. Void requires no outstanding secure, capture or void reservation and releases the entire remaining authorization.\n\nRequests start `pending`. Guarantor outcomes are `succeeded`, `declined`, `failed` or `unknown`; non-success reports require a reason. `unknown` retains the reservation and awaits resolution. Terminal outcomes release the reservation; only success changes confirmed amounts. Duplicate responses must agree, and terminal outcomes cannot be replaced by conflicting ones.\n\n`secured` is remaining confirmed authorization, reduced by successful capture and cleared by successful void. `completed` is cumulative successful captures, without subtracting refunds. `reversed` is cumulative successful refunds. A void is not a refund: it closes further charges while leaving refunds possible. All financial amounts use the child's `/paymentTerms/currency`.\n\nControl actions request payee assignment, transaction-detail changes, final-amount resolution and capture, refund or detail locks/unlocks. These proposals do not take effect until a successful guarantor decision. Payee assignment must use a declared recipient before any completed or reserved capture and resets recipient approval if changed. Detail locks block payee and detail changes. Final resolution cannot exceed the limit or fall below completed plus reserved captures; once resolved, a different final amount is rejected.\n\n## Retirement\n\nThe supplied `settlementPolicy` initializes the child's `/settlementOpen` to `true`. Its `retirePayout` workflow is bound to party `partner`. Retirement rejects any financial request with `pending` or `unknown` status, or any nonzero reservation for secure, capture, void or refund. Otherwise it sets `/settlementOpen` to `false` and emits `Payout Retired`.\n\nEvery new capture request checks `/settlementOpen` through `captureGate`. Retirement does not itself refund, void, clear secured funds or mark the ledger `closed`; it does not require completed payout or inspect pending control requests. No reopening action is supplied.\n\nThese ledger and settlement paths are relative to the child instruction. Missing state is unknown; initialization values apply only after initialization runs. The supplied definitions establish the builder and payment rules, but omit the parent clause's build trigger and the instruction's full startup and public-workflow wiring."
+}
