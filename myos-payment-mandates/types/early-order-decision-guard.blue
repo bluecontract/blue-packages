@@ -1,0 +1,13 @@
+name: Early Order Decision Guard
+type: Dispatch/Document Dispatch Policy
+description: After terminal seller rejection, preserve internal access and source updates, exact rejection replay and ordinary correlated PI provision recovery. Other external Order operations cannot reopen or amend the rejected purchase. Existing native policies still apply.
+do:
+- $return:
+    allowed:
+      $or:
+      - $ne: [{ $document: /orderDecision/status }, REJECTED]
+      - $ne: [{ $binding: dispatch/kind }, EXTERNAL]
+      - $includes:
+          list: [rejectOrder, providePayment]
+          val: { $binding: dispatch/operation }
+    reason: ORDER_REJECTED

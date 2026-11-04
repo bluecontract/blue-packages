@@ -1,0 +1,1865 @@
+{
+  "name": "Early Order Seller Payment Policy Mandate",
+  "type": "Mandates/Operation Mandate",
+  "description": "One seller approves a self-contained canonical Order policy. Its Agent may provide the matching prepared PI, with explicit host-validated bootstrap consent. This neither approves Orders nor permits customer preparation.",
+  "policy": {
+    "type": "MyOSPaymentMandates/Early Order Seller Payment Policy",
+    "schema": {
+      "required": true
+    }
+  },
+  "expectedProgram": {
+    "description": "Server-generated canonical profile blueprints and enumerated substitutions, reviewed by the holder and independently qualified by Core. No caller-supplied predicate.",
+    "contracts": {
+      "schema": {
+        "required": true
+      }
+    },
+    "clauses": {
+      "schema": {
+        "required": true
+      }
+    },
+    "paymentTemplate": {
+      "schema": {
+        "required": true
+      }
+    },
+    "schema": {
+      "required": true,
+      "maxFields": 6
+    },
+    "orderType": {
+      "schema": {
+        "required": true
+      }
+    },
+    "rootKeys": {
+      "type": "List",
+      "itemType": "Text",
+      "schema": {
+        "required": true
+      }
+    },
+    "timelineAccess": {
+      "schema": {
+        "required": true
+      }
+    }
+  },
+  "grantTemplates": {
+    "schema": {
+      "maxFields": 1
+    }
+  },
+  "scope": {
+    "schema": {
+      "maxFields": 1
+    }
+  },
+  "contracts": {
+    "initializeSellerPaymentScope": {
+      "type": "Contracts/Sequential Workflow",
+      "channel": "lifecycle",
+      "event": {
+        "type": "Contracts/Document Processing Initiated"
+      },
+      "order": 20,
+      "steps": [
+        {
+          "type": "Contracts/Compute",
+          "do": [
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/grantTemplates",
+                "val": {
+                  "payment": {
+                    "$pointerSet": {
+                      "object": {
+                        "$pointerSet": {
+                          "object": {
+                            "$call": {
+                              "function": "fixedPaymentGrant",
+                              "args": {}
+                            }
+                          },
+                          "path": "/target/documentValidation/function/constants/policyIdentity",
+                          "val": {
+                            "$nodeBlueId": {
+                              "$document": "/policy"
+                            }
+                          }
+                        }
+                      },
+                      "path": "/target/documentValidation/function/constants/expectedProgramIdentity",
+                      "val": {
+                        "$nodeBlueId": {
+                          "$document": "/expectedProgram"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              "$appendChange": {
+                "op": "replace",
+                "path": "/scope",
+                "val": {
+                  "payment": {
+                    "$pointerSet": {
+                      "object": {
+                        "$pointerSet": {
+                          "object": {
+                            "$call": {
+                              "function": "fixedPaymentGrant",
+                              "args": {}
+                            }
+                          },
+                          "path": "/target/documentValidation/function/constants/policyIdentity",
+                          "val": {
+                            "$nodeBlueId": {
+                              "$document": "/policy"
+                            }
+                          }
+                        }
+                      },
+                      "path": "/target/documentValidation/function/constants/expectedProgramIdentity",
+                      "val": {
+                        "$nodeBlueId": {
+                          "$document": "/expectedProgram"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "functions": {
+            "fixedPaymentGrant": {
+              "args": {},
+              "expr": {
+                "$literal": {
+                  "target": {
+                    "channel": "seller",
+                    "operation": "providePayment",
+                    "documentValidation": {
+                      "function": {
+                        "functions": {
+                          "validReplacement": {
+                            "args": {
+                              "patch": {},
+                              "sectionName": {
+                                "type": "Text"
+                              }
+                            },
+                            "expr": {
+                              "$or": [
+                                {
+                                  "$and": [
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/kind"
+                                          }
+                                        },
+                                        "text"
+                                      ]
+                                    },
+                                    {
+                                      "$isKind": {
+                                        "val": {
+                                          "$pointerGet": {
+                                            "object": {
+                                              "$binding": "targetDocument"
+                                            },
+                                            "path": {
+                                              "$var": {
+                                                "name": "patch",
+                                                "path": "/sourcePath"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "kind": "text"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "$and": [
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/kind"
+                                          }
+                                        },
+                                        "integer"
+                                      ]
+                                    },
+                                    {
+                                      "$isKind": {
+                                        "val": {
+                                          "$pointerGet": {
+                                            "object": {
+                                              "$binding": "targetDocument"
+                                            },
+                                            "path": {
+                                              "$var": {
+                                                "name": "patch",
+                                                "path": "/sourcePath"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "kind": "integer"
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "$and": [
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/kind"
+                                          }
+                                        },
+                                        "reference"
+                                      ]
+                                    },
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": "sectionName"
+                                        },
+                                        "contracts"
+                                      ]
+                                    },
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/path"
+                                          }
+                                        },
+                                        "/initialized/document"
+                                      ]
+                                    },
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/sourcePath"
+                                          }
+                                        },
+                                        "/contracts/initialized/document"
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "$and": [
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/kind"
+                                          }
+                                        },
+                                        "section"
+                                      ]
+                                    },
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": "sectionName"
+                                        },
+                                        "contracts"
+                                      ]
+                                    },
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/section"
+                                          }
+                                        },
+                                        "paymentTemplate"
+                                      ]
+                                    },
+                                    {
+                                      "$includes": {
+                                        "list": [
+                                          "/cx.payment.prepare.preparePayment/steps/0/functions/connectionSnapshots/expr/$literal/template",
+                                          "/cx.payment.prepare.accessReady/steps/0/functions/connectionSnapshots/expr/$literal/template",
+                                          "/providePayment/steps/0/functions/connectionSnapshots/expr/$literal/template"
+                                        ],
+                                        "val": {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/path"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                },
+                                {
+                                  "$and": [
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/kind"
+                                          }
+                                        },
+                                        "reference"
+                                      ]
+                                    },
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": "sectionName"
+                                        },
+                                        "timelineAccess"
+                                      ]
+                                    },
+                                    {
+                                      "$eq": [
+                                        {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/sourcePath"
+                                          }
+                                        },
+                                        {
+                                          "$concat": [
+                                            "/timelineAccess",
+                                            {
+                                              "$var": {
+                                                "name": "patch",
+                                                "path": "/path"
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "$includes": {
+                                        "list": [
+                                          "/customer/contracts/initialized/document",
+                                          "/customer/allowedTimelines/0",
+                                          "/seller/contracts/initialized/document",
+                                          "/seller/allowedTimelines/0",
+                                          "/partner/contracts/initialized/document",
+                                          "/partner/allowedTimelines/0",
+                                          "/customer__myosAgent/contracts/initialized/document",
+                                          "/customer__myosAgent/allowedTimelines/0",
+                                          "/seller__myosAgent/contracts/initialized/document",
+                                          "/seller__myosAgent/allowedTimelines/0",
+                                          "/partner__myosAgent/contracts/initialized/document",
+                                          "/partner__myosAgent/allowedTimelines/0"
+                                        ],
+                                        "val": {
+                                          "$var": {
+                                            "name": "patch",
+                                            "path": "/path"
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "expectedPaymentTemplate": {
+                            "args": {},
+                            "expr": {
+                              "$reduce": {
+                                "in": {
+                                  "$pointerGet": {
+                                    "object": {
+                                      "$document": "/expectedProgram/paymentTemplate"
+                                    },
+                                    "path": "/replacements"
+                                  }
+                                },
+                                "item": "patch",
+                                "acc": "expected",
+                                "init": {
+                                  "$call": {
+                                    "function": "decodeDefinition",
+                                    "args": {
+                                      "sectionName": "paymentTemplate"
+                                    }
+                                  }
+                                },
+                                "expr": {
+                                  "$pointerSet": {
+                                    "object": {
+                                      "$var": "expected"
+                                    },
+                                    "path": {
+                                      "$var": {
+                                        "name": "patch",
+                                        "path": "/path"
+                                      }
+                                    },
+                                    "val": {
+                                      "$choose": {
+                                        "cond": {
+                                          "$eq": [
+                                            {
+                                              "$var": {
+                                                "name": "patch",
+                                                "path": "/kind"
+                                              }
+                                            },
+                                            "text"
+                                          ]
+                                        },
+                                        "then": {
+                                          "$text": {
+                                            "$pointerGet": {
+                                              "object": {
+                                                "$binding": "targetDocument"
+                                              },
+                                              "path": {
+                                                "$var": {
+                                                  "name": "patch",
+                                                  "path": "/sourcePath"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "else": {
+                                          "$choose": {
+                                            "cond": {
+                                              "$eq": [
+                                                {
+                                                  "$var": {
+                                                    "name": "patch",
+                                                    "path": "/kind"
+                                                  }
+                                                },
+                                                "integer"
+                                              ]
+                                            },
+                                            "then": {
+                                              "$integer": {
+                                                "$pointerGet": {
+                                                  "object": {
+                                                    "$binding": "targetDocument"
+                                                  },
+                                                  "path": {
+                                                    "$var": {
+                                                      "name": "patch",
+                                                      "path": "/sourcePath"
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "else": {
+                                              "$pointerGet": {
+                                                "object": {
+                                                  "$binding": "targetDocument"
+                                                },
+                                                "path": {
+                                                  "$var": {
+                                                    "name": "patch",
+                                                    "path": "/sourcePath"
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "expectedSection": {
+                            "args": {
+                              "sectionName": {
+                                "type": "Text"
+                              }
+                            },
+                            "do": [
+                              {
+                                "$let": {
+                                  "name": "expectedAccess",
+                                  "expr": {
+                                    "$call": {
+                                      "function": "expectedUnprocessedSection",
+                                      "args": {
+                                        "sectionName": {
+                                          "$var": "sectionName"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "$return": {
+                                  "$choose": {
+                                    "cond": {
+                                      "$eq": [
+                                        {
+                                          "$var": "sectionName"
+                                        },
+                                        "contracts"
+                                      ]
+                                    },
+                                    "then": {
+                                      "$choose": {
+                                        "cond": {
+                                          "$some": {
+                                            "in": {
+                                              "$keys": {
+                                                "$pointerGet": {
+                                                  "object": {
+                                                    "$binding": "targetDocument"
+                                                  },
+                                                  "path": "/contracts"
+                                                }
+                                              }
+                                            },
+                                            "item": "checkpointKey",
+                                            "where": {
+                                              "$eq": [
+                                                {
+                                                  "$var": "checkpointKey"
+                                                },
+                                                "checkpoint"
+                                              ]
+                                            }
+                                          }
+                                        },
+                                        "then": {
+                                          "$objectSet": {
+                                            "object": {
+                                              "$var": "expectedAccess"
+                                            },
+                                            "key": "checkpoint",
+                                            "val": {
+                                              "$call": {
+                                                "function": "expectedCheckpointAt",
+                                                "args": {
+                                                  "checkpointPath": {
+                                                    "$concat": [
+                                                      "/contracts",
+                                                      "/checkpoint"
+                                                    ]
+                                                  },
+                                                  "channelKind": "root"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "else": {
+                                          "$var": "expectedAccess"
+                                        }
+                                      }
+                                    },
+                                    "else": {
+                                      "$choose": {
+                                        "cond": {
+                                          "$eq": [
+                                            {
+                                              "$var": "sectionName"
+                                            },
+                                            "timelineAccess"
+                                          ]
+                                        },
+                                        "then": {
+                                          "$reduce": {
+                                            "in": {
+                                              "$keys": {
+                                                "$var": "expectedAccess"
+                                              }
+                                            },
+                                            "item": "channel",
+                                            "acc": "access",
+                                            "init": {
+                                              "$emptyObject": true
+                                            },
+                                            "expr": {
+                                              "$objectSet": {
+                                                "object": {
+                                                  "$var": "access"
+                                                },
+                                                "key": {
+                                                  "$var": "channel"
+                                                },
+                                                "val": {
+                                                  "$objectSet": {
+                                                    "object": {
+                                                      "$pointerGet": {
+                                                        "object": {
+                                                          "$var": "expectedAccess"
+                                                        },
+                                                        "path": {
+                                                          "$concat": [
+                                                            "/",
+                                                            {
+                                                              "$var": "channel"
+                                                            }
+                                                          ]
+                                                        }
+                                                      }
+                                                    },
+                                                    "key": "contracts",
+                                                    "val": {
+                                                      "$choose": {
+                                                        "cond": {
+                                                          "$some": {
+                                                            "in": {
+                                                              "$keys": {
+                                                                "$pointerGet": {
+                                                                  "object": {
+                                                                    "$binding": "targetDocument"
+                                                                  },
+                                                                  "path": {
+                                                                    "$concat": [
+                                                                      "/timelineAccess/",
+                                                                      {
+                                                                        "$var": "channel"
+                                                                      },
+                                                                      "/contracts"
+                                                                    ]
+                                                                  }
+                                                                }
+                                                              }
+                                                            },
+                                                            "item": "checkpointKey",
+                                                            "where": {
+                                                              "$eq": [
+                                                                {
+                                                                  "$var": "checkpointKey"
+                                                                },
+                                                                "checkpoint"
+                                                              ]
+                                                            }
+                                                          }
+                                                        },
+                                                        "then": {
+                                                          "$objectSet": {
+                                                            "object": {
+                                                              "$pointerGet": {
+                                                                "object": {
+                                                                  "$pointerGet": {
+                                                                    "object": {
+                                                                      "$var": "expectedAccess"
+                                                                    },
+                                                                    "path": {
+                                                                      "$concat": [
+                                                                        "/",
+                                                                        {
+                                                                          "$var": "channel"
+                                                                        }
+                                                                      ]
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "path": "/contracts"
+                                                              }
+                                                            },
+                                                            "key": "checkpoint",
+                                                            "val": {
+                                                              "$call": {
+                                                                "function": "expectedCheckpointAt",
+                                                                "args": {
+                                                                  "checkpointPath": {
+                                                                    "$concat": [
+                                                                      {
+                                                                        "$concat": [
+                                                                          "/timelineAccess/",
+                                                                          {
+                                                                            "$var": "channel"
+                                                                          },
+                                                                          "/contracts"
+                                                                        ]
+                                                                      },
+                                                                      "/checkpoint"
+                                                                    ]
+                                                                  },
+                                                                  "channelKind": "provider"
+                                                                }
+                                                              }
+                                                            }
+                                                          }
+                                                        },
+                                                        "else": {
+                                                          "$pointerGet": {
+                                                            "object": {
+                                                              "$pointerGet": {
+                                                                "object": {
+                                                                  "$var": "expectedAccess"
+                                                                },
+                                                                "path": {
+                                                                  "$concat": [
+                                                                    "/",
+                                                                    {
+                                                                      "$var": "channel"
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              }
+                                                            },
+                                                            "path": "/contracts"
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "else": {
+                                          "$var": "expectedAccess"
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "sameSection": {
+                            "args": {
+                              "sectionName": {
+                                "type": "Text"
+                              }
+                            },
+                            "expr": {
+                              "$and": [
+                                {
+                                  "$not": {
+                                    "$some": {
+                                      "in": {
+                                        "$pointerGet": {
+                                          "object": {
+                                            "$document": {
+                                              "$concat": [
+                                                "/expectedProgram/",
+                                                {
+                                                  "$var": "sectionName"
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "path": "/replacements"
+                                        }
+                                      },
+                                      "item": "patch",
+                                      "where": {
+                                        "$not": {
+                                          "$call": {
+                                            "function": "validReplacement",
+                                            "args": {
+                                              "patch": {
+                                                "$var": "patch"
+                                              },
+                                              "sectionName": {
+                                                "$var": "sectionName"
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                {
+                                  "$eq": [
+                                    {
+                                      "$nodeBlueId": {
+                                        "$pointerGet": {
+                                          "object": {
+                                            "$binding": "targetDocument"
+                                          },
+                                          "path": {
+                                            "$concat": [
+                                              "/",
+                                              {
+                                                "$var": "sectionName"
+                                              }
+                                            ]
+                                          }
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "$nodeBlueId": {
+                                        "$call": {
+                                          "function": "expectedSection",
+                                          "args": {
+                                            "sectionName": {
+                                              "$var": "sectionName"
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          },
+                          "expectedRoot": {
+                            "args": {},
+                            "expr": {
+                              "$reduce": {
+                                "in": {
+                                  "$document": "/expectedProgram/rootKeys"
+                                },
+                                "item": "rootKey",
+                                "acc": "expected",
+                                "init": {
+                                  "$emptyObject": true
+                                },
+                                "expr": {
+                                  "$objectSet": {
+                                    "object": {
+                                      "$var": "expected"
+                                    },
+                                    "key": {
+                                      "$var": "rootKey"
+                                    },
+                                    "val": {
+                                      "$choose": {
+                                        "cond": {
+                                          "$eq": [
+                                            {
+                                              "$var": "rootKey"
+                                            },
+                                            "type"
+                                          ]
+                                        },
+                                        "then": {
+                                          "$literal": {
+                                            "blueId": "DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS"
+                                          }
+                                        },
+                                        "else": {
+                                          "$choose": {
+                                            "cond": {
+                                              "$eq": [
+                                                {
+                                                  "$var": "rootKey"
+                                                },
+                                                "amountMinor"
+                                              ]
+                                            },
+                                            "then": {
+                                              "$integer": {
+                                                "$get": {
+                                                  "object": {
+                                                    "$binding": "targetDocument"
+                                                  },
+                                                  "key": {
+                                                    "$var": "rootKey"
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "else": {
+                                              "$choose": {
+                                                "cond": {
+                                                  "$includes": {
+                                                    "list": [
+                                                      "currency",
+                                                      "customerPaymentProfile",
+                                                      "description",
+                                                      "name"
+                                                    ],
+                                                    "val": {
+                                                      "$var": "rootKey"
+                                                    }
+                                                  }
+                                                },
+                                                "then": {
+                                                  "$text": {
+                                                    "$get": {
+                                                      "object": {
+                                                        "$binding": "targetDocument"
+                                                      },
+                                                      "key": {
+                                                        "$var": "rootKey"
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                "else": {
+                                                  "$get": {
+                                                    "object": {
+                                                      "$binding": "targetDocument"
+                                                    },
+                                                    "key": {
+                                                      "$var": "rootKey"
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "decodeDefinition": {
+                            "args": {
+                              "sectionName": {
+                                "type": "Text"
+                              }
+                            },
+                            "expr": {
+                              "$reduce": {
+                                "acc": "decoded",
+                                "expr": {
+                                  "$pointerSet": {
+                                    "object": {
+                                      "$var": "decoded"
+                                    },
+                                    "path": {
+                                      "$var": {
+                                        "name": "row",
+                                        "path": "/path"
+                                      }
+                                    },
+                                    "val": {
+                                      "$choose": {
+                                        "cond": {
+                                          "$eq": [
+                                            {
+                                              "$var": {
+                                                "name": "row",
+                                                "path": "/kind"
+                                              }
+                                            },
+                                            "reference"
+                                          ]
+                                        },
+                                        "else": {
+                                          "$choose": {
+                                            "cond": {
+                                              "$eq": [
+                                                {
+                                                  "$var": {
+                                                    "name": "row",
+                                                    "path": "/kind"
+                                                  }
+                                                },
+                                                "object"
+                                              ]
+                                            },
+                                            "else": {
+                                              "$choose": {
+                                                "cond": {
+                                                  "$eq": [
+                                                    {
+                                                      "$var": {
+                                                        "name": "row",
+                                                        "path": "/kind"
+                                                      }
+                                                    },
+                                                    "list"
+                                                  ]
+                                                },
+                                                "else": {
+                                                  "$choose": {
+                                                    "cond": {
+                                                      "$eq": [
+                                                        {
+                                                          "$var": {
+                                                            "name": "row",
+                                                            "path": "/kind"
+                                                          }
+                                                        },
+                                                        "text"
+                                                      ]
+                                                    },
+                                                    "else": {
+                                                      "$choose": {
+                                                        "cond": {
+                                                          "$eq": [
+                                                            {
+                                                              "$var": {
+                                                                "name": "row",
+                                                                "path": "/kind"
+                                                              }
+                                                            },
+                                                            "integer"
+                                                          ]
+                                                        },
+                                                        "else": {
+                                                          "$boolean": {
+                                                            "$var": {
+                                                              "name": "row",
+                                                              "path": "/scalar"
+                                                            }
+                                                          }
+                                                        },
+                                                        "then": {
+                                                          "$integer": {
+                                                            "$var": {
+                                                              "name": "row",
+                                                              "path": "/scalar"
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "then": {
+                                                      "$text": {
+                                                        "$var": {
+                                                          "name": "row",
+                                                          "path": "/scalar"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                "then": {
+                                                  "$emptyList": true
+                                                }
+                                              }
+                                            },
+                                            "then": {
+                                              "$emptyObject": true
+                                            }
+                                          }
+                                        },
+                                        "then": {
+                                          "$objectSet": {
+                                            "object": {},
+                                            "key": "blueId",
+                                            "val": {
+                                              "$text": {
+                                                "$var": {
+                                                  "name": "row",
+                                                  "path": "/scalar"
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                },
+                                "in": {
+                                  "$document": {
+                                    "$concat": [
+                                      "/expectedProgram/",
+                                      {
+                                        "$var": "sectionName"
+                                      },
+                                      "/definition"
+                                    ]
+                                  }
+                                },
+                                "init": {
+                                  "$emptyObject": true
+                                },
+                                "item": "row"
+                              }
+                            }
+                          },
+                          "expectedUnprocessedSection": {
+                            "args": {
+                              "sectionName": {
+                                "type": "Text"
+                              }
+                            },
+                            "expr": {
+                              "$reduce": {
+                                "in": {
+                                  "$pointerGet": {
+                                    "object": {
+                                      "$document": {
+                                        "$concat": [
+                                          "/expectedProgram/",
+                                          {
+                                            "$var": "sectionName"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "path": "/replacements"
+                                  }
+                                },
+                                "item": "patch",
+                                "acc": "expected",
+                                "init": {
+                                  "$call": {
+                                    "args": {
+                                      "sectionName": {
+                                        "$var": "sectionName"
+                                      }
+                                    },
+                                    "function": "decodeDefinition"
+                                  }
+                                },
+                                "expr": {
+                                  "$pointerSet": {
+                                    "object": {
+                                      "$var": "expected"
+                                    },
+                                    "path": {
+                                      "$var": {
+                                        "name": "patch",
+                                        "path": "/path"
+                                      }
+                                    },
+                                    "val": {
+                                      "$choose": {
+                                        "cond": {
+                                          "$eq": [
+                                            {
+                                              "$var": {
+                                                "name": "patch",
+                                                "path": "/kind"
+                                              }
+                                            },
+                                            "section"
+                                          ]
+                                        },
+                                        "then": {
+                                          "$call": {
+                                            "function": "expectedPaymentTemplate",
+                                            "args": {}
+                                          }
+                                        },
+                                        "else": {
+                                          "$choose": {
+                                            "cond": {
+                                              "$eq": [
+                                                {
+                                                  "$var": {
+                                                    "name": "patch",
+                                                    "path": "/kind"
+                                                  }
+                                                },
+                                                "text"
+                                              ]
+                                            },
+                                            "then": {
+                                              "$text": {
+                                                "$pointerGet": {
+                                                  "object": {
+                                                    "$binding": "targetDocument"
+                                                  },
+                                                  "path": {
+                                                    "$var": {
+                                                      "name": "patch",
+                                                      "path": "/sourcePath"
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            },
+                                            "else": {
+                                              "$choose": {
+                                                "cond": {
+                                                  "$eq": [
+                                                    {
+                                                      "$var": {
+                                                        "name": "patch",
+                                                        "path": "/kind"
+                                                      }
+                                                    },
+                                                    "integer"
+                                                  ]
+                                                },
+                                                "then": {
+                                                  "$integer": {
+                                                    "$pointerGet": {
+                                                      "object": {
+                                                        "$binding": "targetDocument"
+                                                      },
+                                                      "path": {
+                                                        "$var": {
+                                                          "name": "patch",
+                                                          "path": "/sourcePath"
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                },
+                                                "else": {
+                                                  "$pointerGet": {
+                                                    "object": {
+                                                      "$binding": "targetDocument"
+                                                    },
+                                                    "path": {
+                                                      "$var": {
+                                                        "name": "patch",
+                                                        "path": "/sourcePath"
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "expectedCheckpointAt": {
+                            "args": {
+                              "checkpointPath": {
+                                "type": "Text"
+                              },
+                              "channelKind": {
+                                "type": "Text"
+                              }
+                            },
+                            "do": [
+                              {
+                                "$let": {
+                                  "name": "allowedChannels",
+                                  "expr": {
+                                    "$choose": {
+                                      "cond": {
+                                        "$eq": [
+                                          {
+                                            "$var": "channelKind"
+                                          },
+                                          "root"
+                                        ]
+                                      },
+                                      "then": {
+                                        "$listConcat": [
+                                          {
+                                            "$keys": {
+                                              "$call": {
+                                                "function": "decodeDefinition",
+                                                "args": {
+                                                  "sectionName": "timelineAccess"
+                                                }
+                                              }
+                                            }
+                                          },
+                                          [
+                                            "cx.payment.prepare.preparePayment_source"
+                                          ]
+                                        ]
+                                      },
+                                      "else": [
+                                        "provider"
+                                      ]
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "$return": {
+                                  "$choose": {
+                                    "cond": {
+                                      "$not": {
+                                        "$some": {
+                                          "in": {
+                                            "$keys": {
+                                              "$pointerGet": {
+                                                "object": {
+                                                  "$pointerGet": {
+                                                    "object": {
+                                                      "$binding": "targetDocument"
+                                                    },
+                                                    "path": {
+                                                      "$var": "checkpointPath"
+                                                    }
+                                                  }
+                                                },
+                                                "path": "/entries"
+                                              }
+                                            }
+                                          },
+                                          "item": "channel",
+                                          "where": {
+                                            "$not": {
+                                              "$and": [
+                                                {
+                                                  "$some": {
+                                                    "in": {
+                                                      "$var": "allowedChannels"
+                                                    },
+                                                    "item": "allowedKey",
+                                                    "where": {
+                                                      "$eq": [
+                                                        {
+                                                          "$var": "allowedKey"
+                                                        },
+                                                        {
+                                                          "$var": "channel"
+                                                        }
+                                                      ]
+                                                    }
+                                                  }
+                                                },
+                                                {
+                                                  "$isKind": {
+                                                    "val": {
+                                                      "$pointerGet": {
+                                                        "object": {
+                                                          "$pointerGet": {
+                                                            "object": {
+                                                              "$pointerGet": {
+                                                                "object": {
+                                                                  "$pointerGet": {
+                                                                    "object": {
+                                                                      "$binding": "targetDocument"
+                                                                    },
+                                                                    "path": {
+                                                                      "$var": "checkpointPath"
+                                                                    }
+                                                                  }
+                                                                },
+                                                                "path": "/entries"
+                                                              }
+                                                            },
+                                                            "path": {
+                                                              "$concat": [
+                                                                "/",
+                                                                {
+                                                                  "$var": "channel"
+                                                                }
+                                                              ]
+                                                            }
+                                                          }
+                                                        },
+                                                        "path": "/timestamp"
+                                                      }
+                                                    },
+                                                    "kind": "integer"
+                                                  }
+                                                }
+                                              ]
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "then": {
+                                      "$objectSet": {
+                                        "object": {
+                                          "$objectSet": {
+                                            "object": {
+                                              "$emptyObject": true
+                                            },
+                                            "key": "type",
+                                            "val": {
+                                              "$objectSet": {
+                                                "object": {
+                                                  "$emptyObject": true
+                                                },
+                                                "key": "blueId",
+                                                "val": "DDu7utWeDaAusXsBXLFXYHKeg9CsnUX9E9q7LgyBznLu"
+                                              }
+                                            }
+                                          }
+                                        },
+                                        "key": "entries",
+                                        "val": {
+                                          "$reduce": {
+                                            "in": {
+                                              "$keys": {
+                                                "$pointerGet": {
+                                                  "object": {
+                                                    "$pointerGet": {
+                                                      "object": {
+                                                        "$binding": "targetDocument"
+                                                      },
+                                                      "path": {
+                                                        "$var": "checkpointPath"
+                                                      }
+                                                    }
+                                                  },
+                                                  "path": "/entries"
+                                                }
+                                              }
+                                            },
+                                            "item": "channel",
+                                            "acc": "rows",
+                                            "init": {
+                                              "$emptyObject": true
+                                            },
+                                            "expr": {
+                                              "$objectSet": {
+                                                "object": {
+                                                  "$var": "rows"
+                                                },
+                                                "key": {
+                                                  "$var": "channel"
+                                                },
+                                                "val": {
+                                                  "$objectSet": {
+                                                    "object": {
+                                                      "$objectSet": {
+                                                        "object": {
+                                                          "$emptyObject": true
+                                                        },
+                                                        "key": "timestamp",
+                                                        "val": {
+                                                          "$integer": {
+                                                            "$pointerGet": {
+                                                              "object": {
+                                                                "$pointerGet": {
+                                                                  "object": {
+                                                                    "$pointerGet": {
+                                                                      "object": {
+                                                                        "$pointerGet": {
+                                                                          "object": {
+                                                                            "$binding": "targetDocument"
+                                                                          },
+                                                                          "path": {
+                                                                            "$var": "checkpointPath"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "path": "/entries"
+                                                                    }
+                                                                  },
+                                                                  "path": {
+                                                                    "$concat": [
+                                                                      "/",
+                                                                      {
+                                                                        "$var": "channel"
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                }
+                                                              },
+                                                              "path": "/timestamp"
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    },
+                                                    "key": "event",
+                                                    "val": {
+                                                      "$objectSet": {
+                                                        "object": {
+                                                          "$emptyObject": true
+                                                        },
+                                                        "key": "blueId",
+                                                        "val": {
+                                                          "$nodeBlueId": {
+                                                            "$pointerGet": {
+                                                              "object": {
+                                                                "$pointerGet": {
+                                                                  "object": {
+                                                                    "$pointerGet": {
+                                                                      "object": {
+                                                                        "$pointerGet": {
+                                                                          "object": {
+                                                                            "$binding": "targetDocument"
+                                                                          },
+                                                                          "path": {
+                                                                            "$var": "checkpointPath"
+                                                                          }
+                                                                        }
+                                                                      },
+                                                                      "path": "/entries"
+                                                                    }
+                                                                  },
+                                                                  "path": {
+                                                                    "$concat": [
+                                                                      "/",
+                                                                      {
+                                                                        "$var": "channel"
+                                                                      }
+                                                                    ]
+                                                                  }
+                                                                }
+                                                              },
+                                                              "path": "/event"
+                                                            }
+                                                          }
+                                                        }
+                                                      }
+                                                    }
+                                                  }
+                                                }
+                                              }
+                                            }
+                                          }
+                                        }
+                                      }
+                                    },
+                                    "else": {
+                                      "$literal": {
+                                        "invalidNativeCheckpoint": true
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            ]
+                          }
+                        },
+                        "expr": {
+                          "$and": [
+                            {
+                              "$eq": [
+                                {
+                                  "$nodeBlueId": {
+                                    "$document": "/policy"
+                                  }
+                                },
+                                {
+                                  "$document": "/grantTemplates/payment/target/documentValidation/function/constants/policyIdentity"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$nodeBlueId": {
+                                    "$document": "/expectedProgram"
+                                  }
+                                },
+                                {
+                                  "$document": "/grantTemplates/payment/target/documentValidation/function/constants/expectedProgramIdentity"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/status"
+                                },
+                                "Active"
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/policy/sellerAccountId"
+                                },
+                                {
+                                  "$document": "/contracts/authorityHolderChannel/actor/displayName"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/policy/sellerAccountId"
+                                },
+                                {
+                                  "$document": "/contracts/authorizedActorChannel/actor/myosAccountId"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/policy/sellerAgentId"
+                                },
+                                {
+                                  "$document": "/contracts/authorizedActorChannel/actor/agentId"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/policy/sellerAccountId"
+                                },
+                                {
+                                  "$binding": "targetDocument/activation/parties/seller/myosAccountId"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$document": "/policy/sellerAgentId"
+                                },
+                                {
+                                  "$binding": "targetDocument/activation/parties/seller/representatives/myosAgent/representativeId"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/customerPaymentProfile"
+                                },
+                                {
+                                  "$document": "/policy/orderProfile"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$nodeBlueId": {
+                                    "$binding": "targetDocument/type"
+                                  }
+                                },
+                                "DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS"
+                              ]
+                            },
+                            {
+                              "$isKind": {
+                                "val": {
+                                  "$binding": "targetDocument/amountMinor"
+                                },
+                                "kind": "integer"
+                              }
+                            },
+                            {
+                              "$gte": [
+                                {
+                                  "$binding": "targetDocument/amountMinor"
+                                },
+                                {
+                                  "$document": "/policy/minimumAmountMinor"
+                                }
+                              ]
+                            },
+                            {
+                              "$lte": [
+                                {
+                                  "$binding": "targetDocument/amountMinor"
+                                },
+                                {
+                                  "$document": "/policy/maximumAmountMinor"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/currency"
+                                },
+                                {
+                                  "$document": "/policy/currency"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$nodeBlueId": {
+                                    "$binding": "targetDocument/paymentTemplate/type"
+                                  }
+                                },
+                                {
+                                  "$document": "/policy/preparedInstructionType"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/paymentTerms/amountMinor"
+                                },
+                                {
+                                  "$binding": "targetDocument/amountMinor"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/paymentTerms/limitMinor"
+                                },
+                                {
+                                  "$binding": "targetDocument/amountMinor"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/paymentTerms/currency"
+                                },
+                                {
+                                  "$document": "/policy/currency"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/guarantorAccountId"
+                                },
+                                {
+                                  "$document": "/policy/guarantorAccountId"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/clauses/activation/parameters/parties/guarantor/myosAccountId"
+                                },
+                                {
+                                  "$document": "/policy/guarantorAccountId"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/paymentDetails/customerPaymentTerms/provider"
+                                },
+                                {
+                                  "$document": "/policy/provider"
+                                }
+                              ]
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/paymentDetails/customerPaymentTerms/recipientPaymentAccountId"
+                                },
+                                {
+                                  "$document": "/policy/recipientPaymentAccountId"
+                                }
+                              ]
+                            },
+                            {
+                              "$isKind": {
+                                "val": {
+                                  "$binding": "targetDocument/paymentTemplate/paymentDetails/customerPaymentTerms/paymentWindowDays"
+                                },
+                                "kind": "integer"
+                              }
+                            },
+                            {
+                              "$gte": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/paymentDetails/customerPaymentTerms/paymentWindowDays"
+                                },
+                                1
+                              ]
+                            },
+                            {
+                              "$lte": [
+                                {
+                                  "$binding": "targetDocument/paymentTemplate/paymentDetails/customerPaymentTerms/paymentWindowDays"
+                                },
+                                3650
+                              ]
+                            },
+                            {
+                              "$call": {
+                                "function": "sameSection",
+                                "args": {
+                                  "sectionName": "paymentTemplate"
+                                }
+                              }
+                            },
+                            {
+                              "$call": {
+                                "function": "sameSection",
+                                "args": {
+                                  "sectionName": "clauses"
+                                }
+                              }
+                            },
+                            {
+                              "$call": {
+                                "function": "sameSection",
+                                "args": {
+                                  "sectionName": "contracts"
+                                }
+                              }
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$nodeBlueId": {
+                                    "$document": "/expectedProgram/orderType"
+                                  }
+                                },
+                                "FNLBDR37nGH2WGTw8r53RvF2HpAza34xBcy1ygcztG3z"
+                              ]
+                            },
+                            {
+                              "$call": {
+                                "function": "sameSection",
+                                "args": {
+                                  "sectionName": "timelineAccess"
+                                }
+                              }
+                            },
+                            {
+                              "$eq": [
+                                {
+                                  "$nodeBlueId": {
+                                    "$binding": "targetDocument"
+                                  }
+                                },
+                                {
+                                  "$nodeBlueId": {
+                                    "$call": {
+                                      "function": "expectedRoot",
+                                      "args": {}
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "constants": {
+                          "policyIdentity": {
+                            "type": "Text"
+                          },
+                          "expectedProgramIdentity": {
+                            "type": "Text"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

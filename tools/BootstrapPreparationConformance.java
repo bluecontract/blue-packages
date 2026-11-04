@@ -44,6 +44,7 @@ public final class BootstrapPreparationConformance {
   }
   public static void main(String[] args)throws Exception {
     Path root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    if(args.length>1&&args[1].equals("early")){earlyPreparation(packages);return;}
     bootstrapPartyGuards(packages);
     bootstrapAccessGuards(packages);
     for(String mode:List.of("bootstrap","inherited","unknown"))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
@@ -52,7 +53,6 @@ public final class BootstrapPreparationConformance {
       host=applied(p.process(host.document(),event(host.document(),"approve_merchant",m("revision",1)),1));
       var request=m("type","Documents/Preparation Input","key","one","values",m("size",42));
       var result=p.process(host.document(),event(host.document(),"prepareOrder",request),2);
-      if(!result.commits()&&!mode.equals("unknown"))ClauseGasProbe.diagnose(p,host.document(),event(host.document(),"prepareOrder",request),2);
       if(mode.equals("unknown")) {
         require(!result.commits(),"Unknown mode must not create an obligation");
         require(host.document().identity().equals(result.document().identity()),"Rejected mode mutated agreement");
@@ -78,6 +78,38 @@ public final class BootstrapPreparationConformance {
         require(!invalid.commits(),"Disallowed size must fail natively");
       }
       System.out.println("PASS native preparation "+mode);
+    }
+  }
+  /** Real native initialization/operation; seller approval remains outstanding. */
+  static void earlyPreparation(CompositionPackages packages)throws Exception {
+    for(boolean optedIn:List.of(false,true))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      var p=runtime.processor(packages.language());
+      var source=source("bootstrap");
+      var clauses=obj(source.get("clauses"));
+      var activation=obj(obj(clauses.get("activation")).get("parameters"));
+      if(optedIn)activation.put("preActivationOperations",List.of("prepareOrder","provideOrder"));
+      obj(obj(clauses.get("orders")).get("parameters")).put("sourcePaths",m("order",""));
+      var host=applied(p.initialize(source));
+      require(!Boolean.TRUE.equals(p.read(host.document(),"/activation/active")),"Seller must still approve");
+      var request=m("type","Documents/Preparation Input","key","one","values",m("size",42));
+      var result=p.process(host.document(),event(host.document(),"prepareOrder",request),1);
+      if(!optedIn) {
+        require(obj(p.read(result.document(),"/process_orders/entries")).isEmpty(),"Default must not prepare before approval: "+result.observations());
+        System.out.println("PASS default preparation requires active host");continue;
+      }
+      host=applied(result);
+      require(!Boolean.TRUE.equals(p.read(host.document(),"/activation/active")),"Preparation must not grant seller approval");
+      var items=obj(p.read(host.document(),"/process_orders/entries"));
+      require(items.size()==1,"One early preparation");
+      var item=obj(items.values().iterator().next());
+      String path=item.get("itemPath")+"/prepared";
+      require(p.read(host.document(),path+"/sources/order")!=null,"Prepared child must contain native Order source");
+      var prepared=obj(p.read(host.document(),path));
+      require(!prepared.containsKey("contracts")||!obj(prepared.get("contracts")).containsKey("initialized"),"Independent child remains uninitialized");
+      var repeated=applied(p.process(host.document(),event(host.document(),"prepareOrder",request),2));
+      require(obj(p.read(repeated.document(),"/process_orders/entries")).size()==1,"Early retry reuses requirement");
+      require(!Boolean.TRUE.equals(p.read(repeated.document(),"/activation/active")),"Replay must not approve host");
+      System.out.println("PASS explicit preactivation prepares once with initialized source while seller approval remains required");
     }
   }
   static Map<String,Object> party(String timeline) {

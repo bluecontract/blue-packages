@@ -733,6 +733,12 @@ functions:
                     $var: p
                   path: /preActivationChannels
                   default: []
+              preTimerChannels:
+                $pointerGet:
+                  object:
+                    $var: p
+                  path: /preActivationTimerChannels
+                  default: []
             do:
               $literal:
               - $if:
@@ -853,6 +859,23 @@ functions:
                             $const: preChannels
                           val:
                             $binding: dispatch/channel
+                    - $and:
+                      - $eq:
+                        - $binding: dispatch/kind
+                        - EXTERNAL
+                      - $includes:
+                          list:
+                            $const: preTimerChannels
+                          val:
+                            $binding: dispatch/channel
+                      - $is:
+                          node:
+                            $document:
+                              $concat:
+                              - /contracts/
+                              - $binding: dispatch/channel
+                          pattern:
+                            type: Time/Timer Channel
                   then:
                   - $return:
                       allowed: true

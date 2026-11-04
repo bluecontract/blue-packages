@@ -50,6 +50,9 @@ public final class ProviderInputConformance {
   }
   @SuppressWarnings("unchecked")
   static Engine.Result execute(String instruction,String operation,Map<String,Object> input,Object document,String channel) {
+    return execute(instruction,operation,input,document,channel,100);
+  }
+  static Engine.Result execute(String instruction,String operation,Map<String,Object> input,Object document,String channel,long timestamp) {
     var instructionHead=values.head(values.source(m("type",instruction),"definition"));
     var contract=NativeRuntime.child(NativeRuntime.head(instructionHead.contracts,runtime),operation);
     var steps=NativeRuntime.head(NativeRuntime.child(NativeRuntime.head(contract,runtime),"steps"),runtime);
@@ -67,7 +70,7 @@ public final class ProviderInputConformance {
     }
     var bex=new Bex(BexProfile.current());
     var program=bex.compile(source,library,null);
-    var context=new BexContext(document,m(),m(),Values.UNDEFINED,m(),m("call",m("channel",channel,"request",input),"timestamp",100),"/",null,
+    var context=new BexContext(document,m(),m(),Values.UNDEFINED,m(),m("call",m("channel",channel,"request",input),"timestamp",timestamp),"/",null,
       (actual,pattern)->values.matches(values.source(actual),values.source(pattern,"definition")),
       (actual,gas)->NativeRuntime.identity(values.source(actual)));
     return bex.execute(program,context,1000000);
@@ -137,7 +140,7 @@ public final class ProviderInputConformance {
     require(execute(receipt,"acknowledgeRefund",input,doc,"payer").changeset().stream().anyMatch(item->item instanceof Map<?,?> map&&"/payment/reversed".equals(map.get("path"))),"Refund acknowledgment records reversed amount");
     System.out.println("PASS Manual5 public inputs, distinct extra-field/length policies and native effects");
   }
-  static void myos() {
+  static void myosLegacy() {
     String type="MyOS/MyOS Customer Payment Instruction";
     Object pattern=matcher(type,"provideSession");
     var input=typed("MyOS/Customer Session Input",m("sessionId","session-1"));
@@ -163,14 +166,28 @@ public final class ProviderInputConformance {
   }
   public static void main(String[] args)throws Exception {
     Path root=Path.of(args[0]).toAbsolutePath();
-    var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    String mode=args.length<2?"all":args[1];
+    Path selection=root.resolve("PACKAGES.json");
+    if(mode.equals("myos-legacy")) {
+      var catalogue=CompositionPackages.obj(CompositionPackages.yaml(selection));
+      Path archive=root.resolve("myos/releases/0.8.0-preview.7.access-events.2/package.bluepkg");
+      String hash="sha256:"+HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(archive)));
+      var legacy=BluePackage.open(archive);
+      CompositionPackages.obj(catalogue.get("mounts")).put("MyOS",m("path",root.relativize(archive).toString(),"blueId",legacy.blueId(),"archiveSha256",hash));
+      Files.createDirectories(root.resolve("build"));
+      selection=Files.createTempFile(root.resolve("build"),"legacy-customer-catalogue-",".json");
+      Files.writeString(selection,WireData.write(catalogue));
+    }
+    var packages=CompositionPackages.published(root,selection);
     try(var language=packages.language()) {
       blue=language;values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();runtime=new NativeRuntime(blue);
-      String mode=args.length<2?"all":args[1];
-      require(Set.of("all","acme","manual","myos").contains(mode),"Unknown provider mode "+mode);
+      require(Set.of("all","acme","manual","myos","myos-legacy").contains(mode),"Unknown provider mode "+mode);
       if(mode.equals("all")||mode.equals("acme"))acme();
       if(mode.equals("all")||mode.equals("manual"))manual();
-      if(mode.equals("all")||mode.equals("myos"))myos();
+      if(mode.equals("all")||mode.equals("myos"))CustomerSessionConformance.check();
+      if(mode.equals("myos-legacy"))myosLegacy();
+    } finally {
+      if(mode.equals("myos-legacy"))Files.deleteIfExists(selection);
     }
   }
 }

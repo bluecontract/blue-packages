@@ -1,21 +1,19 @@
 name: Customer Session Functions
-type: Contracts/Compute Definition
+type: PaymentInstruction/Payment Protocol Functions
+description: Correlated session preparation and guarantor-authorized customer payment requests. Standard financial
+  requests and outcomes retain the Payment Instruction protocol.
 functions:
-  provideSession:
-    args:
-      input: {}
+  prepareSession:
+    args: {}
     do:
-    - $failIf:
+    - $if:
         cond:
-          $not:
-            $and:
-            - $eq:
-              - $const: sourceMode
-              - workflow
-            - $eq:
-              - $binding: call/channel
-              - $document: /paymentTerms/guarantorChannel
-        message: CUSTOMER_SESSION_OPERATOR_REQUIRED
+          $ne:
+          - $document: /customerSession/status
+          - idle
+        then:
+        - $return:
+            outcome: duplicate
     - $failIf:
         cond:
           $ne:
@@ -23,12 +21,151 @@ functions:
           - true
         message: ACCEPT_INSTRUCTION_FIRST
     - $let:
+        name: provider
+        expr:
+          $document: /paymentDetails/customerPaymentTerms/provider
+    - $let:
+        name: recipient
+        expr:
+          $document: /paymentDetails/customerPaymentTerms/recipientPaymentAccountId
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $and:
+              - $isKind:
+                  val:
+                    $var: provider
+                  kind: text
+              - $ne:
+                - $var: provider
+                - ''
+            - $and:
+              - $isKind:
+                  val:
+                    $var: recipient
+                  kind: text
+              - $ne:
+                - $var: recipient
+                - ''
+        message: CUSTOMER_PAYMENT_ACCOUNT_REQUIRED
+    - $let:
+        name: days
+        expr:
+          $pointerGet:
+            object:
+              $document: /paymentDetails/customerPaymentTerms
+            path: /paymentWindowDays
+            default: 30
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: days
+                kind: integer
+            - $gte:
+              - $var: days
+              - 1
+            - $lte:
+              - $var: days
+              - 3650
+        message: CUSTOMER_PAYMENT_WINDOW_INVALID
+    - $let:
+        name: dueAt
+        expr:
+          $add:
+          - $binding: timestamp
+          - $multiply:
+            - $var: days
+            - 86400000000
+    - $appendChange:
+        op: replace
+        path: /customerSession/requestId
+        val: customer-session-1
+    - $appendChange:
+        op: replace
+        path: /customerSession/status
+        val: requested
+    - $appendChange:
+        op: replace
+        path: /customerSession/paymentDueAt
+        val:
+          $var: dueAt
+    - $return:
+        outcome: acceptedNew
+  provideSession:
+    args:
+      input:
+        type: MyOS/Customer Session Input
+        description: Correlated response to the pending preparation request; expiry must equal the PI deadline.
+        requestId:
+          type: Text
+          description: Identifier emitted by this PI for session preparation.
+          schema:
+            minLength: 1
+        sessionId:
+          type: Text
+          description: Durable provider session identifier.
+          schema:
+            minLength: 1
+        expiresAt:
+          type: Integer
+          description: The exact paymentDueAt emitted by this PI.
+    do:
+    - $call:
+        function: guarantor
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: ACCEPT_INSTRUCTION_FIRST
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $and:
+              - $isKind:
+                  val:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /requestId
+                      default: ''
+                  kind: text
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+                    default: ''
+                - ''
+            - $eq:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /requestId
+                  default: ''
+              - $document: /customerSession/requestId
+        message: CUSTOMER_SESSION_REQUEST_MISMATCH
+    - $let:
         name: id
         expr:
           $pointerGet:
             object:
               $var: input
             path: /sessionId
+            default: ''
+    - $let:
+        name: expiry
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /expiresAt
             default: ''
     - $failIf:
         cond:
@@ -42,11 +179,26 @@ functions:
               - $var: id
               - ''
         message: SESSION_ID_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: expiry
+                kind: integer
+            - $eq:
+              - $var: expiry
+              - $document: /customerSession/paymentDueAt
+            - $gt:
+              - $var: expiry
+              - 0
+        message: CUSTOMER_SESSION_EXPIRY_MISMATCH
     - $if:
         cond:
-          $ne:
-          - $document: /customerSession/id
-          - ''
+          $eq:
+          - $document: /customerSession/status
+          - ready
         then:
         - $failIf:
             cond:
@@ -54,203 +206,320 @@ functions:
               - $document: /customerSession/id
               - $var: id
             message: SESSION_ID_CONFLICT
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /customerSession/expiresAt
+              - $var: expiry
+            message: CUSTOMER_SESSION_EXPIRY_MISMATCH
         - $return:
             outcome: duplicate
-    - $let:
-        name: expiresAt
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /expiresAt
-            default:
-              $add:
-              - $binding: timestamp
-              - 900000000
     - $failIf:
         cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $var: expiresAt
-                kind: integer
-            - $gt:
-              - $var: expiresAt
-              - $binding: timestamp
-        message: CUSTOMER_SESSION_EXPIRY_INVALID
-    - $appendChange:
-        op: replace
-        path: /customerSession/expiresAt
-        val:
-          $var: expiresAt
+          $ne:
+          - $document: /customerSession/status
+          - requested
+        message: CUSTOMER_SESSION_NOT_PENDING
     - $appendChange:
         op: replace
         path: /customerSession/id
         val:
           $var: id
     - $appendChange:
+        op: replace
+        path: /customerSession/expiresAt
+        val:
+          $var: expiry
+    - $appendChange:
+        op: replace
+        path: /customerSession/status
+        val: ready
+    - $appendChange:
         op: add
         path: /paymentAction
         val:
           $merge:
           - type: PaymentInstruction/Payment Action
-          - kind: customer-funding
+          - kind: customer-payment
             id:
               $var: id
+            requestId:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /requestId
+                default: ''
             party:
               $document: /paymentTerms/payerChannel
     - $appendEvent:
         $merge:
         - type: PaymentInstruction/Payment Event
         - kind: Customer Payment Session Ready
+          requestId:
+            $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+              default: ''
           sessionId:
             $var: id
+          expiresAt:
+            $var: expiry
     - $return:
         outcome: acceptedNew
-  confirmFunding:
+  failSessionPreparation:
     args:
       input:
-        description: Identify the existing customer funding session.
-        sessionId:
+        description: Known terminal failure for the pending preparation request. Unknown outcomes retain that
+          request.
+        requestId:
           type: Text
-          description: Identifier of the existing customer funding session.
+          description: Identifier of the preparation request.
+          schema:
+            minLength: 1
+        reason:
+          type: Text
+          description: Stable failure reason.
           schema:
             minLength: 1
     do:
+    - $call:
+        function: guarantor
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: ACCEPT_INSTRUCTION_FIRST
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $and:
+              - $isKind:
+                  val:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /requestId
+                      default: ''
+                  kind: text
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: input
+                    path: /requestId
+                    default: ''
+                - ''
+            - $eq:
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /requestId
+                  default: ''
+              - $document: /customerSession/requestId
+        message: CUSTOMER_SESSION_REQUEST_MISMATCH
+    - $let:
+        name: reason
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /reason
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: reason
+                kind: text
+            - $ne:
+              - $var: reason
+              - ''
+        message: CUSTOMER_SESSION_FAILURE_REASON_REQUIRED
+    - $if:
+        cond:
+          $eq:
+          - $document: /customerSession/status
+          - failed
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /customerSession/failureReason
+              - $var: reason
+            message: CUSTOMER_SESSION_FAILURE_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /customerSession/status
+          - requested
+        message: CUSTOMER_SESSION_NOT_PENDING
+    - $appendChange:
+        op: replace
+        path: /customerSession/status
+        val: failed
+    - $appendChange:
+        op: replace
+        path: /customerSession/failureReason
+        val:
+          $var: reason
+    - $appendEvent:
+        $merge:
+        - type: PaymentInstruction/Payment Event
+        - kind: Customer Payment Session Preparation Failed
+          requestId:
+            $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+              default: ''
+          reason:
+            $var: reason
+    - $return:
+        outcome: acceptedNew
+  requestCustomerPayment:
+    args:
+      input:
+        description: Start the authorized public payment attempt; amount and recipient are taken from this
+          instruction.
+        sessionId:
+          type: Text
+          description: Identifier of the ready session.
+          schema:
+            minLength: 1
+        requestId:
+          type: Text
+          description: Durable payment attempt identifier, reused for reconciliation.
+          schema:
+            minLength: 1
+    do:
+    - $call:
+        function: guarantor
+        args: {}
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /payment/accepted
+          - true
+        message: ACCEPT_INSTRUCTION_FIRST
     - $failIf:
         cond:
           $not:
             $and:
             - $eq:
-              - $const: sourceMode
-              - workflow
+              - $document: /customerSession/status
+              - ready
+            - $and:
+              - $isKind:
+                  val:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /sessionId
+                      default: ''
+                  kind: text
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: input
+                    path: /sessionId
+                    default: ''
+                - ''
             - $eq:
-              - $binding: call/channel
-              - $document: /paymentTerms/guarantorChannel
-        message: CUSTOMER_SESSION_OPERATOR_REQUIRED
-    - $failIf:
-        cond:
-          $or:
-          - $eq:
-            - $document: /customerSession/id
-            - ''
-          - $ne:
-            - $document: /customerSession/id
-            - $pointerGet:
-                object:
-                  $var: input
-                path: /sessionId
-                default: ''
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /sessionId
+                  default: ''
+              - $document: /customerSession/id
         message: SESSION_ID_MISMATCH
+    - $call:
+        function: key
+        args:
+          candidate:
+            $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+              default: ''
     - $if:
         cond:
-          $eq:
-          - $document: /customerSession/funded
-          - true
-        then:
-        - $return:
-            outcome: duplicate
-    - $appendChange:
-        op: replace
-        path: /customerSession/funded
-        val: true
-    - $appendChange:
-        op: remove
-        path: /paymentAction
-    - $appendEvent:
-        $merge:
-        - type: PaymentInstruction/Payment Event
-        - kind: Customer Funding Confirmed
-          sessionId:
-            $document: /customerSession/id
-    - $return:
-        outcome: acceptedNew
-  requestFunding:
-    args:
-      input:
-        description: Identify the existing customer funding session.
-        sessionId:
-          type: Text
-          description: Identifier of the existing customer funding session.
-          schema:
-            minLength: 1
-    do:
-    - $failIf:
-        cond:
           $ne:
-          - $binding: call/channel
-          - $document: /paymentTerms/payerChannel
-        message: CUSTOMER_PAYER_REQUIRED
-    - $failIf:
-        cond:
-          $or:
-          - $eq:
-            - $document: /customerSession/id
-            - ''
-          - $ne:
-            - $document: /customerSession/id
-            - $pointerGet:
-                object:
-                  $var: input
-                path: /sessionId
-                default: ''
-        message: SESSION_ID_MISMATCH
+          - $document: /customerSession/paymentAttemptId
+          - ''
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /customerSession/paymentAttemptId
+              - $pointerGet:
+                  object:
+                    $var: input
+                  path: /requestId
+                  default: ''
+            message: CUSTOMER_PAYMENT_ATTEMPT_ALREADY_EXISTS
+        - $return:
+            $call:
+              function: request
+              args:
+                action: secure
+                input:
+                  requestId:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /requestId
+                      default: ''
+                  amountMinor:
+                    $document: /paymentTerms/amountMinor
     - $failIf:
         cond:
           $gte:
           - $binding: timestamp
-          - $document: /customerSession/expiresAt
+          - $document: /customerSession/paymentDueAt
         message: CUSTOMER_SESSION_EXPIRED
-    - $if:
-        cond:
-          $eq:
-          - $document: /customerSession/requested
-          - true
-        then:
-        - $return:
-            outcome: duplicate
     - $failIf:
         cond:
           $eq:
           - $document: /payment/closed
           - true
         message: CUSTOMER_PAYMENT_CLOSED
-    - $appendChange:
-        op: replace
-        path: /customerSession/requested
-        val: true
-    - $appendEvent:
-        $merge:
-        - type: PaymentInstruction/Payment Event
-        - kind: Customer Funding Requested
-          sessionId:
-            $document: /customerSession/id
-          amountMinor:
-            $document: /paymentTerms/amountMinor
-          currency:
-            $document: /paymentTerms/currency
-    - $return:
-        outcome: acceptedNew
-  provideSessionPublic:
-    args:
-      input:
-        type: MyOS/Customer Session Input
-        description: Provide a customer funding session for the accepted payment instruction. Omit expiresAt
-          to use the execution-time expiry default.
-        sessionId:
-          type: Text
-          description: Identifier of the customer funding session.
-          schema:
-            minLength: 1
-    do:
-    - $return:
-        $call:
-          function: provideSession
-          args:
-            input:
-              $pointerSet:
+    - $call:
+        function: request
+        args:
+          action: secure
+          input:
+            requestId:
+              $pointerGet:
                 object:
                   $var: input
-                path: /type
-                op: remove
+                path: /requestId
+                default: ''
+            amountMinor:
+              $document: /paymentTerms/amountMinor
+    - $appendChange:
+        op: replace
+        path: /customerSession/paymentAttemptId
+        val:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $appendChange:
+        op: remove
+        path: /paymentAction
+    - $return:
+        outcome: acceptedNew
+        requestId:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''

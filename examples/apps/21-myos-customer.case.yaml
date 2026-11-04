@@ -29,19 +29,6 @@ steps:
   request: {}
   target: /payment
   requireExactDocumentVersion: true
-- operation: provideSession
-  channel: guarantor
-  request:
-    type: MyOS/Customer Session Input
-    sessionId: test-session
-  target: /payment
-  requireExactDocumentVersion: true
-- operation: confirmFunding
-  channel: guarantor
-  request:
-    sessionId: test-session
-  target: /payment
-  requireExactDocumentVersion: true
 - operation: recordTransactionInitiated
   channel: guarantor
   request:
@@ -52,12 +39,20 @@ steps:
     providerReference: test-1
   target: /payment
   requireExactDocumentVersion: true
-- operation: authorize
-  channel: customer
+- operation: provideSession
+  channel: guarantor
   request:
-    type: PaymentInstruction/Payment Request Input
+    type: MyOS/Customer Session Input
+    sessionId: test-session
+    requestId: customer-session-1
+    expiresAt: 2592005000000
+  target: /payment
+  requireExactDocumentVersion: true
+- operation: requestCustomerPayment
+  channel: guarantor
+  request:
+    sessionId: test-session
     requestId: auth-1
-    amountMinor: 10000
   target: /payment
   requireExactDocumentVersion: true
 - operation: secureFunds

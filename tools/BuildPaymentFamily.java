@@ -16,6 +16,17 @@ public final class BuildPaymentFamily {
   @SuppressWarnings("unchecked") static List<Object> list(Object o) { return (List<Object>)o; }
   static Object read(Path p) throws Exception { return WireData.json(WireData.write(WireData.parse(Files.readString(p), "yaml"))); }
   static String sha(Path p) throws Exception { return "sha256:"+HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(p))); }
+  static boolean retained(Path root, Map<String,Object> selection, Path path, BluePackage pkg) throws Exception {
+    for(Object raw:list(selection.getOrDefault("retainedArchives",List.of()))) {
+      var pin=map(raw);Path declared=root.resolve(pin.get("path").toString()).normalize();
+      if(!declared.startsWith(root))throw new IllegalArgumentException("Retained dependency outside package home");
+      if(!declared.equals(path.toAbsolutePath().normalize()))continue;
+      if(!pkg.blueId().equals(pin.get("packageBlueId"))||!sha(path).equals(pin.get("archiveSha256")))
+        throw new IllegalArgumentException("Retained dependency pin differs: "+path);
+      return true;
+    }
+    return false;
+  }
   static void verifyImport(Map<String,Object> declaration, Path path, BluePackage pkg) throws Exception {
     if (declaration.containsKey("packageBlueId") && !pkg.blueId().equals(declaration.get("packageBlueId")))
       throw new IllegalArgumentException("Pinned package identity differs: " + path);
@@ -65,7 +76,7 @@ public final class BuildPaymentFamily {
         for(var e:map(cfg.get("imports")).entrySet()) if(!mounted.containsKey(e.getKey())) {
           Path dep=source.resolve(map(e.getValue()).get("path").toString()).normalize();var imported=open(dep);
           verifyImport(map(e.getValue()),dep,imported);
-          mounted.put(e.getKey(),Map.of("path",root.relativize(dep).toString(),"blueId",imported.blueId(),"archiveSha256",sha(dep)));
+          if(!retained(root,selection,dep,imported)) mounted.put(e.getKey(),Map.of("path",root.relativize(dep).toString(),"blueId",imported.blueId(),"archiveSha256",sha(dep)));
         }
         continue;
       }
@@ -80,7 +91,7 @@ public final class BuildPaymentFamily {
         if(entry.getKey().equals(cfg.get("language"))) builder.language(entry.getKey(),pkg);
         var pin=Map.of("path",relative,"packageBlueId",pkg.blueId(),"archiveSha256",sha(path),"name",pkg.name(),"version",pkg.version());
         locks.put(entry.getKey(),pin);
-        mounted.put(entry.getKey(),Map.of("path",root.relativize(path).toString(),"blueId",pkg.blueId(),"archiveSha256",sha(path)));
+        if(!retained(root,selection,path,pkg)) mounted.put(entry.getKey(),Map.of("path",root.relativize(path).toString(),"blueId",pkg.blueId(),"archiveSha256",sha(path)));
       }
       for(Object need:list(cfg.get("executionRequires"))) builder.executionRequires(need.toString());
       if(cfg.containsKey("protocol")) {

@@ -168,11 +168,32 @@ class ReleaseTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Path outside package home'):
                     release.retained_archives(root)
 
+    def test_payment_family_allows_only_exact_declared_retained_imports(self):
+        from check_payment_family import check_import_mount
+        root = release.ROOT
+        folder = root / 'myos-customer-expiry-direct'
+        config = json.loads((folder / 'blue-package.yaml').read_text())
+        lock = json.loads((folder / 'blue-package.lock.json').read_text())
+        mounts = json.loads((root / 'PACKAGES.json').read_text())['mounts']
+        retained = release.retained_archives(root)
+        identity = lock['imports']['MyOS']['packageBlueId']
+        check_import_mount(root, folder, 'MyOS', identity, config, lock, mounts, retained)
+        with self.assertRaisesRegex(AssertionError, 'Mixed candidate editions'):
+            check_import_mount(root, folder, 'MyOS', identity, config, lock, mounts, {})
+        with self.assertRaisesRegex(AssertionError, 'Retained source import differs'):
+            check_import_mount(root, folder, 'MyOS', 'wrong-id', config, lock, mounts, retained)
+        changed = json.loads(json.dumps(lock))
+        changed['imports']['MyOS']['archiveSha256'] = 'wrong-hash'
+        with self.assertRaisesRegex(ValueError, 'Retained import pin differs'):
+            check_import_mount(root, folder, 'MyOS', identity, config, changed, mounts, retained)
+
     def test_current_catalogue_and_generated_views_are_consistent(self):
         rows = release.selections(release.ROOT)
-        self.assertEqual(39, len(rows))
+        self.assertEqual(41, len(rows))
+        self.assertEqual(1, sum(row['name'] == 'myos-customer-expiry-direct' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-definition-read' for row in rows))
-        self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments', 'blue-offers', 'myos-business'} <= {row['name'] for row in rows})
+        self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments', 'blue-offers', 'myos-business',
+                         'clause-mandates', 'blue-processing-event-source', 'myos-payment-mandates'} <= {row['name'] for row in rows})
         self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-tasks' for row in rows))
         historical = json.loads((release.ROOT / 'retained/demand-scoped-baseline/publications.json').read_text())

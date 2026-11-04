@@ -1,7 +1,13 @@
 name: MyOS Customer Payment Instruction
 type: PaymentInstruction/Payment Instruction with Clauses
-description: Customer funding session operations belong to this instruction, alongside the standard guarantor
-  protocol.
+description: Standalone or embedded customer payment with correlated session preparation. Only the configured
+  guarantor begins the financial request; session readiness is not authorization or capture.
+paymentDetails:
+  customerPaymentTerms:
+    provider:
+      type: Text
+    recipientPaymentAccountId:
+      type: Text
 clauses:
   customerSessionState:
     type:
@@ -13,11 +19,31 @@ clauses:
         state: /customerSession
       initialState:
         state:
+          requestId: ''
           id: ''
-          funded: false
-          requested: false
+          status: idle
           expiresAt: 0
+          paymentDueAt: 0
+          paymentAttemptId: ''
+          failureReason: ''
 contracts:
+  __customerAccepted:
+    type: Contracts/Triggered Event Channel
+    event:
+      type: PaymentInstruction/Payment Instruction Accepted
+  __customerPrepareSession:
+    type: Contracts/Sequential Workflow
+    channel: __customerAccepted
+    steps:
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Session Functions
+      constants:
+        sourceMode: event
+      do:
+      - $call:
+          function: prepareSession
+          args: {}
   provideSession:
     type: Contracts/Sequential Workflow Operation
     channel: guarantor
@@ -32,16 +58,16 @@ contracts:
         sourceMode: workflow
       do:
       - $call:
-          function: provideSessionPublic
+          function: provideSession
           args:
             input:
               $binding: call/request
     $blue:requestFrom:
       definition:
         type: MyOS/Customer Session Functions
-      function: provideSessionPublic
+      function: provideSession
       argument: input
-  confirmFunding:
+  failSessionPreparation:
     type: Contracts/Sequential Workflow Operation
     channel: guarantor
     steps:
@@ -55,19 +81,18 @@ contracts:
         sourceMode: workflow
       do:
       - $call:
-          function: confirmFunding
+          function: failSessionPreparation
           args:
             input:
-              $object:
-                $binding: call/request
+              $binding: call/request
     $blue:requestFrom:
       definition:
         type: MyOS/Customer Session Functions
-      function: confirmFunding
+      function: failSessionPreparation
       argument: input
-  requestCustomerFunding:
+  requestCustomerPayment:
     type: Contracts/Sequential Workflow Operation
-    channel: payer
+    channel: guarantor
     steps:
     - type: Parties/Require Active Parties
       constants:
@@ -79,15 +104,12 @@ contracts:
         sourceMode: workflow
       do:
       - $call:
-          function: requestFunding
+          function: requestCustomerPayment
           args:
             input:
-              $object:
-                $binding: call/request
+              $binding: call/request
     $blue:requestFrom:
       definition:
         type: MyOS/Customer Session Functions
-      function: requestFunding
+      function: requestCustomerPayment
       argument: input
-paymentTerms:
-  initiationGate: /customerSession/funded
