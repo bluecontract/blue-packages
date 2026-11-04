@@ -1,0 +1,222 @@
+{
+  "blueId": "DaLGJhFuRxPAWznWMSKX8vzynB7Z6mNfhC6KsN4EnX3n",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "AgLhMbSdVYLq7ipjePpoEkUn7vqJEzXHYRJfmq7nBpo7",
+      "HXpjdouR9ykPrqxdnxmMVgfYH1D8Je9aEsPV4PBasmXR",
+      "J8vxeWwGSZZtVPUWrpjDEpxF3uCb1DFDYXKYgfCZwH1G",
+      "CembFBMbnSv4RL4pGqYMWoQgDNwVg8p4WwA1qHmHSjPo",
+      "8VeyhNxqi2UVsxRjdyRHboQA65VfRcUKySnYkqXUqodJ",
+      "CDV72TzMDZAzZyq4F4GmYx6G2dtzdya5Eo4BUHoAD6Ej",
+      "BQs7QbcYjJkTRX3WkJUn6UmEwv34Khd5omHG9nkwxGoE",
+      "4JxB65gr54JtFZG2ysnKSiwuwTTHEvkVJ2Mcb3KqaHos",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Commission Payouts",
+    "limitations": [
+      "The supplied evidence does not establish currency, reservation units or maintenance, settlement totals, payout dates, or a transition confirming cancellation.",
+      "Action dispatch and several preparation helpers are omitted. Duplicate classification is shown, but sharedPrepare itself does not short-circuit duplicates; once-only execution is not established.",
+      "Preparation caller authorization and automatic lifecycle scheduling are not established by the supplied hook definitions.",
+      "Payout-specific guards belong to preparePayout; inherited prepare and start do not contain them."
+    ],
+    "parameterRefs": [
+      "bindings.collection",
+      "bindings.commission",
+      "bindings.parties",
+      "bindings.sources",
+      "bindings.template",
+      "parameters.allowedFields",
+      "parameters.parties"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no zero default is supplied.",
+        "aggregate": null,
+        "binding": "commission",
+        "defaultPath": "/commission",
+        "evidence": "Commission Payouts Clause.actions.preparePayout.preflight",
+        "id": "reservationGuard",
+        "meaning": "Reservation guard value required to equal zero for a new payout destination; units and accounting are unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; no empty collection default is supplied.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All keys in bindings.collection",
+          "unit": "destination entries"
+        },
+        "binding": "collection",
+        "defaultPath": null,
+        "evidence": "Commission Payouts Clause.actions.preparePayout.preflight: $size($keys)",
+        "id": "destinationEntryCount",
+        "meaning": "Count of destination collection keys checked against 20; includes entries regardless of payment outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown preparation key.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.processContext, itemPath, sharedPrepare",
+        "id": "entryKey",
+        "meaning": "Logical entry key; the preparation registry uses its identity, while the destination uses its escaped text.",
+        "path": "/process_{clauseKey}/entries/*/key",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; does not mean zero.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payouts Clause.preparePayout; Preparation Functions.sharedPrepare",
+        "id": "requestedAmount",
+        "meaning": "Requested payout amount in minor units; currency source is not established. Not a paid or reserved total.",
+        "path": "/process_{clauseKey}/entries/*/intent/fields/amountMinor",
+        "scope": "clause",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; key default applies during preparation.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.processContext, sharedPrepare, checkProvision",
+        "id": "requestCorrelation",
+        "meaning": "Preparation request identifier; provider input must match it through inResponseTo.",
+        "path": "/process_{clauseKey}/entries/*/requestId",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; create defaults only during preparation.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare: obtain",
+        "id": "obtainMode",
+        "meaning": "create writes the prepared child; provide awaits an initialized publication from the recorded supplier.",
+        "path": "/process_{clauseKey}/entries/*/obtain",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown supplier.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare, checkProvision",
+        "id": "supplier",
+        "meaning": "Recorded suppliedBy channel; only this caller can provide a publication for a provide-mode entry.",
+        "path": "/process_{clauseKey}/entries/*/supplier",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown lifecycle stage.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare/sharedProvide/sharedRefresh; Admission Functions",
+        "id": "preparationStatus",
+        "meaning": "awaiting_provider awaits supplier; awaiting_activation awaits child activation; linking awaits sources; admission_pending awaits approval, consent and access; installing awaits admission installation; admission_denied records decline; reapproval_required needs approver rebase; selected identifies a chosen child; usable records readiness; cancellation_requested is unconfirmed cancellation. Neither選",
+        "path": "/process_{clauseKey}/entries/*/status",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown prepared requirement.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare, checkProvision",
+        "id": "requirementReference",
+        "meaning": "Exact prepared-document reference that a supplier response must match.",
+        "path": "/process_{clauseKey}/entries/*/requirementRef",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No candidate origin established by this field.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Functions.candidateStage",
+        "id": "candidateOrigin",
+        "meaning": "Staged candidate's initialized origin; replacement is forbidden, but selection may still be pending.",
+        "path": "/process_{clauseKey}/entries/*/candidateOrigin",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Selection is not established by this field.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare/sharedProvide/sharedRefresh/checkCancellation",
+        "id": "selectedOrigin",
+        "meaning": "Selected child origin; blocks generic preparation cancellation and must match initialization on refresh.",
+        "path": "/process_{clauseKey}/entries/*/documentOrigin",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No admission scope established by this field.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Functions.candidateStage: token, admissionRef",
+        "id": "admissionReference",
+        "meaning": "Exact admission token reference binding candidate, requirements, participants and activation revision.",
+        "path": "/process_{clauseKey}/entries/*/admissionRef",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No recorded decision; approval is not established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Consent Functions.recordConsent; Admission Functions.admissionInstallRequest",
+        "id": "participantConsent",
+        "meaning": "Participant's approve or decline for the admission scope; the recorded decision cannot be changed.",
+        "path": "/process_{clauseKey}/entries/*/consents/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Admission completion revision is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Functions.finishAdmission",
+        "id": "admittedRevision",
+        "meaning": "Host activation revision recorded after participant coverage is verified; entry then moves to linking.",
+        "path": "/process_{clauseKey}/entries/*/admittedRevision",
+        "scope": "clause",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Commission Payouts Clause\n\nPrepares keyed commission payout documents through the native document preparation lifecycle. Opening a preparation, selecting a document and making it usable are separate from completing a payout.\n\n## Configuration and payout preparation\n\n- `bindings.collection` points to the destination collection; no default path is supplied. Preparation records are stored separately under `/process_{clauseKey}/entries`, indexed by the identity of each key.\n- `bindings.commission` defaults to `/commission`. Its `reserved` field must equal numeric zero when the payout action's destination-existence check finds no entry. Missing state does not establish zero. This action reads `reserved`; it does not update it.\n- `bindings.template` optionally points to the template. `parameters.template`, when present, takes precedence over the template binding snapshot. Construction requires an uninitialized template.\n- `bindings.parties` maps child parties and must be nonempty for preparation, despite its inherited empty-object default. `parameters.parties` is supplied as `[]`; this does not satisfy the separate mapping requirement.\n- `bindings.sources` defaults to an empty object and maps declared source aliases to document pointers or `self`. Mapped sources must be active and match their declarations. Source mappings cannot coexist with nonempty legacy `sourcePaths`.\n- `parameters.allowedFields` is supplied as `[\"amountMinor\"]`, allowing that top-level field to be filled during construction. Reserved structural fields remain forbidden.\n\n`preparePayout` accepts only `key` and `amountMinor`. The amount must be an integer from 1 through 100,000,000 inclusive; other fields or amounts are rejected. It passes the amount as `fields.amountMinor` into shared preparation. The keyed entry needs a nonempty text key; this action establishes no omission default for its `key`. The internal request identifier defaults to the resolved key.\n\nWhen the destination-existence check finds no entry, preparation is rejected if the collection already contains at least 20 keys (`DOCUMENT_LIMIT_REACHED`) or `commission.reserved` differs from zero (`PAYOUT_ALREADY_UNRESOLVED`). This counts destination entries, not pending preparation records or completed payments. The guard appends the raw key to the collection pointer, whereas shared preparation escapes JSON-pointer characters in keys; these checks can address different locations for keys containing `/` or `~`.\n\nShared preflight rejects a conflicting preparation intent or an occupied destination without a matching preparation record. An identical intent is classified as `duplicate`. After `sharedPrepare` returns `acceptedNew`, `preparePayout` emits `Commission Payout Opened` with `key` and `amountMinor`. The supplied shared function does not itself stop on a duplicate result, so once-only replay handling cannot be established without the action dispatcher.\n\nInherited `prepare` and its compatibility alias `start` also call shared preparation. Their supplied bodies do not include the payout-specific amount bounds, collection limit, reservation guard or opened event. This definition does not identify a fixed actor authorized to invoke preparation; callable actions alone establish no viewer permission or personal obligation.\n\n## Preparation lifecycle\n\n`obtain` defaults to `create`; the other accepted value is `provide`. Creation rejects nonempty `suppliedParties`, writes the prepared document into the collection and records `selected`. Provision requires `suppliedBy`, records `awaiting_provider` and emits `Document Provision Requested`. Both modes emit `Document Prepared`.\n\n`provide` accepts an existing initialized publication only from the recorded `supplier`, with matching `inResponseTo` and `requirementRef`. It checks the reviewed source, effective clause policy, party and data constraints, and required approval policy. Candidate identity cannot be replaced once recorded. The inherited domain hooks add no payout-specific validation or next actions.\n\nA provided candidate can wait in `awaiting_activation` for its activation or `linking` for its required sources. When a `self` source requires additional host participants, `admission_pending` awaits the admission approval process, explicit participant consent and adequate access. Consent is `approve` or `decline`; repeating the same decision is a duplicate, and changing a recorded decision is rejected. A decline produces `admission_denied`; a changed activation revision produces `reapproval_required`. Rebasing requires an admission approver reviewing the exact document version and returns the entry to `awaiting_provider`. `installing` awaits participant installation; successful installation returns to `linking`. Requesting participant addition does not itself grant access or consent.\n\nA ready candidate is selected, referenced in the collection and announced by `Document Selected`. `resume` refreshes selected entries: once initialization, matching identity, active status and source readiness are established, the entry becomes `usable` and emits `Document Attached`. It can return to `selected` when readiness is lost. Neither status confirms payment.\n\n`cancel` requires an existing preparation without `documentOrigin`. It records `cancellation_requested` and emits `Preparation Cancellation Requested`; repeating that request is a duplicate. A selected process requires domain-specific cancellation. Provision rejects `cancellation_requested`, `cancelled`, `admission_denied` and `reapproval_required` entries. No supplied transition confirms cancellation or releases reserved funds.\n\nThe evidence does not establish the payout currency, reservation accounting, settlement outcomes or payout dates. `amountMinor` describes the requested amount, not secured or paid funds."
+}

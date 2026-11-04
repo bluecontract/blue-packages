@@ -36,6 +36,10 @@ class ResellerCompositionTest(unittest.TestCase):
         for path in examples:
             with self.subTest(example=path.name):
                 source = yaml.safe_load(path.read_text())
+                self.assertNotIn('quotes', source)
+                self.assertNotIn('quote', source['clauses']['catalog']['bindings'])
+                self.assertEqual('/products', source['clauses']['orders']['bindings']['catalog'])
+                self.assertNotIn('startOrder', source['clauses']['orders']['bindings'])
                 order = source['orderTemplate']['clauses']
                 self.assertEqual([], order['activation']['parameters']['required'])
                 self.assertEqual('bootstrap', order['payment']['parameters']['prepareFor'])

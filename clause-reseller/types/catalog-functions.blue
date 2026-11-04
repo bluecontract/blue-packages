@@ -848,25 +848,33 @@ functions:
               $const:
                 name: bindings
                 path: /state
-    - $failIf:
+    - $if:
         cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $document:
-                    $const:
-                      name: bindings
-                      path: /quotes
-                kind: object
-            - $eq:
-              - $size:
-                  $document:
-                    $const:
-                      name: bindings
-                      path: /quotes
-              - 0
-        message: INITIAL_QUOTES_MUST_BE_EMPTY
+          $exists:
+            $document:
+              $const:
+                name: bindings
+                path: /quotes
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /quotes
+                    kind: object
+                - $eq:
+                  - $size:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /quotes
+                  - 0
+            message: INITIAL_QUOTES_MUST_BE_EMPTY
     - $return:
         outcome: acceptedNew
   publishCatalog:

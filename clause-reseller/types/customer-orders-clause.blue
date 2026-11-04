@@ -1,6 +1,7 @@
 name: Customer Orders Clause
-description: Prepares an independently bootstrapped customer order from the exact quoted catalog items. Documents
-  owns preparation, provision, identity and access. Optional fulfilment rules remain in the order.
+description: Validates current catalog selections and prices them while preparing an independently bootstrapped
+  customer order. Documents owns preparation, provision, identity and access. Optional fulfilment rules remain in
+  the order.
 type: Documents/Documents Clause
 actionDefinition:
   type:
@@ -26,60 +27,70 @@ actionDefinition:
         args:
           input: {}
         do:
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var:
+                  name: input
+                  path: /catalogRevision
+              minimum: 1
+              maximum: 1000000
+              error: INVALID_CATALOG_REVISION
+        - $let:
+            name: catalogState
+            expr:
+              $document:
+                $const:
+                  name: bindings
+                  path: /catalog
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: input
+                  path: /catalogRevision
+              - $var:
+                  name: catalogState
+                  path: /revision
+            message: STALE_CATALOG_REVISION
+        - $let:
+            name: quote
+            expr:
+              $call:
+                function: priceSelections
+                args:
+                  input:
+                    catalogRevision:
+                      $var:
+                        name: input
+                        path: /catalogRevision
+                    lines:
+                      $var:
+                        name: input
+                        path: /lines
+                  catalogState:
+                    $var: catalogState
         - $let:
             name: fields
             expr:
-              $var:
-                name: input
-                path: /fields
-        - $if:
-            cond:
-              $hasKey:
-                object:
-                  $var: input
-                key: quoteKey
-            then:
-            - $call:
-                function: validateIdentifier
-                args:
-                  candidate:
-                    $var:
-                      name: input
-                      path: /quoteKey
-                  error: INVALID_QUOTE_KEY
-            - $let:
-                name: quote
-                expr:
-                  $get:
-                    object:
-                      $document:
-                        $const:
-                          name: bindings
-                          path: /quotes
-                    key:
-                      $var:
-                        name: input
-                        path: /quoteKey
-            - $failIf:
-                cond:
-                  $not:
-                    $exists:
-                      $var: quote
-                message: UNKNOWN_QUOTE
-            - $set:
-                name: fields
-                expr:
-                  $merge:
-                  - $var: fields
-                  - amountMinor:
-                      $var:
-                        name: quote
-                        path: /totalMinor
-                    quote:
-                      $var: quote
-                    quoteBlueId:
-                      $nodeBlueId:
-                        $var: quote
+              $merge:
+              - $var:
+                  name: input
+                  path: /fields
+              - amountMinor:
+                  $var:
+                    name: quote
+                    path: /totalMinor
+                currency:
+                  $var:
+                    name: quote
+                    path: /currency
+                quote:
+                  $var: quote
+                quoteBlueId:
+                  $nodeBlueId:
+                    $var: quote
         - $if:
             cond:
               $exists:
@@ -88,14 +99,6 @@ actionDefinition:
                     name: bindings
                     path: /fulfilment
             then:
-            - $failIf:
-                cond:
-                  $not:
-                    $hasKey:
-                      object:
-                        $var: input
-                      key: quoteKey
-                message: QUOTE_REQUIRED
             - $let:
                 name: terms
                 expr:
@@ -192,11 +195,11 @@ actionDefinition:
                       list:
                       - key
                       - description
-                      - amountMinor
                       - customer
-                      - quoteKey
                       - groups
                       - requestId
+                      - catalogRevision
+                      - lines
                       val:
                         $var: field
                 message: UNKNOWN_INPUT_FIELD
@@ -245,45 +248,6 @@ actionDefinition:
                   path: /myosAccountId
                   default: ''
             message: CUSTOMER_MUST_BE_DISTINCT
-        - $if:
-            cond:
-              $hasKey:
-                object:
-                  $var: trigger
-                key: quoteKey
-            then:
-            - $failIf:
-                cond:
-                  $hasKey:
-                    object:
-                      $var: trigger
-                    key: amountMinor
-                message: AMOUNT_COMES_FROM_QUOTE
-            else:
-            - $failIf:
-                cond:
-                  $not:
-                    $and:
-                    - $isKind:
-                        val:
-                          $pointerGet:
-                            object:
-                              $var: trigger
-                            path: /amountMinor
-                        kind: integer
-                    - $gte:
-                      - $pointerGet:
-                          object:
-                            $var: trigger
-                          path: /amountMinor
-                      - 1
-                    - $lte:
-                      - $pointerGet:
-                          object:
-                            $var: trigger
-                          path: /amountMinor
-                      - 100000000
-                message: INVALID_AMOUNT
         - $failIf:
             cond:
               $not:
@@ -343,12 +307,6 @@ actionDefinition:
                   name: trigger
                   path: /key
               fields:
-                amountMinor:
-                  $pointerGet:
-                    object:
-                      $var: trigger
-                    path: /amountMinor
-                    default: 0
                 orderDescription:
                   $pointerGet:
                     object:
@@ -363,11 +321,6 @@ actionDefinition:
                 $var:
                   name: trigger
                   path: /customer
-              quoteKey:
-                $pointerGet:
-                  object:
-                    $var: trigger
-                  path: /quoteKey
               groups:
                 $pointerGet:
                   object:
@@ -384,6 +337,14 @@ actionDefinition:
                       path: /key
               values:
                 $var: trigger
+              catalogRevision:
+                $var:
+                  name: trigger
+                  path: /catalogRevision
+              lines:
+                $var:
+                  name: trigger
+                  path: /lines
         - $return:
             $var: params
       constructOrder:
@@ -681,6 +642,12 @@ actionDefinition:
             $merge:
             - $var: checked
             - outcome: acceptedNew
+      priceSelections:
+        blueId: 7J1gJhPpmewfH8z8NLhP6EZ9pEMdicLvsWXKp3snisYu
+      priceLine:
+        blueId: D8FCxmWFaBJxkCw4XPfaSGuTFWufx67rjfwqodXoNUw6
+      validateCalendarDate:
+        blueId: DXr8AQpnGoovgH9g6WVqQmok3ZDwLp4wU6c1piR2CYpp
 actions:
   startOrder:
     resultContract: outcome-v1
@@ -724,7 +691,7 @@ actions:
               path: /fields
               default: {}
           - {}
-        message: ORDER_FIELDS_COME_FROM_QUOTE
+        message: ORDER_FIELDS_COME_FROM_CATALOG
     - $set:
         name: params
         expr:
@@ -854,8 +821,8 @@ actions:
               checked:
                 $var: actionResult
 bindingTypes:
-  quotes: pointer
   fulfilment: pointer
+  catalog: pointer
 parameters:
   obtain: provide
   prepareFor: bootstrap
@@ -869,9 +836,10 @@ parameters:
   - quote
   - quoteBlueId
   - orderSnapshot
+  - currency
 defaultBindings:
   parties:
     seller: seller
     partner: partner
-  quotes: /quotes
   fulfilment: /clauses/fulfilment/parameters
+  catalog: /catalog

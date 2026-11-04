@@ -1,0 +1,239 @@
+{
+  "blueId": "5H7tk8XhysZgR9tHttFPtYHk88aLg1WVuKySQE2Dzheh",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "9uaNLT6DfnQ8EXeozaJQZgCy84P3m8E1fkb3YekMUieb",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Fulfilment Terms",
+    "limitations": [
+      "Action-to-channel connections and their authorization checks are not supplied; approval authority cannot be inferred from action names.",
+      "The inherited validateFields, validateIdentifier and validateInteger implementations are omitted, so additional validation details are not established.",
+      "Timestamp arithmetic establishes microsecond units but does not explicitly establish a Unix epoch.",
+      "Separate Order creation and reservation-state persistence are not established by these two actions; preparation must not be interpreted as fulfilment or payment confirmation."
+    ],
+    "parameterRefs": [
+      "bindings.availability",
+      "bindings.orders",
+      "bindings.quotes",
+      "bindings.terms"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; absence does not mean zero.",
+        "aggregate": {
+          "operation": "count",
+          "over": "entries in orders",
+          "unit": "prepared order snapshots"
+        },
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.placeOrder: orders size guard and snapshot append",
+        "id": "preparedOrderCount",
+        "meaning": "Count of recorded order snapshots, not fulfilled orders; new preparation requires fewer than 200 entries.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no matching readiness is established.",
+        "aggregate": null,
+        "binding": "availability",
+        "defaultPath": "/supplierReadiness",
+        "evidence": "Order Functions.approveAvailability: proof.quoteBlueId; placeOrder",
+        "id": "readinessQuote",
+        "meaning": "Exact quote identity approved by the recorded readiness proof; automatic placement requires a match.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/quoteBlueId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "availability",
+        "defaultPath": "/supplierReadiness",
+        "evidence": "Order Functions.approveAvailability: proof.actor from call/channel",
+        "id": "readinessActor",
+        "meaning": "Calling channel recorded for availability approval; the value alone does not establish supplier authority.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/actor",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "availability",
+        "defaultPath": "/supplierReadiness",
+        "evidence": "Order Functions.approveAvailability: reference validation and proof",
+        "id": "readinessReference",
+        "meaning": "Availability approval reference supplied with the request, constrained to 1–256 characters.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/reference",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "availability",
+        "defaultPath": "/supplierReadiness",
+        "evidence": "Order Functions.approveAvailability: proof.timestampMicros",
+        "id": "readinessRecordedAt",
+        "meaning": "Call timestamp recorded for readiness approval, in microseconds; the supplied evidence does not specify its epoch.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/timestampMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; acceptance time is not established.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.placeOrder: snapshot.acceptedAtMicros; initialGroups",
+        "id": "orderAcceptedAt",
+        "meaning": "Snapshot acceptance timestamp in microseconds, used to validate automatic confirmation timing.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/acceptedAtMicros",
+        "type": "number"
+      },
+      {
+        "absent": "No exact start was supplied for this group.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.validateGroupSelections; placeOrder: snapshot.groups",
+        "id": "orderProposedStart",
+        "meaning": "Selected group's proposed start in microseconds; it is not a stored live reservation confirmation.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/groups/*/proposedStartMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; only snapshot creation applies false.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.placeOrder: immediateConsent; initialGroups consent guard",
+        "id": "orderImmediateConsent",
+        "meaning": "Recorded consent to immediate charge exposure under automatic confirmation; it does not record a payment.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/acceptImmediateCharge",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Fulfilment Terms Clause.description; Order Functions.placeOrder, validateTerms",
+        "id": "acceptedFulfilmentText",
+        "meaning": "Accepted fulfilment Markdown preserved in the order snapshot, including any supplier deposit text.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/terms/fulfilmentText",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; preparation alone supplies the default.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.termsForOrder: agreementDescription; placeOrder",
+        "id": "acceptedAgreementDescription",
+        "meaning": "Document description captured at preparation; an absent source description is captured as empty text.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/terms/agreementDescription",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no default mode is defined.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.validateTerms; initialGroups; placeOrder",
+        "id": "acceptedConfirmationMode",
+        "meaning": "automatic requires matching readiness; supplier prepares groups awaiting supplier confirmation.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/terms/confirmationMode",
+        "type": "string"
+      },
+      {
+        "absent": "Initial-group validation treats omission as false.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.validateTerms; initialGroups: dateRequired default",
+        "id": "acceptedDateRequirement",
+        "meaning": "Whether every selected group must supply an exact proposed start during initial-group validation.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/terms/dateRequired",
+        "type": "boolean"
+      },
+      {
+        "absent": "No accepted cancellation hours are established.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.validateTerms; initialGroups: cancellation cutoff",
+        "id": "acceptedCancellationHours",
+        "meaning": "Accepted free-cancellation cutoff offset before the group start, in whole hours from 0 to 8,760.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/terms/cancellationPolicy/freeCancellationHoursBeforeStart",
+        "type": "number"
+      },
+      {
+        "absent": "No accepted cancellation percentage is established.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.validateTerms, initialGroups; Rounding.roundBps",
+        "id": "acceptedCancellationPercent",
+        "meaning": "Accepted late-cancellation percentage, 0–100; automatic confirmation checks its rounded group charge.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/terms/cancellationPolicy/lateCancellationChargePercent",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.placeOrder: snapshot.quote; cancelGroup: quote/currency",
+        "id": "acceptedQuoteCurrency",
+        "meaning": "Currency of the captured quote and its line amounts; no currency conversion is performed by these actions.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/quote/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; not zero.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orderIntents",
+        "evidence": "Order Functions.placeOrder: snapshot.quote; makeProposal: lineTotalMinor",
+        "id": "acceptedQuoteLineAmount",
+        "meaning": "Captured quote-line price in minor units of the same snapshot's quote.currency; used in group proposal amounts.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/quote/lines/*/lineTotalMinor",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Fulfilment Terms Clause\n\nPrepares an order snapshot containing accepted fulfilment Markdown, the exact quote, structured seller and customer data, group selections, confirmation mode and any cancellation policy. Security deposits remain supplier text; these actions do not manage deposit payments.\n\n## Bindings and terms\n\nThe pointer bindings select data in the executing document: `availability` defaults to `/supplierReadiness`, `orders` to `/orderIntents`, `quotes` to `/quotes`, and `terms` to `/resellerTerms`. Changing a binding changes where its data is read or recorded.\n\n`terms.fulfilmentText` must contain 1–12,000 characters. `agreementDescription` is taken from the document's `description`, overriding any value in `terms`; missing `description` becomes an empty string, and the result is limited to 4,000 characters. `confirmationMode` must be `automatic` or `supplier`, with no default. Optional boolean `dateRequired` is treated as false when omitted during initial-group validation.\n\nOptional `cancellationPolicy` contains both `freeCancellationHoursBeforeStart`, an integer from 0 to 8,760 hours, and `lateCancellationChargePercent`, an integer from 0 to 100. Confirmation validation uses zero values when the policy is absent, but this does not establish an accepted free-cancellation policy.\n\n## Availability approval\n\n`approveAvailability` takes `quoteKey`, `groups` and a `reference` of 1–256 characters. The quote must exist. Each group requires a valid `id` and nonempty `lineIndices`; groups number 1–20, have distinct identifiers, and partition every quote line exactly once. A group cannot contain differing supplied `serviceDate` values.\n\nFor availability approval, every group must also have an integer `proposedStartMicros` from 0 to 9,007,199,254,740,991 strictly later than the call timestamp. The action records the exact quote identity, groups, reference, calling channel as `actor`, and `timestampMicros` under the quote key in `availability`, returning `acceptedNew`. This is recorded readiness evidence, not proof of service delivery. The supplied clause does not establish which actor channels may invoke either action.\n\n## Order preparation\n\n`place` takes `key`, `quoteKey`, `groups` and optional boolean `acceptImmediateCharge`, which defaults to false in the snapshot. Reusing an order key with exactly the same original input returns `duplicate` without preparing another order; different input is rejected with `ORDER_KEY_CONFLICT`. This duplicate check precedes the new-order checks.\n\nA new order requires `call/requireExactDocumentVersion` to be true, fewer than 200 existing order entries, an existing quote whose `supplierId` is `seller`, and a structured seller at `/activation/parties/seller`. Customer data is copied from `/activation/parties/customer`. Group selection follows the same partition rules; a supplied start must be a bounded integer, and `dateRequired: true` requires one for every group.\n\nWith `confirmationMode: automatic`, readiness must match both the exact quote identity and the complete group selection. Every start must be later than `acceptedAtMicros`. If acceptance is strictly after the free-cancellation cutoff and the policy produces a positive charge, `acceptImmediateCharge: true` is required. The charge basis is the group's selected quote-line totals in the quote currency, with percentage rounding to the nearest minor unit, halves upward. With `confirmationMode: supplier`, initial-group validation prepares groups awaiting supplier confirmation and does not itself require a future start.\n\nOn acceptance, `place` stores the snapshot under `orders` using `key`, emits `Reseller Order Prepared` with `clause`, `key` and `snapshot`, and returns `acceptedNew`, `key` and `snapshot`. The snapshot includes `intent`, `quote`, `quoteBlueId`, `terms`, `termsBlueId`, `seller`, `customer`, `groups`, `supplierReadiness`, `acceptImmediateCharge` and `acceptedAtMicros`. Supplier-mode snapshots use an empty `supplierReadiness` object.\n\n`place` calls `initialGroups` to validate preparation but does not store its returned reservation states. An accepted snapshot or emitted preparation event therefore does not establish a separately initialized Order, live reservation confirmation, fulfilment or payment outcome."
+}

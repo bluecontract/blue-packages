@@ -1,0 +1,299 @@
+{
+  "blueId": "3gkrAmyYAz2Zvnpok3CHgwCATdQC4o5EFLi2YjezXaGS",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "2aE614qR9AoVX6NgkwBfSGRdbboy7w7irK5WYLWkuJTc",
+      "38WfjUZyXUA3dW3LbkBGjEnY5yutzb6MFB2iA3xLynfN",
+      "791CtNxSJCV9AV9QR7UnWM7Vmvm9n88xjjpcuk72jXAN",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Catalog Clause",
+    "limitations": [
+      "The supplied offer definition does not specify the structure of sections members.",
+      "External fulfillment and payment are not checked by these catalog actions; a quote does not confirm either."
+    ],
+    "parameterRefs": [
+      "bindings.quotes",
+      "bindings.state",
+      "parameters.offer"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; required by catalog validation.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/catalog",
+        "evidence": "Catalog Functions.validateCatalogState; publishCatalog",
+        "id": "catalogRevision",
+        "meaning": "Current catalog revision, 1–1,000,000; advances on accepted publication.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/revision",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; required by catalog validation.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/catalog",
+        "evidence": "Catalog Functions.validateCatalogState; publishCatalog",
+        "id": "catalogSupplier",
+        "meaning": "Single supplier identifier; preserved when entries are published.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/supplierId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; required by catalog validation.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/catalog",
+        "evidence": "Catalog Functions.validateCatalogState; priceSelections",
+        "id": "catalogCurrency",
+        "meaning": "Currency for item minor-unit prices; validated only as three-character text.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; required for a valid item.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/catalog",
+        "evidence": "Catalog Functions.validateItems; priceLine",
+        "id": "itemUnitAmount",
+        "meaning": "Price per billable unit, 0–100,000,000 minor units of state.currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/entries/*/unitAmountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; required for a valid item.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/catalog",
+        "evidence": "Catalog Functions.validateItems; priceLine",
+        "id": "itemDateRequired",
+        "meaning": "True requires serviceDate; false forbids it. Neither confirms availability.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/entries/*/dateRequired",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; required for a valid item.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/catalog",
+        "evidence": "Catalog Functions.validateItems; priceLine",
+        "id": "itemPricingUnit",
+        "meaning": "per_unit bills quantity; per_selected_hour bills quantity extended by selected hours.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/entries/*/pricingUnit",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no complete snapshot established.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.createQuote; priceSelections snapshot",
+        "id": "quoteCatalogRevision",
+        "meaning": "Catalog revision used to price this immutable quote; later publications do not update it.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/catalogRevision",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; no complete snapshot established.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceSelections snapshot.supplierId",
+        "id": "quoteSupplier",
+        "meaning": "Supplier copied from the catalog when the quote was created.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/supplierId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; do not infer from current catalog.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceSelections snapshot.currency",
+        "id": "quoteCurrency",
+        "meaning": "Captured catalog currency governing all monetary fields in this quote and its lines.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "quotes:/*/lines/*/subtotalMinor",
+          "unit": "quote currency minor units"
+        },
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceSelections subtotalMinor accumulation",
+        "id": "quoteSubtotal",
+        "meaning": "Stored sum of quoted line subtotals before discounts, in this quote's currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/subtotalMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "quotes:/*/lines/*/discountMinor",
+          "unit": "quote currency minor units"
+        },
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceSelections discountMinor accumulation",
+        "id": "quoteDiscount",
+        "meaning": "Stored sum of separately rounded quoted line discounts, in this quote's currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/discountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero or paid.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "quotes:/*/lines/*/lineTotalMinor",
+          "unit": "quote currency minor units"
+        },
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceSelections totalMinor accumulation",
+        "id": "quoteTotal",
+        "meaning": "Stored sum of discounted quoted line totals in this quote's currency minor units; no payment outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/totalMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; incomplete priced line.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine item lookup and return.itemId",
+        "id": "quoteLineItem",
+        "meaning": "Catalog item identifier selected for this line at the quote's catalog revision.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/itemId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine quantity validation and return",
+        "id": "quoteLineQuantity",
+        "meaning": "Selected item quantity, from 1 through the item's maxQuantity; distinct from hourly billableUnits.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/quantity",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine return.unitAmountMinor",
+        "id": "quoteLineUnitAmount",
+        "meaning": "Captured price per billable unit, in the enclosing quote's currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/unitAmountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine subtotalMinor",
+        "id": "quoteLineSubtotal",
+        "meaning": "Priced line amount before discount, in the enclosing quote's currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/subtotalMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no stored discount established.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine discountMinor; Rounding.roundBps",
+        "id": "quoteLineDiscount",
+        "meaning": "Half-up rounded line discount in the enclosing quote's currency minor units; not a refund.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/discountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero or paid.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine lineTotalMinor",
+        "id": "quoteLineTotal",
+        "meaning": "Quoted line amount after discount, in the enclosing quote's currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/lineTotalMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Omitted for a valid line not requiring a date.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine; validateCalendarDate",
+        "id": "quoteServiceDate",
+        "meaning": "Selected YYYY-MM-DD date in 2000–2099; calendar-valid, without availability or booking confirmation.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/serviceDate",
+        "type": "date"
+      },
+      {
+        "absent": "Omitted for a valid per_unit line.",
+        "aggregate": null,
+        "binding": "quotes",
+        "defaultPath": "/quotes",
+        "evidence": "Catalog Functions.priceLine duration validation and return",
+        "id": "quoteDurationHours",
+        "meaning": "Selected offered duration of 1–168 whole hours for per_selected_hour pricing; not a timestamp.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/lines/*/durationHours",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Catalog Clause\n\nDescribes one offer and one supplier's catalog, and creates immutable quotes from selected items. Optional `parameters.offer.title`, `text` and `sections` provide authored descriptive content. They create no booking, date, availability or payment requirements; executable date requirements come from catalog items.\n\n## Catalog and bindings\n\n`bindings.state` points to the catalog, defaulting to `/catalog`; `bindings.quotes` points to keyed quote snapshots, defaulting to `/quotes`. Overrides relocate these reads and writes within the executing document. Both bindings must be non-root JSON pointers. These defaults specify locations, not initial data.\n\nThe catalog requires exactly `revision`, `supplierId`, `currency` and `entries`. `revision` is an integer from 1 to 1,000,000. `currency` is three-character text; validation does not establish that it is a recognized currency code. `entries` is a dictionary of 1–100 items keyed by item identifier.\n\nEach item requires:\n\n- `label`: 1–120 characters.\n- `pricingUnit`: `per_unit` or `per_selected_hour`.\n- `dateRequired`: Boolean controlling whether a selection must supply `serviceDate`.\n- `maxQuantity`: integer from 1 to 1,000, limiting each selected line's quantity.\n- `unitAmountMinor`: integer from 0 to 100,000,000, in the catalog's currency minor units.\n\nOptional `description` is 1–2,000 characters. Optional `guestDiscountPercent` is an integer from 0 to 100; pricing treats omission as zero and applies it without a separate buyer eligibility check. `dateSelectionHint` is descriptive text of 1–500 characters, allowed only when `dateRequired` is true. For `per_unit`, `allowedDurationHours` must be absent or empty. For `per_selected_hour`, it must contain 1–24 distinct integer choices, each from 1 to 168 hours.\n\nSupplier identifiers, item identifiers and quote keys are 1–64 characters, contain neither `/` nor `~`, and cannot start with `$`. They cannot equal `name`, `description`, `type`, `itemType`, `keyType`, `valueType`, `value`, `items`, `blueId`, `blue`, `schema`, `constraints`, `mergePolicy`, `properties` or `contracts`. Catalog, item, publication, quote and selection objects reject unsupported fields.\n\n## Actions and outcomes\n\n`validate` runs automatically once on `initialized`. It validates the existing catalog and requires `quotes`, if present, to be an empty object. It returns `acceptedNew` without creating catalog or quote data. Missing state is otherwise unknown, not an implied initialized value.\n\n`publish` requires exactly `expectedRevision` and `entries`. The expected revision must match the current revision, which must be below 1,000,000. After validating all replacement entries, it replaces the complete item dictionary and increments `revision`, preserving `supplierId` and `currency`. It returns `acceptedNew` with the new revision and emits `Catalog Published` with `clause` and `revision`. A stale revision, invalid entries or the revision ceiling rejects publication. Existing quote snapshots remain unchanged.\n\n`quote` requires exactly `key`, `catalogRevision` and `lines`. For an existing key, an exactly equal stored `intent` returns `duplicate` without rewriting the snapshot or emitting another quote event; any different intent fails with `QUOTE_KEY_CONFLICT`. This duplicate check precedes capacity, revision and pricing checks, so an exact retry can remain a duplicate after the catalog changes. A new quote requires fewer than 200 stored quotes and a `catalogRevision` matching the current catalog.\n\n`lines` must contain 1–20 selections. Each requires `itemId` and integer `quantity` from 1 through that item's `maxQuantity`. Unknown items are rejected. `serviceDate` is required when `dateRequired` is true and forbidden otherwise. It must be a valid `YYYY-MM-DD` calendar date in 2000–2099; this check does not establish availability or require a future date. `durationHours` is required for `per_selected_hour`, must match an offered duration, and is forbidden for `per_unit`. Repeated selections with the same item, service date and duration are rejected even if their quantities differ.\n\nPricing records `billableUnits` as quantity for `per_unit`, or quantity extended by selected hours for `per_selected_hour`. Each line stores the unit price, pre-discount `subtotalMinor`, applied `guestDiscountPercent`, half-up rounded `discountMinor`, and discounted `lineTotalMinor`. Rounding occurs separately per line. Line and quote pre-discount subtotals cannot exceed 1,000,000,000,000 minor units. Quote `subtotalMinor`, `discountMinor` and `totalMinor` are stored sums of their respective line amounts, all in the snapshot's `currency`.\n\nA new snapshot preserves `intent`, `catalogBlueId`, `catalogRevision`, `supplierId`, `currency`, priced `lines` and totals. Lines preserve `itemId`, `itemLabel`, pricing details and applicable `serviceDate` and `durationHours`, plus `itemDescription` and `dateSelectionHint` when supplied. Creation returns `acceptedNew` with `key` and emits `Quote Created` with `clause`, `quoteKey`, `catalogRevision` and `totalMinor`. These amounts describe a quote, not reserved, secured, captured or paid funds; a selected date is not a confirmed booking.\n\n## Connections\n\n`publish` and `quote` have no default actor or trigger. Named action connections determine invocation sources and `params`; workflow connections require an authenticated `party` or `channel`. A callable action alone grants no viewer permission or personal obligation. Connection `when` can skip execution, and `parameters.conditions` can reject a named action. `before` runs before the action body; `after` and completion of a `once` connection occur only for `acceptedNew`, so a duplicate skips those later steps but can already have run `before`. Invalid catalog operations fail rather than returning a stored rejection status. Changing an installed clause configuration requires a new clause key.\n\nAction invocation is an attempt; accepted effects and stored snapshots establish catalog publication or quote creation, without confirming external fulfillment or payment."
+}

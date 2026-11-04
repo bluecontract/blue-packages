@@ -1,0 +1,237 @@
+{
+  "blueId": "EWMrPZWUi46vyUu6gcw3k5xZRPFMxWPfoC9mGwFvXPFz",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "38WfjUZyXUA3dW3LbkBGjEnY5yutzb6MFB2iA3xLynfN",
+      "9uaNLT6DfnQ8EXeozaJQZgCy84P3m8E1fkb3YekMUieb",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Confirmation Clause",
+    "limitations": [
+      "Concrete connection authorization and inherited identifier, catalog and pricing validator implementations are not supplied; their additional checks are unknown.",
+      "The supplied definitions establish microsecond timestamps but do not specify a Unix epoch."
+    ],
+    "parameterRefs": [
+      "bindings.requests",
+      "bindings.snapshot",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; initialization must succeed first.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups, confirmProposal, proposeAlternative, acceptProposal, fulfilGroup",
+        "id": "groupStatus",
+        "meaning": "pending_supplier awaits supplier; pending_customer awaits customer; confirmed fixes start; fulfilled records fulfilment.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Current proposal identity unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups, proposeAlternative, reservationRequest",
+        "id": "proposalIdentity",
+        "meaning": "Identity of the current proposal; new actions must match it through expectedProposalBlueId.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposalBlueId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; do not assume the initial number.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups, proposeAlternative, makeProposal",
+        "id": "proposalNumber",
+        "meaning": "Current proposal revision, initialized to 1 and incremented for each accepted alternative.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/number",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "proposal.quote.lines selected by proposal.lineIndices",
+          "unit": "minor units of proposal.quote.currency"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.makeProposal: selected lineTotalMinor sum",
+        "id": "proposalAmount",
+        "meaning": "Proposed total of selected quote lines in proposal.quote.currency minor units; not payment confirmation.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Currency unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.makeProposal, proposeAlternative: currency match",
+        "id": "proposalCurrency",
+        "meaning": "Currency of the proposal price; alternatives must match snapshot.quote.currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/quote/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "No exact start recorded; confirmation needs one.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups, confirmProposal, acceptProposal, proposeAlternative",
+        "id": "proposedStart",
+        "meaning": "Proposed service instant in microseconds; must be future when confirmed or accepted. Epoch unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/proposedStartMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; automatic confirmation may omit it.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.confirmProposal, proposeAlternative, acceptProposal",
+        "id": "supplierApproval",
+        "meaning": "Approval recorded by confirm or alternative; accept requires true.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/supplierApproved",
+        "type": "boolean"
+      },
+      {
+        "absent": "No deadline guard applies when the field is absent.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.setResponseDeadline, confirmProposal, proposeAlternative, acceptProposal",
+        "id": "responseDeadline",
+        "meaning": "One-time pending-response deadline in microseconds; confirm, alternative and accept require an earlier timestamp.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/responseDeadlineMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; consent guards still apply.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.confirmProposal: pending_customer branch; acceptProposal merge",
+        "id": "immediateConsentRequired",
+        "meaning": "Confirm deferred for immediate cancellation-charge consent; retained after acceptance, not a live pending flag.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/immediateChargeConsentRequired",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; automatic confirmation may omit it.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.acceptProposal: consent and immediateChargeAccepted",
+        "id": "immediateConsentAccepted",
+        "meaning": "Boolean consent saved by accept from acceptImmediateCharge; does not record a collected charge.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/immediateChargeAccepted",
+        "type": "boolean"
+      },
+      {
+        "absent": "Confirmation time unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups, confirmProposal, acceptProposal",
+        "id": "confirmedAt",
+        "meaning": "Confirmation instant in microseconds: snapshot.acceptedAtMicros automatically, otherwise action timestamp.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/confirmedAtMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Confirmed service start unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups, confirmProposal, acceptProposal, fulfilGroup",
+        "id": "confirmedStart",
+        "meaning": "Exact service start copied from the confirmed proposal; fulfil requires this instant to have arrived.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/confirmedStartMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; omitted when cancellationPolicy is absent.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups, confirmProposal, acceptProposal, saveReservation",
+        "id": "freeCancellationCutoff",
+        "meaning": "Microsecond cutoff preceding confirmed start by the policy's freeCancellationHoursBeforeStart.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/freeCancellationUntilMicros",
+        "type": "number"
+      },
+      {
+        "absent": "No fulfilment timestamp established.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.fulfilGroup: fulfilledAtMicros",
+        "id": "fulfilledAt",
+        "meaning": "Action timestamp in microseconds when fulfil recorded fulfilled, at or after confirmedStartMicros.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/fulfilledAtMicros",
+        "type": "number"
+      },
+      {
+        "absent": "No saved outcome established for this request.",
+        "aggregate": null,
+        "binding": "requests",
+        "defaultPath": "/reservationRequests",
+        "evidence": "Order Functions.saveReservation: requests entry status",
+        "id": "savedRequestStatus",
+        "meaning": "Group status when this action was saved, not necessarily current status; uses the group lifecycle values.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Caller channel unknown.",
+        "aggregate": null,
+        "binding": "requests",
+        "defaultPath": "/reservationRequests",
+        "evidence": "Order Functions.reservationRequest, saveReservation: intent.actor",
+        "id": "savedRequestActor",
+        "meaning": "Caller channel saved with the action and exact input; participates in duplicate and conflicting-key checks.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/intent/actor",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Confirmation Clause\n\nMaintains one current proposal and, upon confirmation, one exact service start per fulfilment group. It supports supplier confirmation, supplier-approved automatic confirmation, customer acceptance of alternatives or immediate cancellation-charge exposure, and recording fulfilment.\n\n## Bindings and initialization\n\nThe pointer bindings `snapshot`, `state` and `requests` default to `/orderSnapshot`, `/reservations` and `/reservationRequests`. They locate the order snapshot, groups keyed by group ID, and saved actions keyed by request key in the executing document. Rebinding changes these locations.\n\n`initialize` runs once on `initialized`. Both `state` and `requests` must equal `{}`. Initialization verifies `quoteBlueId` and `termsBlueId` against the snapshot's `quote` and `terms`. Its `groups` must contain 1–20 uniquely identified, nonempty selections whose `lineIndices` cover every quote line exactly once. A group cannot combine differing explicit `serviceDate` values.\n\nRequired `terms` fields are `fulfilmentText` (1–12,000 characters), `agreementDescription` (0–4,000 characters), and `confirmationMode` (`supplier` or `automatic`). Optional boolean `dateRequired` defaults to false for initialization. When true, every group needs `proposedStartMicros`; automatic confirmation always needs an exact start. Supplied start and deadline values are integers from 0 through 9007199254740991, measured in microseconds; the supplied definitions do not specify their epoch.\n\nEach initial proposal has `number: 1`, selected `lineIndices`, its `quote` and `quoteBlueId`, and `amountMinor`: the sum of selected quote lines' `lineTotalMinor`, in that quote's `currency`. This is a proposed price, not secured or paid funds. `history` retains proposals, while `originalLineIndices` preserves the initial selection.\n\nSupplier mode starts at `pending_supplier`. Automatic mode requires `supplierReadiness.quoteBlueId` and `supplierReadiness.groups` to match the snapshot exactly, and a start later than `acceptedAtMicros`. It records confirmation at `acceptedAtMicros`, subject to any required `acceptImmediateCharge` consent.\n\n## Actions and outcomes\n\nEvery non-initialization action requires `key`, `groupId` and `expectedProposalBlueId`. New requests require an existing group and the current proposal identity. Reusing a saved key with identical action, caller channel and input returns `duplicate` before checking current state; conflicting reuse fails. At most 500 distinct requests can be saved.\n\n- `confirm` requires `pending_supplier`, an exact future start, and an unexpired response deadline if present. It sets `supplierApproved: true` and normally records `confirmed`. If immediate cancellation-charge consent is needed, it instead records `pending_customer` and `immediateChargeConsentRequired: true`.\n- `alternative` additionally requires `catalog`, `lines` and `proposedStartMicros`. It requires a pending group, an unexpired deadline, and fewer than 20 proposals in `history`. The catalog must pass validation and match the snapshot quote's supplier and currency. Pricing the selections creates the next numbered proposal with a future start, appends history, and sets `supplierApproved: true` and `pending_customer`.\n- `accept` requires `pending_customer`, `supplierApproved: true`, a future proposed start and an unexpired deadline. Optional boolean `acceptImmediateCharge` defaults to false. Successful acceptance records `confirmed`, `confirmedAtMicros`, `confirmedStartMicros` and `immediateChargeAccepted`.\n- `deadline` additionally requires future `deadlineMicros`. It sets `responseDeadlineMicros` once, only while pending. Confirmation, alternatives and acceptance must occur strictly before it. This clause declares no automatic expiry action.\n- `fulfil` requires `confirmed` and a timestamp at or after `confirmedStartMicros`; it records `fulfilled` and `fulfilledAtMicros`. It does not independently verify service delivery.\n\nSuccessful non-initialization actions save the resulting group, record the intent, resulting status and timestamp in `requests`, emit `Reservation Changed`, and return `acceptedNew`. That result confirms the recorded transition: `confirm` can successfully leave the group awaiting customer acceptance. These actions do not establish a payment outcome.\n\nThe intended supplier and customer roles do not themselves authorize a caller. The supplied action bodies record the caller channel but contain no supplier/customer channel checks; concrete connection authorization is not shown.\n\n## Cancellation-charge consent\n\nOptional `terms.cancellationPolicy` requires integer `freeCancellationHoursBeforeStart` from 0–8760 and `lateCancellationChargePercent` from 0–100. Consent is required only strictly after the free-cancellation cutoff when the percentage charge, rounded half up to minor units, is positive. At the cutoff itself it is not required. Automatic initialization rejects missing consent; `confirm` defers to customer acceptance; `accept` requires explicit true consent.\n\nWithout a cancellation policy, confirmation uses zero hours and zero percent internally and omits `freeCancellationUntilMicros` from saved state. This does not establish cancellation rights. Confirmation stores the cutoff when a policy exists. `immediateChargeConsentRequired` is not cleared on acceptance, so it is not a standalone indicator of an outstanding response. Automatic confirmation need not populate `supplierApproved` or `immediateChargeAccepted`; their absence is not false."
+}

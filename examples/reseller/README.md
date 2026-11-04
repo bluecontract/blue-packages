@@ -4,20 +4,22 @@
 
 ## Clause configuration
 
-- `Customer Orders Clause` reads the template, order collection, quotes and optional fulfilment parameters through pointer bindings. Moving or renaming the fulfilment clause requires updating that binding, not copying its implementation. Removing the fulfilment clause removes the date and confirmation requirement from new orders.
+- `Customer Orders Clause` reads the template, order collection, catalog and optional fulfilment parameters through pointer bindings. Moving or renaming these fields requires updating a binding, not copying implementation. Removing the fulfilment clause removes the date and confirmation requirement from new orders.
 - `Commercial Terms Negotiation Clause` invalidates earlier approvals when terms change before activation. Both parties must approve the resulting version. `Commercial Terms Validation Clause` checks the commission range and this example's USD currency.
 - `Commission Clause` reads confirmed net payment results and the configured commission rate. `Commission Payouts Clause` prepares a payout and reserves its amount once. A payout document is not evidence of a completed transfer.
 - `Catalog Clause` owns the authored offer description and points to the catalog and quote collections. Descriptive content does not introduce executable booking requirements.
 
 ## Independent customer orders
 
-The exported Customer Orders Clause now specializes `Documents/Documents Clause`. The partner calls `prepareOrder` with a typed `Documents/Preparation Input`: `key`, `requestId` and `values` containing `quoteKey`, `customer`, `description` and optional fulfilment `groups`. Core derives the frozen quote, total, discount and fulfilment terms; callers cannot provide `orderAccess` or override these fields.
+The exported Customer Orders Clause specializes `Documents/Documents Clause`. The partner calls `prepareOrder` once with a typed `Documents/Preparation Input`: `key`, `requestId` and `values` containing `catalogRevision`, `lines`, `customer`, `description` and optional fulfilment `groups`. Each line selects an `itemId`, `quantity` and any catalog-required date or duration. The clause checks the current catalog revision, item membership and quantity/duration constraints, calculates prices and discounts using the shared Catalog Functions, and freezes the result in the prepared Order. Currency also comes from that catalog. Caller-supplied amounts, prices, `quoteKey`, `orderAccess` and prepared fields are rejected.
+
+There is no `createQuote` operation or `/quotes` collection in these three agreements. The Order retains its calculated line breakdown under `quote` and its exact identity under `quoteBlueId`, as required by the existing fulfilment snapshot contract; these fields are calculation evidence, not a separate quotation workflow. A new preparation uses current prices and rejects a stale revision. Repeating the same preparation returns the existing result without repricing it; conflicting reuse is rejected.
 
 Handle `Documents/Document Provision Requested` for the orders clause, bootstrap the exact `requirementRef` using the seller, partner and customer account mappings, then call `provideOrder` as partner with `key`, `inResponseTo`, `requirementRef` and `document: {blueId: ...}`. Native Documents validates the mapped parties and their representatives against the fresh transports before linking the independently hosted Order. An identical preparation or provision is idempotent; conflicting reuse is rejected. The retained `newOrder` operation is a preparation alias, no longer an embedded factory.
 
 The Adventures in Paradise example has two catalog lines in one order: two child tickets at USD 49 and one free infant ticket. Its frozen quote totals USD 93.10 after a USD 4.90 discount. `massage-preview.blue` and `watersports-preview.blue` configure the same clauses for the other review examples.
 
-`bootstrap-preparation.case.json` checks the multi-line total, cold-restore retry and rejection of forged access and a seller-as-customer input. The older `preview-booking`, `preview-card` and `preview-multi-item-order` cases describe the former embedded factory and are not qualification for this independent bootstrap edition. Hosted bootstrap, representative channels and PI provision are qualified separately in the Core integration branch.
+`bootstrap-preparation.case.json` checks direct multi-line pricing, invalid selections and stale revisions, absence of stored quotes, cold-restore retries and rejection of forged amounts/access. The older `preview-booking`, `preview-card` and `preview-multi-item-order` cases describe the former embedded factory and are not qualification for this independent bootstrap edition. Hosted bootstrap, representative channels and PI provision are qualified separately in the Core integration branch.
 
 ## Card Payment Instruction
 
