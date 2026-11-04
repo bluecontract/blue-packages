@@ -171,3 +171,11 @@ Run Core's `scripts/import-independent-processes.py --source <blue-packages>` to
 copy a closed, integrity-checked package selection for the generic native tests.
 Its `--verify` mode checks the retained fixture bytes. The implementation ledger and
 ignored reports in the Core worktree distinguish passing evidence from pending work.
+
+The preparation planner emits only the canonical transitive function closure for
+`nextAdmissionRequest`, `admissionInstallRequest`, and `finishAdmission`. It checks
+the native identities of the canonical library and every included function once
+while constructing the plan, retaining the selected constants. Custom definitions
+(including overridden helpers or a missing canonical anchor) retain their complete
+selected definition. Function bodies, admission guards, effects, and the ordinary
+10,000,000 execution-gas limit are unchanged.
