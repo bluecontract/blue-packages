@@ -1,0 +1,82 @@
+name: Confirmation Clause
+description: One exact proposal and final instant per fulfilment group; supplier or explicit supplier-approved automatic
+  confirmation. Changes and immediate cancellation charges need customer acceptance.
+type: Connections/Connected Clause
+actionDefinition:
+  type: Reseller/Order Functions
+actions:
+  initialize:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: initializeOrder
+            args: {}
+    automatic:
+      'on': initialized
+      once: true
+  confirm:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: confirmProposal
+            args:
+              input:
+                $var: params
+  alternative:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: proposeAlternative
+            args:
+              input:
+                $var: params
+  accept:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: acceptProposal
+            args:
+              input:
+                $var: params
+  deadline:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: setResponseDeadline
+            args:
+              input:
+                $var: params
+  fulfil:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: fulfilGroup
+            args:
+              input:
+                $var: params
+bindingTypes:
+  state: pointer
+  snapshot: pointer
+  requests: pointer
+defaultBindings:
+  state: /reservations
+  snapshot: /orderSnapshot
+  requests: /reservationRequests

@@ -1,0 +1,430 @@
+name: Commission Clause
+type: Ledger/Ledger Clause
+actionDefinition:
+  type:
+    type: Ledger/Balance Functions
+    functions:
+      reconcile:
+        args:
+          input: {}
+        do:
+        - $let:
+            name: key
+            expr:
+              $var:
+                name: input
+                path: /key
+        - $let:
+            name: path
+            expr:
+              $concat:
+              - $concat:
+                - $const:
+                    name: bindings
+                    path: /payouts
+                - /
+              - $var: key
+              - /payment
+        - $let:
+            name: pi
+            expr:
+              $document:
+                $var: path
+        - $let:
+            name: s
+            expr:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state
+        - $let:
+            name: old
+            expr:
+              $pointerGet:
+                object:
+                  $var: s
+                path:
+                  $concat:
+                  - /settlements/
+                  - $var: key
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $var: old
+            message: UNKNOWN_SETTLEMENT
+        - $let:
+            name: state
+            expr:
+              $pointerGet:
+                object:
+                  $var: pi
+                path: /payment
+        - $let:
+            name: net
+            expr:
+              $subtract:
+              - $pointerGet:
+                  object:
+                    $var: state
+                  path: /completed
+              - $pointerGet:
+                  object:
+                    $var: state
+                  path: /reversed
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: net
+                    kind: integer
+                - $gte:
+                  - $var: net
+                  - 0
+                - $lte:
+                  - $var: net
+                  - $pointerGet:
+                      object:
+                        $var: old
+                      path: /amountMinor
+            message: INVALID_CONFIRMED_PAYOUT
+        - $let:
+            name: terminal
+            expr:
+              $or:
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: pi
+                    path: /settlementOpen
+                - false
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /rejected
+                - true
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /closed
+                - true
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /completed
+                - $pointerGet:
+                    object:
+                      $var: old
+                    path: /amountMinor
+        - $if:
+            cond:
+              $not:
+                $var: terminal
+            then:
+            - $return:
+                outcome: duplicate
+        - $if:
+            cond:
+              $ne:
+              - $add:
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /reserved/secure
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /reserved/capture
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /reserved/void
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /reserved/refund
+              - 0
+            then:
+            - $return:
+                outcome: duplicate
+        - $let:
+            name: previousPaid
+            expr:
+              $pointerGet:
+                object:
+                  $var: old
+                path: /paidMinor
+                default: 0
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: old
+                    path: /status
+                - closed
+              - $eq:
+                - $var: previousPaid
+                - $var: net
+            then:
+            - $return:
+                outcome: duplicate
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object:
+                    $var: old
+                  path: /status
+              - reserved
+            then:
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $const:
+                      name: bindings
+                      path: /state
+                  - /reserved
+                val:
+                  $subtract:
+                  - $pointerGet:
+                      object:
+                        $var: s
+                      path: /reserved
+                  - $pointerGet:
+                      object:
+                        $var: old
+                      path: /amountMinor
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $const:
+                  name: bindings
+                  path: /state
+              - /paid
+            val:
+              $add:
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /paid
+              - $subtract:
+                - $var: net
+                - $var: previousPaid
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $concat:
+                - $const:
+                    name: bindings
+                    path: /state
+                - /settlements/
+              - $var: key
+            val:
+              amountMinor:
+                $pointerGet:
+                  object:
+                    $var: old
+                  path: /amountMinor
+              paidMinor:
+                $var: net
+              status: closed
+        - $appendEvent:
+            $merge:
+            - type: Events/Event
+            - kind: Payout Reconciled
+        - $return:
+            outcome: acceptedNew
+actions:
+  reconcile:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reconcile
+            args:
+              input:
+                $var: params
+  confirmed:
+    resultContract: outcome-v1
+    automatic:
+      'on': collection
+      pathBinding: orders
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Payment/Payment Event Received
+                event:
+                  type: PaymentInstruction/Payment Completed
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: setTarget
+            args:
+              input:
+                key:
+                  $sliceAfter:
+                  - $event: /sourcePath
+                  - $concat:
+                    - $const:
+                        name: bindings
+                        path: /orders
+                    - /
+                amountMinor:
+                  $call:
+                    function: roundBps
+                    args:
+                      basis:
+                        $subtract:
+                        - $document:
+                            $concat:
+                            - $event: /sourcePath
+                            - /payment/payment/completed
+                        - $document:
+                            $concat:
+                            - $event: /sourcePath
+                            - /payment/payment/reversed
+                      bps:
+                        $document:
+                          $const:
+                            name: bindings
+                            path: /rate
+  reversed:
+    resultContract: outcome-v1
+    automatic:
+      'on': collection
+      pathBinding: orders
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Payment/Payment Event Received
+                event:
+                  type: PaymentInstruction/Payment Reversed After Completion
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: setTarget
+            args:
+              input:
+                key:
+                  $sliceAfter:
+                  - $event: /sourcePath
+                  - $concat:
+                    - $const:
+                        name: bindings
+                        path: /orders
+                    - /
+                amountMinor:
+                  $call:
+                    function: roundBps
+                    args:
+                      basis:
+                        $subtract:
+                        - $document:
+                            $concat:
+                            - $event: /sourcePath
+                            - /payment/payment/completed
+                        - $document:
+                            $concat:
+                            - $event: /sourcePath
+                            - /payment/payment/reversed
+                      bps:
+                        $document:
+                          $const:
+                            name: bindings
+                            path: /rate
+  opened:
+    resultContract: outcome-v1
+    automatic:
+      'on': event
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: ''
+              pattern:
+                type: Events/Event
+                kind: Commission Payout Opened
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reserve
+            args:
+              input:
+                key:
+                  $event: /key
+                amountMinor:
+                  $event: /amountMinor
+  observed:
+    resultContract: outcome-v1
+    automatic:
+      'on': collection
+      pathBinding: payouts
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Payment/Payment Event Received
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reconcile
+            args:
+              input:
+                key:
+                  $sliceAfter:
+                  - $event: /sourcePath
+                  - $concat:
+                    - $const:
+                        name: bindings
+                        path: /payouts
+                    - /
+description: Accrue the configured commission on confirmed net order receipts, reserve payouts and reconcile
+  their confirmed net results.
+bindingTypes:
+  orders: pointer
+  payouts: pointer
+  rate: pointer
+defaultBindings:
+  orders: /orders
+  payouts: /payouts
+  rate: /terms/commissionBps
