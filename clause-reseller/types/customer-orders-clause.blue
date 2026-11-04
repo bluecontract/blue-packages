@@ -1,0 +1,877 @@
+name: Customer Orders Clause
+description: Prepares an independently bootstrapped customer order from the exact quoted catalog items. Documents
+  owns preparation, provision, identity and access. Optional fulfilment rules remain in the order.
+type: Documents/Documents Clause
+actionDefinition:
+  type:
+    type: Documents/Document Preparation Functions
+    functions:
+      initialGroups:
+        blueId: Fqc3hnFEpfvCSJe1EZwZgR8EqPXuAFqVtZNHXcdDL4dq
+      makeProposal:
+        blueId: HjmASuWBFrh9XeH7g24DsgnDHU7SJC73koFuCZiNsDEv
+      roundBps:
+        blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
+      validateFields:
+        blueId: GByX6ruLZb6tSEPcRxMaRbd5fECsVsUSG3x6s5Dv6cTB
+      validateGroupSelections:
+        blueId: 6Ud5Qi5RneB6Gso6sDDWFrbHXXfnpq3RmR5vzkbkRwiB
+      validateIdentifier:
+        blueId: EQqobr2xgAJtjDXQdMYqX4Nz442Nsz8hrRp4DigwHNsY
+      validateInteger:
+        blueId: 12iMBcxoxTPHtxKQcN8Dq59TSUcGbM9xQ9kZh5Vt5RGJ
+      validateTerms:
+        blueId: 9AxmRcd35ToficguVjW16mmfVmNBwWo6Tkto1DmrAbjA
+      prepareBooking:
+        args:
+          input: {}
+        do:
+        - $let:
+            name: fields
+            expr:
+              $var:
+                name: input
+                path: /fields
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: input
+                key: quoteKey
+            then:
+            - $call:
+                function: validateIdentifier
+                args:
+                  candidate:
+                    $var:
+                      name: input
+                      path: /quoteKey
+                  error: INVALID_QUOTE_KEY
+            - $let:
+                name: quote
+                expr:
+                  $get:
+                    object:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /quotes
+                    key:
+                      $var:
+                        name: input
+                        path: /quoteKey
+            - $failIf:
+                cond:
+                  $not:
+                    $exists:
+                      $var: quote
+                message: UNKNOWN_QUOTE
+            - $set:
+                name: fields
+                expr:
+                  $merge:
+                  - $var: fields
+                  - amountMinor:
+                      $var:
+                        name: quote
+                        path: /totalMinor
+                    quote:
+                      $var: quote
+                    quoteBlueId:
+                      $nodeBlueId:
+                        $var: quote
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /fulfilment
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $hasKey:
+                      object:
+                        $var: input
+                      key: quoteKey
+                message: QUOTE_REQUIRED
+            - $let:
+                name: terms
+                expr:
+                  $merge:
+                  - $document:
+                      $concat:
+                      - $const:
+                          name: bindings
+                          path: /fulfilment
+                      - /terms
+                  - agreementDescription:
+                      $document: /description
+            - $let:
+                name: snapshot
+                expr:
+                  quote:
+                    $var:
+                      name: fields
+                      path: /quote
+                  quoteBlueId:
+                    $var:
+                      name: fields
+                      path: /quoteBlueId
+                  terms:
+                    $var: terms
+                  termsBlueId:
+                    $nodeBlueId:
+                      $var: terms
+                  groups:
+                    $var:
+                      name: input
+                      path: /groups
+            - $call:
+                function: initialGroups
+                args:
+                  snapshot:
+                    $var: snapshot
+            - $forEach:
+                in:
+                  $var:
+                    name: input
+                    path: /groups
+                item: group
+                do:
+                - $if:
+                    cond:
+                      $var:
+                        name: terms
+                        path: /dateRequired
+                    then:
+                    - $failIf:
+                        cond:
+                          $not:
+                            $gt:
+                            - $var:
+                                name: group
+                                path: /proposedStartMicros
+                            - $binding: timestamp
+                        message: START_NOT_FUTURE
+            - $set:
+                name: fields
+                expr:
+                  $merge:
+                  - $var: fields
+                  - orderSnapshot:
+                      $var: snapshot
+            else:
+            - $failIf:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: input
+                    key: groups
+                message: BOOKING_CLAUSE_REQUIRED
+        - $return:
+            $merge:
+            - $var: input
+            - fields:
+                $var: fields
+      orderInput:
+        args:
+          trigger: {}
+        do:
+        - $forEach:
+            item: field
+            in:
+              $keys:
+                $var: trigger
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $includes:
+                      list:
+                      - key
+                      - description
+                      - amountMinor
+                      - customer
+                      - quoteKey
+                      - groups
+                      - requestId
+                      val:
+                        $var: field
+                message: UNKNOWN_INPUT_FIELD
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: trigger
+                        path: /customer
+                    kind: text
+                - $is:
+                    node:
+                      $var:
+                        name: trigger
+                        path: /customer
+                    pattern:
+                      type: Text
+                      schema:
+                        minLength: 1
+                        maxLength: 256
+            message: CUSTOMER_REQUIRED
+        - $failIf:
+            cond:
+              $eq:
+              - $var:
+                  name: trigger
+                  path: /customer
+              - $pointerGet:
+                  object:
+                    $document: /activation/parties/partner
+                  path: /myosAccountId
+                  default: ''
+            message: CUSTOMER_MUST_BE_DISTINCT
+        - $failIf:
+            cond:
+              $eq:
+              - $var:
+                  name: trigger
+                  path: /customer
+              - $pointerGet:
+                  object:
+                    $document: /activation/parties/seller
+                  path: /myosAccountId
+                  default: ''
+            message: CUSTOMER_MUST_BE_DISTINCT
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: trigger
+                key: quoteKey
+            then:
+            - $failIf:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: trigger
+                    key: amountMinor
+                message: AMOUNT_COMES_FROM_QUOTE
+            else:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $pointerGet:
+                            object:
+                              $var: trigger
+                            path: /amountMinor
+                        kind: integer
+                    - $gte:
+                      - $pointerGet:
+                          object:
+                            $var: trigger
+                          path: /amountMinor
+                      - 1
+                    - $lte:
+                      - $pointerGet:
+                          object:
+                            $var: trigger
+                          path: /amountMinor
+                      - 100000000
+                message: INVALID_AMOUNT
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: trigger
+                        path: /description
+                        default: Order
+                    kind: text
+                - $is:
+                    node:
+                      $pointerGet:
+                        object:
+                          $var: trigger
+                        path: /description
+                        default: Order
+                    pattern:
+                      type: Text
+                      schema:
+                        minLength: 1
+                        maxLength: 300
+            message: INVALID_ORDER_DESCRIPTION
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $document:
+                    $concat:
+                    - /process_
+                    - $const: clauseKey
+                    - /entries/
+                    - $nodeBlueId:
+                        $var:
+                          name: trigger
+                          path: /key
+            then:
+            - $failIf:
+                cond:
+                  $gte:
+                  - $size:
+                      $keys:
+                        $document:
+                          $concat:
+                          - /process_
+                          - $const: clauseKey
+                          - /entries
+                  - 20
+                message: DOCUMENT_LIMIT_REACHED
+        - $let:
+            name: params
+            expr:
+              key:
+                $var:
+                  name: trigger
+                  path: /key
+              fields:
+                amountMinor:
+                  $pointerGet:
+                    object:
+                      $var: trigger
+                    path: /amountMinor
+                    default: 0
+                orderDescription:
+                  $pointerGet:
+                    object:
+                      $var: trigger
+                    path: /description
+                    default: Order
+                customerAccountId:
+                  $var:
+                    name: trigger
+                    path: /customer
+              customer:
+                $var:
+                  name: trigger
+                  path: /customer
+              quoteKey:
+                $pointerGet:
+                  object:
+                    $var: trigger
+                  path: /quoteKey
+              groups:
+                $pointerGet:
+                  object:
+                    $var: trigger
+                  path: /groups
+              requestId:
+                $pointerGet:
+                  object:
+                    $var: trigger
+                  path: /requestId
+                  default:
+                    $var:
+                      name: trigger
+                      path: /key
+              values:
+                $var: trigger
+        - $return:
+            $var: params
+      constructOrder:
+        args:
+          input: {}
+          checked: {}
+        do:
+        - $let:
+            name: booking
+            expr:
+              $call:
+                function: prepareBooking
+                args:
+                  input:
+                    $var: input
+        - $set:
+            name: booking
+            expr:
+              $pointerSet:
+                object:
+                  $var: booking
+                path: /values
+                val: {}
+        - $let:
+            name: child
+            expr:
+              $call:
+                function: constructDocument
+                args:
+                  input:
+                    $var: booking
+                  checked:
+                    $var: checked
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /fulfilment
+            then:
+            - $set:
+                name: child
+                expr:
+                  $merge:
+                  - $var: child
+                  - clauses:
+                      $merge:
+                      - $var:
+                          name: child
+                          path: /clauses
+                      - $document:
+                          $concat:
+                          - $const:
+                              name: bindings
+                              path: /fulfilment
+                          - /template/clauses
+                    reservations: {}
+                    reservationRequests: {}
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /clauses/activation/parameters/preActivationChannels
+                    val:
+                      $listConcat:
+                      - $pointerGet:
+                          object:
+                            $var: child
+                          path: /clauses/activation/parameters/preActivationChannels
+                          default: []
+                      - - cx.confirmation.initialize._automatic_source
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: booking
+                  path: /fields/amountMinor
+              - 0
+            then:
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /clauses/payment
+                    op: remove
+        - $return:
+            $var: child
+      sharedPrepareOrder:
+        args:
+          input: {}
+          checked: {}
+        do:
+        - $let:
+            name: parameters
+            expr:
+              $call:
+                function: configurationParameters
+                args: {}
+        - $let:
+            name: prepareFor
+            expr:
+              $call:
+                function: preparationMode
+                args: {}
+        - $let:
+            name: obtain
+            expr:
+              $pointerGet:
+                object:
+                  $var: parameters
+                path: /obtain
+                default: create
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - create
+                  - provide
+                  val:
+                    $var: obtain
+            message: PREPARATION_OBTAIN_INVALID
+        - $failIf:
+            cond:
+              $and:
+              - $eq:
+                - $var: obtain
+                - create
+              - $gt:
+                - $size:
+                    $pointerGet:
+                      object:
+                        $var: parameters
+                      path: /suppliedParties
+                      default: []
+                - 0
+            message: PREPARATION_CREATE_HAS_UNRESOLVED_PARTIES
+        - $let:
+            name: prepared
+            expr:
+              $call:
+                function: constructOrder
+                args:
+                  input:
+                    $var: input
+                  checked:
+                    $var: checked
+        - $set:
+            name: prepared
+            expr:
+              $call:
+                function: configureSources
+                args:
+                  prepared:
+                    $var: prepared
+                  checked:
+                    $var: checked
+        - $let:
+            name: domainTerms
+            expr:
+              $call:
+                function: checkedDomainPrepare
+                args:
+                  prepared:
+                    $var: prepared
+        - $let:
+            name: slots
+            expr:
+              $call:
+                function: specializationSlots
+                args:
+                  prepared:
+                    $var: prepared
+        - $let:
+            name: requirementRef
+            expr:
+              $nodeBlueId:
+                $var: prepared
+        - $let:
+            name: item
+            expr:
+              $merge:
+              - $var: checked
+              - prepared:
+                  $var: prepared
+                requirementRef:
+                  $var: requirementRef
+                domainTerms:
+                  $var: domainTerms
+                status: awaiting_provider
+                prepareFor:
+                  $var: prepareFor
+                obtain:
+                  $var: obtain
+                supplier:
+                  $pointerGet:
+                    object:
+                      $var: parameters
+                    path: /suppliedBy
+                    default: ''
+                slots:
+                  $var: slots
+        - $if:
+            cond:
+              $eq:
+              - $var: obtain
+              - create
+            then:
+            - $appendChange:
+                op: add
+                path:
+                  $var:
+                    name: checked
+                    path: /path
+                val:
+                  $var: prepared
+            - $set:
+                name: item
+                expr:
+                  $merge:
+                  - $var: item
+                  - status: selected
+                    documentOrigin:
+                      $var: requirementRef
+        - $appendChange:
+            op: add
+            path:
+              $var:
+                name: checked
+                path: /itemPath
+            val:
+              $var: item
+        - $appendEvent:
+            $merge:
+            - type: Documents/Document Prepared
+            - clauseId:
+                $const: clauseKey
+              itemKey:
+                $var:
+                  name: checked
+                  path: /key
+              requestId:
+                $var:
+                  name: checked
+                  path: /requestId
+              requirementRef:
+                $var: requirementRef
+              status:
+                $pointerGet:
+                  object:
+                    $var: item
+                  path: /status
+        - $if:
+            cond:
+              $eq:
+              - $var: obtain
+              - provide
+            then:
+            - $failIf:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $var: parameters
+                      path: /suppliedBy
+                      default: ''
+                  - ''
+                message: PREPARATION_SUPPLIER_REQUIRED
+            - $appendEvent:
+                $merge:
+                - type: Documents/Document Provision Requested
+                - clauseId:
+                    $const: clauseKey
+                  itemKey:
+                    $var:
+                      name: checked
+                      path: /key
+                  inResponseTo:
+                    $var:
+                      name: checked
+                      path: /requestId
+                  requirementRef:
+                    $var: requirementRef
+                  party:
+                    $pointerGet:
+                      object:
+                        $var: parameters
+                      path: /suppliedBy
+        - $return:
+            $merge:
+            - $var: checked
+            - outcome: acceptedNew
+actions:
+  startOrder:
+    resultContract: outcome-v1
+    preflight:
+    - $set:
+        name: params
+        expr:
+          $call:
+            function: orderInput
+            args:
+              trigger:
+                $var: trigger
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: checkPreparation
+            args:
+              input:
+                $var: params
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: sharedPrepareOrder
+            args:
+              input:
+                $var: params
+              checked:
+                $var: actionResult
+  prepareOrder:
+    resultContract: outcome-v1
+    preflight:
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: params
+              path: /fields
+              default: {}
+          - {}
+        message: ORDER_FIELDS_COME_FROM_QUOTE
+    - $set:
+        name: params
+        expr:
+          $call:
+            function: orderInput
+            args:
+              trigger:
+                $merge:
+                - $pointerGet:
+                    object:
+                      $var: params
+                    path: /values
+                    default: {}
+                - key:
+                    $var:
+                      name: params
+                      path: /key
+                  requestId:
+                    $pointerGet:
+                      object:
+                        $var: params
+                      path: /requestId
+                      default:
+                        $var:
+                          name: params
+                          path: /key
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: checkPreparation
+            args:
+              input:
+                $var: params
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: sharedPrepareOrder
+            args:
+              input:
+                $var: params
+              checked:
+                $var: actionResult
+  provideOrder:
+    resultContract: outcome-v1
+    defaults:
+      key:
+        $pointerGet:
+          object:
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          path: /key
+          default: single
+      inResponseTo:
+        $pointerGet:
+          object:
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          path: /inResponseTo
+          default: ''
+      requirementRef:
+        $pointerGet:
+          object:
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          path: /requirementRef
+          default: ''
+      document:
+        $pointerGet:
+          object:
+            $pointerSet:
+              object:
+                $object:
+                  $var: trigger
+              path: /type
+              op: remove
+          path: /document
+          default: ''
+    preflight:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: checkProvision
+            args:
+              input:
+                $var: params
+    - $if:
+        cond:
+          $ne:
+          - $var:
+              name: actionResult
+              path: /outcome
+          - duplicate
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var:
+                  name: actionResult
+                  path: /item/prepared/customerAccountId
+              - $var:
+                  name: actionResult
+                  path: /candidate/activation/parties/customer/myosAccountId
+            message: ORDER_CUSTOMER_MISMATCH
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: sharedProvide
+            args:
+              checked:
+                $var: actionResult
+bindingTypes:
+  quotes: pointer
+  fulfilment: pointer
+parameters:
+  obtain: provide
+  prepareFor: bootstrap
+  suppliedBy: partner
+  suppliedParties:
+  - customer
+  allowedFields:
+  - orderDescription
+  - amountMinor
+  - customerAccountId
+  - quote
+  - quoteBlueId
+  - orderSnapshot
+defaultBindings:
+  parties:
+    seller: seller
+    partner: partner
+  quotes: /quotes
+  fulfilment: /clauses/fulfilment/parameters

@@ -43,7 +43,9 @@ def subject(blue_id):
 
 
 def response(blue_id):
-    return dict(blueId=blue_id, semanticText='# Fixture\n\nAn exact reusable type description.')
+    return dict(blueId=blue_id, semanticText='# Fixture\n\nAn exact reusable type description.',
+                metadata=dict(displayLabel='Fixture', parameterRefs=[], covers=[],
+                              dependencies=[], stateFacts=[], limitations=[]))
 
 
 def request(blue_id):
@@ -204,6 +206,35 @@ class SourceTests(unittest.TestCase):
         context = sources.evidence(B, {**DEFINITIONS, B: {'defaultBindings': {'inline': {}}}})
         self.assertEqual([dict(name='inline', defaultPath=None)], context['bindings'])
 
+    def test_executable_inheritance_is_kept_before_incidental_dependencies(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B] = {'actionDefinition': {'type': {'blueId': E}}, 'unrelated': {'blueId': D}}
+        definitions[E] = {'type': {'blueId': F}}
+        definitions[F] = {'functions': {'init': {'$appendChange': {
+            'op': 'add', 'path': '/ledger', 'val': {'total': 0}}}}}
+        definitions[D] = {'description': 'x' * 480_000}
+        context = sources.evidence(B, definitions)
+        self.assertIn('/ledger/total', context['documentPaths'])
+        self.assertIn(D, context['omittedDependencies'])
+
+    def test_clause_paths_require_the_exact_compiler_constant(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B]['functions'] = [
+            {'$concat': ['/process_', {'$const': 'clauseKey'}, '/entries']},
+            {'$concat': ['/process_', {'$var': 'clauseKey'}, '/entries']},
+        ]
+        self.assertEqual(['/process_{clauseKey}/entries'], sources.evidence(B, definitions)['clausePaths'])
+
+    def test_payment_evidence_includes_native_ledger_from_inherited_functions(self):
+        _, definitions = sources.inventory(ROOT)
+        for identity in ('E9D2hMTnDHeShhe2r5gaCXRXComc6wxKpAmrRtUQpi2L',
+                         'Gdr3NionS59mbSkTJQZoeBdtCWCmsqrfgfXx1BshdsQJ'):
+            context = sources.evidence(identity, definitions)
+            self.assertTrue({'/payment/accepted', '/payment/rejected', '/payment/secured',
+                             '/payment/completed', '/payment/reversed', '/payment/reserved/void',
+                             '/paymentTerms/currency'} <= set(context['documentPaths']))
+            self.assertLess(len(wire(context)), 1_000_000)
+
 
     def test_added_export_without_rebuild_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -318,11 +349,97 @@ class CardTests(unittest.TestCase):
         self.assertEqual({B}, set(cards.cards_in(self.root)))
         self.assertEqual([C], cards.prepare(self.root, self.output)['generate'])
 
-    def test_accept_stores_only_identity_and_text_without_padding_or_fixed_sections(self):
+    def test_accept_stores_generated_metadata_without_padding_or_fixed_sections(self):
         card = self.card()
         self.assertEqual(response(B), card)
         self.assertEqual(wire(response(B)), (self.destination / (B + '.json')).read_bytes())
         self.assertEqual(card, cards.validate_card(card, B))
+
+    def test_legacy_cards_are_readable_but_new_generation_requires_metadata(self):
+        legacy = response(B)
+        legacy.pop('metadata')
+        cards.validate_card(legacy, B)
+        with self.assertRaises(ValidationError):
+            cards.accept(request(B), legacy, self.destination)
+
+    def test_generated_state_facts_are_checked_against_exact_evidence(self):
+        card = response(B)
+        fact = dict(id='counter', scope='document', path='/counter', binding=None,
+                    defaultPath=None, suffix='', type='count', absent='Unknown',
+                    meaning='Recorded counter', evidence='New type.counter', aggregate=None)
+        card['metadata']['stateFacts'] = [fact]
+        cards.validate_output(card, request(B)['context'])
+        invalid = [
+            {'path': '/invented/status'}, {'binding': 'state'},
+            {'type': 'string', 'aggregate': dict(over='Records', operation='count', unit='records')},
+            {'scope': 'clause', 'path': '/invented/{clauseKey}/status'},
+            {'scope': 'binding', 'path': None, 'binding': 'state', 'defaultPath': '/wrong'},
+            {'scope': 'binding', 'path': None, 'binding': 'undeclared'},
+            {'scope': 'binding', 'path': None, 'binding': 'state', 'defaultPath': '/state', 'suffix': '/bad~path'},
+        ]
+        for change in invalid:
+            bad = deepcopy(card)
+            bad['metadata']['stateFacts'][0].update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                cards.validate_output(bad, request(B)['context'])
+        for key in ('scope', 'path', 'aggregate'):
+            old = deepcopy(card)
+            old['metadata']['stateFacts'][0].pop(key)
+            cards.validate_card(old, B)
+            with self.assertRaises(ValidationError):
+                cards.validate_output(old, request(B)['context'])
+        for key, values in [('parameterRefs', ['parameters.unknown']), ('dependencies', [D]),
+                            ('covers', [B]), ('stateFacts', [fact, fact])]:
+            bad = deepcopy(card)
+            bad['metadata'][key] = values
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                cards.validate_output(bad, request(B)['context'])
+
+    def test_generated_facts_accept_inherited_bindings_and_compiler_clause_paths(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B]['functions'] = {'path': {'$concat': ['/run_', {'$const': 'clauseKey'}]}}
+        context = sources.evidence(C, definitions)
+        card = response(C)
+        card['metadata']['parameterRefs'] = ['parameters.amount', 'bindings.state']
+        card['metadata']['dependencies'] = [B]
+        fact = dict(id='boundTotal', scope='binding', path=None, binding='state',
+                    defaultPath='/state', suffix='/total', type='number', absent='Unknown',
+                    meaning='Bound total', evidence='Inherited state binding', aggregate=None)
+        card['metadata']['stateFacts'] = [fact, dict(fact, id='status', scope='clause',
+                                                   path='/run_{clauseKey}/status', binding=None,
+                                                   defaultPath=None, suffix='', type='string')]
+        cards.validate_output(card, context)
+
+    def test_refresh_generates_only_selected_candidates_and_preserves_existing_cards(self):
+        original = self.card()
+        regenerated = response(B)
+        regenerated['semanticText'] += '\n\nUpdated explanation.'
+
+        def run(command, **kwargs):
+            Path(command[-2]).write_bytes(wire(regenerated))
+            return subprocess.CompletedProcess(command, 0)
+
+        version = request(B)['generator']['codexVersion']
+        with patch.object(cards.subprocess, 'check_output', return_value='codex-cli ' + version), \
+             patch.object(cards.subprocess, 'run', side_effect=run):
+            plan = cards.generate(self.root, self.output, 1, refresh=[B])
+        self.assertEqual([B], plan['generate'])
+        self.assertEqual(original, cards.read_json(self.destination / (B + '.json')))
+        self.assertEqual(regenerated, cards.read_json(self.output / 'cards' / (B + '.json')))
+        with self.assertRaisesRegex(ValueError, 'outside'):
+            cards.prepare(self.root, self.output, refresh=[D])
+
+    def test_published_card_can_include_typed_state_metadata(self):
+        metadata = dict(displayLabel='Fixture', parameterRefs=[], covers=[], dependencies=[],
+                        stateFacts=[dict(id='status', scope='binding', path=None,
+                                         binding='state', defaultPath='/records', suffix='/*/status',
+                                         type='string', absent='Unknown', meaning='Recorded status',
+                                         evidence='Exact definition', aggregate=None)], limitations=[])
+        card = dict(response(B), metadata=metadata)
+        self.assertEqual(card, cards.validate_card(card, B))
+        metadata['stateFacts'][0]['type'] = 'executable'
+        with self.assertRaises(ValidationError):
+            cards.validate_card(card, B)
 
     def test_validation_rejects_wrong_identity_and_symlinks(self):
         card = self.card()

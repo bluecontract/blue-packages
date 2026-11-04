@@ -1,0 +1,378 @@
+name: Sea-Doo jet ski rental — umowa resellerska
+type: Agreements/Agreement with Clauses
+template:
+  id: reseller-catalog-preview
+  version: 0.1.0-preview.1
+terms:
+  commissionBps: 1000
+  currency: USD
+  exclusive: false
+orders: {}
+payouts: {}
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type:
+            blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+          displayName: Dostawca
+          business:
+            type: Parties/Business
+            displayName: Nor’Banks Sailing & Watersports
+        partner:
+          type:
+            blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+          displayName: Partner
+          business:
+            type: Parties/Business
+            displayName: Partner przykładowy
+      required:
+      - seller
+      - partner
+      preActivationOperations:
+      - proposeTerms_seller
+      - proposeTerms_partner
+      preActivationChannels:
+      - cx.termsValidation.validate._automatic_source
+  termsValidation:
+    type: Reseller/Commercial Terms Validation Clause
+    bindings:
+      terms: /terms
+  orders:
+    type: Reseller/Customer Orders Clause
+    bindings:
+      template: /orderTemplate
+      collection: /orders
+      quotes: /quotes
+      fulfilment: /clauses/fulfilment/parameters
+      startOrder:
+        newOrder:
+          'on': workflow
+          party: partner
+      prepareOrder:
+        prepareOrder:
+          'on': workflow
+          party: partner
+          request:
+            type: Documents/Preparation Input
+          params:
+            $pointerSet:
+              object:
+                $var: trigger
+              path: /type
+              op: remove
+      provideOrder:
+        provideOrder:
+          'on': workflow
+          party: partner
+  payouts:
+    type: Reseller/Commission Payouts Clause
+    bindings:
+      template: /payoutTemplate
+      collection: /payouts
+      commission: /commission
+      parties:
+        seller: seller
+        partner: partner
+      preparePayout:
+        startPayout:
+          'on': workflow
+          party: seller
+  commission:
+    type: Reseller/Commission Clause
+    bindings:
+      state: /commission
+      orders: /orders
+      payouts: /payouts
+      rate: /terms/commissionBps
+  negotiation:
+    type: Reseller/Commercial Terms Negotiation Clause
+    bindings:
+      terms: /terms
+      propose:
+        proposeTerms_seller:
+          'on': workflow
+          party: seller
+        proposeTerms_partner:
+          'on': workflow
+          party: partner
+  catalog:
+    type: Reseller/Catalog Clause
+    parameters:
+      offer:
+        title: Sea-Doo jet ski rental
+        text: Take a Sea-Doo GTX Pro out with Nor’Banks Sailing & Watersports for a half-hour, three-quarter-hour
+          or one-hour rental. The rental rate includes fuel, a cleaned and sanitized life vest, and instruction;
+          additional passengers are not charged. Each Sea-Doo can carry up to three riders, subject to a maximum
+          combined weight of 500 pounds. Prices are listed per jet ski, not per rider. The operator’s rate
+          card links to booking with real-time availability.
+        sections:
+        - title: W cenie
+          bullets:
+          - Fuel
+          - Cleaned and sanitized life vest
+          - Instruction
+        - title: Warto wiedzieć
+          bullets:
+          - Up to 3 passengers per Sea-Doo.
+          - Maximum 500 pounds per Sea-Doo.
+    bindings:
+      state: /products
+      quotes: /quotes
+      quote:
+        createQuote:
+          'on': workflow
+          party: partner
+          params:
+            $var: trigger
+  fulfilment:
+    type: Reseller/Fulfilment Terms Clause
+    parameters:
+      terms:
+        fulfilmentText: Zamówienie wymaga wskazania proponowanego terminu i potwierdzenia przez Nor’Banks Sailing
+          & Watersports. Klient wskazuje proponowany termin przy składaniu zamówienia. Jeżeli dostawca zaproponuje
+          inny termin, klient musi go zaakceptować.
+        confirmationMode: supplier
+        dateRequired: true
+      template:
+        name: Potwierdzenie terminu zamówienia
+        description: Ta klauzula jest dołączana do zamówienia tylko wtedy, gdy umowa zawiera klauzulę fulfilment.
+          Wymagania i proponowany termin są zapisywane w zamówieniu.
+        type: Orders/Order with Clauses
+        clauses:
+          confirmation:
+            type: Reseller/Confirmation Clause
+            bindings:
+              confirm:
+                confirmReservation:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              alternative:
+                proposeAlternative:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              accept:
+                acceptProposal:
+                  'on': workflow
+                  party: customer
+                  params:
+                    $var: trigger
+orderTemplate:
+  name: Guest booking
+  type: Orders/Order with Clauses
+  description: Zamówienie klienta w ramach umowy resellerskiej, z kwotą i opisem wskazanymi przy jego tworzeniu.
+  currency: USD
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: Parties/Party
+          partner:
+            type: Parties/Party
+          customer:
+            type: Parties/Party
+        required: []
+        preActivationChannels:
+        - cx.payment.prepare.onOrderCreated_source
+        preActivationOperations:
+        - providePayment
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        obtain: provide
+        template:
+          name: Card payment for the guest booking
+          type: PaymentInstruction/Payment Instruction with Clauses
+          clauses:
+            activation:
+              type: Activation/Activation Clause
+              parameters:
+                parties:
+                  payer:
+                    type: Parties/Party
+                  payee:
+                    type: Parties/Party
+                  guarantor:
+                    type: Parties/Party
+                  observer:
+                    type: Parties/Party
+                required: []
+            payment:
+              type: Payment/Payment Process Clause
+              parameters:
+                method: card
+                capture:
+                  mode: workflow
+              bindings:
+                requestAuthorize:
+                  authorize:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+                requestCapture:
+                  pay:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+                requestRefund:
+                  refund:
+                    'on': workflow
+                    party: payee
+                    params:
+                      $object:
+                        $var: trigger
+                requestVoid:
+                  cancel:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+          paymentTerms:
+            amountMinor:
+              type: Integer
+            limitMinor:
+              type: Integer
+            currency:
+              type: Text
+            payerChannel: payer
+            payeeChannel: payee
+            guarantorChannel: guarantor
+            allowedPayees:
+            - payee
+            recipientApprovalRequired: false
+          businessContext:
+            description: Płatność kartą za zamówiony usługa.
+        suppliedBy: seller
+        fieldPaths:
+          amountMinor: /paymentTerms/amountMinor
+          limitMinor: /paymentTerms/limitMinor
+          currency: /paymentTerms/currency
+        prepareFor: bootstrap
+      bindings:
+        instruction: /payment
+        parties:
+          payer: customer
+          payee: seller
+          guarantor:
+            type: MyOS/MyOS Party
+            email: payments@example.test
+          observer: partner
+        prepare:
+          onOrderCreated:
+            'on': initialized
+            params:
+              values:
+                amountMinor:
+                  $document: /amountMinor
+                limitMinor:
+                  $document: /amountMinor
+                currency:
+                  $document: /currency
+        provide:
+          providePayment:
+            'on': workflow
+            party: seller
+    paymentEvents:
+      type: Reseller/Payment Observation Clause
+      bindings:
+        instruction: /payment
+payoutTemplate:
+  name: Partner commission payout
+  type: Agreements/Agreement with Clauses
+  amountMinor: 1000
+  currency: USD
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: Parties/Party
+          partner:
+            type: Parties/Party
+        required: []
+    payment:
+      type: Reseller/Commission Payout Payment Clause
+      parameters:
+        payer: seller
+        payee: partner
+        currency: USD
+      bindings:
+        amount: /amountMinor
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: seller
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          capture:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestRefund:
+          refund:
+            'on': workflow
+            party: partner
+            params:
+              $object:
+                $var: trigger
+        requestVoid:
+          cancel:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+description: Umowa współpracy obejmująca ofertę Sea-Doo jet ski rental.
+products:
+  revision: 1
+  supplierId: seller
+  currency: USD
+  entries:
+    variant-1:
+      label: 30-minute rental
+      description: Sea-Doo rental, priced per jet ski.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 7900
+      guestDiscountPercent: 5
+    variant-2:
+      label: 45-minute rental
+      description: Sea-Doo rental, priced per jet ski.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 9900
+      guestDiscountPercent: 5
+    variant-3:
+      label: 1-hour rental
+      description: Sea-Doo rental, priced per jet ski.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 11900
+      guestDiscountPercent: 5
+quotes: {}

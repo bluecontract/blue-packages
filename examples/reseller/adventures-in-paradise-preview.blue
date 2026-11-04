@@ -1,0 +1,378 @@
+name: Adventures in Paradise × Manatee Bay Inn — reseller agreement
+type: Agreements/Agreement with Clauses
+template:
+  id: reseller-catalog-preview
+  version: 0.1.0-preview.1
+terms:
+  commissionBps: 1000
+  currency: USD
+  exclusive: false
+orders: {}
+payouts: {}
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type:
+            blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+          displayName: Dostawca
+          business:
+            type: Parties/Business
+            displayName: Adventures in Paradise
+        partner:
+          type:
+            blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+          displayName: Partner
+          business:
+            type: Parties/Business
+            displayName: Manatee Bay Inn
+      required:
+      - seller
+      - partner
+      preActivationOperations:
+      - proposeTerms_seller
+      - proposeTerms_partner
+      preActivationChannels:
+      - cx.termsValidation.validate._automatic_source
+  termsValidation:
+    type: Reseller/Commercial Terms Validation Clause
+    bindings:
+      terms: /terms
+  orders:
+    type: Reseller/Customer Orders Clause
+    bindings:
+      template: /orderTemplate
+      collection: /orders
+      quotes: /quotes
+      fulfilment: /clauses/fulfilment/parameters
+      startOrder:
+        newOrder:
+          'on': workflow
+          party: partner
+      prepareOrder:
+        prepareOrder:
+          'on': workflow
+          party: partner
+          request:
+            type: Documents/Preparation Input
+          params:
+            $pointerSet:
+              object:
+                $var: trigger
+              path: /type
+              op: remove
+      provideOrder:
+        provideOrder:
+          'on': workflow
+          party: partner
+  payouts:
+    type: Reseller/Commission Payouts Clause
+    bindings:
+      template: /payoutTemplate
+      collection: /payouts
+      commission: /commission
+      parties:
+        seller: seller
+        partner: partner
+      preparePayout:
+        startPayout:
+          'on': workflow
+          party: seller
+  commission:
+    type: Reseller/Commission Clause
+    bindings:
+      state: /commission
+      orders: /orders
+      payouts: /payouts
+      rate: /terms/commissionBps
+  negotiation:
+    type: Reseller/Commercial Terms Negotiation Clause
+    bindings:
+      terms: /terms
+      propose:
+        proposeTerms_seller:
+          'on': workflow
+          party: seller
+        proposeTerms_partner:
+          'on': workflow
+          party: partner
+  catalog:
+    type: Reseller/Catalog Clause
+    parameters:
+      offer:
+        title: Afternoon Dolphin & Wildlife Cruise
+        text: Popołudniowy rejs po wodach Fort Myers Beach i wyspy Sanibel trwa około 1,5 godziny. Przyrodnik
+          lub biolog morski opowiada o delfinach i lokalnej przyrodzie. Obserwacja delfinów nie jest gwarantowana.
+        sections:
+        - title: W cenie
+          bullets:
+          - Rejs z komentarzem przyrodnika lub biologa morskiego.
+          - Woda butelkowana i napoje bezalkoholowe.
+        - title: Warto wiedzieć
+          text: Rejs trwa około 1,5 godziny. Harmonogram i wymagania dotyczące terminu są określone w klauzuli
+            realizacji zamówienia.
+          bullets:
+          - Dzieci do 3 lat płyną bezpłatnie, ale trzeba je uwzględnić w liczbie pasażerów.
+          - Napiwki są dobrowolne i nie są wliczone w cenę.
+        - title: Miejsce zbiórki
+          text: Snug Harbor Marina, 645 Old San Carlos Blvd, Fort Myers Beach, FL 33931. Przystań i kasa znajdują
+            się pod Sky Bridge, obok Nervous Nellie’s.
+        - title: Warunki anulowania podane w ofercie
+          text: Oferta podaje terminy 24 godzin dla zwykłych rejsów, 14 dni dla rejsów świątecznych i 48 godzin
+            dla grup od 6 osób. Zwrot jest pomniejszany o 6% opłaty rezerwacyjnej. Zmiany i anulowania w ciągu
+            24 godzin przed rejsem podlegają opłacie 100%. Anulowania przez e-mail lub pocztę głosową nie są
+            przyjmowane.
+    bindings:
+      state: /products
+      quotes: /quotes
+      quote:
+        createQuote:
+          'on': workflow
+          party: partner
+          params:
+            $var: trigger
+  fulfilment:
+    type: Reseller/Fulfilment Terms Clause
+    parameters:
+      terms:
+        fulfilmentText: Zamówienie wymaga wskazania proponowanego terminu i potwierdzenia przez Adventures
+          in Paradise. Klient wskazuje proponowany termin przy składaniu zamówienia. Jeżeli dostawca zaproponuje
+          inny termin, klient musi go zaakceptować.
+        confirmationMode: supplier
+        dateRequired: true
+      schedule: Wtorki, czwartki i soboty, od 13:00 do 14:30. Podane godziny nie gwarantują dostępności miejsc.
+      template:
+        name: Potwierdzenie terminu zamówienia
+        description: Ta klauzula jest dołączana do zamówienia tylko wtedy, gdy umowa zawiera klauzulę fulfilment.
+          Wymagania i proponowany termin są zapisywane w zamówieniu.
+        type: Orders/Order with Clauses
+        clauses:
+          confirmation:
+            type: Reseller/Confirmation Clause
+            bindings:
+              confirm:
+                confirmReservation:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              alternative:
+                proposeAlternative:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              accept:
+                acceptProposal:
+                  'on': workflow
+                  party: customer
+                  params:
+                    $var: trigger
+orderTemplate:
+  name: Guest booking
+  type: Orders/Order with Clauses
+  description: Zamówienie klienta w ramach umowy resellerskiej, z kwotą i opisem wskazanymi przy jego tworzeniu.
+  currency: USD
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: Parties/Party
+          partner:
+            type: Parties/Party
+          customer:
+            type: Parties/Party
+        required: []
+        preActivationChannels:
+        - cx.payment.prepare.onOrderCreated_source
+        preActivationOperations:
+        - providePayment
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        obtain: provide
+        prepareFor: bootstrap
+        template:
+          name: Card payment for the guest booking
+          type: PaymentInstruction/Payment Instruction with Clauses
+          clauses:
+            activation:
+              type: Activation/Activation Clause
+              parameters:
+                parties:
+                  payer:
+                    type: Parties/Party
+                  payee:
+                    type: Parties/Party
+                  guarantor:
+                    type: Parties/Party
+                  observer:
+                    type: Parties/Party
+                required: []
+            payment:
+              type: Payment/Payment Process Clause
+              parameters:
+                method: card
+                capture:
+                  mode: workflow
+              bindings:
+                requestAuthorize:
+                  authorize:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+                requestCapture:
+                  pay:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+                requestRefund:
+                  refund:
+                    'on': workflow
+                    party: payee
+                    params:
+                      $object:
+                        $var: trigger
+                requestVoid:
+                  cancel:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+          paymentTerms:
+            amountMinor:
+              type: Integer
+            limitMinor:
+              type: Integer
+            currency:
+              type: Text
+            payerChannel: payer
+            payeeChannel: payee
+            guarantorChannel: guarantor
+            allowedPayees:
+            - payee
+            recipientApprovalRequired: false
+          businessContext:
+            description: Płatność kartą za zamówiony rejs.
+        suppliedBy: seller
+        fieldPaths:
+          amountMinor: /paymentTerms/amountMinor
+          limitMinor: /paymentTerms/limitMinor
+          currency: /paymentTerms/currency
+      bindings:
+        instruction: /payment
+        parties:
+          payer: customer
+          payee: seller
+          guarantor:
+            type: MyOS/MyOS Party
+            email: payments@example.test
+          observer: partner
+        prepare:
+          onOrderCreated:
+            'on': initialized
+            params:
+              values:
+                amountMinor:
+                  $document: /amountMinor
+                limitMinor:
+                  $document: /amountMinor
+                currency:
+                  $document: /currency
+        provide:
+          providePayment:
+            'on': workflow
+            party: seller
+    paymentEvents:
+      type: Reseller/Payment Observation Clause
+      bindings:
+        instruction: /payment
+payoutTemplate:
+  name: Partner commission payout
+  type: Agreements/Agreement with Clauses
+  amountMinor: 1000
+  currency: USD
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: Parties/Party
+          partner:
+            type: Parties/Party
+        required: []
+    payment:
+      type: Reseller/Commission Payout Payment Clause
+      parameters:
+        payer: seller
+        payee: partner
+        currency: USD
+      bindings:
+        amount: /amountMinor
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: seller
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          capture:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestRefund:
+          refund:
+            'on': workflow
+            party: partner
+            params:
+              $object:
+                $var: trigger
+        requestVoid:
+          cancel:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+description: Umowa resellerska dotycząca Afternoon Dolphin & Wildlife Cruise. Adventures in Paradise dostarcza
+  rejsy, a Manatee Bay Inn poleca ofertę gościom i otrzymuje prowizję od potwierdzonych wpływów netto z zamówień.
+products:
+  revision: 1
+  supplierId: seller
+  currency: USD
+  entries:
+    dolphin-cruise-child:
+      label: Dziecko w wieku 4–12 lat
+      description: Bilet dziecięcy na rejs trwający około 1,5 godziny.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 4900
+      guestDiscountPercent: 5
+    dolphin-cruise-under-4:
+      label: Dziecko do 3 lat
+      description: Udział bezpłatny. Dziecko trzeba uwzględnić w liczbie pasażerów.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 0
+      guestDiscountPercent: 5
+quotes: {}

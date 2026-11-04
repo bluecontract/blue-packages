@@ -1,0 +1,3266 @@
+name: Order Functions
+description: Native reseller snapshots, date proposals, confirmation and cancellation transitions. Cancellation
+  policy is optional for confirmation and required for cancellation decisions.
+type: Reseller/Catalog Functions
+functions:
+  validateTerms:
+    args:
+      terms: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: terms
+          allowed:
+          - fulfilmentText
+          - agreementDescription
+          - confirmationMode
+          - cancellationPolicy
+          - dateRequired
+          required:
+          - fulfilmentText
+          - agreementDescription
+          - confirmationMode
+          error: INVALID_TERMS
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: terms
+                    path: /fulfilmentText
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: terms
+                    path: /fulfilmentText
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 1
+                    maxLength: 12000
+        message: INVALID_FULFILMENT_TEXT
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: terms
+                    path: /agreementDescription
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: terms
+                    path: /agreementDescription
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 0
+                    maxLength: 4000
+        message: INVALID_AGREEMENT_DESCRIPTION
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - automatic
+              - supplier
+              val:
+                $var:
+                  name: terms
+                  path: /confirmationMode
+        message: INVALID_CONFIRMATION_MODE
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: terms
+            key: dateRequired
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var:
+                      name: terms
+                      path: /dateRequired
+                  kind: boolean
+            message: INVALID_DATE_REQUIREMENT
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: terms
+            key: cancellationPolicy
+        then:
+        - $call:
+            function: validateFields
+            args:
+              candidate:
+                $var:
+                  name: terms
+                  path: /cancellationPolicy
+              allowed:
+              - freeCancellationHoursBeforeStart
+              - lateCancellationChargePercent
+              required:
+              - freeCancellationHoursBeforeStart
+              - lateCancellationChargePercent
+              error: INVALID_CANCELLATION_POLICY
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var:
+                  name: terms
+                  path: /cancellationPolicy/freeCancellationHoursBeforeStart
+              minimum: 0
+              maximum: 8760
+              error: INVALID_CANCELLATION_HOURS
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var:
+                  name: terms
+                  path: /cancellationPolicy/lateCancellationChargePercent
+              minimum: 0
+              maximum: 100
+              error: INVALID_CANCELLATION_PERCENT
+    - $return: true
+  termsForOrder:
+    args: {}
+    do:
+    - $let:
+        name: terms
+        expr:
+          $merge:
+          - $document:
+              $const:
+                name: bindings
+                path: /terms
+          - agreementDescription:
+              $pointerGet:
+                object:
+                  $document: ''
+                path: /description
+                default: ''
+    - $call:
+        function: validateTerms
+        args:
+          terms:
+            $var: terms
+    - $return:
+        $var: terms
+  validateGroupSelections:
+    args:
+      groups: []
+      quote: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: groups
+                kind: list
+            - $gte:
+              - $size:
+                  $var: groups
+              - 1
+            - $lte:
+              - $size:
+                  $var: groups
+              - 20
+        message: INVALID_GROUPS
+    - $let:
+        name: seenIds
+        expr: []
+    - $let:
+        name: seenLines
+        expr: []
+    - $forEach:
+        in:
+          $var: groups
+        item: spec
+        do:
+        - $call:
+            function: validateFields
+            args:
+              candidate:
+                $var: spec
+              allowed:
+              - id
+              - lineIndices
+              - proposedStartMicros
+              required:
+              - id
+              - lineIndices
+              error: INVALID_GROUP_FIELDS
+        - $call:
+            function: validateIdentifier
+            args:
+              candidate:
+                $var:
+                  name: spec
+                  path: /id
+              error: INVALID_GROUP_ID
+        - $failIf:
+            cond:
+              $includes:
+                list:
+                  $var: seenIds
+                val:
+                  $var:
+                    name: spec
+                    path: /id
+            message: DUPLICATE_GROUP
+        - $set:
+            name: seenIds
+            expr:
+              $listConcat:
+              - $var: seenIds
+              - - $var:
+                    name: spec
+                    path: /id
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: spec
+                        path: /lineIndices
+                    kind: list
+                - $gte:
+                  - $size:
+                      $var:
+                        name: spec
+                        path: /lineIndices
+                  - 1
+            message: EMPTY_GROUP
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: spec
+                key: proposedStartMicros
+            then:
+            - $call:
+                function: validateInteger
+                args:
+                  candidate:
+                    $var:
+                      name: spec
+                      path: /proposedStartMicros
+                  minimum: 0
+                  maximum: 9007199254740991
+                  error: INVALID_START
+        - $let:
+            name: dates
+            expr: []
+        - $forEach:
+            in:
+              $var:
+                name: spec
+                path: /lineIndices
+            item: lineIndex
+            do:
+            - $call:
+                function: validateInteger
+                args:
+                  candidate:
+                    $var: lineIndex
+                  minimum: 0
+                  maximum:
+                    $subtract:
+                    - $size:
+                        $var:
+                          name: quote
+                          path: /lines
+                    - 1
+                  error: INVALID_LINE_INDEX
+            - $failIf:
+                cond:
+                  $includes:
+                    list:
+                      $var: seenLines
+                    val:
+                      $var: lineIndex
+                message: LINE_IN_MULTIPLE_GROUPS
+            - $set:
+                name: seenLines
+                expr:
+                  $listConcat:
+                  - $var: seenLines
+                  - - $var: lineIndex
+            - $let:
+                name: line
+                expr:
+                  $listGet:
+                    list:
+                      $var:
+                        name: quote
+                        path: /lines
+                    index:
+                      $var: lineIndex
+            - $if:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: line
+                    key: serviceDate
+                then:
+                - $if:
+                    cond:
+                      $not:
+                        $includes:
+                          list:
+                            $var: dates
+                          val:
+                            $var:
+                              name: line
+                              path: /serviceDate
+                    then:
+                    - $set:
+                        name: dates
+                        expr:
+                          $listConcat:
+                          - $var: dates
+                          - - $var:
+                                name: line
+                                path: /serviceDate
+        - $failIf:
+            cond:
+              $not:
+                $lte:
+                - $size:
+                    $var: dates
+                - 1
+            message: GROUP_HAS_DIFFERENT_DATES
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $size:
+                $var: seenLines
+            - $size:
+                $var:
+                  name: quote
+                  path: /lines
+        message: UNGROUPED_QUOTE_LINE
+    - $return: true
+  approveAvailability:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: input
+          allowed:
+          - quoteKey
+          - groups
+          - reference
+          required:
+          - quoteKey
+          - groups
+          - reference
+          error: INVALID_AVAILABILITY_FIELDS
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /quoteKey
+          error: INVALID_QUOTE_KEY
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: input
+                    path: /reference
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: input
+                    path: /reference
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 1
+                    maxLength: 256
+        message: AVAILABILITY_REFERENCE_REQUIRED
+    - $let:
+        name: quote
+        expr:
+          $get:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /quotes
+            key:
+              $var:
+                name: input
+                path: /quoteKey
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: quote
+        message: UNKNOWN_QUOTE
+    - $call:
+        function: validateGroupSelections
+        args:
+          groups:
+            $var:
+              name: input
+              path: /groups
+          quote:
+            $var: quote
+    - $forEach:
+        in:
+          $var:
+            name: input
+            path: /groups
+        item: spec
+        do:
+        - $call:
+            function: validateInteger
+            args:
+              candidate:
+                $var:
+                  name: spec
+                  path: /proposedStartMicros
+              minimum: 0
+              maximum: 9007199254740991
+              error: EXACT_START_REQUIRED
+        - $failIf:
+            cond:
+              $not:
+                $gt:
+                - $var:
+                    name: spec
+                    path: /proposedStartMicros
+                - $binding: timestamp
+            message: START_NOT_FUTURE
+    - $let:
+        name: proof
+        expr:
+          quoteBlueId:
+            $nodeBlueId:
+              $var: quote
+          groups:
+            $var:
+              name: input
+              path: /groups
+          reference:
+            $var:
+              name: input
+              path: /reference
+          timestampMicros:
+            $binding: timestamp
+          actor:
+            $binding: call/channel
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $const:
+              name: bindings
+              path: /availability
+          - /
+          - $var:
+              name: input
+              path: /quoteKey
+        val:
+          $var: proof
+    - $return:
+        outcome: acceptedNew
+  placeOrder:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: input
+          allowed:
+          - key
+          - quoteKey
+          - groups
+          - acceptImmediateCharge
+          required:
+          - key
+          - quoteKey
+          - groups
+          error: INVALID_ORDER_FIELDS
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /key
+          error: INVALID_ORDER_KEY
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /quoteKey
+          error: INVALID_QUOTE_KEY
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /orders
+            key:
+              $var:
+                name: input
+                path: /key
+    - $if:
+        cond:
+          $exists:
+            $var: previous
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var:
+                    name: previous
+                    path: /intent
+                - $var: input
+            message: ORDER_KEY_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $binding: call/requireExactDocumentVersion
+            - true
+        message: EXACT_AGREEMENT_VERSION_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $lt:
+            - $size:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /orders
+            - 200
+        message: ORDER_LIMIT
+    - $let:
+        name: quote
+        expr:
+          $get:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /quotes
+            key:
+              $var:
+                name: input
+                path: /quoteKey
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: quote
+        message: UNKNOWN_QUOTE
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: quote
+                path: /supplierId
+            - seller
+        message: QUOTE_SELLER_MISMATCH
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $document: /activation/parties/seller
+        message: STRUCTURED_SELLER_REQUIRED
+    - $let:
+        name: terms
+        expr:
+          $call:
+            function: termsForOrder
+            args: {}
+    - $call:
+        function: validateGroupSelections
+        args:
+          groups:
+            $var:
+              name: input
+              path: /groups
+          quote:
+            $var: quote
+    - $let:
+        name: immediateConsent
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /acceptImmediateCharge
+            default: false
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: immediateConsent
+              kind: boolean
+        message: INVALID_IMMEDIATE_CONSENT
+    - $let:
+        name: readiness
+        expr: {}
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: terms
+              path: /confirmationMode
+          - automatic
+        then:
+        - $set:
+            name: readiness
+            expr:
+              $get:
+                object:
+                  $document:
+                    $const:
+                      name: bindings
+                      path: /availability
+                key:
+                  $var:
+                    name: input
+                    path: /quoteKey
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq:
+                  - $var:
+                      name: readiness
+                      path: /quoteBlueId
+                  - $nodeBlueId:
+                      $var: quote
+                - $eq:
+                  - $var:
+                      name: readiness
+                      path: /groups
+                  - $var:
+                      name: input
+                      path: /groups
+            message: SUPPLIER_READINESS_REQUIRED
+    - $let:
+        name: snapshot
+        expr:
+          intent:
+            $var: input
+          quote:
+            $var: quote
+          quoteBlueId:
+            $nodeBlueId:
+              $var: quote
+          terms:
+            $var: terms
+          termsBlueId:
+            $nodeBlueId:
+              $var: terms
+          seller:
+            $document: /activation/parties/seller
+          customer:
+            $document: /activation/parties/customer
+          groups:
+            $var:
+              name: input
+              path: /groups
+          acceptedAtMicros:
+            $binding: timestamp
+          acceptImmediateCharge:
+            $var: immediateConsent
+          supplierReadiness:
+            $var: readiness
+    - $call:
+        function: initialGroups
+        args:
+          snapshot:
+            $var: snapshot
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $const:
+              name: bindings
+              path: /orders
+          - /
+          - $var:
+              name: input
+              path: /key
+        val:
+          $var: snapshot
+    - $appendEvent:
+        $merge:
+        - type:
+            blueId: HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9
+        - clause:
+            $const: clauseKey
+          kind: Reseller Order Prepared
+          key:
+            $var:
+              name: input
+              path: /key
+          snapshot:
+            $var: snapshot
+    - $return:
+        outcome: acceptedNew
+        key:
+          $var:
+            name: input
+            path: /key
+        snapshot:
+          $var: snapshot
+  makeProposal:
+    args:
+      quote: {}
+      indices: []
+      number:
+        type:
+          blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+      start: {}
+    do:
+    - $let:
+        name: amount
+        expr: 0
+    - $forEach:
+        in:
+          $var: indices
+        item: lineIndex
+        do:
+        - $set:
+            name: amount
+            expr:
+              $add:
+              - $var: amount
+              - $pointerGet:
+                  object:
+                    $listGet:
+                      list:
+                        $var:
+                          name: quote
+                          path: /lines
+                      index:
+                        $var: lineIndex
+                  path: /lineTotalMinor
+    - $return:
+        $merge:
+        - number:
+            $var: number
+          quote:
+            $var: quote
+          quoteBlueId:
+            $nodeBlueId:
+              $var: quote
+          lineIndices:
+            $var: indices
+          amountMinor:
+            $var: amount
+        - $var: start
+  initializeOrder:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $document:
+                $const:
+                  name: bindings
+                  path: /state
+            - {}
+        message: RESERVATIONS_MUST_BE_EMPTY
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $document:
+                $const:
+                  name: bindings
+                  path: /requests
+            - {}
+        message: REQUESTS_MUST_BE_EMPTY
+    - $appendChange:
+        op: replace
+        path:
+          $const:
+            name: bindings
+            path: /state
+        val:
+          $call:
+            function: initialGroups
+            args:
+              snapshot:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /snapshot
+    - $return:
+        outcome: acceptedNew
+  reservationRequest:
+    args:
+      input: {}
+      action:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+      allowed: []
+      required: []
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate:
+            $var: input
+          allowed:
+            $var: allowed
+          required:
+            $var: required
+          error: INVALID_RESERVATION_FIELDS
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /key
+          error: INVALID_REQUEST_KEY
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /groupId
+          error: INVALID_GROUP_ID
+    - $let:
+        name: intent
+        expr:
+          action:
+            $var: action
+          input:
+            $var: input
+          actor:
+            $binding: call/channel
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /requests
+            key:
+              $var:
+                name: input
+                path: /key
+    - $if:
+        cond:
+          $exists:
+            $var: previous
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var:
+                    name: previous
+                    path: /intent
+                - $var: intent
+            message: REQUEST_KEY_CONFLICT
+        - $return:
+            duplicate: true
+    - $failIf:
+        cond:
+          $not:
+            $lt:
+            - $size:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /requests
+            - 500
+        message: REQUEST_LIMIT
+    - $let:
+        name: group
+        expr:
+          $get:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state
+            key:
+              $var:
+                name: input
+                path: /groupId
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var: group
+        message: UNKNOWN_GROUP
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: input
+                path: /expectedProposalBlueId
+            - $var:
+                name: group
+                path: /proposalBlueId
+        message: STALE_PROPOSAL
+    - $return:
+        duplicate: false
+        group:
+          $var: group
+  saveReservation:
+    args:
+      input: {}
+      action:
+        type:
+          blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+      group: {}
+    do:
+    - $if:
+        cond:
+          $and:
+          - $not:
+              $hasKey:
+                object:
+                  $pointerGet:
+                    object:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /snapshot
+                    path: /terms
+                key: cancellationPolicy
+          - $hasKey:
+              object:
+                $var: group
+              key: freeCancellationUntilMicros
+        then:
+        - $set:
+            name: group
+            expr:
+              $pointerSet:
+                object:
+                  $var: group
+                path: /freeCancellationUntilMicros
+                op: remove
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - $const:
+              name: bindings
+              path: /state
+          - /
+          - $var:
+              name: input
+              path: /groupId
+        val:
+          $var: group
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - $const:
+              name: bindings
+              path: /requests
+          - /
+          - $var:
+              name: input
+              path: /key
+        val:
+          intent:
+            action:
+              $var: action
+            input:
+              $var: input
+            actor:
+              $binding: call/channel
+          status:
+            $var:
+              name: group
+              path: /status
+          timestampMicros:
+            $binding: timestamp
+    - $appendEvent:
+        $merge:
+        - type:
+            blueId: HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9
+        - clause:
+            $const: clauseKey
+          kind: Reservation Changed
+          groupId:
+            $var:
+              name: input
+              path: /groupId
+          status:
+            $var:
+              name: group
+              path: /status
+          requestKey:
+            $var:
+              name: input
+              path: /key
+    - $return:
+        outcome: acceptedNew
+  confirmProposal:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: confirm
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+            default:
+              freeCancellationHoursBeforeStart: 0
+              lateCancellationChargePercent: 0
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: group
+                path: /status
+            - pending_supplier
+        message: NOT_PENDING_SUPPLIER
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $not:
+                $hasKey:
+                  object:
+                    $var: group
+                  key: responseDeadlineMicros
+            - $lt:
+              - $binding: timestamp
+              - $var:
+                  name: group
+                  path: /responseDeadlineMicros
+        message: RESPONSE_DEADLINE_PASSED
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var:
+              name: group
+              path: /proposal/proposedStartMicros
+          minimum: 0
+          maximum: 9007199254740991
+          error: EXACT_START_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - $var:
+                name: group
+                path: /proposal/proposedStartMicros
+            - $binding: timestamp
+        message: START_NOT_FUTURE
+    - $if:
+        cond:
+          $and:
+          - $gt:
+            - $binding: timestamp
+            - $subtract:
+              - $var:
+                  name: group
+                  path: /proposal/proposedStartMicros
+              - $multiply:
+                - $var:
+                    name: policy
+                    path: /freeCancellationHoursBeforeStart
+                - 3600000000
+          - $gt:
+            - $call:
+                function: roundBps
+                args:
+                  basis:
+                    $var:
+                      name: group
+                      path: /proposal/amountMinor
+                  bps:
+                    $multiply:
+                    - $var:
+                        name: policy
+                        path: /lateCancellationChargePercent
+                    - 100
+            - 0
+        then:
+        - $set:
+            name: group
+            expr:
+              $merge:
+              - $var: group
+              - status: pending_customer
+                supplierApproved: true
+                immediateChargeConsentRequired: true
+        else:
+        - $set:
+            name: group
+            expr:
+              $merge:
+              - $var: group
+              - status: confirmed
+                supplierApproved: true
+                confirmedStartMicros:
+                  $var:
+                    name: group
+                    path: /proposal/proposedStartMicros
+                freeCancellationUntilMicros:
+                  $subtract:
+                  - $var:
+                      name: group
+                      path: /proposal/proposedStartMicros
+                  - $multiply:
+                    - $var:
+                        name: policy
+                        path: /freeCancellationHoursBeforeStart
+                    - 3600000000
+                confirmedAtMicros:
+                  $binding: timestamp
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: confirm
+            group:
+              $var: group
+  acceptProposal:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: accept
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - acceptImmediateCharge
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+            default:
+              freeCancellationHoursBeforeStart: 0
+              lateCancellationChargePercent: 0
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: group
+                path: /status
+            - pending_customer
+        message: NOT_PENDING_CUSTOMER
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $not:
+                $hasKey:
+                  object:
+                    $var: group
+                  key: responseDeadlineMicros
+            - $lt:
+              - $binding: timestamp
+              - $var:
+                  name: group
+                  path: /responseDeadlineMicros
+        message: RESPONSE_DEADLINE_PASSED
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: group
+                path: /supplierApproved
+            - true
+        message: SUPPLIER_APPROVAL_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - $var:
+                name: group
+                path: /proposal/proposedStartMicros
+            - $binding: timestamp
+        message: START_NOT_FUTURE
+    - $let:
+        name: consent
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /acceptImmediateCharge
+            default: false
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: consent
+              kind: boolean
+        message: INVALID_IMMEDIATE_CONSENT
+    - $if:
+        cond:
+          $and:
+          - $gt:
+            - $binding: timestamp
+            - $subtract:
+              - $var:
+                  name: group
+                  path: /proposal/proposedStartMicros
+              - $multiply:
+                - $var:
+                    name: policy
+                    path: /freeCancellationHoursBeforeStart
+                - 3600000000
+          - $gt:
+            - $call:
+                function: roundBps
+                args:
+                  basis:
+                    $var:
+                      name: group
+                      path: /proposal/amountMinor
+                  bps:
+                    $multiply:
+                    - $var:
+                        name: policy
+                        path: /lateCancellationChargePercent
+                    - 100
+            - 0
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var: consent
+                - true
+            message: IMMEDIATE_CHARGE_CONSENT_REQUIRED
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: confirmed
+            confirmedStartMicros:
+              $var:
+                name: group
+                path: /proposal/proposedStartMicros
+            freeCancellationUntilMicros:
+              $subtract:
+              - $var:
+                  name: group
+                  path: /proposal/proposedStartMicros
+              - $multiply:
+                - $var:
+                    name: policy
+                    path: /freeCancellationHoursBeforeStart
+                - 3600000000
+            confirmedAtMicros:
+              $binding: timestamp
+            immediateChargeAccepted:
+              $var: consent
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: accept
+            group:
+              $var: group
+  proposeAlternative:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: alternative
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - catalog
+              - lines
+              - proposedStartMicros
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - catalog
+              - lines
+              - proposedStartMicros
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+            default:
+              freeCancellationHoursBeforeStart: 0
+              lateCancellationChargePercent: 0
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - pending_supplier
+              - pending_customer
+              val:
+                $var:
+                  name: group
+                  path: /status
+        message: NOT_PENDING
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $not:
+                $hasKey:
+                  object:
+                    $var: group
+                  key: responseDeadlineMicros
+            - $lt:
+              - $binding: timestamp
+              - $var:
+                  name: group
+                  path: /responseDeadlineMicros
+        message: RESPONSE_DEADLINE_PASSED
+    - $failIf:
+        cond:
+          $not:
+            $lt:
+            - $size:
+                $var:
+                  name: group
+                  path: /history
+            - 20
+        message: PROPOSAL_LIMIT
+    - $call:
+        function: validateCatalogState
+        args:
+          catalogState:
+            $var:
+              name: input
+              path: /catalog
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $var:
+                  name: input
+                  path: /catalog/supplierId
+              - $pointerGet:
+                  object:
+                    $document:
+                      $const:
+                        name: bindings
+                        path: /snapshot
+                  path: /quote/supplierId
+            - $eq:
+              - $var:
+                  name: input
+                  path: /catalog/currency
+              - $pointerGet:
+                  object:
+                    $document:
+                      $const:
+                        name: bindings
+                        path: /snapshot
+                  path: /quote/currency
+        message: ALTERNATIVE_SELLER_OR_CURRENCY_MISMATCH
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /proposedStartMicros
+          minimum: 0
+          maximum: 9007199254740991
+          error: EXACT_START_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - $var:
+                name: input
+                path: /proposedStartMicros
+            - $binding: timestamp
+        message: START_NOT_FUTURE
+    - $let:
+        name: quote
+        expr:
+          $call:
+            function: priceSelections
+            args:
+              input:
+                key:
+                  $var:
+                    name: input
+                    path: /key
+                lines:
+                  $var:
+                    name: input
+                    path: /lines
+                catalogRevision:
+                  $var:
+                    name: input
+                    path: /catalog/revision
+              catalogState:
+                $var:
+                  name: input
+                  path: /catalog
+    - $let:
+        name: indices
+        expr: []
+    - $let:
+        name: n
+        expr: 0
+    - $forEach:
+        in:
+          $var:
+            name: quote
+            path: /lines
+        item: line
+        do:
+        - $set:
+            name: indices
+            expr:
+              $listConcat:
+              - $var: indices
+              - - $var: n
+        - $set:
+            name: n
+            expr:
+              $add:
+              - $var: n
+              - 1
+    - $call:
+        function: validateGroupSelections
+        args:
+          quote:
+            $var: quote
+          groups:
+          - id:
+              $var:
+                name: input
+                path: /groupId
+            lineIndices:
+              $var: indices
+            proposedStartMicros:
+              $var:
+                name: input
+                path: /proposedStartMicros
+    - $let:
+        name: proposal
+        expr:
+          $call:
+            function: makeProposal
+            args:
+              quote:
+                $var: quote
+              indices:
+                $var: indices
+              number:
+                $add:
+                - $var:
+                    name: group
+                    path: /proposal/number
+                - 1
+              start:
+                proposedStartMicros:
+                  $var:
+                    name: input
+                    path: /proposedStartMicros
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: pending_customer
+            proposal:
+              $var: proposal
+            proposalBlueId:
+              $nodeBlueId:
+                $var: proposal
+            history:
+              $listConcat:
+              - $var:
+                  name: group
+                  path: /history
+              - - $var: proposal
+            supplierApproved: true
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: alternative
+            group:
+              $var: group
+  setResponseDeadline:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: deadline
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - deadlineMicros
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - deadlineMicros
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - pending_supplier
+              - pending_customer
+              val:
+                $var:
+                  name: group
+                  path: /status
+        message: NOT_PENDING
+    - $failIf:
+        cond:
+          $hasKey:
+            object:
+              $var: group
+            key: responseDeadlineMicros
+        message: DEADLINE_ALREADY_SET
+    - $call:
+        function: validateInteger
+        args:
+          candidate:
+            $var:
+              name: input
+              path: /deadlineMicros
+          minimum: 0
+          maximum: 9007199254740991
+          error: INVALID_DEADLINE
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - $var:
+                name: input
+                path: /deadlineMicros
+            - $binding: timestamp
+        message: DEADLINE_NOT_FUTURE
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - responseDeadlineMicros:
+              $var:
+                name: input
+                path: /deadlineMicros
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: deadline
+            group:
+              $var: group
+  fulfilGroup:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: fulfil
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: group
+                path: /status
+            - confirmed
+        message: NOT_CONFIRMED
+    - $failIf:
+        cond:
+          $not:
+            $gte:
+            - $binding: timestamp
+            - $var:
+                name: group
+                path: /confirmedStartMicros
+        message: SERVICE_NOT_STARTED
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: fulfilled
+            fulfilledAtMicros:
+              $binding: timestamp
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: fulfil
+            group:
+              $var: group
+  cancelGroup:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: cancel
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: input
+                    path: /reason
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: input
+                    path: /reason
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 1
+                    maxLength: 1000
+        message: REASON_REQUIRED
+    - $let:
+        name: charge
+        expr: 0
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $includes:
+                list:
+                - pending_supplier
+                - pending_customer
+                val:
+                  $var:
+                    name: group
+                    path: /status
+            - $eq:
+              - $var:
+                  name: group
+                  path: /status
+              - confirmed
+        message: CANCELLATION_CLOSED
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: group
+              path: /status
+          - confirmed
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $or:
+                - $lt:
+                  - $binding: timestamp
+                  - $var:
+                      name: group
+                      path: /confirmedStartMicros
+                - $and:
+                  - $eq:
+                    - $binding: timestamp
+                    - $var:
+                        name: group
+                        path: /confirmedStartMicros
+                  - $eq:
+                    - $var:
+                        name: policy
+                        path: /freeCancellationHoursBeforeStart
+                    - 0
+            message: ORDINARY_CANCELLATION_AFTER_START
+        - $if:
+            cond:
+              $gt:
+              - $binding: timestamp
+              - $var:
+                  name: group
+                  path: /freeCancellationUntilMicros
+            then:
+            - $set:
+                name: charge
+                expr:
+                  $call:
+                    function: roundBps
+                    args:
+                      basis:
+                        $var:
+                          name: group
+                          path: /proposal/amountMinor
+                      bps:
+                        $multiply:
+                        - $var:
+                            name: policy
+                            path: /lateCancellationChargePercent
+                        - 100
+    - $let:
+        name: decision
+        expr:
+          requestKey:
+            $var:
+              name: input
+              path: /key
+          groupId:
+            $var:
+              name: input
+              path: /groupId
+          kind: cancel
+          reason:
+            $var:
+              name: input
+              path: /reason
+          actor:
+            $binding: call/channel
+          timestampMicros:
+            $binding: timestamp
+          proposalBlueId:
+            $var:
+              name: group
+              path: /proposalBlueId
+          basisMinor:
+            $var:
+              name: group
+              path: /proposal/amountMinor
+          currency:
+            $pointerGet:
+              object:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /snapshot
+              path: /quote/currency
+          policy:
+            $var: policy
+          chargeMinor:
+            $var: charge
+          releasedMinor:
+            $subtract:
+            - $var:
+                name: group
+                path: /proposal/amountMinor
+            - $var: charge
+          settlementStatus: payment_evidence_required
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: cancelled
+            decision:
+              $var: decision
+            decisionBlueId:
+              $nodeBlueId:
+                $var: decision
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: cancel
+            group:
+              $var: group
+  supplierCancelGroup:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: supplierCancel
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: input
+                    path: /reason
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: input
+                    path: /reason
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 1
+                    maxLength: 1000
+        message: REASON_REQUIRED
+    - $let:
+        name: charge
+        expr: 0
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $includes:
+                list:
+                - pending_supplier
+                - pending_customer
+                val:
+                  $var:
+                    name: group
+                    path: /status
+            - $eq:
+              - $var:
+                  name: group
+                  path: /status
+              - confirmed
+        message: CANCELLATION_CLOSED
+    - $let:
+        name: decision
+        expr:
+          requestKey:
+            $var:
+              name: input
+              path: /key
+          groupId:
+            $var:
+              name: input
+              path: /groupId
+          kind: supplierCancel
+          reason:
+            $var:
+              name: input
+              path: /reason
+          actor:
+            $binding: call/channel
+          timestampMicros:
+            $binding: timestamp
+          proposalBlueId:
+            $var:
+              name: group
+              path: /proposalBlueId
+          basisMinor:
+            $var:
+              name: group
+              path: /proposal/amountMinor
+          currency:
+            $pointerGet:
+              object:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /snapshot
+              path: /quote/currency
+          policy:
+            $var: policy
+          chargeMinor:
+            $var: charge
+          releasedMinor:
+            $subtract:
+            - $var:
+                name: group
+                path: /proposal/amountMinor
+            - $var: charge
+          settlementStatus: payment_evidence_required
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: cancelled
+            decision:
+              $var: decision
+            decisionBlueId:
+              $nodeBlueId:
+                $var: decision
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: supplierCancel
+            group:
+              $var: group
+  noShowGroup:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: noShow
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: input
+                    path: /reason
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: input
+                    path: /reason
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 1
+                    maxLength: 1000
+        message: REASON_REQUIRED
+    - $let:
+        name: charge
+        expr: 0
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: group
+                path: /status
+            - confirmed
+        message: NOT_CONFIRMED
+    - $failIf:
+        cond:
+          $not:
+            $gte:
+            - $binding: timestamp
+            - $var:
+                name: group
+                path: /confirmedStartMicros
+        message: SERVICE_NOT_STARTED
+    - $set:
+        name: charge
+        expr:
+          $call:
+            function: roundBps
+            args:
+              basis:
+                $var:
+                  name: group
+                  path: /proposal/amountMinor
+              bps:
+                $multiply:
+                - $var:
+                    name: policy
+                    path: /lateCancellationChargePercent
+                - 100
+    - $let:
+        name: decision
+        expr:
+          requestKey:
+            $var:
+              name: input
+              path: /key
+          groupId:
+            $var:
+              name: input
+              path: /groupId
+          kind: noShow
+          reason:
+            $var:
+              name: input
+              path: /reason
+          actor:
+            $binding: call/channel
+          timestampMicros:
+            $binding: timestamp
+          proposalBlueId:
+            $var:
+              name: group
+              path: /proposalBlueId
+          basisMinor:
+            $var:
+              name: group
+              path: /proposal/amountMinor
+          currency:
+            $pointerGet:
+              object:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /snapshot
+              path: /quote/currency
+          policy:
+            $var: policy
+          chargeMinor:
+            $var: charge
+          releasedMinor:
+            $subtract:
+            - $var:
+                name: group
+                path: /proposal/amountMinor
+            - $var: charge
+          settlementStatus: payment_evidence_required
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: no_show
+            decision:
+              $var: decision
+            decisionBlueId:
+              $nodeBlueId:
+                $var: decision
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: noShow
+            group:
+              $var: group
+  declineGroup:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: decline
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: input
+                    path: /reason
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: input
+                    path: /reason
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 1
+                    maxLength: 1000
+        message: REASON_REQUIRED
+    - $let:
+        name: charge
+        expr: 0
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - pending_supplier
+              - pending_customer
+              val:
+                $var:
+                  name: group
+                  path: /status
+        message: NOT_PENDING
+    - $let:
+        name: decision
+        expr:
+          requestKey:
+            $var:
+              name: input
+              path: /key
+          groupId:
+            $var:
+              name: input
+              path: /groupId
+          kind: decline
+          reason:
+            $var:
+              name: input
+              path: /reason
+          actor:
+            $binding: call/channel
+          timestampMicros:
+            $binding: timestamp
+          proposalBlueId:
+            $var:
+              name: group
+              path: /proposalBlueId
+          basisMinor:
+            $var:
+              name: group
+              path: /proposal/amountMinor
+          currency:
+            $pointerGet:
+              object:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /snapshot
+              path: /quote/currency
+          policy:
+            $var: policy
+          chargeMinor:
+            $var: charge
+          releasedMinor:
+            $subtract:
+            - $var:
+                name: group
+                path: /proposal/amountMinor
+            - $var: charge
+          settlementStatus: payment_evidence_required
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: declined
+            decision:
+              $var: decision
+            decisionBlueId:
+              $nodeBlueId:
+                $var: decision
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: decline
+            group:
+              $var: group
+  expireGroup:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: expire
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              - reason
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $document:
+                $const:
+                  name: bindings
+                  path: /snapshot
+            path: /terms/cancellationPolicy
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: input
+                    path: /reason
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: input
+                    path: /reason
+                pattern:
+                  type:
+                    blueId: GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC
+                  schema:
+                    minLength: 1
+                    maxLength: 1000
+        message: REASON_REQUIRED
+    - $let:
+        name: charge
+        expr: 0
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - pending_supplier
+              - pending_customer
+              val:
+                $var:
+                  name: group
+                  path: /status
+        message: NOT_PENDING
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var: group
+              key: responseDeadlineMicros
+        message: NO_DEADLINE
+    - $failIf:
+        cond:
+          $not:
+            $gte:
+            - $binding: timestamp
+            - $var:
+                name: group
+                path: /responseDeadlineMicros
+        message: DEADLINE_NOT_REACHED
+    - $let:
+        name: decision
+        expr:
+          requestKey:
+            $var:
+              name: input
+              path: /key
+          groupId:
+            $var:
+              name: input
+              path: /groupId
+          kind: expire
+          reason:
+            $var:
+              name: input
+              path: /reason
+          actor:
+            $binding: call/channel
+          timestampMicros:
+            $binding: timestamp
+          proposalBlueId:
+            $var:
+              name: group
+              path: /proposalBlueId
+          basisMinor:
+            $var:
+              name: group
+              path: /proposal/amountMinor
+          currency:
+            $pointerGet:
+              object:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /snapshot
+              path: /quote/currency
+          policy:
+            $var: policy
+          chargeMinor:
+            $var: charge
+          releasedMinor:
+            $subtract:
+            - $var:
+                name: group
+                path: /proposal/amountMinor
+            - $var: charge
+          settlementStatus: payment_evidence_required
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - $var: group
+          - status: expired
+            decision:
+              $var: decision
+            decisionBlueId:
+              $nodeBlueId:
+                $var: decision
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: expire
+            group:
+              $var: group
+  initialGroups:
+    args:
+      snapshot: {}
+    do:
+    - $call:
+        function: validateTerms
+        args:
+          terms:
+            $var:
+              name: snapshot
+              path: /terms
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: snapshot
+                path: /quoteBlueId
+            - $nodeBlueId:
+                $var:
+                  name: snapshot
+                  path: /quote
+        message: QUOTE_ID_MISMATCH
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var:
+                name: snapshot
+                path: /termsBlueId
+            - $nodeBlueId:
+                $var:
+                  name: snapshot
+                  path: /terms
+        message: TERMS_ID_MISMATCH
+    - $call:
+        function: validateGroupSelections
+        args:
+          groups:
+            $var:
+              name: snapshot
+              path: /groups
+          quote:
+            $var:
+              name: snapshot
+              path: /quote
+    - $let:
+        name: result
+        expr: {}
+    - $let:
+        name: policy
+        expr:
+          $pointerGet:
+            object:
+              $var: snapshot
+            path: /terms/cancellationPolicy
+            default:
+              freeCancellationHoursBeforeStart: 0
+              lateCancellationChargePercent: 0
+    - $forEach:
+        in:
+          $var:
+            name: snapshot
+            path: /groups
+        item: spec
+        do:
+        - $if:
+            cond:
+              $pointerGet:
+                object:
+                  $var: snapshot
+                path: /terms/dateRequired
+                default: false
+            then:
+            - $call:
+                function: validateInteger
+                args:
+                  candidate:
+                    $var:
+                      name: spec
+                      path: /proposedStartMicros
+                  minimum: 0
+                  maximum: 9007199254740991
+                  error: PROPOSED_DATE_REQUIRED
+        - $let:
+            name: proposal
+            expr:
+              $call:
+                function: makeProposal
+                args:
+                  quote:
+                    $var:
+                      name: snapshot
+                      path: /quote
+                  indices:
+                    $var:
+                      name: spec
+                      path: /lineIndices
+                  number: 1
+                  start:
+                    $choose:
+                      cond:
+                        $hasKey:
+                          object:
+                            $var: spec
+                          key: proposedStartMicros
+                      then:
+                        proposedStartMicros:
+                          $get:
+                            object:
+                              $var: spec
+                            key: proposedStartMicros
+                      else: {}
+        - $let:
+            name: group
+            expr:
+              status: pending_supplier
+              originalLineIndices:
+                $var:
+                  name: spec
+                  path: /lineIndices
+              proposal:
+                $var: proposal
+              proposalBlueId:
+                $nodeBlueId:
+                  $var: proposal
+              history:
+              - $var: proposal
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: snapshot
+                  path: /terms/confirmationMode
+              - automatic
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $eq:
+                      - $var:
+                          name: snapshot
+                          path: /supplierReadiness/quoteBlueId
+                      - $var:
+                          name: snapshot
+                          path: /quoteBlueId
+                    - $eq:
+                      - $var:
+                          name: snapshot
+                          path: /supplierReadiness/groups
+                      - $var:
+                          name: snapshot
+                          path: /groups
+                message: SUPPLIER_READINESS_REQUIRED
+            - $call:
+                function: validateInteger
+                args:
+                  candidate:
+                    $var:
+                      name: proposal
+                      path: /proposedStartMicros
+                  minimum: 0
+                  maximum: 9007199254740991
+                  error: EXACT_START_REQUIRED
+            - $failIf:
+                cond:
+                  $not:
+                    $gt:
+                    - $var:
+                        name: proposal
+                        path: /proposedStartMicros
+                    - $var:
+                        name: snapshot
+                        path: /acceptedAtMicros
+                message: START_NOT_FUTURE
+            - $if:
+                cond:
+                  $and:
+                  - $gt:
+                    - $var:
+                        name: snapshot
+                        path: /acceptedAtMicros
+                    - $subtract:
+                      - $var:
+                          name: proposal
+                          path: /proposedStartMicros
+                      - $multiply:
+                        - $var:
+                            name: policy
+                            path: /freeCancellationHoursBeforeStart
+                        - 3600000000
+                  - $gt:
+                    - $call:
+                        function: roundBps
+                        args:
+                          basis:
+                            $var:
+                              name: group
+                              path: /proposal/amountMinor
+                          bps:
+                            $multiply:
+                            - $var:
+                                name: policy
+                                path: /lateCancellationChargePercent
+                            - 100
+                    - 0
+                then:
+                - $failIf:
+                    cond:
+                      $not:
+                        $eq:
+                        - $var:
+                            name: snapshot
+                            path: /acceptImmediateCharge
+                        - true
+                    message: IMMEDIATE_CHARGE_CONSENT_REQUIRED
+            - $set:
+                name: group
+                expr:
+                  $merge:
+                  - $var: group
+                  - status: confirmed
+                    confirmedStartMicros:
+                      $var:
+                        name: proposal
+                        path: /proposedStartMicros
+                    freeCancellationUntilMicros:
+                      $subtract:
+                      - $var:
+                          name: proposal
+                          path: /proposedStartMicros
+                      - $multiply:
+                        - $var:
+                            name: policy
+                            path: /freeCancellationHoursBeforeStart
+                        - 3600000000
+                    confirmedAtMicros:
+                      $var:
+                        name: snapshot
+                        path: /acceptedAtMicros
+        - $if:
+            cond:
+              $and:
+              - $not:
+                  $hasKey:
+                    object:
+                      $var:
+                        name: snapshot
+                        path: /terms
+                    key: cancellationPolicy
+              - $hasKey:
+                  object:
+                    $var: group
+                  key: freeCancellationUntilMicros
+            then:
+            - $set:
+                name: group
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: group
+                    path: /freeCancellationUntilMicros
+                    op: remove
+        - $set:
+            name: result
+            expr:
+              $objectSet:
+                object:
+                  $var: result
+                key:
+                  $var:
+                    name: spec
+                    path: /id
+                val:
+                  $var: group
+    - $return:
+        $var: result
+  reconcileSettlement:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input:
+                $var: input
+              action: reconcileSettlement
+              allowed:
+              - key
+              - groupId
+              - expectedProposalBlueId
+              required:
+              - key
+              - groupId
+              - expectedProposalBlueId
+    - $if:
+        cond:
+          $var:
+            name: context
+            path: /duplicate
+        then:
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: group
+        expr:
+          $var:
+            name: context
+            path: /group
+    - $failIf:
+        cond:
+          $not:
+            $exists:
+              $var:
+                name: group
+                path: /decisionBlueId
+        message: CANCELLATION_DECISION_REQUIRED
+    - $let:
+        name: instruction
+        expr:
+          $document:
+            $concat:
+            - $const:
+                name: bindings
+                path: /payments
+            - /
+            - $var:
+                name: input
+                path: /groupId
+    - $failIf:
+        cond:
+          $not:
+            $is:
+              node:
+                $var: instruction
+              pattern:
+                type: PaymentInstruction/Payment Instruction
+        message: NATIVE_PAYMENT_INSTRUCTION_REQUIRED
+    - $let:
+        name: payment
+        expr:
+          $var:
+            name: instruction
+            path: /payment
+    - $let:
+        name: decision
+        expr:
+          $var:
+            name: group
+            path: /decision
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $var:
+                  name: instruction
+                  path: /paymentTerms/currency
+              - $var:
+                  name: decision
+                  path: /currency
+            - $eq:
+              - $var:
+                  name: instruction
+                  path: /paymentTerms/amountMinor
+              - $var:
+                  name: decision
+                  path: /basisMinor
+            - $eq:
+              - $var:
+                  name: instruction
+                  path: /paymentTerms/payerChannel
+              - customer
+            - $eq:
+              - $var:
+                  name: instruction
+                  path: /paymentTerms/payeeChannel
+              - seller
+        message: PAYMENT_TERMS_MISMATCH
+    - $let:
+        name: netPaid
+        expr:
+          $subtract:
+          - $var:
+              name: payment
+              path: /completed
+          - $var:
+              name: payment
+              path: /reversed
+    - $let:
+        name: cashRefundDue
+        expr:
+          $choose:
+            cond:
+              $gt:
+              - $var: netPaid
+              - $var:
+                  name: decision
+                  path: /chargeMinor
+            then:
+              $subtract:
+              - $var: netPaid
+              - $var:
+                  name: decision
+                  path: /chargeMinor
+            else: 0
+    - $let:
+        name: remainingCharge
+        expr:
+          $choose:
+            cond:
+              $gt:
+              - $var:
+                  name: decision
+                  path: /chargeMinor
+              - $var: netPaid
+            then:
+              $subtract:
+              - $var:
+                  name: decision
+                  path: /chargeMinor
+              - $var: netPaid
+            else: 0
+    - $let:
+        name: request
+        expr:
+          $get:
+            object:
+              $var:
+                name: payment
+                path: /requests
+            key:
+              $var:
+                name: group
+                path: /decisionBlueId
+    - $let:
+        name: refundStatus
+        expr:
+          $choose:
+            cond:
+              $gt:
+              - $var: cashRefundDue
+              - 0
+            then: not_requested
+            else: not_required
+    - $if:
+        cond:
+          $exists:
+            $var: request
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var:
+                    name: request
+                    path: /intent/action
+                - refund
+            message: REFUND_REQUEST_REQUIRED
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var:
+                    name: request
+                    path: /intent/amountMinor
+                - $add:
+                  - $var: cashRefundDue
+                  - $choose:
+                      cond:
+                        $eq:
+                        - $var:
+                            name: request
+                            path: /status
+                        - succeeded
+                      then:
+                        $var:
+                          name: request
+                          path: /intent/amountMinor
+                      else: 0
+            message: REFUND_AMOUNT_MISMATCH
+        - $failIf:
+            cond:
+              $not:
+                $lte:
+                - $var:
+                    name: request
+                    path: /intent/amountMinor
+                - $var:
+                    name: decision
+                    path: /releasedMinor
+            message: REFUND_EXCEEDS_RELEASED_PRICE
+        - $set:
+            name: refundStatus
+            expr:
+              $get:
+                object:
+                  pending: requested
+                  unknown: unknown
+                  failed: failed
+                  declined: failed
+                  succeeded: completed
+                key:
+                  $var:
+                    name: request
+                    path: /status
+    - $let:
+        name: settlement
+        expr:
+          decisionBlueId:
+            $var:
+              name: group
+              path: /decisionBlueId
+          paymentInstructionBlueId:
+            $nodeBlueId:
+              $var: instruction
+          paymentRequestId:
+            $var:
+              name: group
+              path: /decisionBlueId
+          currency:
+            $var:
+              name: decision
+              path: /currency
+          capturedMinor:
+            $var:
+              name: payment
+              path: /completed
+          refundedMinor:
+            $var:
+              name: payment
+              path: /reversed
+          cashRefundDueMinor:
+            $var: cashRefundDue
+          additionalChargeDueMinor:
+            $var: remainingCharge
+          authorizationReleaseDueMinor:
+            $choose:
+              cond:
+                $gt:
+                - $var:
+                    name: payment
+                    path: /secured
+                - $var: remainingCharge
+              then:
+                $subtract:
+                - $var:
+                    name: payment
+                    path: /secured
+                - $var: remainingCharge
+              else: 0
+          refundStatus:
+            $var: refundStatus
+          cashRefundCompleted:
+            $eq:
+            - $var: refundStatus
+            - completed
+          observedAtMicros:
+            $binding: timestamp
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input:
+              $var: input
+            action: reconcileSettlement
+            group:
+              $merge:
+              - $var: group
+              - settlement:
+                  $var: settlement

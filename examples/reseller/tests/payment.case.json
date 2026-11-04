@@ -1,0 +1,1534 @@
+{
+  "scenarios": [
+    {
+      "name": "Actual native payment captured 0",
+      "requirements": [
+        "X14"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "startPayment",
+          "channel": "customer",
+          "request": {},
+          "target": "/orders/o1",
+          "requireExactDocumentVersion": true,
+          "timestampMicros": 1794574799999998
+        },
+        {
+          "operation": "acceptPaymentInstruction",
+          "channel": "guarantor",
+          "request": {},
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "recordTransactionInitiated",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Transaction Initiation Input",
+            "transactionId": "local-native-fixture",
+            "railType": "test",
+            "attachmentPoint": "instruction",
+            "providerReference": "local-no-psp"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "authorize",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "authorize-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "secureFunds",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "authorize-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/capturedMinor": 0,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 0,
+            "/orders/o1/reservations/trip/settlement/authorizationReleaseDueMinor": 10000,
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false,
+            "/orders/o1/reservations/trip/settlement/refundStatus": "not_required"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Actual native payment captured 4000",
+      "requirements": [
+        "X14"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "startPayment",
+          "channel": "customer",
+          "request": {},
+          "target": "/orders/o1",
+          "requireExactDocumentVersion": true,
+          "timestampMicros": 1794574799999998
+        },
+        {
+          "operation": "acceptPaymentInstruction",
+          "channel": "guarantor",
+          "request": {},
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "recordTransactionInitiated",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Transaction Initiation Input",
+            "transactionId": "local-native-fixture",
+            "railType": "test",
+            "attachmentPoint": "instruction",
+            "providerReference": "local-no-psp"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "authorize",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "authorize-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "secureFunds",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "authorize-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "capture",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "capture-1",
+            "amountMinor": 4000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "completePayment",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "capture-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/capturedMinor": 4000,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 4000,
+            "/orders/o1/reservations/trip/settlement/authorizationReleaseDueMinor": 6000,
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false,
+            "/orders/o1/reservations/trip/settlement/refundStatus": "not_requested"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Actual native payment captured 10000",
+      "requirements": [
+        "X14"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "startPayment",
+          "channel": "customer",
+          "request": {},
+          "target": "/orders/o1",
+          "requireExactDocumentVersion": true,
+          "timestampMicros": 1794574799999998
+        },
+        {
+          "operation": "acceptPaymentInstruction",
+          "channel": "guarantor",
+          "request": {},
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "recordTransactionInitiated",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Transaction Initiation Input",
+            "transactionId": "local-native-fixture",
+            "railType": "test",
+            "attachmentPoint": "instruction",
+            "providerReference": "local-no-psp"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "authorize",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "authorize-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "secureFunds",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "authorize-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "capture",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "capture-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "completePayment",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "capture-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/capturedMinor": 10000,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 10000,
+            "/orders/o1/reservations/trip/settlement/authorizationReleaseDueMinor": 0,
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false,
+            "/orders/o1/reservations/trip/settlement/refundStatus": "not_requested"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payment feedback failed",
+      "requirements": [
+        "I08",
+        "I05"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "startPayment",
+          "channel": "customer",
+          "request": {},
+          "target": "/orders/o1",
+          "requireExactDocumentVersion": true,
+          "timestampMicros": 1794574799999998
+        },
+        {
+          "operation": "acceptPaymentInstruction",
+          "channel": "guarantor",
+          "request": {},
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "recordTransactionInitiated",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Transaction Initiation Input",
+            "transactionId": "local-native-fixture",
+            "railType": "test",
+            "attachmentPoint": "instruction",
+            "providerReference": "local-no-psp"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "authorize",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "authorize-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "secureFunds",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "authorize-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "capture",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "capture-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "completePayment",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "capture-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 10000,
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false
+          }
+        },
+        {
+          "operation": "refund",
+          "channel": "seller",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId",
+            "amountMinor": "/orders/o1/reservations/trip/settlement/cashRefundDueMinor"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-2",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "requested",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false
+          }
+        },
+        {
+          "operation": "failReverseAfterCompletion",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-3",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "failed",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 10000
+          },
+          "capture": "payment-failed",
+          "capturePaths": [
+            "/orders/o1/reservations/trip",
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/payments/trip/payment"
+          ]
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-3",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "failed",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 10000
+          },
+          "restore": true,
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders/o1/reservations/trip",
+            "/orders/o1/payments/trip/payment"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payment feedback unknown",
+      "requirements": [
+        "I08",
+        "I05"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "startPayment",
+          "channel": "customer",
+          "request": {},
+          "target": "/orders/o1",
+          "requireExactDocumentVersion": true,
+          "timestampMicros": 1794574799999998
+        },
+        {
+          "operation": "acceptPaymentInstruction",
+          "channel": "guarantor",
+          "request": {},
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "recordTransactionInitiated",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Transaction Initiation Input",
+            "transactionId": "local-native-fixture",
+            "railType": "test",
+            "attachmentPoint": "instruction",
+            "providerReference": "local-no-psp"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "authorize",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "authorize-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "secureFunds",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "authorize-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "capture",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "capture-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "completePayment",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "capture-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 10000,
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false
+          }
+        },
+        {
+          "operation": "refund",
+          "channel": "seller",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId",
+            "amountMinor": "/orders/o1/reservations/trip/settlement/cashRefundDueMinor"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-2",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "requested",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false
+          }
+        },
+        {
+          "operation": "recordPaymentReversalUnknown",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-3",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "unknown",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 10000
+          }
+        },
+        {
+          "operation": "reverseAfterCompletion",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-4",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "completed",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": true,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 0
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-4",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "completed",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": true,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 0
+          },
+          "restore": true,
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders/o1/reservations/trip",
+            "/orders/o1/payments/trip/payment"
+          ],
+          "capture": "payment-unknown",
+          "capturePaths": [
+            "/orders/o1/reservations/trip",
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/payments/trip/payment"
+          ]
+        },
+        {
+          "operation": "reverseAfterCompletion",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId"
+          },
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders/o1/payments/trip/payment"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Payment feedback completed",
+      "requirements": [
+        "I08",
+        "I05"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "startPayment",
+          "channel": "customer",
+          "request": {},
+          "target": "/orders/o1",
+          "requireExactDocumentVersion": true,
+          "timestampMicros": 1794574799999998
+        },
+        {
+          "operation": "acceptPaymentInstruction",
+          "channel": "guarantor",
+          "request": {},
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "recordTransactionInitiated",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Transaction Initiation Input",
+            "transactionId": "local-native-fixture",
+            "railType": "test",
+            "attachmentPoint": "instruction",
+            "providerReference": "local-no-psp"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "authorize",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "authorize-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "secureFunds",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "authorize-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "capture",
+          "channel": "customer",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "capture-1",
+            "amountMinor": 10000
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "completePayment",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "capture-1"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 10000,
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false
+          }
+        },
+        {
+          "operation": "refund",
+          "channel": "seller",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId",
+            "amountMinor": "/orders/o1/reservations/trip/settlement/cashRefundDueMinor"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-2",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "requested",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": false
+          }
+        },
+        {
+          "operation": "reverseAfterCompletion",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId"
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-3",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "completed",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": true,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 0
+          }
+        },
+        {
+          "operation": "reconcileSettlement",
+          "channel": "customer",
+          "request": {
+            "key": "observe-3",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/settlement/refundStatus": "completed",
+            "/orders/o1/reservations/trip/settlement/cashRefundCompleted": true,
+            "/orders/o1/reservations/trip/settlement/cashRefundDueMinor": 0
+          },
+          "restore": true,
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders/o1/reservations/trip",
+            "/orders/o1/payments/trip/payment"
+          ],
+          "capture": "payment-completed",
+          "capturePaths": [
+            "/orders/o1/reservations/trip",
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/payments/trip/payment"
+          ]
+        },
+        {
+          "operation": "reverseAfterCompletion",
+          "channel": "guarantor",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input"
+          },
+          "target": "/orders/o1/payments/trip",
+          "timestampMicros": 1794574799999998,
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "requestId": "/orders/o1/reservations/trip/decisionBlueId"
+          },
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders/o1/payments/trip/payment"
+          ]
+        }
+      ]
+    }
+  ]
+}
