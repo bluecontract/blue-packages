@@ -16,6 +16,22 @@ def records(path):
 
 
 class BootstrapCompositionTest(unittest.TestCase):
+    def test_selected_catalogue_contains_the_exact_reseller_dependency_closure(self):
+        sources = json.loads((ROOT / 'PACKAGE-SOURCES.json').read_text())
+        self.assertIn('clause-reseller', sources['packages'])
+        catalogue = json.loads((ROOT / 'PACKAGES.json').read_text())
+        selected = {row['packageBlueId']: row for row in catalogue['packages']}
+        metadata = json.loads((PACKAGE / 'dist/package.json').read_text())
+        self.assertIn(metadata['packageBlueId'], selected)
+        lock = json.loads((PACKAGE / 'blue-package.lock.json').read_text())
+        for dependency in lock['imports'].values():
+            row = selected[dependency['packageBlueId']]
+            self.assertEqual(row['archiveSha256'], dependency['archiveSha256'])
+        for name in ('SHARED-PACKAGES.json', 'PAYMENT-FAMILY-PACKAGES.json'):
+            consumer = json.loads((ROOT / name).read_text())
+            self.assertIn(metadata['packageBlueId'],
+                          {row['packageBlueId'] for row in consumer['packages']})
+
     def test_historical_exported_sources_are_unchanged(self):
         source = json.loads((PACKAGE / 'source-import.json').read_text())
         self.assertEqual(len(source['sourceFiles']), 14)

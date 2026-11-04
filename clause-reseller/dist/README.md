@@ -61,10 +61,10 @@ source integrity and exact replay/access checks passed. Earlier failures remain
 recorded; successful authenticated hosted provision and payment execution remain
 unqualified.
 
-The committed distribution is a review candidate. `clause-reseller` is deliberately
-absent from `PACKAGE-SOURCES.json` and the current release catalogues. The ordinary
-collection CI therefore does not build, publish or qualify this new package.
-Selecting or releasing it is a separate reviewed change.
+The committed distribution is an unpublished integration candidate selected in
+`PACKAGE-SOURCES.json` and the generated consumer catalogues. Collection integrity
+checks include its exact archive and dependencies. Selection does not establish
+hosted provision or payment qualification, and does not publish a release.
 
 With Python dependencies from `tools/requirements.txt`, Java 21 and the qualified
 `BLUE_JAVA_CLASSPATH`, reproduce the package checks explicitly:
