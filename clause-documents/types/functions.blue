@@ -764,6 +764,65 @@ functions:
           $call:
             function: configuredSources
             args: {}
+    - $let:
+        name: sourcePaths
+        expr:
+          $pointerGet:
+            object:
+              $call:
+                function: configurationParameters
+                args: {}
+            path: /sourcePaths
+            default: {}
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $var: sourcePaths
+          - 0
+        then:
+        - $forEach:
+            key: alias
+            item: declaration
+            in:
+              $var: declarations
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $hasKey:
+                      object:
+                        $var: sourcePaths
+                      key:
+                        $var: alias
+                message: SOURCE_MAPPING_INCOMPLETE
+            - $let:
+                name: source
+                expr:
+                  $document:
+                    $get:
+                      object:
+                        $var: sourcePaths
+                      key:
+                        $var: alias
+            - $call:
+                function: processOrigin
+                args:
+                  document:
+                    $var: source
+            - $failIf:
+                cond:
+                  $not:
+                    $call:
+                      function: sourceDeclarationMatches
+                      args:
+                        alias:
+                          $var: alias
+                        source:
+                          $var: source
+                message: SOURCE_DECLARATION_MISMATCH
+        - $return:
+            $var: prepared
     - $failIf:
         cond:
           $ne:

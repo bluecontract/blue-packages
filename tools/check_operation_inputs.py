@@ -22,6 +22,7 @@ CASES = {
     'helper-final': ('OperationInputConformance', 'final'),
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
     'activation-effects': ('ActivationExecutionConformance',),
+    'source-path-declarations': ('SourcePathsDeclarationConformance',),
     'source-binding': ('SourceBindingConformance',),
     'source-binding-cyclic': ('SourceBindingConformance', 'cyclic'),
     'source-binding-public': ('SourceBindingConformance', 'public', 'cyclic'),
@@ -73,6 +74,8 @@ def main():
     sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
+    if 'SourcePathsDeclarationConformance' in sources:
+        sources.add('BootstrapPreparationConformance')
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
     if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:

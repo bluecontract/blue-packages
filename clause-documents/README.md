@@ -108,6 +108,15 @@ agree. The containing clause supplies exactly those names through `bindings.sour
 `self` selects its own native instance; another pointer selects a particular existing
 document. An incoming observer never becomes an implicit parent.
 
+Alternatively, `parameters.sourcePaths` binds already initialized native documents
+directly into the prepared child's `sources`. Every declared dependency must have
+a matching path and satisfy its compiled type and field constraints. This mode
+does not require commercial activation of the source and does not grant access or
+approval. The exact selected reference is frozen during construction. Existing
+path aliases without declarations remain supported. Do not combine this mode with
+`bindings.sources`; the latter retains its active-source, participant and subsequent
+source-binding checks.
+
 The plan freezes these declarations with the template snapshot and compiles native
 BEX `$is` checks. Preparation requires the declared type ancestry and field
 constraints; structural similarity alone does not make an Agreement an Order.
