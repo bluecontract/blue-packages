@@ -1,8 +1,8 @@
 name: Customer Orders Bootstrap Clause
 type: Clauses/Clause
-description: 'Hosted customer Orders: preserve exact native quote and customer requirements, bootstrap
-  the full participant roster through ordinary Core, then provide the initialized Order. Historical embedded
-  Customer Orders remain a separate profile.'
+description: 'Hosted customer Orders: preserve exact native quote and customer requirements, bootstrap the full
+  participant roster through ordinary Core, then provide the initialized Order. Historical embedded Customer Orders
+  remain a separate profile.'
 actionDefinition:
   type:
     type: Contracts/Compute Definition
@@ -136,50 +136,110 @@ actionDefinition:
             name: suppliedRoles
             expr:
               $pointerGet:
-                object: {$call: {function: configurationParameters, args: {}}}
+                object:
+                  $call:
+                    function: configurationParameters
+                    args: {}
                 path: /suppliedParties
-                default: [customer]
+                default:
+                - customer
         - $failIf:
-            cond: {$not: {$isKind: {val: {$var: suppliedRoles}, kind: list}}}
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: suppliedRoles
+                  kind: list
             message: CUSTOMER_ORDER_CUSTOMER_SLOT_REQUIRED
         - $failIf:
-            cond: {$not: {$includes: {list: {$var: suppliedRoles}, val: customer}}}
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: suppliedRoles
+                  val: customer
             message: CUSTOMER_ORDER_CUSTOMER_SLOT_REQUIRED
         - $let:
             name: suppliedSeen
             expr: {}
         - $forEach:
             item: role
-            in: {$var: suppliedRoles}
+            in:
+              $var: suppliedRoles
             do:
             - $failIf:
                 cond:
                   $or:
-                  - {$not: {$call: {function: validPartyName, args: {candidate: {$var: role}}}}}
-                  - {$hasKey: {object: {$var: suppliedSeen}, key: {$var: role}}}
+                  - $not:
+                      $call:
+                        function: validPartyName
+                        args:
+                          candidate:
+                            $var: role
+                  - $hasKey:
+                      object:
+                        $var: suppliedSeen
+                      key:
+                        $var: role
                 message: CUSTOMER_ORDER_INVALID_SUPPLIED_ROLE
             - $set:
                 name: suppliedSeen
-                expr: {$objectSet: {object: {$var: suppliedSeen}, key: {$var: role}, val: true}}
+                expr:
+                  $objectSet:
+                    object:
+                      $var: suppliedSeen
+                    key:
+                      $var: role
+                    val: true
             - $if:
-                cond: {$ne: [{$var: role}, customer]}
+                cond:
+                  $ne:
+                  - $var: role
+                  - customer
                 then:
                 - $let:
                     name: fixedAccount
                     expr:
                       $pointerGet:
-                        object: {$call: {function: configuredTemplate, args: {}}}
-                        path: {$concat: [/clauses/activation/parameters/parties/, {$var: role}, /myosAccountId]}
+                        object:
+                          $call:
+                            function: configuredTemplate
+                            args: {}
+                        path:
+                          $concat:
+                          - /clauses/activation/parameters/parties/
+                          - $var: role
+                          - /myosAccountId
                         default: ''
                 - $failIf:
                     cond:
                       $or:
-                      - {$includes: {list: [seller, partner], val: {$var: role}}}
-                      - {$not: {$isKind: {val: {$var: fixedAccount}, kind: text}}}
-                      - {$eq: [{$var: fixedAccount}, '']}
-                      - {$hasKey: {object: {$pointerGet: {object: {$const: bindings}, path: /parties, default: {}}}, key: {$var: role}}}
+                      - $includes:
+                          list:
+                          - seller
+                          - partner
+                          val:
+                            $var: role
+                      - $not:
+                          $isKind:
+                            val:
+                              $var: fixedAccount
+                            kind: text
+                      - $eq:
+                        - $var: fixedAccount
+                        - ''
+                      - $hasKey:
+                          object:
+                            $pointerGet:
+                              object:
+                                $const: bindings
+                              path: /parties
+                              default: {}
+                          key:
+                            $var: role
                     message: CUSTOMER_ORDER_FIXED_SUPPLIED_ACCOUNT_REQUIRED
-        - $return: {$var: suppliedRoles}
+        - $return:
+            $var: suppliedRoles
       constructDocument:
         args:
           input: {}
@@ -227,6 +287,96 @@ actionDefinition:
                     $call:
                       function: suppliedCustomerOrderRoles
                       args: {}
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $var:
+                    name: input
+                    path: /fields/customerAccountId
+            then:
+            - $failIf:
+                cond:
+                  $exists:
+                    $var:
+                      name: child
+                      path: /clauses/customerBinding
+                message: CUSTOMER_BINDING_CLAUSE_CONFLICT
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /clauses/customerBinding
+                    val:
+                      type:
+                        type: Connections/Connected Clause
+                        actions:
+                          bind:
+                            do:
+                            - $failIf:
+                                cond:
+                                  $not:
+                                    $and:
+                                    - $isKind:
+                                        val:
+                                          $document: /activation/parties/customer/myosAccountId
+                                        kind: text
+                                    - $ne:
+                                      - $document: /activation/parties/customer/myosAccountId
+                                      - ''
+                                message: CUSTOMER_BINDING_REQUIRED
+                            - $failIf:
+                                cond:
+                                  $eq:
+                                  - $document: /activation/parties/customer/myosAccountId
+                                  - $document: /activation/parties/partner/myosAccountId
+                                message: CUSTOMER_MUST_BE_DISTINCT
+                            - $failIf:
+                                cond:
+                                  $eq:
+                                  - $document: /activation/parties/customer/myosAccountId
+                                  - $document: /activation/parties/seller/myosAccountId
+                                message: CUSTOMER_MUST_BE_DISTINCT
+                            - $appendChange:
+                                op: add
+                                path: /customerAccountId
+                                val:
+                                  $document: /activation/parties/customer/myosAccountId
+                            - $if:
+                                cond:
+                                  $exists:
+                                    $document: /orderSnapshot
+                                then:
+                                - $appendChange:
+                                    op: add
+                                    path: /orderSnapshot/customer
+                                    val:
+                                      $objectSet:
+                                        object:
+                                          $document: /orderSnapshot/customer
+                                        key: myosAccountId
+                                        val:
+                                          $document: /activation/parties/customer/myosAccountId
+                            automatic:
+                              'on': initialized
+                              once: true
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /clauses/activation/parameters/preActivationChannels
+                    val:
+                      $listConcat:
+                      - $pointerGet:
+                          object:
+                            $var: child
+                          path: /clauses/activation/parameters/preActivationChannels
+                          default: []
+                      - - cx.customerBinding.bind._automatic_source
         - $if:
             cond:
               $exists:
@@ -281,18 +431,23 @@ actionDefinition:
                           name: input
                           path: /fields/orderSnapshot
                       - seller:
-                          $var:
-                            name: child
-                            path: /clauses/activation/parameters/parties/seller
-                        customer:
-                          $merge:
-                          - $var:
+                          myosAccountId:
+                            $var:
                               name: child
-                              path: /clauses/activation/parameters/parties/customer
-                          - myosAccountId:
-                              $var:
-                                name: input
-                                path: /fields/customerAccountId
+                              path: /clauses/activation/parameters/parties/seller/myosAccountId
+                        customer:
+                          $choose:
+                            cond:
+                              $exists:
+                                $var:
+                                  name: input
+                                  path: /fields/customerAccountId
+                            then:
+                              myosAccountId:
+                                $var:
+                                  name: input
+                                  path: /fields/customerAccountId
+                            else: {}
         - $if:
             cond:
               $eq:
@@ -547,32 +702,41 @@ actionDefinition:
           prepared: {}
         do:
         - $return:
-            request:
-              $var:
-                name: prepared
-                path: /orderRequest
-            customerAccountId:
-              $var:
-                name: prepared
-                path: /customerAccountId
-            quote:
-              $var:
-                name: prepared
-                path: /quote
-            quoteBlueId:
-              $var:
-                name: prepared
-                path: /quoteBlueId
-            amountMinor:
-              $var:
-                name: prepared
-                path: /amountMinor
-            orderSnapshot:
-              $pointerGet:
-                object:
-                  $var: prepared
-                path: /orderSnapshot
-                default: {}
+            $merge:
+            - request:
+                $var:
+                  name: prepared
+                  path: /orderRequest
+              quote:
+                $var:
+                  name: prepared
+                  path: /quote
+              quoteBlueId:
+                $var:
+                  name: prepared
+                  path: /quoteBlueId
+              amountMinor:
+                $var:
+                  name: prepared
+                  path: /amountMinor
+              orderSnapshot:
+                $pointerGet:
+                  object:
+                    $var: prepared
+                  path: /orderSnapshot
+                  default: {}
+            - $choose:
+                cond:
+                  $exists:
+                    $var:
+                      name: prepared
+                      path: /customerAccountId
+                then:
+                  customerAccountId:
+                    $var:
+                      name: prepared
+                      path: /customerAccountId
+                else: {}
       domainValidateCandidate:
         args:
           frozenTerms: {}
@@ -580,13 +744,54 @@ actionDefinition:
         do:
         - $failIf:
             cond:
-              $ne:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var:
+                        name: candidate
+                        path: /customerAccountId
+                    kind: text
+                - $ne:
+                  - $var:
+                      name: candidate
+                      path: /customerAccountId
+                  - ''
+            message: CUSTOMER_BINDING_REQUIRED
+        - $failIf:
+            cond:
+              $eq:
               - $var:
                   name: candidate
                   path: /customerAccountId
               - $var:
-                  name: frozenTerms
+                  name: candidate
+                  path: /activation/parties/partner/myosAccountId
+            message: CUSTOMER_MUST_BE_DISTINCT
+        - $failIf:
+            cond:
+              $eq:
+              - $var:
+                  name: candidate
                   path: /customerAccountId
+              - $var:
+                  name: candidate
+                  path: /activation/parties/seller/myosAccountId
+            message: CUSTOMER_MUST_BE_DISTINCT
+        - $failIf:
+            cond:
+              $and:
+              - $exists:
+                  $var:
+                    name: frozenTerms
+                    path: /customerAccountId
+              - $ne:
+                - $var:
+                    name: candidate
+                    path: /customerAccountId
+                - $var:
+                    name: frozenTerms
+                    path: /customerAccountId
             message: CUSTOMER_ORDER_COMMERCIAL_TERMS_CHANGED
         - $failIf:
             cond:
@@ -621,11 +826,37 @@ actionDefinition:
         - $failIf:
             cond:
               $ne:
-              - $pointerGet:
-                  object:
-                    $var: candidate
-                  path: /orderSnapshot
-                  default: {}
+              - $choose:
+                  cond:
+                    $and:
+                    - $not:
+                        $exists:
+                          $var:
+                            name: frozenTerms
+                            path: /customerAccountId
+                    - $exists:
+                        $var:
+                          name: frozenTerms
+                          path: /orderSnapshot/customer
+                  then:
+                    $pointerSet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: candidate
+                          path: /orderSnapshot
+                          default: {}
+                      path: /customer
+                      val:
+                        $var:
+                          name: frozenTerms
+                          path: /orderSnapshot/customer
+                  else:
+                    $pointerGet:
+                      object:
+                        $var: candidate
+                      path: /orderSnapshot
+                      default: {}
               - $var:
                   name: frozenTerms
                   path: /orderSnapshot
@@ -636,9 +867,20 @@ actionDefinition:
               - $var:
                   name: candidate
                   path: /activation/parties/customer/myosAccountId
-              - $var:
-                  name: frozenTerms
-                  path: /customerAccountId
+              - $choose:
+                  cond:
+                    $exists:
+                      $var:
+                        name: frozenTerms
+                        path: /customerAccountId
+                  then:
+                    $var:
+                      name: frozenTerms
+                      path: /customerAccountId
+                  else:
+                    $var:
+                      name: candidate
+                      path: /customerAccountId
             message: CUSTOMER_ORDER_IDENTITY_CHANGED
         - $failIf:
             cond:
@@ -646,10 +888,79 @@ actionDefinition:
               - $var:
                   name: candidate
                   path: /contracts/initialized/document/clauses/activation/parameters/parties/customer/myosAccountId
-              - $var:
-                  name: frozenTerms
-                  path: /customerAccountId
+              - $choose:
+                  cond:
+                    $exists:
+                      $var:
+                        name: frozenTerms
+                        path: /customerAccountId
+                  then:
+                    $var:
+                      name: frozenTerms
+                      path: /customerAccountId
+                  else:
+                    $var:
+                      name: candidate
+                      path: /customerAccountId
             message: CUSTOMER_ORDER_BOOTSTRAP_IDENTITY_CHANGED
+        - $if:
+            cond:
+              $and:
+              - $not:
+                  $exists:
+                    $var:
+                      name: frozenTerms
+                      path: /customerAccountId
+              - $exists:
+                  $var:
+                    name: frozenTerms
+                    path: /orderSnapshot/customer
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $nodeBlueId:
+                      $var:
+                        name: candidate
+                        path: /orderSnapshot/customer
+                  - $nodeBlueId:
+                      $objectSet:
+                        object:
+                          $var:
+                            name: frozenTerms
+                            path: /orderSnapshot/customer
+                        key: myosAccountId
+                        val:
+                          $var:
+                            name: candidate
+                            path: /customerAccountId
+                message: CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED
+        - $if:
+            cond:
+              $exists:
+                $var:
+                  name: frozenTerms
+                  path: /orderSnapshot/seller
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $eq:
+                      - $var:
+                          name: candidate
+                          path: /orderSnapshot/seller/myosAccountId
+                      - $var:
+                          name: candidate
+                          path: /activation/parties/seller/myosAccountId
+                    - $eq:
+                      - $var:
+                          name: candidate
+                          path: /orderSnapshot/seller/myosAccountId
+                      - $var:
+                          name: candidate
+                          path: /contracts/initialized/document/clauses/activation/parameters/parties/seller/myosAccountId
+                message: CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED
         - $return: true
       itemPath:
         blueId: 689Jn4o4XPk6tMK5SRQeicpXtZc7RH9tnzgCadNxauA1
@@ -718,7 +1029,6 @@ actionDefinition:
               required:
               - key
               - requestId
-              - customer
               - quoteKey
               error: UNKNOWN_ORDER_INPUT
         - $call:
@@ -737,20 +1047,27 @@ actionDefinition:
                   name: input
                   path: /requestId
               error: INVALID_ORDER_REQUEST_ID
-        - $failIf:
+        - $if:
             cond:
-              $not:
-                $is:
-                  node:
-                    $var:
-                      name: input
-                      path: /customer
-                  pattern:
-                    type: Text
-                    schema:
-                      minLength: 1
-                      maxLength: 256
-            message: CUSTOMER_REQUIRED
+              $exists:
+                $var:
+                  name: input
+                  path: /customer
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $is:
+                      node:
+                        $var:
+                          name: input
+                          path: /customer
+                      pattern:
+                        type: Text
+                        schema:
+                          minLength: 1
+                          maxLength: 256
+                message: CUSTOMER_REQUIRED
         - $failIf:
             cond:
               $not:
@@ -849,28 +1166,33 @@ actionDefinition:
                         $var:
                           name: input
                           path: /key
-                      customer:
-                        $var:
-                          name: input
-                          path: /customer
                       quoteKey:
                         $var:
                           name: input
                           path: /quoteKey
                       fields:
-                        amountMinor: 0
-                        orderDescription:
-                          $pointerGet:
-                            object:
-                              $var: input
-                            path: /description
-                            default: Order
-                        customerAccountId:
-                          $var:
-                            name: input
-                            path: /customer
-                        orderRequest:
-                          $var: input
+                        $merge:
+                        - amountMinor: 0
+                          orderDescription:
+                            $pointerGet:
+                              object:
+                                $var: input
+                              path: /description
+                              default: Order
+                          orderRequest:
+                            $var: input
+                        - $choose:
+                            cond:
+                              $exists:
+                                $var:
+                                  name: input
+                                  path: /customer
+                            then:
+                              customerAccountId:
+                                $var:
+                                  name: input
+                                  path: /customer
+                            else: {}
                     - $choose:
                         cond:
                           $hasKey:

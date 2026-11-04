@@ -85,6 +85,10 @@ public final class BootstrapOrdersConformance {
       require(!obj(prepared.getOrDefault("contracts",m())).containsKey("initialized"),"Requirement remains uninitialized");
       equal(p.read(current.document(),path+"/clauses/activation/parameters/required"),required,"Template required approvers preserved");
       equal(prepared.get("quote"),fixture.get("quote"),"Frozen quote");equal(prepared.get("customerAccountId"),"customer-account","Frozen customer");
+      if(fulfilment) {
+        equal(obj(prepared.get("orderSnapshot")).get("seller"),m("myosAccountId","seller-account"),"Snapshot seller is identity data only");
+        equal(obj(prepared.get("orderSnapshot")).get("customer"),m("myosAccountId","customer-account"),"Snapshot customer is identity data only");
+      }
       for(String role:List.of("seller","partner")) {
         var mapped=obj(p.read(current.document(),path+"/clauses/activation/parameters/parties/"+role));
         require(!obj(mapped.getOrDefault("lead",m())).containsKey("channel"),"No parent lead channel");
@@ -198,19 +202,21 @@ public final class BootstrapOrdersConformance {
     var code=m("do",List.of(m("$return",m("$call",m("function","domainValidateCandidate","args",m(
         "frozenTerms",m("$binding","call/request/frozen"),"candidate",m("$binding","call/request/candidate")))))));
     var bex=new Bex(BexProfile.current());var program=bex.compile(code,library,null);
-    for(String variant:List.of("exact","changed-current-customer","changed-origin-customer","missing-origin-customer","changed-quote","changed-price","changed-fulfilment")) {
+    for(String variant:List.of("exact","changed-current-customer","changed-origin-customer","missing-origin-customer","changed-quote","changed-price","changed-fulfilment","changed-current-seller","changed-origin-seller")) {
       var candidate=obj(copy(prepared));var initial=obj(copy(prepared));
       var initialCustomer=obj(obj(obj(obj(initial.get("clauses")).get("activation")).get("parameters")).get("parties"));
       // The generic bootstrap requirement deliberately leaves the supplied customer slot open.
       // This isolated domain test models the Core-bound origin; the hosted proof supplies it for real.
       initialCustomer.put("customer",m("myosAccountId","customer-account"));
       candidate.put("contracts",m("initialized",m("document",initial)));
-      candidate.put("activation",m("parties",m("customer",m("myosAccountId","customer-account"))));
+      candidate.put("activation",m("parties",m("customer",m("myosAccountId","customer-account"),"seller",m("myosAccountId","seller-account"))));
       String reason="CUSTOMER_ORDER_COMMERCIAL_TERMS_CHANGED";
       switch(variant) {
         case "changed-current-customer" -> {obj(obj(candidate.get("activation")).get("parties")).put("customer",m("myosAccountId","foreign"));reason="CUSTOMER_ORDER_IDENTITY_CHANGED";}
         case "changed-origin-customer" -> {obj(initialCustomer.get("customer")).put("myosAccountId","foreign");reason="CUSTOMER_ORDER_BOOTSTRAP_IDENTITY_CHANGED";}
         case "missing-origin-customer" -> {obj(initialCustomer.get("customer")).remove("myosAccountId");reason="CUSTOMER_ORDER_BOOTSTRAP_IDENTITY_CHANGED";}
+        case "changed-current-seller" -> {if(!frozen.containsKey("orderSnapshot"))continue;obj(obj(candidate.get("activation")).get("parties")).put("seller",m("myosAccountId","foreign"));reason="CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED";}
+        case "changed-origin-seller" -> {if(!frozen.containsKey("orderSnapshot"))continue;obj(initialCustomer.get("seller")).put("myosAccountId","foreign");reason="CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED";}
         case "changed-quote" -> candidate.put("quote",m("totalMinor",1));
         case "changed-price" -> candidate.put("amountMinor",1);
         case "changed-fulfilment" -> {candidate.put("orderSnapshot",m("changed",true));reason="CUSTOMER_ORDER_FULFILMENT_CHANGED";}
