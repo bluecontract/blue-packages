@@ -187,7 +187,7 @@ def executable_references(value):
         return set().union(*(executable_references(child) for child in value))
     if not isinstance(value, dict):
         return set()
-    return set().union(*(references(child) if key.lower().endswith('definition')
+    return set().union(*(references(child) if key.lower().endswith('definition') or key == 'functions'
                          else executable_references(child) for key, child in value.items()))
 
 
@@ -195,9 +195,9 @@ def evidence(blue_id, definitions):
     root = compact(definitions[blue_id])
     require(len(wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
     supplied, omitted, visited = {}, set(), {blue_id}
-    # Include inheritance first, so optional event/helper references cannot crowd it out.
-    queue = [(identity, 0) for identity, _ in list(type_chain(blue_id, definitions))[1:]]
-    queue += [(ref, 1) for ref in sorted(executable_references(root))]
+    # Keep the subject's executable specialization ahead of its large framework ancestry.
+    queue = [(ref, 1) for ref in sorted(executable_references(root))]
+    queue += [(identity, 0) for identity, _ in list(type_chain(blue_id, definitions))[1:]]
     queue += [(ref, 1) for ref in sorted(references(root))]
     size = 0
     while queue:

@@ -217,6 +217,17 @@ class SourceTests(unittest.TestCase):
         self.assertIn('/ledger/total', context['documentPaths'])
         self.assertIn(D, context['omittedDependencies'])
 
+    def test_inline_specialization_is_kept_before_large_parent_definitions(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B] = {'type': {'blueId': A}, 'actionDefinition': {'type': {'blueId': E}}}
+        definitions[A] = {'hookDefinition': {'type': {'blueId': D}}}
+        definitions[D] = {'description': 'x' * 479_000}
+        definitions[E] = {'functions': {'constructOrder': {'blueId': F}}}
+        definitions[F] = {'args': {}, 'do': [{'$return': 'selected-quote'}]}
+        context = sources.evidence(B, definitions)
+        included = {row['blueId'] for row in context['dependencyDefinitions']}
+        self.assertTrue({E, F}.issubset(included))
+
     def test_clause_paths_require_the_exact_compiler_constant(self):
         definitions = deepcopy(DEFINITIONS)
         definitions[B]['functions'] = [

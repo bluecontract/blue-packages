@@ -2,7 +2,7 @@
 
 Native Blue/BEX catalog and reservation clauses extending the existing reseller agreement. The existing reseller-percentage 3.2.0 profile owns partner commission and payouts; this package does not replace that logic. This is an unpublished preview.
 
-The package exports five clauses and two shared function definitions. Each has a generated semantic card matching its current exact BlueId:
+The package exports reusable clauses and shared function definitions. The following catalog and fulfilment types have generated semantic cards:
 
 - [Description Clause](types/description-clause.blue) — independent authored content: a title, text and optional sections with their own titles, text and bullet items. It declares no actions, guards, effects or mutable state. [Semantic card](../semantics/cards/6KwmfuRrit267m3cr56FHdVGEmgNrZ9SboSMgUb3KTz6.json).
 - [Catalog Clause](types/catalog-clause.blue) — an optional offer description and groups together with product variants, prices, guest discounts and immutable quotes. [Semantic card](../semantics/cards/4rTrNG5UrWWnU1zER1tZnzMbsbqGrCUYUET681fEWznf.json).
