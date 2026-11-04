@@ -60,6 +60,94 @@ functions:
                 name: needsHost
                 expr: true
         key: alias
+    - $let:
+        name: declaredSourcePaths
+        expr:
+          $pointerGet:
+            object:
+              $call:
+                function: configurationParameters
+                args: {}
+            path: /sourcePaths
+            default: {}
+    - $forEach:
+        key: alias
+        item: declaration
+        in:
+          $call:
+            function: configuredSources
+            args: {}
+        do:
+        - $if:
+            cond:
+              $and:
+              - $hasKey:
+                  object:
+                    $var: declaredSourcePaths
+                  key:
+                    $var: alias
+              - $eq:
+                - $get:
+                    object:
+                      $var: declaredSourcePaths
+                    key:
+                      $var: alias
+                - ''
+            then:
+            - $let:
+                name: escapedAlias
+                expr:
+                  $join:
+                    list:
+                      $split:
+                        text:
+                          $join:
+                            list:
+                              $split:
+                                text:
+                                  $var: alias
+                                separator: '~'
+                            separator: ~0
+                        separator: /
+                    separator: ~1
+            - $let:
+                name: source
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path:
+                      $concat:
+                      - /sources/
+                      - $var: escapedAlias
+            - $failIf:
+                cond:
+                  $ne:
+                  - $call:
+                      function: processOrigin
+                      args:
+                        document:
+                          $var: source
+                  - $call:
+                      function: processOrigin
+                      args:
+                        document:
+                          $document: ''
+                message: SOURCE_IDENTITY_MISMATCH
+            - $failIf:
+                cond:
+                  $not:
+                    $call:
+                      function: sourceDeclarationMatches
+                      args:
+                        alias:
+                          $var: alias
+                        source:
+                          $var: source
+                message: SOURCE_DECLARATION_MISMATCH
+            - $set:
+                name: needsHost
+                expr: true
     - $if:
         cond:
           $var: needsHost

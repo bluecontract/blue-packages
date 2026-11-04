@@ -113,7 +113,17 @@ directly into the prepared child's `sources`. Every declared dependency must hav
 a matching path and satisfy its compiled type and field constraints. This mode
 does not require commercial activation of the source and does not grant access or
 approval. The exact selected reference is frozen during construction. Existing
-path aliases without declarations remain supported. Do not combine this mode with
+path aliases without declarations remain supported. Declared paths also install an
+ordinary embedded-source observer, so subsequent native versions of the same source
+can reach the child. The generated `documentSourceObservation_<native alias identity>` clause names
+are reserved. Undeclared path aliases do not acquire this observation behavior.
+
+A declared path selecting the current host root (`''`) participates in the existing
+missing-party admission lifecycle. The candidate source must retain the host's exact
+initialized origin and satisfy the compiled declaration. Required admission approval,
+participant consent, reader access and revision checks remain in force; admitting a
+participant does not commercially approve the host. A non-root path does not grant
+admission rights on the containing host. Do not combine this mode with
 `bindings.sources`; the latter retains its active-source, participant and subsequent
 source-binding checks.
 

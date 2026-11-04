@@ -23,6 +23,9 @@ CASES = {
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
     'activation-effects': ('ActivationExecutionConformance',),
     'source-path-declarations': ('SourcePathsDeclarationConformance',),
+    'source-path-observation': ('SourcePathsObservationConformance',),
+    **{'source-path-' + mode: ('SourcePathsObservationConformance', mode)
+       for mode in ('admission', 'collision', 'undeclared', 'foreign-source', 'nonroot', 'escaped-alias')},
     'source-binding': ('SourceBindingConformance',),
     'source-binding-cyclic': ('SourceBindingConformance', 'cyclic'),
     'source-binding-public': ('SourceBindingConformance', 'public', 'cyclic'),
@@ -75,7 +78,7 @@ def main():
     sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
-    if {'SourcePathsDeclarationConformance', 'AdmissionDefinitionConformance'} & sources:
+    if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance'} & sources:
         sources.add('BootstrapPreparationConformance')
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')

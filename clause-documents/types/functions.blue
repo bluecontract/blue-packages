@@ -821,6 +821,72 @@ functions:
                         source:
                           $var: source
                 message: SOURCE_DECLARATION_MISMATCH
+        - $forEach:
+            key: alias
+            item: declaration
+            in:
+              $var: declarations
+            do:
+            - $let:
+                name: escapedAlias
+                expr:
+                  $join:
+                    list:
+                      $split:
+                        text:
+                          $join:
+                            list:
+                              $split:
+                                text:
+                                  $var: alias
+                                separator: '~'
+                            separator: ~0
+                        separator: /
+                    separator: ~1
+            - $let:
+                name: observationPath
+                expr:
+                  $concat:
+                  - /clauses/documentSourceObservation_
+                  - $nodeBlueId:
+                      $var: alias
+            - $failIf:
+                cond:
+                  $exists:
+                    $pointerGet:
+                      object:
+                        $var: prepared
+                      path:
+                        $var: observationPath
+                message: SOURCE_OBSERVATION_CLAUSE_NAME_RESERVED
+            - $set:
+                name: prepared
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: prepared
+                    path:
+                      $var: observationPath
+                    val:
+                      type:
+                        type: Connections/Connected Clause
+                        bindingTypes:
+                          source: pointer
+                        embeds:
+                        - source
+                        actions:
+                          observe:
+                            observation: true
+                            automatic:
+                              'on': embedded
+                              pathBinding: source
+                            do:
+                            - $return: {}
+                      bindings:
+                        source:
+                          $concat:
+                          - /sources/
+                          - $var: escapedAlias
         - $return:
             $var: prepared
     - $failIf:
