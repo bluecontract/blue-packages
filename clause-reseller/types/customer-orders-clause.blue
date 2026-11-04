@@ -1,0 +1,1469 @@
+name: Customer Orders Clause
+type: Connections/Connected Clause
+actionDefinition:
+  type:
+    type: Reseller/Order Functions
+    functions:
+      createOrder:
+        args:
+          input: {}
+        do:
+        - $set:
+            name: input
+            expr:
+              $call:
+                function: prepareBooking
+                args:
+                  input:
+                    $var: input
+        - $let:
+            name: key
+            expr:
+              $var:
+                name: input
+                path: /key
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: key
+                    kind: text
+                - $ne:
+                  - $var: key
+                  - ''
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var: key
+                        separator: /
+                  - 1
+                - $eq:
+                  - $size:
+                      $split:
+                        text:
+                          $var: key
+                        separator: '~'
+                  - 1
+            message: Invalid document key
+        - $let:
+            name: path
+            expr:
+              $concat:
+              - $const:
+                  name: bindings
+                  path: /collection
+              - /
+              - $var: key
+        - $let:
+            name: intent
+            expr:
+              fields:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /fields
+                  default: {}
+              templateBlueId:
+                $nodeBlueId:
+                  $document:
+                    $const:
+                      name: bindings
+                      path: /template
+              sourcePaths:
+                $pointerGet:
+                  object:
+                    $call:
+                      function: configurationParameters
+                      args: {}
+                  path: /sourcePaths
+                  default: {}
+              inheritChannels:
+                $pointerGet:
+                  object:
+                    $call:
+                      function: configurationParameters
+                      args: {}
+                  path: /inheritChannels
+                  default: []
+              customer:
+                $var:
+                  name: input
+                  path: /customer
+              orderAccess:
+                $pointerGet:
+                  object:
+                    $var: input
+                  path: /orderAccess
+                  default: {}
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $var: path
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $document:
+                      $concat:
+                      - $var: path
+                      - /creationIntent
+                  - $var: intent
+                message: DOCUMENT_KEY_CONFLICT
+            - $return:
+                outcome: duplicate
+                path:
+                  $var: path
+                key:
+                  $var: key
+        - $let:
+            name: child
+            expr:
+              $document:
+                $const:
+                  name: bindings
+                  path: /template
+        - $set:
+            name: child
+            expr:
+              $call:
+                function: activateOrder
+                args:
+                  child:
+                    $var: child
+                  input:
+                    $var: input
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /fulfilment
+            then:
+            - $set:
+                name: child
+                expr:
+                  $merge:
+                  - $var: child
+                  - clauses:
+                      $merge:
+                      - $var:
+                          name: child
+                          path: /clauses
+                      - $document:
+                          $concat:
+                          - $const:
+                              name: bindings
+                              path: /fulfilment
+                          - /template/clauses
+                    reservations: {}
+                    reservationRequests: {}
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /clauses/activation/parameters/preActivationChannels
+                    val:
+                      $listConcat:
+                      - $pointerGet:
+                          object:
+                            $var: child
+                          path: /clauses/activation/parameters/preActivationChannels
+                          default: []
+                      - - cx.confirmation.initialize._automatic_source
+            - $set:
+                name: input
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: input
+                    path: /fields/orderSnapshot
+                    val:
+                      $merge:
+                      - $var:
+                          name: input
+                          path: /fields/orderSnapshot
+                      - seller:
+                          $var:
+                            name: child
+                            path: /clauses/activation/parameters/parties/seller
+                        customer:
+                          $var:
+                            name: child
+                            path: /clauses/activation/parameters/parties/customer
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: input
+                  path: /fields/amountMinor
+              - 0
+            then:
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /clauses/payment
+                    op: remove
+        - $failIf:
+            cond:
+              $exists:
+                $var:
+                  name: child
+                  path: /contracts/initialized
+            message: Factory requires an uninitialized template
+        - $forEach:
+            item: role
+            in:
+              $list:
+                $pointerGet:
+                  object:
+                    $call:
+                      function: configurationParameters
+                      args: {}
+                  path: /inheritChannels
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var: role
+                        kind: text
+                    - $ne:
+                      - $var: role
+                      - ''
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $var: role
+                            separator: /
+                      - 1
+                    - $eq:
+                      - $size:
+                          $split:
+                            text:
+                              $var: role
+                            separator: '~'
+                      - 1
+                message: 'FACTORY_CHANNEL: invalid participant channel name'
+            - $let:
+                name: channelPath
+                expr:
+                  $concat:
+                  - /contracts/
+                  - $var: role
+            - $let:
+                name: inherited
+                expr:
+                  $document:
+                    $var: channelPath
+            - $failIf:
+                cond:
+                  $not:
+                    $or:
+                    - $is:
+                        node:
+                          $var: inherited
+                        pattern:
+                          type:
+                            blueId: HW7dw1gGvAMknFW6HXvHc432TZfzCut2mW4KCk4rj8o1
+                    - $is:
+                        node:
+                          $var: inherited
+                        pattern:
+                          type:
+                            blueId: GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy
+                    - $is:
+                        node:
+                          $var: inherited
+                        pattern:
+                          type:
+                            blueId: GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy
+                message: 'FACTORY_CHANNEL: only explicit participant channels may be inherited'
+            - $failIf:
+                cond:
+                  $and:
+                  - $exists:
+                      $pointerGet:
+                        object:
+                          $var: child
+                        path:
+                          $var: channelPath
+                  - $ne:
+                    - $pointerGet:
+                        object:
+                          $var: child
+                        path:
+                          $var: channelPath
+                    - $var: inherited
+                message: 'FACTORY_CHANNEL: template declares a different participant channel'
+            - $set:
+                name: child
+                expr:
+                  $objectSet:
+                    object:
+                      $var: child
+                    key: contracts
+                    val:
+                      $objectSet:
+                        object:
+                          $object:
+                            $var:
+                              name: child
+                              path: /contracts
+                        key:
+                          $var: role
+                        val:
+                          $var: inherited
+        - $forEach:
+            item: nextValue
+            key: field
+            in:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /fields
+                default: {}
+            do:
+            - $failIf:
+                cond:
+                  $or:
+                  - $not:
+                      $includes:
+                        list:
+                          $pointerGet:
+                            object:
+                              $call:
+                                function: configurationParameters
+                                args: {}
+                            path: /allowedFields
+                        val:
+                          $var: field
+                  - $includes:
+                      list:
+                      - contracts
+                      - clauses
+                      - type
+                      - itemType
+                      - keyType
+                      - valueType
+                      - value
+                      - items
+                      - blueId
+                      - blue
+                      - schema
+                      - constraints
+                      - mergePolicy
+                      - properties
+                      - $previous
+                      - $previousItems
+                      - $pos
+                      - $replace
+                      - $empty
+                      - instanceKey
+                      val:
+                        $var: field
+                message: Field not allowed by document factory
+            - $set:
+                name: child
+                expr:
+                  $objectSet:
+                    object:
+                      $var: child
+                    key:
+                      $var: field
+                    val:
+                      $var: nextValue
+        - $let:
+            name: sources
+            expr: {}
+        - $forEach:
+            key: sourceKey
+            item: sourcePath
+            in:
+              $object:
+                $pointerGet:
+                  object:
+                    $call:
+                      function: configurationParameters
+                      args: {}
+                  path: /sourcePaths
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $exists:
+                      $document:
+                        $concat:
+                        - $var: sourcePath
+                        - /contracts/initialized
+                message: SOURCE_NOT_INITIALIZED
+            - $let:
+                name: ref
+                expr:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $nodeBlueId:
+                        $document:
+                          $var: sourcePath
+            - $set:
+                name: sources
+                expr:
+                  $objectSet:
+                    object:
+                      $var: sources
+                    key:
+                      $var: sourceKey
+                    val:
+                      $var: ref
+        - $set:
+            name: child
+            expr:
+              $merge:
+              - $var: child
+              - sources:
+                  $var: sources
+                creationIntent:
+                  $var: intent
+        - $let:
+            name: identity
+            expr:
+              $concat:
+              - $nodeBlueId:
+                  $document: /contracts/initialized/document
+              - ':'
+              - $const: clauseKey
+              - ':'
+              - $var: key
+        - $set:
+            name: child
+            expr:
+              $merge:
+              - $var: child
+              - instanceKey:
+                  $var: identity
+        - $forEach:
+            item: identityPath
+            in:
+              $list:
+                $pointerGet:
+                  object:
+                    $call:
+                      function: configurationParameters
+                      args: {}
+                  path: /identityChildren
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $exists:
+                        $pointerGet:
+                          object:
+                            $var: child
+                          path:
+                            $var: identityPath
+                    - $not:
+                        $exists:
+                          $pointerGet:
+                            object:
+                              $var: child
+                            path:
+                              $concat:
+                              - $var: identityPath
+                              - /contracts/initialized
+                message: IDENTITY_CHILD_MUST_BE_UNINITIALIZED_TEMPLATE
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path:
+                      $concat:
+                      - $var: identityPath
+                      - /instanceKey
+                    val:
+                      $concat:
+                      - $var: identity
+                      - ':'
+                      - $var: identityPath
+        - $appendChange:
+            op: add
+            path:
+              $var: path
+            val:
+              $var: child
+        - $appendEvent:
+            $merge:
+            - type: Commerce/Domain Event
+            - kind: Document Started
+              clause:
+                $const: clauseKey
+              entityId:
+                $var: key
+              path:
+                $var: path
+        - $return:
+            outcome: acceptedNew
+            path:
+              $var: path
+            key:
+              $var: key
+      activateOrder:
+        args:
+          child: {}
+          input: {}
+        do:
+        - $let:
+            name: roster
+            expr:
+              seller:
+                $document: /activation/parties/seller
+              partner:
+                $document: /activation/parties/partner
+        - $let:
+            name: proofs
+            expr: {}
+        - $let:
+            name: paths
+            expr: []
+        - $if:
+            cond:
+              $is:
+                node:
+                  $document: /activation/parties/seller/lead/channel
+                pattern:
+                  type:
+                    blueId: HW7dw1gGvAMknFW6HXvHc432TZfzCut2mW4KCk4rj8o1
+            then:
+            - $forEach:
+                item: field
+                in:
+                  $keys:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /orderAccess
+                      default: {}
+                do:
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $var: field
+                      - customerReaderKey
+                    message: EXTERNAL_ORDER_ACCESS_UNSUPPORTED
+            - $if:
+                cond:
+                  $exists:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /orderAccess/customerReaderKey
+                then:
+                - $failIf:
+                    cond:
+                      $not:
+                        $and:
+                        - $isKind:
+                            val:
+                              $pointerGet:
+                                object:
+                                  $var: input
+                                path: /orderAccess/customerReaderKey
+                            kind: text
+                        - $ne:
+                          - $pointerGet:
+                              object:
+                                $var: input
+                              path: /orderAccess/customerReaderKey
+                          - ''
+                    message: CUSTOMER_READER_KEY_REQUIRED
+            - $set:
+                name: roster
+                expr:
+                  $objectSet:
+                    object:
+                      $var: roster
+                    key: customer
+                    val:
+                      $objectSet:
+                        object:
+                          displayName: Customer
+                          myosAccountId:
+                            $var:
+                              name: input
+                              path: /customer
+                          lead:
+                            $objectSet:
+                              object:
+                                channel:
+                                  $objectSet:
+                                    object:
+                                      event:
+                                        source:
+                                          $var:
+                                            name: input
+                                            path: /customer
+                                    key: type
+                                    val:
+                                      blueId: HW7dw1gGvAMknFW6HXvHc432TZfzCut2mW4KCk4rj8o1
+                              key: type
+                              val:
+                                blueId: EjcKH2GFS4uuZ5sSq2jiRQtNsA8cGgQf8SgJMg1DEHZK
+                          readerKeys:
+                            $choose:
+                              cond:
+                                $exists:
+                                  $pointerGet:
+                                    object:
+                                      $var: input
+                                    path: /orderAccess/customerReaderKey
+                              then:
+                              - $pointerGet:
+                                  object:
+                                    $var: input
+                                  path: /orderAccess/customerReaderKey
+                              else: []
+                        key: type
+                        val:
+                          blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+            else:
+            - $failIf:
+                cond:
+                  $not:
+                    $is:
+                      node:
+                        $document: /activation/parties/seller/lead/channel
+                      pattern:
+                        type:
+                          blueId: GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy
+                message: UNSUPPORTED_ORDER_TRANSPORT
+            - $failIf:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      kind: object
+                message: ORDER_ACCESS_REQUIRED
+            - $failIf:
+                cond:
+                  $ne:
+                  - $size:
+                      $keys:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                  - 3
+                message: ORDER_ACCESS_REQUIRED
+            - $forEach:
+                item: key
+                in:
+                  $keys:
+                    $pointerGet:
+                      object:
+                        $var: input
+                      path: /orderAccess
+                      default: {}
+                do:
+                - $failIf:
+                    cond:
+                      $not:
+                        $includes:
+                          list:
+                          - timelines
+                          - proofs
+                          - customerReaderKey
+                          val:
+                            $var: key
+                    message: ORDER_ACCESS_REQUIRED
+            - $failIf:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $pointerGet:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: input
+                              path: /orderAccess
+                              default: {}
+                          path: /timelines
+                      kind: object
+                message: ORDER_TIMELINES_REQUIRED
+            - $failIf:
+                cond:
+                  $ne:
+                  - $size:
+                      $keys:
+                        $pointerGet:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: input
+                              path: /orderAccess
+                              default: {}
+                          path: /timelines
+                  - 3
+                message: ORDER_TIMELINES_REQUIRED
+            - $forEach:
+                item: key
+                in:
+                  $keys:
+                    $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /timelines
+                do:
+                - $failIf:
+                    cond:
+                      $not:
+                        $includes:
+                          list:
+                          - seller
+                          - partner
+                          - customer
+                          val:
+                            $var: key
+                    message: ORDER_TIMELINES_REQUIRED
+            - $failIf:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $pointerGet:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: input
+                              path: /orderAccess
+                              default: {}
+                          path: /proofs
+                      kind: object
+                message: ORDER_PROOFS_REQUIRED
+            - $failIf:
+                cond:
+                  $ne:
+                  - $size:
+                      $keys:
+                        $pointerGet:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: input
+                              path: /orderAccess
+                              default: {}
+                          path: /proofs
+                  - 3
+                message: ORDER_PROOFS_REQUIRED
+            - $forEach:
+                item: key
+                in:
+                  $keys:
+                    $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /proofs
+                do:
+                - $failIf:
+                    cond:
+                      $not:
+                        $includes:
+                          list:
+                          - seller
+                          - partner
+                          - customer
+                          val:
+                            $var: key
+                    message: ORDER_PROOFS_REQUIRED
+            - $failIf:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $pointerGet:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: input
+                              path: /orderAccess
+                              default: {}
+                          path: /customerReaderKey
+                      kind: text
+                message: CUSTOMER_READER_KEY_REQUIRED
+            - $forEach:
+                item: role
+                in:
+                - seller
+                - partner
+                - customer
+                do:
+                - $let:
+                    name: timeline
+                    expr:
+                      $get:
+                        object:
+                          $pointerGet:
+                            object:
+                              $pointerGet:
+                                object:
+                                  $var: input
+                                path: /orderAccess
+                                default: {}
+                            path: /timelines
+                        key:
+                          $var: role
+                - $failIf:
+                    cond:
+                      $or:
+                      - $eq:
+                        - $var: timeline
+                        - $document: /activation/parties/seller/lead/channel/timeline
+                      - $eq:
+                        - $var: timeline
+                        - $document: /activation/parties/partner/lead/channel/timeline
+                    message: ORDER_REQUIRES_SEPARATE_TIMELINES
+            - $failIf:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /timelines/seller
+                  - $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /timelines/partner
+                message: ORDER_TIMELINES_MUST_DIFFER
+            - $failIf:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /timelines/seller
+                  - $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /timelines/customer
+                message: ORDER_TIMELINES_MUST_DIFFER
+            - $failIf:
+                cond:
+                  $eq:
+                  - $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /timelines/partner
+                  - $pointerGet:
+                      object:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /orderAccess
+                          default: {}
+                      path: /timelines/customer
+                message: ORDER_TIMELINES_MUST_DIFFER
+            - $set:
+                name: roster
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: roster
+                    path: /seller/lead/channel/actor
+                    val:
+                      $merge:
+                      - {}
+                      - $document: /activation/parties/seller/lead/channel/actor
+            - $set:
+                name: roster
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: roster
+                    path: /partner/lead/channel/actor
+                    val:
+                      $merge:
+                      - {}
+                      - $document: /activation/parties/partner/lead/channel/actor
+            - $set:
+                name: roster
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: roster
+                    path: /seller/lead/channel/timeline
+                    val:
+                      $pointerGet:
+                        object:
+                          $pointerGet:
+                            object:
+                              $var: input
+                            path: /orderAccess
+                            default: {}
+                        path: /timelines/seller
+            - $set:
+                name: roster
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: roster
+                    path: /partner/lead/channel/timeline
+                    val:
+                      $pointerGet:
+                        object:
+                          $pointerGet:
+                            object:
+                              $var: input
+                            path: /orderAccess
+                            default: {}
+                        path: /timelines/partner
+            - $set:
+                name: roster
+                expr:
+                  $objectSet:
+                    object:
+                      $var: roster
+                    key: customer
+                    val:
+                      $objectSet:
+                        object:
+                          displayName: Customer
+                          myosAccountId:
+                            $var:
+                              name: input
+                              path: /customer
+                          readerKeys:
+                          - $pointerGet:
+                              object:
+                                $pointerGet:
+                                  object:
+                                    $var: input
+                                  path: /orderAccess
+                                  default: {}
+                              path: /customerReaderKey
+                          lead:
+                            $objectSet:
+                              object:
+                                channel:
+                                  $objectSet:
+                                    object:
+                                      timeline:
+                                        $pointerGet:
+                                          object:
+                                            $pointerGet:
+                                              object:
+                                                $var: input
+                                              path: /orderAccess
+                                              default: {}
+                                          path: /timelines/customer
+                                      actor:
+                                        $objectSet:
+                                          object:
+                                            displayName:
+                                              $var:
+                                                name: input
+                                                path: /customer
+                                          key: type
+                                          val:
+                                            blueId: 7QS9KeuXB5Ukm1xsxfyx6gT3TUrvibjP9XQXCcoM1xjo
+                                    key: type
+                                    val:
+                                      blueId: GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy
+                              key: type
+                              val:
+                                blueId: EjcKH2GFS4uuZ5sSq2jiRQtNsA8cGgQf8SgJMg1DEHZK
+                        key: type
+                        val:
+                          blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+            - $set:
+                name: proofs
+                expr:
+                  $pointerGet:
+                    object:
+                      $pointerGet:
+                        object:
+                          $var: input
+                        path: /orderAccess
+                        default: {}
+                    path: /proofs
+            - $set:
+                name: paths
+                expr:
+                - /timelineAccess/seller
+                - /timelineAccess/partner
+                - /timelineAccess/customer
+        - $let:
+            name: params
+            expr:
+              $merge:
+              - $pointerGet:
+                  object:
+                    $var: child
+                  path: /clauses/activation/parameters
+                  default: {}
+              - parties:
+                  $var: roster
+                readers: {}
+                accessPaths:
+                  $var: paths
+                required:
+                - customer
+                frozen: true
+        - $return:
+            $pointerSet:
+              object:
+                $merge:
+                - $var: child
+                - timelineAccess:
+                    $var: proofs
+              path: /clauses/activation/parameters
+              val:
+                $var: params
+      prepareBooking:
+        args:
+          input: {}
+        do:
+        - $let:
+            name: fields
+            expr:
+              $var:
+                name: input
+                path: /fields
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: input
+                key: quoteKey
+            then:
+            - $call:
+                function: validateIdentifier
+                args:
+                  candidate:
+                    $var:
+                      name: input
+                      path: /quoteKey
+                  error: INVALID_QUOTE_KEY
+            - $let:
+                name: quote
+                expr:
+                  $get:
+                    object:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /quotes
+                    key:
+                      $var:
+                        name: input
+                        path: /quoteKey
+            - $failIf:
+                cond:
+                  $not:
+                    $exists:
+                      $var: quote
+                message: UNKNOWN_QUOTE
+            - $set:
+                name: fields
+                expr:
+                  $merge:
+                  - $var: fields
+                  - amountMinor:
+                      $var:
+                        name: quote
+                        path: /totalMinor
+                    quote:
+                      $var: quote
+                    quoteBlueId:
+                      $nodeBlueId:
+                        $var: quote
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /fulfilment
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $hasKey:
+                      object:
+                        $var: input
+                      key: quoteKey
+                message: QUOTE_REQUIRED
+            - $let:
+                name: terms
+                expr:
+                  $merge:
+                  - $document:
+                      $concat:
+                      - $const:
+                          name: bindings
+                          path: /fulfilment
+                      - /terms
+                  - agreementDescription:
+                      $document: /description
+            - $let:
+                name: snapshot
+                expr:
+                  quote:
+                    $var:
+                      name: fields
+                      path: /quote
+                  quoteBlueId:
+                    $var:
+                      name: fields
+                      path: /quoteBlueId
+                  terms:
+                    $var: terms
+                  termsBlueId:
+                    $nodeBlueId:
+                      $var: terms
+                  groups:
+                    $var:
+                      name: input
+                      path: /groups
+            - $call:
+                function: initialGroups
+                args:
+                  snapshot:
+                    $var: snapshot
+            - $forEach:
+                in:
+                  $var:
+                    name: input
+                    path: /groups
+                item: group
+                do:
+                - $if:
+                    cond:
+                      $var:
+                        name: terms
+                        path: /dateRequired
+                    then:
+                    - $failIf:
+                        cond:
+                          $not:
+                            $gt:
+                            - $var:
+                                name: group
+                                path: /proposedStartMicros
+                            - $binding: timestamp
+                        message: START_NOT_FUTURE
+            - $set:
+                name: fields
+                expr:
+                  $merge:
+                  - $var: fields
+                  - orderSnapshot:
+                      $var: snapshot
+            else:
+            - $failIf:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: input
+                    key: groups
+                message: BOOKING_CLAUSE_REQUIRED
+        - $return:
+            $merge:
+            - $var: input
+            - fields:
+                $var: fields
+actions:
+  startOrder:
+    resultContract: outcome-v1
+    do:
+    - $forEach:
+        item: field
+        in:
+          $keys:
+            $var: trigger
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - key
+                  - description
+                  - amountMinor
+                  - customer
+                  - orderAccess
+                  - quoteKey
+                  - groups
+                  val:
+                    $var: field
+            message: UNKNOWN_INPUT_FIELD
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /customer
+                kind: text
+            - $is:
+                node:
+                  $var:
+                    name: trigger
+                    path: /customer
+                pattern:
+                  type: Text
+                  schema:
+                    minLength: 1
+                    maxLength: 256
+        message: CUSTOMER_REQUIRED
+    - $failIf:
+        cond:
+          $eq:
+          - $var:
+              name: trigger
+              path: /customer
+          - $pointerGet:
+              object:
+                $document: /activation/parties/partner/lead/channel
+              path: /actor/displayName
+              default:
+                $pointerGet:
+                  object:
+                    $document: /activation/parties/partner/lead/channel
+                  path: /event/source
+                  default: ''
+        message: CUSTOMER_MUST_BE_DISTINCT
+    - $failIf:
+        cond:
+          $eq:
+          - $var:
+              name: trigger
+              path: /customer
+          - $pointerGet:
+              object:
+                $document: /activation/parties/seller/lead/channel
+              path: /actor/displayName
+              default:
+                $pointerGet:
+                  object:
+                    $document: /activation/parties/seller/lead/channel
+                  path: /event/source
+                  default: ''
+        message: CUSTOMER_MUST_BE_DISTINCT
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: trigger
+            key: quoteKey
+        then:
+        - $failIf:
+            cond:
+              $hasKey:
+                object:
+                  $var: trigger
+                key: amountMinor
+            message: AMOUNT_COMES_FROM_QUOTE
+        else:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: trigger
+                        path: /amountMinor
+                    kind: integer
+                - $gte:
+                  - $pointerGet:
+                      object:
+                        $var: trigger
+                      path: /amountMinor
+                  - 1
+                - $lte:
+                  - $pointerGet:
+                      object:
+                        $var: trigger
+                      path: /amountMinor
+                  - 100000000
+            message: INVALID_AMOUNT
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $pointerGet:
+                    object:
+                      $var: trigger
+                    path: /description
+                    default: Order
+                kind: text
+            - $is:
+                node:
+                  $pointerGet:
+                    object:
+                      $var: trigger
+                    path: /description
+                    default: Order
+                pattern:
+                  type: Text
+                  schema:
+                    minLength: 1
+                    maxLength: 300
+        message: INVALID_ORDER_DESCRIPTION
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $concat:
+                - $concat:
+                  - $const:
+                      name: bindings
+                      path: /collection
+                  - /
+                - $var:
+                    name: trigger
+                    path: /key
+        then:
+        - $failIf:
+            cond:
+              $gte:
+              - $size:
+                  $keys:
+                    $document:
+                      $const:
+                        name: bindings
+                        path: /collection
+              - 20
+            message: DOCUMENT_LIMIT_REACHED
+    - $set:
+        name: params
+        expr:
+          key:
+            $var:
+              name: trigger
+              path: /key
+          fields:
+            amountMinor:
+              $pointerGet:
+                object:
+                  $var: trigger
+                path: /amountMinor
+                default: 0
+            orderDescription:
+              $pointerGet:
+                object:
+                  $var: trigger
+                path: /description
+                default: Order
+            customerAccountId:
+              $var:
+                name: trigger
+                path: /customer
+          customer:
+            $var:
+              name: trigger
+              path: /customer
+          orderAccess:
+            $pointerGet:
+              object:
+                $var: trigger
+              path: /orderAccess
+              default: {}
+          quoteKey:
+            $pointerGet:
+              object:
+                $var: trigger
+              path: /quoteKey
+          groups:
+            $pointerGet:
+              object:
+                $var: trigger
+              path: /groups
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: createOrder
+            args:
+              input:
+                $var: params
+description: Creates a customer order from the configured template and exact quote. Adds date confirmation
+  only when the agreement contains the fulfilment clause.
+bindingTypes:
+  template: pointer
+  collection: pointer
+  quotes: pointer
+  fulfilment: pointer
+embedsCollections:
+- collection
+readParametersFromDocument: true
+snapshotBindings:
+- template
+parameters:
+  allowedFields:
+  - orderDescription
+  - amountMinor
+  - customerAccountId
+  - quote
+  - quoteBlueId
+  - orderSnapshot
+  parties: []
+defaultBindings:
+  quotes: /quotes
+  fulfilment: /clauses/fulfilment/parameters

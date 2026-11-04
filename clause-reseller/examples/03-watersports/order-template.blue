@@ -1,0 +1,125 @@
+name: Guest booking
+type: Orders/Order with Clauses
+description: "Zam\xF3wienie klienta w ramach umowy resellerskiej, z kwot\u0105 i opisem wskazanymi przy\
+  \ jego tworzeniu."
+currency: USD
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: Parties/Party
+        partner:
+          type: Parties/Party
+        customer:
+          type: Parties/Party
+      required: []
+      preActivationChannels:
+      - cx.payment.prepare.onOrderCreated_source
+      preActivationOperations:
+      - providePayment
+  payment:
+    type: Payment/Payment Clause
+    parameters:
+      obtain: provide
+      template:
+        name: Card payment for the guest booking
+        type: PaymentInstruction/Payment Instruction with Clauses
+        clauses:
+          activation:
+            type: Activation/Activation Clause
+            parameters:
+              parties:
+                payer:
+                  type: Parties/Party
+                payee:
+                  type: Parties/Party
+                guarantor:
+                  type: Parties/Party
+                observer:
+                  type: Parties/Party
+              required: []
+          payment:
+            type: Payment/Payment Process Clause
+            parameters:
+              method: card
+              capture:
+                mode: workflow
+            bindings:
+              requestAuthorize:
+                authorize:
+                  'on': workflow
+                  party: payer
+                  params:
+                    $object:
+                      $var: trigger
+              requestCapture:
+                pay:
+                  'on': workflow
+                  party: payer
+                  params:
+                    $object:
+                      $var: trigger
+              requestRefund:
+                refund:
+                  'on': workflow
+                  party: payee
+                  params:
+                    $object:
+                      $var: trigger
+              requestVoid:
+                cancel:
+                  'on': workflow
+                  party: payer
+                  params:
+                    $object:
+                      $var: trigger
+        paymentTerms:
+          amountMinor:
+            type: Integer
+          limitMinor:
+            type: Integer
+          currency:
+            type: Text
+          payerChannel: payer
+          payeeChannel: payee
+          guarantorChannel: guarantor
+          allowedPayees:
+          - payee
+          recipientApprovalRequired: false
+        businessContext:
+          description: "P\u0142atno\u015B\u0107 kart\u0105 za zam\xF3wiony us\u0142uga."
+      suppliedBy: seller
+      fieldPaths:
+        amountMinor: /paymentTerms/amountMinor
+        limitMinor: /paymentTerms/limitMinor
+        currency: /paymentTerms/currency
+    bindings:
+      instruction: /payment
+      parties:
+        payer: customer
+        payee: seller
+        guarantor:
+          type: MyOS/MyOS Party
+          email: payments@example.test
+        observer: partner
+      prepare:
+        onOrderCreated:
+          'on': initialized
+          params:
+            values:
+              amountMinor:
+                $document: /amountMinor
+              limitMinor:
+                $document: /amountMinor
+              currency:
+                $document: /currency
+      provide:
+        providePayment:
+          'on': workflow
+          party: seller
+  paymentEvents:
+    type: Reseller/Payment Observation Clause
+    bindings:
+      instruction: /payment
