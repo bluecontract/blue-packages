@@ -15,6 +15,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
+    'myos-instruction-types': ('blue.core.MyosInstructionTypesConformance',),
     'access-events-behavior': ('blue.core.AccessEventsConformance',),
     'helper-native': ('OperationInputConformance', 'native'),
     'helper-payment': ('OperationInputConformance', 'payment'),
@@ -74,7 +75,7 @@ def main():
         sources.add(CASES[key][0].split('.')[-1])
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
-    if 'PaymentExecutionConformance' in sources:
+    if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
         sources.add('CurrentOperationScenarios')
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:
         subprocess.run([javac, '-cp', classpath, '-d', classes,
