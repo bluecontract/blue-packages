@@ -48,6 +48,19 @@ public final class EarlyBlueprintReferenceConformance {
         Object allowed=bex.execute(check,context,1000000).value();
         OperationInputConformance.require(Boolean.TRUE.equals(allowed)==scenario.equals("canonical"),"Access-ready snapshot replacement: "+scenario+"="+allowed);
       }
+      var checkpoint=find(mandate,"expectedCheckpointAt");
+      var checkpointSource=m("do",List.of(m("$return",m("$call",m("function","expectedCheckpointAt","args",m("checkpointPath","/contracts/checkpoint","channelKind","root"))))));
+      var checkpointProgram=bex.compile(checkpointSource,m("functions",m("decodeDefinition",decoder,"expectedCheckpointAt",checkpoint)),null);
+      String timerChannel="cx.payment.prepare.preparePayment_source";
+      for(String scenario:List.of("canonical","foreign-channel","invalid-timestamp")){
+        var actual=m("type",m("blueId","DDu7utWeDaAusXsBXLFXYHKeg9CsnUX9E9q7LgyBznLu"),"entries",m(scenario.equals("foreign-channel")?"cx.foreign.timer":timerChannel,m("event",m("blueId",other),"timestamp",scenario.equals("invalid-timestamp")?"0":0)));
+        var document=m("expectedProgram",m("timelineAccess",m("definition",List.of(m("path","","kind","object"),m("path","/seller","kind","object")))));
+        var context=new BexContext(document,m(),m(),Values.UNDEFINED,m(),m("targetDocument",m("contracts",m("checkpoint",actual))),"/",null,(a,b)->values.matches(values.source(a),values.source(b,"definition")),(a,g)->NativeRuntime.identity(values.source(a,"definition")));
+        Object expected=bex.execute(checkpointProgram,context,1000000).value();
+        boolean same=NativeRuntime.identity(values.source(expected,"definition")).equals(NativeRuntime.identity(values.source(actual,"definition")));
+        OperationInputConformance.require(same==scenario.equals("canonical"),"Prepare timer checkpoint: "+scenario+"="+same);
+      }
+      System.out.println("PASS canonical prepare timer checkpoint and foreign channel/invalid timestamp denial");
       System.out.println("PASS exact access-ready snapshot replacement and foreign path/section/kind denial");
       System.out.println("PASS inert scalar reference storage and exact native decoder identity; changed ID cannot preserve original identity");
     }
