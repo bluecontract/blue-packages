@@ -49,3 +49,31 @@ Supplier confirmation of dates remains separate. An Order's Payment Instruction
 preparation and `providePayment` are unchanged, separate processes; Order provision
 is not payment execution. The inherited generic preparation action is routed
 through the same checked customer-order input and cannot accept arbitrary prices.
+
+## Review candidate and verification
+
+This adaptation is based on repository main `4450364dc9497bee1f97fb9eac9f7c514504562f`.
+The import-time facts in `source-import.json` remain historical provenance. All
+thirteen imported dependency archives match the component-qualified `cd3bbfa9`
+composition byte-for-byte. The original component evidence is retained under
+`reports/reseller-bootstrap-integration/` locally: five preparation scenarios,
+source integrity and exact replay/access checks passed. Earlier failures remain
+recorded; successful authenticated hosted provision and payment execution remain
+unqualified.
+
+The committed distribution is a review candidate. `clause-reseller` is deliberately
+absent from `PACKAGE-SOURCES.json` and the current release catalogues. The ordinary
+collection CI therefore does not build, publish or qualify this new package.
+Selecting or releasing it is a separate reviewed change.
+
+With Python dependencies from `tools/requirements.txt`, Java 21 and the qualified
+`BLUE_JAVA_CLASSPATH`, reproduce the package checks explicitly:
+
+```sh
+python3 tools/build_final_gas.py clause-reseller --check
+python3 -m unittest discover -s clause-reseller/tests -p 'test_*.py' -v
+```
+
+`tests/BootstrapOrdersConformance.java` is the component harness; it uses the
+qualified Core `CompositionPackages` test helper and stops at `awaiting_provider`.
+It is not a replacement for the pending authenticated hosted integration proof.
