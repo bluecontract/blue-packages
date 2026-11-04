@@ -31,6 +31,7 @@ CASES = {
     'bootstrap-preparation': ('BootstrapPreparationConformance',),
     'bootstrap-preparation-early': ('BootstrapPreparationConformance', 'early'),
     'early-order-observer-predicate': ('EarlyOrderObserverPredicateConformance',),
+    'early-blueprint-reference': ('EarlyBlueprintReferenceConformance',),
     'early-order-void': ('EarlyVoidConnectionConformance',),
     'early-activation-timer': ('EarlyActivationTimerConformance',),
     'early-order-decision': ('EarlyOrderDecisionConformance',),
