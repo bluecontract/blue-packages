@@ -201,6 +201,8 @@ def evidence(blue_id, definitions):
     queue += [(ref, 1) for ref in sorted(references(root))]
     size = 0
     while queue:
+        # Visit the nearest source first, before a deeper path can mark it omitted.
+        queue.sort(key=lambda item: item[1])
         ref, depth = queue.pop(0)
         if ref in visited or ref in PRIMITIVES:
             continue

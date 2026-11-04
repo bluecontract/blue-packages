@@ -236,6 +236,20 @@ class SourceTests(unittest.TestCase):
         ]
         self.assertEqual(['/process_{clauseKey}/entries'], sources.evidence(B, definitions)['clausePaths'])
 
+    def test_shallow_dependency_is_not_lost_after_a_deeper_reference(self):
+        definitions = deepcopy(DEFINITIONS)
+        g = 'G' * 44
+        definitions[B] = {'type': {'blueId': A}, 'actionDefinition': {'type': {'blueId': E}}}
+        definitions[A] = {'hookDefinition': {'type': {'blueId': D}}}
+        definitions[E] = {'functions': {'deep': {'blueId': F}}}
+        definitions[F] = {'functions': {'deeper': {'blueId': g}}}
+        definitions[g] = {'functions': {'shared': {'blueId': D}}}
+        definitions[D] = {'functions': {'run': {'$appendChange': {
+            'op': 'add', 'path': '/result', 'val': {'timestamp': 0}}}}}
+        context = sources.evidence(B, definitions)
+        self.assertIn('/result/timestamp', context['documentPaths'])
+        self.assertNotIn(D, context['omittedDependencies'])
+
     def test_payment_evidence_includes_native_ledger_from_inherited_functions(self):
         _, definitions = sources.inventory(ROOT)
         for identity in ('E9D2hMTnDHeShhe2r5gaCXRXComc6wxKpAmrRtUQpi2L',
@@ -245,6 +259,13 @@ class SourceTests(unittest.TestCase):
                              '/payment/completed', '/payment/reversed', '/payment/reserved/void',
                              '/paymentTerms/currency'} <= set(context['documentPaths']))
             self.assertLess(len(wire(context)), 1_000_000)
+
+    def test_confirmation_evidence_keeps_inherited_timestamp_semantics(self):
+        _, definitions = sources.inventory(ROOT)
+        context = sources.evidence('EWMrPZWUi46vyUu6gcw3k5xZRPFMxWPfoC9mGwFvXPFz', definitions)
+        self.assertIn('timestamp must be an integer Unix timestamp in microseconds',
+                      json.dumps(context))
+        self.assertLess(len(wire(context)), 1_000_000)
 
 
     def test_added_export_without_rebuild_is_rejected(self):

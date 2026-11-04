@@ -59,6 +59,11 @@ metadata makes the same semantics available as structured, read-only facts:
   Return [] for a type with no established state; explain missing source evidence
   in limitations when it prevents describing material state. Do not omit state
   facts merely because the prose already explains them.
+- For collections of offered products or ordered items, include their source-defined
+  business names, descriptions, quantities, prices, discounts and currency references
+  as structured facts, not only validation flags and internal identifiers. Prioritize
+  these fields over bookkeeping. A price without its currency or an item without its
+  business label is not a complete account of that collection.
 - Each fact has a unique id, type, meaning, absent and evidence. evidence names
   the exact supplied definition and function/field establishing its meaning.
   Explain supported status values and the actor or event awaited. Facts contain
