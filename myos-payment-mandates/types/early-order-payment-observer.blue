@@ -1,0 +1,277 @@
+{
+  "name": "Early Order Payment Observer",
+  "type": "Connections/Connected Clause",
+  "description": "Observe the same native Order and reciprocal PI binding. Source decisions are cancellation intent only; financial outcomes remain native Payment Instruction events. Missing linkage, access or changed terms closes capture.",
+  "actions": {
+    "refresh": {
+      "do": [
+        {
+          "$let": {
+            "name": "sameOrder",
+            "expr": {
+              "$and": [
+                {
+                  "$exists": {
+                    "$document": "/sources/order/contracts/initialized/document"
+                  }
+                },
+                {
+                  "$eq": [
+                    {
+                      "$nodeBlueId": {
+                        "$document": "/sources/order/contracts/initialized/document"
+                      }
+                    },
+                    {
+                      "$document": "/paymentPreparation/orderDocumentId"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "sameTerms",
+            "expr": {
+              "$and": [
+                {
+                  "$var": "sameOrder"
+                },
+                {
+                  "$exists": {
+                    "$document": "/customerOrderTerms/revision"
+                  }
+                },
+                {
+                  "$exists": {
+                    "$document": "/customerOrderTerms/termsRef"
+                  }
+                },
+                {
+                  "$exists": {
+                    "$document": "/paymentTerms/amountMinor"
+                  }
+                },
+                {
+                  "$exists": {
+                    "$document": "/paymentTerms/currency"
+                  }
+                },
+                {
+                  "$exists": {
+                    "$document": "/paymentDetails/customerPaymentTerms/provider"
+                  }
+                },
+                {
+                  "$exists": {
+                    "$document": "/paymentDetails/customerPaymentTerms/recipientPaymentAccountId"
+                  }
+                },
+                {
+                  "$eq": [
+                    {
+                      "$document": "/sources/order/activation/revision"
+                    },
+                    {
+                      "$document": "/customerOrderTerms/revision"
+                    }
+                  ]
+                },
+                {
+                  "$eq": [
+                    {
+                      "$document": "/sources/order/activation/terms/ref"
+                    },
+                    {
+                      "$document": "/customerOrderTerms/termsRef"
+                    }
+                  ]
+                },
+                {
+                  "$eq": [
+                    {
+                      "$document": "/sources/order/paymentTemplate/paymentTerms"
+                    },
+                    {
+                      "$document": "/paymentTerms"
+                    }
+                  ]
+                },
+                {
+                  "$eq": [
+                    {
+                      "$document": "/sources/order/paymentTemplate/paymentDetails/customerPaymentTerms"
+                    },
+                    {
+                      "$document": "/paymentDetails/customerPaymentTerms"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "rejected",
+            "expr": {
+              "$and": [
+                {
+                  "$var": "sameOrder"
+                },
+                {
+                  "$eq": [
+                    {
+                      "$document": "/sources/order/orderDecision/status"
+                    },
+                    "REJECTED"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "linked",
+            "expr": {
+              "$and": [
+                {
+                  "$exists": {
+                    "$document": "/sources/order/payment/contracts/initialized/document"
+                  }
+                },
+                {
+                  "$eq": [
+                    {
+                      "$nodeBlueId": {
+                        "$document": "/sources/order/payment/contracts/initialized/document"
+                      }
+                    },
+                    {
+                      "$nodeBlueId": {
+                        "$document": "/contracts/initialized/document"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$let": {
+            "name": "accepted",
+            "expr": {
+              "$and": [
+                {
+                  "$var": "sameTerms"
+                },
+                {
+                  "$var": "linked"
+                },
+                {
+                  "$eq": [
+                    {
+                      "$document": "/sources/order/activation/active"
+                    },
+                    true
+                  ]
+                },
+                {
+                  "$eq": [
+                    {
+                      "$document": "/sources/order/activation/approved/seller"
+                    },
+                    true
+                  ]
+                },
+                {
+                  "$not": {
+                    "$var": "rejected"
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$appendChange": {
+            "op": "add",
+            "path": "/customerOrderState",
+            "val": {
+              "status": {
+                "$choose": {
+                  "cond": {
+                    "$var": "rejected"
+                  },
+                  "then": "REJECTED",
+                  "else": {
+                    "$choose": {
+                      "cond": {
+                        "$var": "accepted"
+                      },
+                      "then": "ACCEPTED",
+                      "else": {
+                        "$choose": {
+                          "cond": {
+                            "$and": [
+                              {
+                                "$var": "sameOrder"
+                              },
+                              {
+                                "$not": {
+                                  "$var": "sameTerms"
+                                }
+                              }
+                            ]
+                          },
+                          "then": "TERMS_MISMATCH",
+                          "else": "WAITING"
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "cancellationRequested": {
+                "$var": "rejected"
+              },
+              "captureAllowed": {
+                "$var": "accepted"
+              }
+            }
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$var": "rejected"
+            },
+            "then": [
+              {
+                "$appendChange": {
+                  "op": "add",
+                  "path": "/customerOrderState/decision",
+                  "val": {
+                    "orderDocumentId": {
+                      "$document": "/paymentPreparation/orderDocumentId"
+                    },
+                    "revision": {
+                      "$document": "/sources/order/orderDecision/revision"
+                    },
+                    "termsRef": {
+                      "$document": "/sources/order/orderDecision/termsRef"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+name: Early Order Decision
+type: Connections/Connected Clause
+description: Seller-only rejection of an unaccepted Order. Install only with the matching terminal dispatch policy; rejection does not itself report a financial outcome.
+actions:
+  reject:
+    do:
+    - $failIf:
+        cond:
+          $ne: [{ $binding: call/channel }, seller]
+        message: SELLER_DECISION_REQUIRED
+    - $failIf:
+        cond:
+          $ne: [{ $binding: call/requireExactDocumentVersion }, true]
+        message: EXACT_REVIEW_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $var: { name: params, path: /revision }
+          - $document: /activation/revision
+        message: ORDER_REVISION_CHANGED
+    - $failIf:
+        cond:
+          $or:
+          - $eq: [{ $document: /activation/everActivated }, true]
+          - $eq: [{ $document: /activation/approved/seller }, true]
+        message: ORDER_ALREADY_ACCEPTED
+    - $if:
+        cond:
+          $eq: [{ $document: /orderDecision/status }, REJECTED]
+        then:
+        - $return: {}
+    - $appendChange:
+        op: add
+        path: /orderDecision
+        val:
+          status: REJECTED
+          revision: { $document: /activation/revision }
+          termsRef: { $document: /activation/terms/ref }
+    - $appendEvent:
+        $merge:
+        - type: MyOSPaymentMandates/Early Order Rejected
+        - revision: { $document: /orderDecision/revision }
+          termsRef: { $document: /orderDecision/termsRef }
