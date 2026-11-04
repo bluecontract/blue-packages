@@ -39,6 +39,17 @@ representatives. Provision must satisfy the unchanged Documents source, policy,
 requirement, origin and full access checks, plus the frozen customer identity and
 commercial snapshot. The source does not implement a manual channel binder.
 
+An Order template may declare an additional fixed-account participant, such as
+its payment guarantor, without adding that participant to the parent Agreement.
+List that role alongside `customer` in the orders clause's `suppliedParties`.
+Every additional role must be declared in the child template with a nonempty text
+`myosAccountId` and must not also have an inherited party mapping. Roles must be
+valid and unique; seller and partner retain their inherited mappings. This does not grant access or supply channels: ordinary Core
+bootstrap supplies authentic participant bindings, and the existing Documents
+slot, initialized-origin, current-party and access checks still govern provision.
+The default remains `[customer]`; customer identity and commercial terms remain
+frozen exactly as before.
+
 `bootstrap-composition.json` identifies the exact reused native function nodes.
 The new constructor and domain hooks are local to this profile; no generic
 Documents, Parties, Activation or Core source is changed. Native quote/group and

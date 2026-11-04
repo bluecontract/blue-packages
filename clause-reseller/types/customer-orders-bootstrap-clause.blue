@@ -129,6 +129,57 @@ actionDefinition:
         blueId: CiwKE8ejuxFQPydT4Cd1XGFHtZtpAd52pJdNWzTYDtQi
       connectionSnapshots:
         blueId: CiwKE8ejuxFQPydT4Cd1XGFHtZtpAd52pJdNWzTYDtQi
+      suppliedCustomerOrderRoles:
+        args: {}
+        do:
+        - $let:
+            name: suppliedRoles
+            expr:
+              $pointerGet:
+                object: {$call: {function: configurationParameters, args: {}}}
+                path: /suppliedParties
+                default: [customer]
+        - $failIf:
+            cond: {$not: {$isKind: {val: {$var: suppliedRoles}, kind: list}}}
+            message: CUSTOMER_ORDER_CUSTOMER_SLOT_REQUIRED
+        - $failIf:
+            cond: {$not: {$includes: {list: {$var: suppliedRoles}, val: customer}}}
+            message: CUSTOMER_ORDER_CUSTOMER_SLOT_REQUIRED
+        - $let:
+            name: suppliedSeen
+            expr: {}
+        - $forEach:
+            item: role
+            in: {$var: suppliedRoles}
+            do:
+            - $failIf:
+                cond:
+                  $or:
+                  - {$not: {$call: {function: validPartyName, args: {candidate: {$var: role}}}}}
+                  - {$hasKey: {object: {$var: suppliedSeen}, key: {$var: role}}}
+                message: CUSTOMER_ORDER_INVALID_SUPPLIED_ROLE
+            - $set:
+                name: suppliedSeen
+                expr: {$objectSet: {object: {$var: suppliedSeen}, key: {$var: role}, val: true}}
+            - $if:
+                cond: {$ne: [{$var: role}, customer]}
+                then:
+                - $let:
+                    name: fixedAccount
+                    expr:
+                      $pointerGet:
+                        object: {$call: {function: configuredTemplate, args: {}}}
+                        path: {$concat: [/clauses/activation/parameters/parties/, {$var: role}, /myosAccountId]}
+                        default: ''
+                - $failIf:
+                    cond:
+                      $or:
+                      - {$includes: {list: [seller, partner], val: {$var: role}}}
+                      - {$not: {$isKind: {val: {$var: fixedAccount}, kind: text}}}
+                      - {$eq: [{$var: fixedAccount}, '']}
+                      - {$hasKey: {object: {$pointerGet: {object: {$const: bindings}, path: /parties, default: {}}}, key: {$var: role}}}
+                    message: CUSTOMER_ORDER_FIXED_SUPPLIED_ACCOUNT_REQUIRED
+        - $return: {$var: suppliedRoles}
       constructDocument:
         args:
           input: {}
@@ -173,7 +224,9 @@ actionDefinition:
                       path: /parties
                       default: {}
                   suppliedRoles:
-                  - customer
+                    $call:
+                      function: suppliedCustomerOrderRoles
+                      args: {}
         - $if:
             cond:
               $exists:
@@ -757,18 +810,9 @@ actionDefinition:
                   args: {}
               - bootstrap
             message: CUSTOMER_ORDER_BOOTSTRAP_REQUIRED
-        - $failIf:
-            cond:
-              $ne:
-              - $pointerGet:
-                  object:
-                    $call:
-                      function: configurationParameters
-                      args: {}
-                  path: /suppliedParties
-                  default: []
-              - - customer
-            message: CUSTOMER_ORDER_CUSTOMER_SLOT_REQUIRED
+        - $call:
+            function: suppliedCustomerOrderRoles
+            args: {}
         - $failIf:
             cond:
               $eq:

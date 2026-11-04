@@ -62,7 +62,7 @@ class BootstrapCompositionTest(unittest.TestCase):
             self.assertIn(reference['blueId'], definitions)
         self.assertEqual(set(composition['customFunctions']), {
             'constructDocument', 'prepareCustomerOrder', 'domainPrepare',
-            'domainValidateCandidate', 'domainNextActions'})
+            'domainValidateCandidate', 'domainNextActions', 'suppliedCustomerOrderRoles'})
 
     def test_ordinary_provision_and_planning_are_not_replaced(self):
         clause = yaml.safe_load((PACKAGE / 'types/customer-orders-bootstrap-clause.blue').read_text())
