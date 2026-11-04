@@ -62,9 +62,14 @@ bootstrap/provision, guarantor session, secure-before-approval, gated capture an
 financial cancellation remain separate required Core/Business evidence. Local
 package tests alone do not establish those outcomes or deployment readiness.
 
-Deployment must retain old package roots and source histories. Core must support
-and qualify the new exact profile before Business emits it. No package
-publication, deployment or mutation of existing documents is implied here.
+Core must support and qualify the new exact profile before Business emits it.
+The owner confirmed that the payment flows were never deployed or used; no old
+payment migration or runtime fallback is required. No package publication,
+deployment or mutation of existing documents is implied here.
 
 The ten replaced dependency archives are retained by exact root and SHA-256 in
 `PACKAGE-SOURCES.json`; these are historical data, not alternative active mounts.
+Their retention does not require shipping an old payment execution path. Published
+identities must not be rewritten; removing retained archives from a future delivery
+requires checking actual references, including nonpayment users of shared packages,
+rather than assuming every archive is needed for old payments.
