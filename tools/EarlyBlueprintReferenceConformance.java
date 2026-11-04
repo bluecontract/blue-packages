@@ -38,6 +38,17 @@ public final class EarlyBlueprintReferenceConformance {
         OperationInputConformance.require(actual.equals(expected),"Scalar reference must reconstruct exact identity: "+id);
         if(!id.equals(timer))OperationInputConformance.require(!actual.equals(NativeRuntime.identity(values.source(m("type",m("blueId",timer)),"definition"))),"Changed reference must change canonical identity");
       }
+      var replacement=find(mandate,"validReplacement");
+      var checkSource=m("do",List.of(m("$return",m("$call",m("function","validReplacement","args",m("sectionName","contracts","patch",m("$document","/patch")))))));
+      var check=bex.compile(checkSource,m("functions",m("validReplacement",replacement)),null);
+      String prefix="/cx.payment.prepare.accessReady/steps/0/functions/connectionSnapshots/expr/$literal/";
+      for(String scenario:List.of("canonical","foreign-path","foreign-section","wrong-kind")){
+        var patch=m("kind",scenario.equals("wrong-kind")?"text":"section","section",scenario.equals("foreign-section")?"clauses":"paymentTemplate","path",prefix+(scenario.equals("foreign-path")?"other":"template"),"sourcePath","/unapproved");
+        var context=new BexContext(m("patch",patch),m(),m(),Values.UNDEFINED,m(),m(),"/",null,(a,b)->values.matches(values.source(a),values.source(b,"definition")),(a,g)->NativeRuntime.identity(values.source(a,"definition")));
+        Object allowed=bex.execute(check,context,1000000).value();
+        OperationInputConformance.require(Boolean.TRUE.equals(allowed)==scenario.equals("canonical"),"Access-ready snapshot replacement: "+scenario+"="+allowed);
+      }
+      System.out.println("PASS exact access-ready snapshot replacement and foreign path/section/kind denial");
       System.out.println("PASS inert scalar reference storage and exact native decoder identity; changed ID cannot preserve original identity");
     }
   }
