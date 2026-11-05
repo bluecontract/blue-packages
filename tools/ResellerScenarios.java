@@ -333,6 +333,10 @@ public final class ResellerScenarios {
       for (var entry : object(row.getOrDefault("expect", map())).entrySet()) {
         sameValue(entry.getValue(), processor.read(document, entry.getKey()), label + " " + entry.getKey());
       }
+      for (var entry : object(row.getOrDefault("expectEntryCounts", map())).entrySet()) {
+        sameValue(entry.getValue(), object(processor.read(document, entry.getKey())).size(),
+            label + " entry count " + entry.getKey());
+      }
       for (Object path : array(row.getOrDefault("absent", List.of()))) {
         equal(Values.UNDEFINED, processor.read(document, text(path)), label + " unexpected field " + path);
       }
