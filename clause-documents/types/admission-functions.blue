@@ -1,6 +1,73 @@
 name: Admission Functions
 type: Documents/Factory Functions
 functions:
+  mappedBootstrapPartyCovered:
+    args:
+      item: {}
+      candidate: {}
+      role: {type: Text}
+      party: {}
+    do:
+    - $if:
+        cond: {$ne: [{$pointerGet: {object: {$var: item}, path: /prepareFor}}, bootstrap]}
+        then:
+        - $return: false
+    - $let:
+        name: slots
+        expr:
+          $filter:
+            in: {$pointerGet: {object: {$var: item}, path: /slots, default: []}}
+            item: slot
+            where:
+              $and:
+              - {$eq: [{$pointerGet: {object: {$var: slot}, path: /kind}}, party]}
+              - {$eq: [{$pointerGet: {object: {$var: slot}, path: /role}}, {$var: role}]}
+              - {$eq: [{$pointerGet: {object: {$var: slot}, path: /supplied}}, false]}
+              - {$exists: {$pointerGet: {object: {$var: slot}, path: /bootstrapPrimary}}}
+    - $if:
+        cond: {$ne: [{$size: {$var: slots}}, 1]}
+        then:
+        - $return: false
+    - $let:
+        name: expected
+        expr: {$pointerGet: {object: {$var: slots}, path: /0/bootstrapPrimary}}
+    - $let:
+        name: matches
+        expr: 0
+    - $forEach:
+        item: hostParty
+        key: hostRole
+        in: {$document: /activation/parties}
+        do:
+        - $if:
+            cond: {$eq: [{$nodeBlueId: {$var: expected}}, {$nodeBlueId: {$var: hostParty}}]}
+            then:
+            - $set:
+                name: matches
+                expr: {$add: [{$var: matches}, 1]}
+    - $if:
+        cond: {$ne: [{$var: matches}, 1]}
+        then:
+        - $return: false
+    # The frozen mapped witness must survive native bootstrap in both versions.
+    # This does not install an alias in the host or grant it host authority.
+    - $call:
+        function: requireSameBootstrapParty
+        args:
+          expected: {$var: expected}
+          actual:
+            $get:
+              object:
+                $pointerGet:
+                  object: {$pointerGet: {object: {$var: candidate}, path: /contracts/initialized/document}}
+                  path: /clauses/activation/parameters/parties
+              key: {$var: role}
+    - $call:
+        function: requireSameBootstrapParty
+        args:
+          expected: {$var: expected}
+          actual: {$var: party}
+    - $return: true
   candidateStage:
     args:
       checked: {}
@@ -162,19 +229,28 @@ functions:
             do:
             - $if:
                 cond:
-                  $not:
-                    $call:
-                      function: rosterCovers
-                      args:
-                        required:
-                          $objectSet:
-                            object: {}
-                            key:
-                              $var: role
-                            val:
-                              $var: party
-                        available:
-                          $document: /activation/parties
+                  $and:
+                  - $not:
+                      $call:
+                        function: rosterCovers
+                        args:
+                          required:
+                            $objectSet:
+                              object: {}
+                              key:
+                                $var: role
+                              val:
+                                $var: party
+                          available:
+                            $document: /activation/parties
+                  - $not:
+                      $call:
+                        function: mappedBootstrapPartyCovered
+                        args:
+                          item: {$var: item}
+                          candidate: {$var: candidate}
+                          role: {$var: role}
+                          party: {$var: party}
                 then:
                 - $let:
                     name: hostRole

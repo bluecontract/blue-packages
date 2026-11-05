@@ -156,6 +156,15 @@ prepared requirement, added main identities, reader scope and Activation revisio
 The added party separately consents on its actual main channel. Existing commercial
 `required` and `approved` values are preserved when admission succeeds.
 
+For `prepareFor: bootstrap`, a mapped, explicitly nonsupplied Party slot does not
+create a new host participant when its frozen `bootstrapPrimary` exactly matches
+one current host Party and both the original and current child pass the existing
+bootstrap identity checks (actors, primary readers and representatives). Fresh
+child transports alone do not require admitting that mapped identity again. This
+recognition neither installs a host alias nor grants host authority. Missing,
+ambiguous or changed host witnesses do not qualify; supplied parties still require
+the ordinary admission and consent flow.
+
 `approveAdmission_<clause>_<party>` approves the exact pending proposal. Neither a
 provider response nor an event containing a party name is an approval. Admission
 also rechecks actual access at installation. A queued candidate cannot overwrite

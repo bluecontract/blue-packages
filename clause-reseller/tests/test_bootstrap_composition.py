@@ -49,9 +49,10 @@ class BootstrapCompositionTest(unittest.TestCase):
             self.assertIn(reference['blueId'], definitions, name)
         for name in ['checkProvision', 'sharedProvide', 'validateProviderSlots',
                      'validateBootstrapAccess', 'requireSameBootstrapParty',
-                     'normalizeProvisionSource', 'sharedPrepare', 'prepareMappedChild']:
+                     'normalizeProvisionSource', 'sharedPrepare', 'prepareMappedChild',
+                     'mappedBootstrapPartyCovered']:
             self.assertIn(name, composition['functions'])
-        self.assertEqual(len(composition['functions']), 98)
+        self.assertEqual(len(composition['functions']), 99)
 
     def test_domain_helpers_are_native_references_not_reimplemented_pricing(self):
         composition = json.loads((PACKAGE / 'bootstrap-composition.json').read_text())
