@@ -15,6 +15,13 @@ public final class ResellerBootstrapFunctionPinsConformance {
         var authored = object(WireData.parse(Files.readString(root.resolve("clause-reseller/types/customer-orders-bootstrap-clause.blue")), "yaml"));
         var copied = object(object(object(authored.get("actionDefinition")).get("type")).get("functions"));
         var errors = new ArrayList<String>();
+        // checkProvision and its exact Admission Plan function execute these sibling functions.
+        for (String name : List.of("providedInitialTerms", "providedAdmissionPlan", "providedAdmissionProof",
+                "validateProviderSlotsWithAdmission", "validateBootstrapAccessWithAdmission",
+                "assembleAdmissionPlan", "assembleAdmissionDefinition")) {
+            if (!object(composition.get("functions")).containsKey(name)) errors.add("missing/composition/" + name);
+            if (!copied.containsKey(name)) errors.add("missing/actionDefinition/" + name);
+        }
         try (var blue = Blue.builder().packages(PackageBundle.builder().mount("Documents", documents).build()).build()) {
             var values = new Contracts(blue, RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
             var definition = new Exact.Ref(documents.exportId("Document Preparation Functions"));

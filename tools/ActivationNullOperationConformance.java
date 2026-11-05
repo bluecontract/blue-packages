@@ -66,13 +66,15 @@ public final class ActivationNullOperationConformance {
             if (args.length < 3 || !args[2].equals("retained")) {
                 var authored = AdmissionConsentDispatchConformance.policySource(WireData.parse(
                         Files.readString(root.resolve("clause-activation/types/plan.blue")), "yaml"));
-                body.put("do", object(authored.get("do")).get("$literal"));
+                // Match installed native policy materialization: raw YAML null is not
+                // the same value as the native empty node in a retained program.
+                body.put("do", values.bexData(values.source(object(authored.get("do")).get("$literal"))));
             }
             body.remove("type");
             body.remove("definition");
             body.put("functions", functions);
             for (String scenario : consent ? List.of("consent", "wrongConsentChannel", "unknownNamed")
-                    : List.of("seller", "seller__myosAgent", "missingOperation", "unknownNamed")) {
+                    : List.of("seller", "seller__myosAgent", "missingOperation", "nonTextOperation", "unknownNamed")) {
                 var dispatch = new LinkedHashMap<String, Object>();
                 dispatch.put("kind", "EXTERNAL");
                 dispatch.put("channel", scenario.equals("consent") ? consentOperation.get("channel")
@@ -81,6 +83,7 @@ public final class ActivationNullOperationConformance {
                         ? consentOperation.get("name") : scenario.equals("seller") ? "preparePayment"
                         : scenario.equals("unknownNamed") ? "unregisteredOperation" : null);
                 if (scenario.equals("missingOperation")) dispatch.remove("operation");
+                if (scenario.equals("nonTextOperation")) dispatch.put("operation", 42);
                 // DocumentDispatchV1 installs this raw map. Native source conversion erases
                 // explicit null and would miss the non-target Agent delivery regression.
                 var result = RawDispatchEvaluation.evaluate(processor, host, dispatch, body, 10_000_000);

@@ -607,9 +607,20 @@ functions:
                             name: item
                             path: /slots
         message: PREPARATION_EFFECTIVE_POLICY_CHANGED
+    - $let:
+        name: providedAdmission
+        expr:
+          $call:
+            function: providedAdmissionProof
+            args:
+              original:
+                $var: original
+              candidate:
+                $var: candidate
     - $call:
-        function: validateProviderSlots
+        function: validateProviderSlotsWithAdmission
         args:
+          admission: {$var: providedAdmission}
           original:
             $var: original
           candidate:
@@ -620,8 +631,9 @@ functions:
         cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}, bootstrap]}
         then:
         - $call:
-            function: validateBootstrapAccess
+            function: validateBootstrapAccessWithAdmission
             args:
+              admission: {$var: providedAdmission}
               candidate: {$var: candidate}
     - $let:
         name: domainValid
@@ -1858,6 +1870,163 @@ functions:
               default: []
         message: PREPARATION_APPROVAL_POLICY_CHANGED
     - $return: true
+  validateProviderSlotsWithAdmission:
+    args:
+      admission: {}
+      original: {}
+      candidate: {}
+      item: {}
+    do:
+    - $let:
+        name: roles
+        expr: 0
+    - $forEach:
+        item: slot
+        in:
+          $var:
+            name: item
+            path: /slots
+        do:
+        - $let:
+            name: originalValue
+            expr:
+              $pointerGet:
+                object:
+                  $var: original
+                path:
+                  $var:
+                    name: slot
+                    path: /path
+        - $call:
+            function: slotWitness
+            args:
+              candidate:
+                datum:
+                  $var: originalValue
+              slot:
+                $var: slot
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: slot
+                  path: /kind
+              - party
+            then:
+            - $set:
+                name: roles
+                expr:
+                  $add:
+                  - $var: roles
+                  - 1
+            - $let:
+                name: currentParty
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path:
+                      $concat:
+                      - /activation/parties/
+                      - $var:
+                          name: slot
+                          path: /role
+            - $call:
+                function: slotWitness
+                args:
+                  candidate:
+                    datum:
+                      $var: currentParty
+                  slot:
+                    $var: slot
+            - $call:
+                function: requireSameMainParty
+                args:
+                  left:
+                    $var: originalValue
+                  right:
+                    $var: currentParty
+            - $if:
+                cond:
+                  $not:
+                    $var:
+                      name: slot
+                      path: /supplied
+                then:
+                - $if:
+                    cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}, bootstrap]}
+                    then:
+                    - $forEach:
+                        item: providedParty
+                        in: [{$var: originalValue}, {$var: currentParty}]
+                        do:
+                        - $call:
+                            function: requireSameBootstrapParty
+                            args:
+                              expected: {$pointerGet: {object: {$var: slot}, path: /bootstrapPrimary}}
+                              actual: {$var: providedParty}
+                    else:
+                    - $call:
+                        function: requireSameMainParty
+                        args:
+                          left:
+                            $var:
+                              name: slot
+                              path: /primary
+                          right:
+                            $var: originalValue
+            else:
+            - $let:
+                name: currentValue
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path:
+                      $var:
+                        name: slot
+                        path: /path
+            - $call:
+                function: slotWitness
+                args:
+                  candidate:
+                    datum:
+                      $var: currentValue
+                  slot:
+                    $var: slot
+            - $failIf:
+                cond:
+                  $ne:
+                  - $nodeBlueId:
+                      $var: currentValue
+                  - $nodeBlueId:
+                      $var: originalValue
+                message: PREPARATION_PROVIDER_DATA_CHANGED
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /activation/parties
+          - $add: [{$var: roles}, {$size: {$pointerGet: {object: {$var: admission}, path: /parties, default: {}}}}]
+        message: PREPARATION_UNDECLARED_PARTY
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/required
+              default: []
+          - $pointerGet:
+              object:
+                $var: item
+              path: /prepared/clauses/activation/parameters/required
+              default: []
+        message: PREPARATION_APPROVAL_POLICY_CHANGED
+    - $return: true
   configuredConstraint:
     args:
       slot: {}
@@ -2074,3 +2243,1139 @@ functions:
           args:
             input:
               $var: input
+
+  providedInitialTerms:
+    args:
+      original: {}
+    do:
+    - $let:
+        name: definition
+        expr:
+          $var: original
+    - $let:
+        name: paths
+        expr:
+          $pointerGet:
+            object:
+              $pointerGet:
+                object:
+                  $var: original
+                path: /clauses/activation/parameters
+            path: /negotiation/allowedPaths
+            default: []
+    - $forEach:
+        item: path
+        in:
+          $pointerGet:
+            object:
+              $pointerGet:
+                object:
+                  $var: original
+                path: /clauses/activation/parameters
+            path: /accessPaths
+            default: []
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: definition
+                  path:
+                    $var: path
+            then:
+            - $set:
+                name: definition
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: definition
+                    path:
+                      $var: path
+                    op: remove
+    - $forEach:
+        item: field
+        in:
+        - accessPaths
+        - readers
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: definition
+                  path:
+                    $concat:
+                    - /clauses/activation/parameters/
+                    - $var: field
+            then:
+            - $set:
+                name: definition
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: definition
+                    path:
+                      $concat:
+                      - /clauses/activation/parameters/
+                      - $var: field
+                    op: remove
+    - $forEach:
+        item: party
+        in:
+          $pointerGet:
+            object:
+              $var: definition
+            path: /clauses/activation/parameters/parties
+            default: {}
+        do:
+        - $if:
+            cond:
+              $exists:
+                $pointerGet:
+                  object:
+                    $var: party
+                  path: /readerKeys
+            then:
+            - $set:
+                name: definition
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: definition
+                    path:
+                      $concat:
+                      - /clauses/activation/parameters/parties/
+                      - $var: role
+                      - /readerKeys
+                    op: remove
+        key: role
+    - $let:
+        name: fields
+        expr: {}
+    - $forEach:
+        item: path
+        in:
+          $var: paths
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: original
+                    path:
+                      $var: path
+            message: NEGOTIATION_FIELD_MISSING
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $pointerGet:
+                      object:
+                        $var: original
+                      path:
+                        $var: path
+                  kind:
+                  - text
+                  - integer
+                  - double
+                  - boolean
+            message: NEGOTIATION_REQUIRES_SCALAR_FIELD
+        - $set:
+            name: fields
+            expr:
+              $objectSet:
+                object:
+                  $var: fields
+                key:
+                  $var: path
+                val:
+                  $pointerGet:
+                    object:
+                      $var: original
+                    path:
+                      $var: path
+        - $set:
+            name: definition
+            expr:
+              $pointerSet:
+                object:
+                  $var: definition
+                path:
+                  $var: path
+                op: remove
+    - $let:
+        name: terms
+        expr:
+          definition:
+            $nodeBlueId:
+              $var: definition
+          fields:
+            $var: fields
+    - $return:
+        $merge:
+        - $var: terms
+        - ref:
+            $nodeBlueId:
+              $var: terms
+  providedAdmissionPlan:
+    args:
+      original: {}
+      clauseKey:
+        type: Text
+      definition: {}
+    do:
+    - $return:
+        $call:
+          function: assembleAdmissionPlan
+          args:
+            base:
+              contracts: {}
+              states:
+                process:
+                  initial: {}
+            definition:
+              $objectFromEntries:
+              - key: blueId
+                val:
+                  $nodeBlueId:
+                    $var: definition
+            clauses:
+              $pointerGet:
+                object:
+                  $var: original
+                path: /clauses
+            clauseKey:
+              $var: clauseKey
+  providedAdmissionProof:
+    args:
+      original: {}
+      candidate: {}
+    do:
+    - $let:
+        name: originalParties
+        expr:
+          $pointerGet:
+            object:
+              $var: original
+            path: /clauses/activation/parameters/parties
+    - $let:
+        name: parties
+        expr:
+          $pointerGet:
+            object:
+              $var: candidate
+            path: /activation/parties
+    - $if:
+        cond:
+          $eq:
+          - $size:
+              $var: originalParties
+          - $size:
+              $var: parties
+        then:
+        - $return:
+            parties: {}
+            paths: []
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /clauseRuntime/initialDocument
+          - $nodeBlueId:
+              $var: original
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/revision
+          - 2
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /clauseRuntime/revision
+          - 1
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $let:
+        name: initialTerms
+        expr:
+          $call:
+            function: providedInitialTerms
+            args:
+              original:
+                $var: original
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: original
+                path: /clauses/activation/parameters/negotiation/allowedPaths
+                default: []
+          - 0
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /activation/negotiation/history
+                default: {}
+          - 0
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $size:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path: /activation/negotiation/proposal
+                default: {}
+          - 0
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $let:
+        name: required
+        expr:
+          $pointerGet:
+            object:
+              $var: original
+            path: /clauses/activation/parameters/required
+            default: []
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/required
+              default: []
+          - $var: required
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $let:
+        name: nextTerms
+        expr:
+          definition:
+            $nodeBlueId:
+              previous:
+                $pointerGet:
+                  object:
+                    $var: initialTerms
+                  path: /definition
+              parties:
+                $var: parties
+              required:
+                $var: required
+          fields:
+            $pointerGet:
+              object:
+                $var: initialTerms
+              path: /fields
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/terms/ref
+          - $nodeBlueId:
+              $var: nextTerms
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/terms/definition
+          - $pointerGet:
+              object:
+                $var: nextTerms
+              path: /definition
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $pointerGet:
+              object:
+                $var: candidate
+              path: /activation/terms/fields
+          - $pointerGet:
+              object:
+                $var: nextTerms
+              path: /fields
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $let:
+        name: proof
+        expr:
+          parties: {}
+          paths: []
+    - $let:
+        name: found
+        expr: false
+    - $forEach:
+        item: clause
+        key: clauseKey
+        in:
+          $pointerGet:
+            object:
+              $var: original
+            path: /clauses
+        do:
+        - $let:
+            name: state
+            expr:
+              $pointerGet:
+                object:
+                  $var: candidate
+                path:
+                  $concat:
+                  - /process_
+                  - $var: clauseKey
+                default: {}
+        - $forEach:
+            item: entry
+            key: entryKey
+            in:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /entries
+                default: {}
+            do:
+            - $if:
+                cond:
+                  $exists:
+                    $pointerGet:
+                      object:
+                        $var: entry
+                      path: /admittedTerms
+                then:
+                - $failIf:
+                    cond:
+                      $var: found
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $nodeBlueId:
+                          $pointerGet:
+                            object:
+                              $var: clause
+                            path: /hookDefinition/type
+                      - $nodeBlueId:
+                          $get:
+                            object:
+                              $literal:
+                                type: Documents/Preparation Plan
+                            key: type
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $nodeBlueId:
+                          $pointerGet:
+                            object:
+                              $var: candidate
+                            path:
+                              $concat:
+                              - /clauses/
+                              - $var: clauseKey
+                      - $nodeBlueId:
+                          $var: clause
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $let:
+                    name: token
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: entry
+                        path: /admissionToken
+                - $let:
+                    name: ref
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: entry
+                        path: /admissionRef
+                - $let:
+                    name: witness
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: entry
+                        path: /admittedTerms
+                - $let:
+                    name: itemPath
+                    expr:
+                      $concat:
+                      - /process_
+                      - $var: clauseKey
+                      - /entries/
+                      - $var: entryKey
+                - $failIf:
+                    cond:
+                      $not:
+                        $includes:
+                          list:
+                          - linking
+                          - selected
+                          - usable
+                          val:
+                            $pointerGet:
+                              object:
+                                $var: entry
+                              path: /status
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: entry
+                          path: /itemPath
+                      - $var: itemPath
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $var: ref
+                      - $nodeBlueId:
+                          $var: token
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: token
+                          path: /itemPath
+                      - $var: itemPath
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: token
+                          path: /activationRevision
+                      - 1
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: token
+                          path: /accessScope/processOrigin
+                      - $nodeBlueId:
+                          $var: original
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $nodeBlueId:
+                          $pointerGet:
+                            object:
+                              $var: token
+                            path: /accessScope/parties
+                      - $nodeBlueId:
+                          $var: parties
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $nodeBlueId:
+                          $pointerGet:
+                            object:
+                              $var: token
+                            path: /accessScope/readers
+                      - $nodeBlueId:
+                          $pointerGet:
+                            object:
+                              $var: candidate
+                            path: /activation/readers
+                            default: {}
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $get:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: state
+                              path: /admission/grants
+                          key:
+                            $var: ref
+                      - $var: token
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $get:
+                          object:
+                            $pointerGet:
+                              object:
+                                $var: state
+                              path: /admission/ledger/history
+                          key:
+                            $var: ref
+                      - true
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: entry
+                          path: /admittedRevision
+                      - 2
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: witness
+                          path: /previousRef
+                      - $pointerGet:
+                          object:
+                            $var: initialTerms
+                          path: /ref
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: witness
+                          path: /previousRevision
+                      - 1
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: witness
+                          path: /ref
+                      - $nodeBlueId:
+                          $var: nextTerms
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: witness
+                          path: /revision
+                      - 2
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: witness
+                          path: /admissionRef
+                      - $var: ref
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: witness
+                          path: /candidateOrigin
+                      - $pointerGet:
+                          object:
+                            $var: entry
+                          path: /candidateOrigin
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: witness
+                          path: /requirementRef
+                      - $pointerGet:
+                          object:
+                            $var: entry
+                          path: /requirementRef
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: token
+                          path: /candidateOrigin
+                      - $pointerGet:
+                          object:
+                            $var: entry
+                          path: /candidateOrigin
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $pointerGet:
+                          object:
+                            $var: token
+                          path: /requirementRef
+                      - $pointerGet:
+                          object:
+                            $var: entry
+                          path: /requirementRef
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $let:
+                    name: extras
+                    expr:
+                      $objectFromEntries:
+                        $filter:
+                          in:
+                            $entries:
+                              $var: parties
+                          item: partyEntry
+                          where:
+                            $not:
+                              $hasKey:
+                                object:
+                                  $var: originalParties
+                                key:
+                                  $pointerGet:
+                                    object:
+                                      $var: partyEntry
+                                    path: /key
+                - $failIf:
+                    cond:
+                      $ne:
+                      - $nodeBlueId:
+                          $var: extras
+                      - $nodeBlueId:
+                          $pointerGet:
+                            object:
+                              $var: token
+                            path: /parties
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $failIf:
+                    cond:
+                      $eq:
+                      - $size:
+                          $var: extras
+                      - 0
+                    message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $forEach:
+                    item: party
+                    key: role
+                    in:
+                      $var: extras
+                    do:
+                    - $failIf:
+                        cond:
+                          $ne:
+                          - $get:
+                              object:
+                                $pointerGet:
+                                  object:
+                                    $var: entry
+                                  path: /consents
+                              key:
+                                $var: role
+                          - approve
+                        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                    - $let:
+                        name: suffix
+                        expr:
+                          $concat:
+                          - $var: clauseKey
+                          - _
+                          - $nodeBlueId:
+                            - $var:
+                                name: entry
+                                path: /admissionRef
+                            - $var: role
+                    - $let:
+                        name: channel
+                        expr:
+                          $concat:
+                          - admissionConsent_
+                          - $var: suffix
+                    - $let:
+                        name: operation
+                        expr:
+                          $concat:
+                          - consentAdmission_
+                          - $var: suffix
+                    - $let:
+                        name: channelDeclaration
+                        expr:
+                          $pointerGet:
+                            object:
+                              $var: party
+                            path: /lead/channel
+                    - $let:
+                        name: handler
+                        expr:
+                          $merge:
+                          - type: Contracts/Sequential Workflow Operation
+                          - channel:
+                              $var: channel
+                            steps:
+                            - $merge:
+                              - type: Contracts/Compute
+                              - definition:
+                                  $objectFromEntries:
+                                  - key: blueId
+                                    val:
+                                      $nodeBlueId:
+                                        type: Documents/Admission Consent Functions
+                                constants:
+                                  itemPath:
+                                    $var:
+                                      name: entry
+                                      path: /itemPath
+                                  admissionRef:
+                                    $var:
+                                      name: entry
+                                      path: /admissionRef
+                                  party:
+                                    $var: role
+                                do:
+                                  $literal:
+                                  - $return:
+                                      $call:
+                                        function: recordConsent
+                                        args:
+                                          input:
+                                            $binding: call/request
+                          - $literal:
+                              $blue:requestFrom:
+                                definition:
+                                  type: Documents/Admission Consent Functions
+                                function: recordConsent
+                                argument: input
+                    - $let:
+                        name: registration
+                        expr:
+                          operationId:
+                            $nodeBlueId:
+                              $var: handler
+                          channel:
+                            $var: channel
+                          channelId:
+                            $nodeBlueId:
+                              $var: channelDeclaration
+                          itemPath:
+                            $var:
+                              name: entry
+                              path: /itemPath
+                          admissionRef:
+                            $var:
+                              name: entry
+                              path: /admissionRef
+                          party:
+                            $var: role
+                          activationRevision:
+                            $var:
+                              name: entry
+                              path: /admissionToken/activationRevision
+                    - $failIf:
+                        cond:
+                          $ne:
+                          - $nodeBlueId:
+                              $pointerGet:
+                                object:
+                                  $var: candidate
+                                path:
+                                  $concat:
+                                  - /contracts/
+                                  - $var: channel
+                          - $nodeBlueId:
+                              $var: channelDeclaration
+                        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                    - $failIf:
+                        cond:
+                          $ne:
+                          - $nodeBlueId:
+                              $pointerGet:
+                                object:
+                                  $var: candidate
+                                path:
+                                  $concat:
+                                  - /contracts/
+                                  - $var: operation
+                          - $nodeBlueId:
+                              $var: handler
+                        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                    - $failIf:
+                        cond:
+                          $ne:
+                          - $nodeBlueId:
+                              $pointerGet:
+                                object:
+                                  $var: candidate
+                                path:
+                                  $concat:
+                                  - /activation/admissionConsentOperations/
+                                  - $var: operation
+                          - $nodeBlueId:
+                              $var: registration
+                        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $let:
+                    name: definition
+                    expr:
+                      $pointerGet:
+                        object:
+                          $var: clause
+                        path: /actionDefinition/type
+                - $let:
+                    name: expected
+                    expr:
+                      $call:
+                        function: providedAdmissionPlan
+                        args:
+                          original:
+                            $var: original
+                          clauseKey:
+                            $var: clauseKey
+                          definition:
+                            $var: definition
+                - $forEach:
+                    item: declaration
+                    key: contractKey
+                    in:
+                      $pointerGet:
+                        object:
+                          $var: expected
+                        path: /contracts
+                    do:
+                    - $failIf:
+                        cond:
+                          $ne:
+                          - $nodeBlueId:
+                              $pointerGet:
+                                object:
+                                  $var: candidate
+                                path:
+                                  $concat:
+                                  - /contracts/
+                                  - $var: contractKey
+                          - $nodeBlueId:
+                              $pointerGet:
+                                object:
+                                  $var: declaration
+                                path: /contract
+                        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                - $call:
+                    function: requirePartyAccessDocuments
+                    args:
+                      parties:
+                        $var: extras
+                      documents:
+                        $pointerGet:
+                          object:
+                            $var: token
+                          path: /accessDocuments
+                - $let:
+                    name: paths
+                    expr: []
+                - $forEach:
+                    item: access
+                    key: transport
+                    in:
+                      $pointerGet:
+                        object:
+                          $var: token
+                        path: /accessDocuments
+                    do:
+                    - $let:
+                        name: origin
+                        expr:
+                          $nodeBlueId:
+                            $pointerGet:
+                              object:
+                                $var: access
+                              path: /contracts/initialized/document
+                    - $let:
+                        name: path
+                        expr:
+                          $concat:
+                          - /partyAccess/
+                          - $var: origin
+                    - $failIf:
+                        cond:
+                          $includes:
+                            list:
+                              $var: paths
+                            val:
+                              $var: path
+                        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                    - $let:
+                        name: currentAccess
+                        expr:
+                          $pointerGet:
+                            object:
+                              $var: candidate
+                            path:
+                              $var: path
+                    - $failIf:
+                        cond:
+                          $ne:
+                          - $nodeBlueId:
+                              $pointerGet:
+                                object:
+                                  $var: currentAccess
+                                path: /contracts/initialized/document
+                          - $var: origin
+                        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+                    - $call:
+                        function: validateAccessDocument
+                        args:
+                          access:
+                            $var: currentAccess
+                    - $set:
+                        name: paths
+                        expr:
+                          $listConcat:
+                          - $var: paths
+                          - - $var: path
+                - $set:
+                    name: proof
+                    expr:
+                      parties:
+                        $var: extras
+                      paths:
+                        $var: paths
+                - $set:
+                    name: found
+                    expr: true
+    - $failIf:
+        cond:
+          $not:
+            $var: found
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $return:
+        $var: proof
+  assembleAdmissionPlan:
+    $blue:functionFrom:
+      type: Documents/Admission Plan Function
+  assembleAdmissionDefinition:
+    args:
+      definition: {}
+      names: []
+      definitionPath:
+        type: Text
+      canonicalPath:
+        type: Text
+      clauses: {}
+      clauseKey:
+        type: Text
+    do:
+    - $let:
+        name: definitionView
+        expr:
+          $pointerGet:
+            object:
+              $pointerGet:
+                object:
+                  $var: clauses
+                path:
+                  $concat:
+                  - /
+                  - $var: clauseKey
+            path: /actionDefinition
+    - $let:
+        name: canonical
+        expr:
+          $pointerGet:
+            object:
+              $pointerGet:
+                object:
+                  $var: clauses
+                path:
+                  $concat:
+                  - /
+                  - $var: clauseKey
+            path: /hookDefinition/constants/admissionCanonicalDefinition
+    # Frozen hook configuration cannot redefine the trusted admission library.
+    - $failIf:
+        cond:
+          $ne:
+          - $nodeBlueId:
+              $var: canonical
+          - $nodeBlueId:
+              $literal:
+                type: Documents/Admission Functions
+        message: PREPARATION_ADMISSION_PROOF_REQUIRED
+    - $let:
+        name: selected
+        expr: {}
+    - $forEach:
+        item: functionName
+        in:
+          $var: names
+        do:
+        - $let:
+            name: body
+            expr:
+              $pointerGet:
+                object:
+                  $var: canonical
+                path:
+                  $concat:
+                  - /functions/
+                  - $var: functionName
+        - $failIf:
+            cond:
+              $ne:
+              - $nodeBlueId:
+                  $pointerGet:
+                    object:
+                      $var: definitionView
+                    path:
+                      $concat:
+                      - /functions/
+                      - $var: functionName
+              - $nodeBlueId:
+                  $var: body
+            message: PREPARATION_ADMISSION_PROOF_REQUIRED
+        - $set:
+            name: selected
+            expr:
+              $objectSet:
+                object:
+                  $var: selected
+                key:
+                  $var: functionName
+                val:
+                  $var: body
+    - $return:
+        $merge:
+        - type: Contracts/Compute Definition
+        - constants:
+            $pointerGet:
+              object:
+                $var: definitionView
+              path: /constants
+              default: {}
+          functions:
+            $var: selected

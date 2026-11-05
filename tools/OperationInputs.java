@@ -6,6 +6,7 @@ public final class OperationInputs {
   private OperationInputs() {}
   // Reserved package-authoring namespace; ordinary requestFrom is always user data.
   private static final String LINK = "$blue:requestFrom";
+  private static final String FUNCTION_LINK = "$blue:functionFrom";
 
   static Map<String,Object> publish(String namespace,Map<String,Object> definitions,Map<String,BluePackage> imports) {
     if(!containsLink(definitions))return definitions;
@@ -65,7 +66,7 @@ public final class OperationInputs {
   }
 
   private static boolean containsLink(Object value) {
-    if(value instanceof Map<?,?> map)return map.containsKey(LINK)||map.values().stream().anyMatch(OperationInputs::containsLink);
+    if(value instanceof Map<?,?> map)return (map.containsKey(LINK)||map.containsKey(FUNCTION_LINK))||map.values().stream().anyMatch(OperationInputs::containsLink);
     return value instanceof List<?> list&&list.stream().anyMatch(OperationInputs::containsLink);
   }
 
@@ -74,6 +75,11 @@ public final class OperationInputs {
       var result=new ArrayList<Object>();for(int i=0;i<list.size();i++)result.add(transform(list.get(i),blue,path+"/"+i));return result;
     }
     if(!(value instanceof Map<?,?> map))return value;
+    if(map.containsKey(FUNCTION_LINK)) {
+      if(!map.keySet().equals(Set.of(FUNCTION_LINK)))
+        throw new IllegalArgumentException("Function reference must be a singleton at "+path);
+      return functionReference(map.get(FUNCTION_LINK),blue,path);
+    }
     var result=new LinkedHashMap<String,Object>();
     map.forEach((k,v)->{if(!k.equals(LINK))result.put(k.toString(),transform(v,blue,path+"/"+k));});
     if(map.containsKey(LINK)) {
@@ -82,6 +88,27 @@ public final class OperationInputs {
       if(!result.containsKey("request"))result.put("request",request);
     }
     return result;
+  }
+
+  /** Authoring-time exact reference, not a runtime function loader or a typed instance. */
+  private static Object functionReference(Object raw,Blue blue,String path) {
+    try {
+      if(!(raw instanceof Map<?,?> link)||!link.keySet().equals(Set.of("type"))
+          ||!(link.get("type") instanceof String alias)||alias.isBlank())
+        throw new IllegalArgumentException("Expected exactly one named function type");
+      var wrapper=blue.admitDefinition(WireData.write(link));
+      var runtime=new NativeRuntime(blue);
+      var selected=NativeRuntime.recipe(NativeRuntime.exactOf(wrapper));
+      String typeId=NativeRuntime.head(selected,runtime).type;
+      if(typeId==null)throw new IllegalArgumentException("Function type is missing");
+      selected=NativeRuntime.recipe(new Exact.Ref(typeId));
+      var head=NativeRuntime.head(selected,runtime);
+      if(!head.fields.containsKey("args")||(!head.fields.containsKey("do")&&!head.fields.containsKey("expr")))
+        throw new IllegalArgumentException("Referenced definition is not a function");
+      return Map.of("blueId",NativeRuntime.identity(NativeRuntime.exact(selected,runtime)));
+    } catch(RuntimeException failure) {
+      throw new IllegalArgumentException("Invalid function reference at "+path+": "+failure.getMessage(),failure);
+    }
   }
 
   private static Object resolve(Object raw,Blue blue,String path) {
