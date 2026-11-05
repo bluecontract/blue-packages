@@ -184,12 +184,36 @@ def pointer(value):
 
 def evidence(blue_id, definitions):
     root = compact(definitions[blue_id])
+    supplied = {}
+    if len(wire(root)) > 200_000 and isinstance(root.get('functions'), dict):
+        # Presentation only: replace inline bodies by existing exact archive records.
+        # Byte equality precedes compaction, so scalar types cannot alias each other.
+        exact = {}
+        for identity, body in sorted(definitions.items()):
+            if identity != blue_id:
+                exact.setdefault(wire(body), identity)
+        candidates = []
+        for name, body in definitions[blue_id]['functions'].items():
+            identity = exact.get(wire(body))
+            if identity is not None:
+                saving = len(wire(root['functions'][name])) - len(wire({'blueId': identity}))
+                if saving > 0:
+                    candidates.append((-saving, name, identity))
+        for _, name, identity in sorted(candidates):
+            if len(wire(root)) <= 200_000:
+                break
+            supplied[identity] = compact(definitions[identity])
+            root['functions'][name] = {'blueId': identity}
+        # Factored bodies were part of the root: never omit them to fit optional refs.
+        require(len(supplied) <= 128 and sum(len(wire(v)) for v in supplied.values()) <= 240_000,
+                'Required function exceeds semantic dependency budget: ' + blue_id)
     require(len(wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
-    supplied, omitted, visited = {}, set(), {blue_id}
+    omitted, visited = set(), {blue_id, *supplied}
     # Include inheritance first, so optional event/helper references cannot crowd it out.
     queue = [(identity, 0) for identity, _ in list(type_chain(blue_id, definitions))[1:]]
     queue += [(ref, 1) for ref in sorted(references(root))]
-    size = 0
+    queue += [(ref, 1) for body in supplied.values() for ref in sorted(references(body))]
+    size = sum(len(wire(value)) for value in supplied.values())
     while queue:
         ref, depth = queue.pop(0)
         if ref in visited or ref in PRIMITIVES:

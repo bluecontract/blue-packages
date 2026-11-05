@@ -95,6 +95,39 @@ class InfrastructureTests(unittest.TestCase):
 
 
 class SourceTests(unittest.TestCase):
+    def test_large_inline_function_is_required_before_optional_dependencies(self):
+        function = {'body': 'x' * 120_000}
+        original = {'type': {'blueId': B}, 'functions': {'large': function}, 'description': 'y' * 90_000}
+        definitions = {A: original, B: {'description': 'z' * 180_000}, C: deepcopy(function)}
+        before = deepcopy(definitions)
+        context = sources.evidence(A, definitions)
+        self.assertEqual({'blueId': C}, context['definition']['functions']['large'])
+        self.assertEqual([{'blueId': C, 'definition': function}], context['dependencyDefinitions'])
+        self.assertIn(B, context['omittedDependencies'])
+        self.assertNotIn(C, context['omittedDependencies'])
+        self.assertEqual(before, definitions)
+        self.assertEqual(digest(wire(original)), sources.definition_digest(A, definitions))
+
+    def test_required_function_exceeding_dependency_budget_fails_closed(self):
+        function = {'body': 'x' * 240_001}
+        with self.assertRaisesRegex(ValueError, 'Required function exceeds semantic dependency budget'):
+            sources.evidence(A, {A: {'functions': {'large': function}}, C: function})
+
+    def test_small_inline_function_context_stays_inline(self):
+        function = {'body': 'small'}
+        original = {'functions': {'small': function}}
+        context = sources.evidence(A, {A: original, C: function})
+        self.assertEqual(original, context['definition'])
+        self.assertEqual([], context['dependencyDefinitions'])
+        self.assertEqual([], context['referencedBlueIds'])
+        self.assertEqual([], context['omittedDependencies'])
+
+    def test_large_unmatched_function_still_fails_root_budget(self):
+        function = {'body': 'x' * 200_001, 'value': True}
+        with self.assertRaisesRegex(ValueError, 'Root definition exceeds semantic context budget'):
+            sources.evidence(A, {A: {'functions': {'large': function}},
+                                 C: dict(function, value=1)})
+
     def test_inventory_includes_exact_core_access_events_and_current_collection(self):
         subjects, definitions = sources.inventory(ROOT)
         expected = {
@@ -242,6 +275,19 @@ class SourceTests(unittest.TestCase):
         for blue_id in subjects:
             context = sources.evidence(blue_id, definitions)
             self.assertEqual(blue_id, context['blueId'])
+            original = sources.compact(definitions[blue_id])
+            restored = deepcopy(context['definition'])
+            dependencies = {item['blueId']: item['definition']
+                            for item in context['dependencyDefinitions']}
+            for name, body in original.get('functions', {}).items():
+                selected = restored['functions'][name]
+                if selected != body:
+                    self.assertEqual({'blueId'}, set(selected))
+                    self.assertNotIn(selected['blueId'], context['omittedDependencies'])
+                    restored['functions'][name] = dependencies[selected['blueId']]
+            self.assertEqual(original, restored)
+            self.assertLessEqual(len(wire(context['definition'])), 200_000)
+            self.assertLessEqual(sum(len(wire(v)) for v in dependencies.values()), 240_000)
 
 
 class CardTests(unittest.TestCase):
