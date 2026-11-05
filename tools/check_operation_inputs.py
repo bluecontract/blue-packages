@@ -37,6 +37,7 @@ CASES = {
     'document-provision': ('ProvisionInputConformance',),
     'bootstrap-preparation': ('BootstrapPreparationConformance',),
     'admission-definition': ('AdmissionDefinitionConformance',),
+    'static-identity-predicate': ('StaticIdentityPredicateConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
@@ -81,6 +82,8 @@ def main():
         sources.add(CASES[key][0].split('.')[-1])
     if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance'} & sources:
         sources.add('BootstrapPreparationConformance')
+    if 'StaticIdentityPredicateConformance' in sources:
+        sources.add('AdmissionConsentDispatchConformance')
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
     if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
