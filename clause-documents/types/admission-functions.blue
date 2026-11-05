@@ -548,6 +548,24 @@ functions:
                     default: []
         then:
         - $return: false
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: item, path: /status}}, admission_pending]}
+            - {$eq: [{$var: {name: item, path: /admissionToken/activationRevision}}, {$document: /activation/revision}]}
+            - {$eq: [{$var: {name: item, path: /admissionRef}}, {$nodeBlueId: {$var: {name: item, path: /admissionToken}}}]}
+            - {$eq: [{$document: {$concat: [/process_, {$const: clauseKey}, /admission/ledger/history/, {$var: {name: item, path: /admissionRef}}]}}, true]}
+            - {$eq: [{$document: {$concat: [/process_, {$const: clauseKey}, /admission/grants/, {$var: {name: item, path: /admissionRef}}]}}, {$var: {name: item, path: /admissionToken}}]}
+        then:
+        - $return: false
+    - $if:
+        cond: {$not: {$exists: {$document: /activation/admissionConsentOperations}}}
+        then:
+        - $appendChange:
+            op: add
+            path: /activation/admissionConsentOperations
+            val: {}
     - $forEach:
         item: party
         in:
@@ -682,6 +700,30 @@ functions:
                   - $var: operation
                 val:
                   $var: handler
+        - $let:
+            name: registration
+            expr:
+              operationId: {$nodeBlueId: {$var: handler}}
+              channel: {$var: channel}
+              channelId: {$nodeBlueId: {$var: channelDeclaration}}
+              itemPath: {$var: {name: item, path: /itemPath}}
+              admissionRef: {$var: {name: item, path: /admissionRef}}
+              party: {$var: role}
+              activationRevision: {$var: {name: item, path: /admissionToken/activationRevision}}
+        - $let:
+            name: registrationPath
+            expr: {$concat: [/activation/admissionConsentOperations/, {$var: operation}]}
+        - $if:
+            cond: {$exists: {$document: {$var: registrationPath}}}
+            then:
+            - $failIf:
+                cond: {$ne: [{$nodeBlueId: {$document: {$var: registrationPath}}}, {$nodeBlueId: {$var: registration}}]}
+                message: ADMISSION_CONSENT_REGISTRATION_CONFLICT
+            else:
+            - $appendChange:
+                op: add
+                path: {$var: registrationPath}
+                val: {$var: registration}
         key: role
     - $return: true
   nextAdmissionRequest:

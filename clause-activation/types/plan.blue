@@ -833,6 +833,45 @@ functions:
                       allowed: false
                       reason: DOCUMENT_CLOSED
               - $if:
+                  cond: {$eq: [{$binding: dispatch/kind}, EXTERNAL]}
+                  then:
+                  - $let:
+                      name: consentRegistration
+                      expr:
+                        $get:
+                          object: {$pointerGet: {object: {$var: s}, path: /admissionConsentOperations, default: {}}}
+                          key: {$binding: dispatch/operation}
+                  - $if:
+                      cond: {$exists: {$var: consentRegistration}}
+                      then:
+                      - $let:
+                          name: consentItem
+                          expr: {$document: {$pointerGet: {object: {$var: consentRegistration}, path: /itemPath}}}
+                      - $let:
+                          name: consentParty
+                          expr:
+                            $get:
+                              object: {$pointerGet: {object: {$var: consentItem}, path: /admissionToken/parties, default: {}}}
+                              key: {$pointerGet: {object: {$var: consentRegistration}, path: /party}}
+                      - $if:
+                          cond:
+                            $and:
+                            - {$exists: {$var: consentItem}}
+                            - {$exists: {$var: consentParty}}
+                            - {$eq: [{$pointerGet: {object: {$var: consentItem}, path: /status}}, admission_pending]}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /admissionRef}}, {$pointerGet: {object: {$var: consentItem}, path: /admissionRef}}]}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /admissionRef}}, {$nodeBlueId: {$pointerGet: {object: {$var: consentItem}, path: /admissionToken}}}]}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /activationRevision}}, {$pointerGet: {object: {$var: s}, path: /revision}}]}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /activationRevision}}, {$pointerGet: {object: {$var: consentItem}, path: /admissionToken/activationRevision}}]}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /channel}}, {$binding: dispatch/channel}]}
+                            - {$exists: {$document: {$concat: [/contracts/, {$binding: dispatch/operation}]}}}
+                            - {$exists: {$document: {$concat: [/contracts/, {$binding: dispatch/channel}]}}}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /operationId}}, {$nodeBlueId: {$document: {$concat: [/contracts/, {$binding: dispatch/operation}]}}}]}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /channelId}}, {$nodeBlueId: {$document: {$concat: [/contracts/, {$binding: dispatch/channel}]}}}]}
+                            - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /channelId}}, {$nodeBlueId: {$pointerGet: {object: {$var: consentParty}, path: /lead/channel}}}]}
+                          then:
+                          - $return: {allowed: true}
+              - $if:
                   cond:
                     $or:
                     - $and:
