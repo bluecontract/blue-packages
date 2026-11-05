@@ -28,6 +28,13 @@ Catalog prices originate in the user handoff. Dates and descriptive text do not 
 
 ## Integration edition
 
+The preview.3 candidate removes the agreement-wide limit of 20 distinct Order
+preparations. Each new key can prepare another catalog-priced Order; an identical
+retry retains its existing preparation. Catalog, quantity, pricing and request
+validation still apply, including the separate limit on lines in one order.
+`examples/reseller/tests/preparation-count.case.json` exercises 21 preparations,
+retained entries, a retry after the former boundary and cold restoration.
+
 Customer Orders uses native Documents preparation/provision and independent bootstrap. In preview.2, `prepareOrder` takes `catalogRevision` and `lines` instead of a stored `quoteKey`. Shared Catalog Functions validate and price the selected items; the prepared Order retains the frozen calculation, currency and optional fulfilment terms. The `catalog` pointer replaces the `quotes` binding. New preparations require the current revision; identical retries retain the original prepared document even after a catalog change. The standalone Catalog Clause still supports explicit quotation workflows when configured, without requiring a quote store for catalog-only use.
 
 The constructor is the only customization of the standard shared preparation lifecycle; `tools/test_reseller_composition.py` checks this seam against the selected Documents source. Shared function references use exact native node identities. See `examples/reseller/README.md` for the request contract and historical fixture boundary. Earlier execution results above apply to the previous embedded factory edition, not this transport contract.
