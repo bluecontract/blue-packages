@@ -21,6 +21,7 @@ CASES = {
     'helper-payment': ('OperationInputConformance', 'payment'),
     'helper-final': ('OperationInputConformance', 'final'),
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
+    'representative-access': ('RepresentativeAccessConformance',),
     'activation-effects': ('ActivationExecutionConformance',),
     'source-path-declarations': ('SourcePathsDeclarationConformance',),
     'source-path-observation': ('SourcePathsObservationConformance',),
