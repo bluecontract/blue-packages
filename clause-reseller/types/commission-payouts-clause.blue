@@ -1,0 +1,144 @@
+name: Commission Payouts Clause
+type: Documents/Documents Clause
+description: Prepare one commission payout using native document preparation. Guard unresolved prior payouts
+  and record an accepted new payout once.
+parameters:
+  allowedFields:
+  - amountMinor
+  parties: []
+bindingTypes:
+  commission: pointer
+defaultBindings:
+  commission: /commission
+actions:
+  preparePayout:
+    resultContract: outcome-v1
+    defaults:
+      fields: {}
+      values: {}
+    preflight:
+    - $forEach:
+        item: field
+        in:
+          $keys:
+            $var: trigger
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - key
+                  - amountMinor
+                  val:
+                    $var: field
+            message: UNKNOWN_INPUT_FIELD
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /amountMinor
+                kind: integer
+            - $gte:
+              - $var:
+                  name: trigger
+                  path: /amountMinor
+              - 1
+            - $lte:
+              - $var:
+                  name: trigger
+                  path: /amountMinor
+              - 100000000
+        message: INVALID_AMOUNT
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $concat:
+                - $concat:
+                  - $const:
+                      name: bindings
+                      path: /collection
+                  - /
+                - $var:
+                    name: trigger
+                    path: /key
+        then:
+        - $failIf:
+            cond:
+              $gte:
+              - $size:
+                  $keys:
+                    $document:
+                      $const:
+                        name: bindings
+                        path: /collection
+              - 20
+            message: DOCUMENT_LIMIT_REACHED
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $concat:
+                  - $const:
+                      name: bindings
+                      path: /commission
+                  - /reserved
+              - 0
+            message: PAYOUT_ALREADY_UNRESOLVED
+    - $set:
+        name: params
+        expr:
+          key:
+            $var:
+              name: trigger
+              path: /key
+          fields:
+            amountMinor:
+              $var:
+                name: trigger
+                path: /amountMinor
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: checkPreparation
+            args:
+              input:
+                $var: params
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: sharedPrepare
+            args:
+              input:
+                $var: params
+              checked:
+                $var: actionResult
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: actionResult
+              path: /outcome
+          - acceptedNew
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Events/Event
+            - kind: Commission Payout Opened
+              key:
+                $var:
+                  name: trigger
+                  path: /key
+              amountMinor:
+                $var:
+                  name: trigger
+                  path: /amountMinor

@@ -1,0 +1,348 @@
+{
+  "scenarios": [
+    {
+      "name": "Approved clause and catalogue changes preserve old order snapshots",
+      "requirements": [
+        "F02",
+        "I01"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999970,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "timestampMicros": 1794574799999980,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "proposeTerms",
+          "channel": "seller",
+          "request": {
+            "type": "Amendments/Amendment Input",
+            "proposalId": "terms-v2",
+            "expectedRevision": 1,
+            "path": "/resellerTerms",
+            "replacement": {
+              "fulfilmentText": "Updated fulfilment: meet at Pier B. Supplier deposit remains outside MyOS.",
+              "confirmationMode": "supplier",
+              "cancellationPolicy": {
+                "freeCancellationHoursBeforeStart": 48,
+                "lateCancellationChargePercent": 50
+              }
+            }
+          }
+        },
+        {
+          "timestampMicros": 1794574799999980,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "sellerApprove",
+          "channel": "seller",
+          "request": {
+            "proposalId": "terms-v2"
+          },
+          "expect": {
+            "/resellerTerms/cancellationPolicy/lateCancellationChargePercent": 100
+          }
+        },
+        {
+          "timestampMicros": 1794574799999980,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "partnerApprove",
+          "channel": "partner",
+          "request": {
+            "proposalId": "terms-v2"
+          },
+          "expect": {
+            "/resellerTerms/cancellationPolicy/lateCancellationChargePercent": 50
+          }
+        },
+        {
+          "timestampMicros": 1794574799999981,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "publishCatalog",
+          "channel": "seller",
+          "request": {
+            "expectedRevision": 1,
+            "entries": {
+              "service": {
+                "label": "Boat service",
+                "description": "New service description",
+                "pricingUnit": "per_unit",
+                "dateRequired": true,
+                "maxQuantity": 20,
+                "unitAmountMinor": 20000,
+                "guestDiscountPercent": 0,
+                "dateSelectionHint": "New descriptive date hint"
+              },
+              "alternative": {
+                "label": "Alternative boat service",
+                "pricingUnit": "per_unit",
+                "dateRequired": true,
+                "maxQuantity": 20,
+                "unitAmountMinor": 12000
+              },
+              "voucher": {
+                "label": "Undated voucher",
+                "pricingUnit": "per_unit",
+                "dateRequired": false,
+                "maxQuantity": 20,
+                "unitAmountMinor": 5000
+              }
+            }
+          },
+          "status": "FAILED",
+          "expectNoEffects": true
+        },
+        {
+          "timestampMicros": 1794574799999981,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "proposeCatalog",
+          "channel": "seller",
+          "request": {
+            "type": "Amendments/Amendment Input",
+            "proposalId": "catalog-v2",
+            "expectedRevision": 1,
+            "path": "/catalogUpdate",
+            "replacement": {
+              "expectedRevision": 1,
+              "entries": {
+                "service": {
+                  "label": "Boat service",
+                  "description": "New service description",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": true,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 20000,
+                  "guestDiscountPercent": 0,
+                  "dateSelectionHint": "New descriptive date hint"
+                },
+                "alternative": {
+                  "label": "Alternative boat service",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": true,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 12000
+                },
+                "voucher": {
+                  "label": "Undated voucher",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": false,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 5000
+                }
+              }
+            }
+          }
+        },
+        {
+          "timestampMicros": 1794574799999981,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "sellerApproveCatalog",
+          "channel": "seller",
+          "request": {
+            "proposalId": "catalog-v2"
+          },
+          "expect": {
+            "/catalog/revision": 1,
+            "/catalog/entries/service/unitAmountMinor": 10000
+          }
+        },
+        {
+          "timestampMicros": 1794574799999981,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "sellerApproveCatalog",
+          "channel": "seller",
+          "request": {
+            "proposalId": "catalog-v2"
+          },
+          "expect": {
+            "/catalog/revision": 1
+          }
+        },
+        {
+          "timestampMicros": 1794574799999981,
+          "requireExactDocumentVersion": true,
+          "unchangedPaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ],
+          "operation": "partnerApproveCatalog",
+          "channel": "partner",
+          "request": {
+            "proposalId": "catalog-v2"
+          },
+          "expect": {
+            "/catalog/revision": 2,
+            "/catalog/entries/service/unitAmountMinor": 20000
+          }
+        },
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q2",
+            "catalogRevision": 2,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999982
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o2",
+            "quoteKey": "q2",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999983,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o2/orderSnapshot/terms/fulfilmentText": "Updated fulfilment: meet at Pier B. Supplier deposit remains outside MyOS.",
+            "/orders/o2/orderSnapshot/terms/cancellationPolicy/lateCancellationChargePercent": 50,
+            "/orders/o2/orderSnapshot/quote/totalMinor": 20000
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 10000,
+            "/orders/o1/reservations/trip/decision/policy/lateCancellationChargePercent": 100
+          }
+        }
+      ]
+    }
+  ]
+}

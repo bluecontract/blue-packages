@@ -1,0 +1,42 @@
+name: Registration Scope Plan
+type: Connections/Connection Plan
+description: >-
+  Compile the owner-approved scalar registration pattern into the native matcher
+  of each handler. The actor supplies values, never grant rules or executable code.
+functions:
+  plan:
+    expr: {$call: {function: planRegistrationScopes, args: {}}}
+  planRegistrationScopes:
+    args: {}
+    do:
+    - $let:
+        name: clause
+        expr: {$document: {$concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}]}}
+    - $let: {name: pattern, expr: {$document: {path: {$concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /parameters/registrationPattern]}, view: definition}}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: pattern}, kind: object}}}
+        message: MANDATE_REGISTRATION_PATTERN_REQUIRED
+    - $let: {name: planned, expr: {$call: {function: planConnections, args: {}}}}
+    - $forEach:
+        key: contributionKey
+        item: contribution
+        in: {$var: {name: planned, path: /contracts}}
+        do:
+        - $if:
+            cond: {$eq: [{$var: {name: contribution, path: /kind}}, handler]}
+            then:
+            - $set:
+                name: planned
+                expr:
+                  $pointerSet:
+                    object: {$var: planned}
+                    path: {$concat: [/contracts/, {$var: contributionKey}, /contract/steps/0/functions/qualifiesRegistration]}
+                    val:
+                      $pointerSet:
+                        object:
+                          $literal:
+                            args: {candidate: {}}
+                            expr: {$is: {node: {$var: candidate}, pattern: {}}}
+                        path: /expr/$is/pattern
+                        val: {$var: pattern}
+    - $return: {$var: planned}

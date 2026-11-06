@@ -1,0 +1,767 @@
+{
+  "scenarios": [
+    {
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/orderTemplate/clauses/payment/bindings/parties/guarantor": {
+          "type": "Parties/Party",
+          "lead": {
+            "channel": {
+              "type": "Contracts/External Channel",
+              "event": {
+                "source": "guarantor"
+              }
+            }
+          },
+          "readerKeys": [
+            "reader-guarantor"
+          ]
+        }
+      },
+      "name": "Card PI is prepared on order creation and supplied once by seller before customer approval",
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-child",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ]
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "diagnosticContains": "BEX_BEX_RUNTIME_ERROR",
+          "status": "FAILED",
+          "unchangedPaths": [
+            "/orders"
+          ]
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794679200000000
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders/o1/amountMinor": 4655,
+            "/orders/o1/reservations/cruise/status": "pending_supplier",
+            "/orders/o1/activation/active": false
+          },
+          "capture": "pending-confirmation",
+          "capturePaths": [
+            "/orders/o1/process_payment",
+            "/orders/o1/activation",
+            "/commission"
+          ],
+          "absent": [
+            "/orders/o1/payment"
+          ],
+          "expectProvisionRequested": "/orders/o1/process_payment"
+        },
+        {
+          "bootstrapPrepared": "/orders/o1/process_payment",
+          "rememberAs": "card",
+          "expectBootstrapped": {
+            "/paymentTerms/amountMinor": 4655,
+            "/paymentTerms/limitMinor": 4655,
+            "/paymentTerms/currency": "USD",
+            "/clauses/payment/parameters/method": "card",
+            "/payment/completed": 0
+          }
+        },
+        {
+          "operation": "providePayment",
+          "channel": "customer",
+          "target": "/orders/o1",
+          "request": {},
+          "requestFromRemembered": {
+            "document": "card",
+            "inResponseTo": "card.inResponseTo",
+            "requirementRef": "card.requirementRef"
+          },
+          "timestampMicros": 1793700000000000,
+          "source": "guest",
+          "status": "FAILED",
+          "diagnosticContains": "INVALID_TARGET_OPERATION",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders/o1"
+          ]
+        },
+        {
+          "operation": "providePayment",
+          "channel": "seller",
+          "target": "/orders/o1",
+          "request": {
+            "inResponseTo": "wrong-correlation"
+          },
+          "requestFromRemembered": {
+            "document": "card",
+            "requirementRef": "card.requirementRef"
+          },
+          "timestampMicros": 1793700000000000,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders/o1"
+          ]
+        },
+        {
+          "operation": "providePayment",
+          "channel": "seller",
+          "target": "/orders/o1",
+          "request": {},
+          "requestFromRemembered": {
+            "document": "card",
+            "inResponseTo": "card.inResponseTo",
+            "requirementRef": "card.requirementRef"
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders/o1/payment/paymentTerms/amountMinor": 4655,
+            "/orders/o1/payment/clauses/payment/parameters/method": "card",
+            "/orders/o1/payment/payment/completed": 0,
+            "/orders/o1/activation/active": false,
+            "/commission/accrued": 0
+          },
+          "capture": "attached-card",
+          "capturePaths": [
+            "/orders/o1/process_payment",
+            "/orders/o1/payment",
+            "/commission"
+          ]
+        },
+        {
+          "operation": "providePayment",
+          "channel": "seller",
+          "target": "/orders/o1",
+          "request": {},
+          "requestFromRemembered": {
+            "document": "card",
+            "inResponseTo": "card.inResponseTo",
+            "requirementRef": "card.requirementRef"
+          },
+          "timestampMicros": 1793700000000000,
+          "unchangedPaths": [
+            "/orders/o1/payment/payment",
+            "/orders/o1/payment/paymentTerms",
+            "/orders/o1/payment/contracts/initialized/document",
+            "/orders/o1/process_payment/entries",
+            "/commission"
+          ],
+          "capture": "duplicate-provision",
+          "capturePaths": [
+            "/orders/o1/process_payment"
+          ],
+          "absentEventTypes": [
+            "Documents/Document Provision Requested",
+            "Documents/Document Selected"
+          ]
+        },
+        {
+          "operation": "approve_customer",
+          "channel": "customer",
+          "source": "guest",
+          "target": "/orders/o1",
+          "request": {},
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/orders/o1/activation/revision"
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "acceptPaymentInstruction",
+          "channel": "guarantor",
+          "source": "guarantor",
+          "target": "/orders/o1/payment",
+          "request": {},
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "recordTransactionInitiated",
+          "channel": "guarantor",
+          "source": "guarantor",
+          "target": "/orders/o1/payment",
+          "request": {
+            "type": "PaymentInstruction/Transaction Initiation Input",
+            "transactionId": "native-card-fixture",
+            "railType": "card",
+            "attachmentPoint": "instruction",
+            "providerReference": "local-no-psp"
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "authorize",
+          "channel": "payer",
+          "source": "guest",
+          "target": "/orders/o1/payment",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "authorize-1",
+            "amountMinor": 4655
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "secureFunds",
+          "channel": "guarantor",
+          "source": "guarantor",
+          "target": "/orders/o1/payment",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "authorize-1"
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "pay",
+          "channel": "payer",
+          "source": "guest",
+          "target": "/orders/o1/payment",
+          "request": {
+            "type": "PaymentInstruction/Payment Request Input",
+            "requestId": "capture-1",
+            "amountMinor": 4655
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "completePayment",
+          "channel": "guarantor",
+          "source": "guarantor",
+          "target": "/orders/o1/payment",
+          "request": {
+            "type": "PaymentInstruction/Payment Outcome Input",
+            "requestId": "capture-1"
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders/o1/payment/payment/completed": 4655,
+            "/commission/accrued": 466
+          },
+          "capture": "confirmed-card-receipt",
+          "capturePaths": [
+            "/commission",
+            "/orders/o1/payment/payment"
+          ]
+        },
+        {
+          "operation": "startPayout",
+          "channel": "seller",
+          "request": {
+            "key": "p1",
+            "amountMinor": 300
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/payouts/p1/amountMinor": 300,
+            "/commission/reserved": 300,
+            "/commission/paid": 0
+          }
+        },
+        {
+          "operation": "startPayout",
+          "channel": "seller",
+          "request": {
+            "key": "p1",
+            "amountMinor": 300
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/payouts/p1/amountMinor": 300,
+            "/commission/reserved": 300,
+            "/commission/paid": 0
+          },
+          "unchangedPaths": [
+            "/commission",
+            "/payouts/p1/amountMinor"
+          ]
+        },
+        {
+          "operation": "startPayout",
+          "channel": "seller",
+          "request": {
+            "key": "p2",
+            "amountMinor": 300
+          },
+          "timestampMicros": 1793700000000000,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/commission",
+            "/payouts"
+          ]
+        }
+      ]
+    },
+    {
+      "sourcePatch": {
+        "/orderTemplate/clauses/payment/bindings/parties/guarantor": {
+          "type": "Parties/Party",
+          "lead": {
+            "channel": {
+              "type": "Contracts/External Channel",
+              "event": {
+                "source": "guarantor"
+              }
+            }
+          },
+          "readerKeys": [
+            "reader-guarantor"
+          ]
+        },
+        "/clauses": {
+          "activation": {
+            "type": "Activation/Activation Clause",
+            "parameters": {
+              "parties": {
+                "seller": {
+                  "type": {
+                    "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                  },
+                  "displayName": "Dostawca",
+                  "business": {
+                    "type": "Parties/Business",
+                    "displayName": "Adventures in Paradise"
+                  },
+                  "lead": {
+                    "channel": {
+                      "type": "Contracts/External Channel",
+                      "event": {
+                        "source": "seller"
+                      }
+                    }
+                  },
+                  "readerKeys": [
+                    "reader-seller"
+                  ]
+                },
+                "partner": {
+                  "type": {
+                    "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                  },
+                  "displayName": "Partner",
+                  "business": {
+                    "type": "Parties/Business",
+                    "displayName": "Manatee Bay Inn"
+                  },
+                  "lead": {
+                    "channel": {
+                      "type": "Contracts/External Channel",
+                      "event": {
+                        "source": "partner"
+                      }
+                    }
+                  },
+                  "readerKeys": [
+                    "reader-partner"
+                  ]
+                }
+              },
+              "required": [],
+              "preActivationOperations": [
+                "proposeTerms_seller",
+                "proposeTerms_partner"
+              ],
+              "preActivationChannels": [
+                "cx.termsValidation.validate._automatic_source"
+              ]
+            }
+          },
+          "termsValidation": {
+            "type": "Reseller/Commercial Terms Validation Clause",
+            "bindings": {
+              "terms": "/terms"
+            }
+          },
+          "orders": {
+            "type": "Reseller/Customer Orders Clause",
+            "bindings": {
+              "template": "/orderTemplate",
+              "collection": "/orders",
+              "quotes": "/quotes",
+              "fulfilment": "/clauses/bookingPolicy/parameters",
+              "startOrder": {
+                "newOrder": {
+                  "on": "workflow",
+                  "party": "partner"
+                }
+              }
+            }
+          },
+          "payouts": {
+            "type": "Reseller/Commission Payouts Clause",
+            "bindings": {
+              "template": "/payoutTemplate",
+              "collection": "/payouts",
+              "commission": "/commission",
+              "parties": {
+                "seller": "seller",
+                "partner": "partner"
+              },
+              "preparePayout": {
+                "startPayout": {
+                  "on": "workflow",
+                  "party": "seller"
+                }
+              }
+            }
+          },
+          "commission": {
+            "type": "Reseller/Commission Clause",
+            "bindings": {
+              "state": "/commission",
+              "orders": "/orders",
+              "payouts": "/payouts",
+              "rate": "/terms/commissionBps"
+            }
+          },
+          "negotiation": {
+            "type": "Reseller/Commercial Terms Negotiation Clause",
+            "bindings": {
+              "terms": "/terms",
+              "propose": {
+                "proposeTerms_seller": {
+                  "on": "workflow",
+                  "party": "seller"
+                },
+                "proposeTerms_partner": {
+                  "on": "workflow",
+                  "party": "partner"
+                }
+              }
+            }
+          },
+          "catalog": {
+            "type": "Reseller/Catalog Clause",
+            "parameters": {
+              "offer": {
+                "title": "Afternoon Dolphin & Wildlife Cruise",
+                "text": "Popołudniowy rejs po wodach Fort Myers Beach i wyspy Sanibel trwa około 1,5 godziny. Przyrodnik lub biolog morski opowiada o delfinach i lokalnej przyrodzie. Obserwacja delfinów nie jest gwarantowana.",
+                "sections": [
+                  {
+                    "title": "W cenie",
+                    "bullets": [
+                      "Rejs z komentarzem przyrodnika lub biologa morskiego.",
+                      "Woda butelkowana i napoje bezalkoholowe."
+                    ]
+                  },
+                  {
+                    "title": "Warto wiedzieć",
+                    "text": "Rejs trwa około 1,5 godziny. Harmonogram i wymagania dotyczące terminu są określone w klauzuli realizacji zamówienia.",
+                    "bullets": [
+                      "Dzieci do 3 lat płyną bezpłatnie, ale trzeba je uwzględnić w liczbie pasażerów.",
+                      "Napiwki są dobrowolne i nie są wliczone w cenę."
+                    ]
+                  },
+                  {
+                    "title": "Miejsce zbiórki",
+                    "text": "Snug Harbor Marina, 645 Old San Carlos Blvd, Fort Myers Beach, FL 33931. Przystań i kasa znajdują się pod Sky Bridge, obok Nervous Nellie’s."
+                  },
+                  {
+                    "title": "Warunki anulowania podane w ofercie",
+                    "text": "Oferta podaje terminy 24 godzin dla zwykłych rejsów, 14 dni dla rejsów świątecznych i 48 godzin dla grup od 6 osób. Zwrot jest pomniejszany o 6% opłaty rezerwacyjnej. Zmiany i anulowania w ciągu 24 godzin przed rejsem podlegają opłacie 100%. Anulowania przez e-mail lub pocztę głosową nie są przyjmowane."
+                  }
+                ]
+              }
+            },
+            "bindings": {
+              "state": "/products",
+              "quotes": "/quotes",
+              "quote": {
+                "createQuote": {
+                  "on": "workflow",
+                  "party": "partner",
+                  "params": {
+                    "$var": "trigger"
+                  }
+                }
+              }
+            }
+          },
+          "bookingPolicy": {
+            "type": "Reseller/Fulfilment Terms Clause",
+            "parameters": {
+              "terms": {
+                "fulfilmentText": "Zamówienie wymaga wskazania proponowanego terminu i potwierdzenia przez Adventures in Paradise. Akceptacja zamówienia przez klienta obejmuje proponowany termin. Jeżeli dostawca zaproponuje inny termin, klient musi go zaakceptować.",
+                "confirmationMode": "supplier",
+                "dateRequired": true
+              },
+              "schedule": "Wtorki, czwartki i soboty, od 13:00 do 14:30. Podane godziny nie gwarantują dostępności miejsc.",
+              "template": {
+                "name": "Potwierdzenie terminu zamówienia",
+                "description": "Ta klauzula jest dołączana do zamówienia tylko wtedy, gdy umowa zawiera klauzulę fulfilment. Wymagania i proponowany termin są zapisywane w zamówieniu.",
+                "type": "Orders/Order with Clauses",
+                "clauses": {
+                  "confirmation": {
+                    "type": "Reseller/Confirmation Clause",
+                    "bindings": {
+                      "confirm": {
+                        "confirmReservation": {
+                          "on": "workflow",
+                          "party": "seller",
+                          "params": {
+                            "$var": "trigger"
+                          }
+                        }
+                      },
+                      "alternative": {
+                        "proposeAlternative": {
+                          "on": "workflow",
+                          "party": "seller",
+                          "params": {
+                            "$var": "trigger"
+                          }
+                        }
+                      },
+                      "accept": {
+                        "acceptProposal": {
+                          "on": "workflow",
+                          "party": "customer",
+                          "params": {
+                            "$var": "trigger"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "name": "Reusable order clause reads the configured fulfilment pointer",
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "dolphin-cruise-child",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1793700000000000
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ]
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "diagnosticContains": "BEX_BEX_RUNTIME_ERROR",
+          "status": "FAILED",
+          "unchangedPaths": [
+            "/orders"
+          ]
+        },
+        {
+          "operation": "newOrder",
+          "channel": "partner",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "customer": "guest",
+            "groups": [
+              {
+                "id": "cruise",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794679200000000
+              }
+            ],
+            "orderAccess": {
+              "customerReaderKey": "reader-guest"
+            }
+          },
+          "timestampMicros": 1793700000000000,
+          "expect": {
+            "/orders/o1/amountMinor": 4655,
+            "/orders/o1/reservations/cruise/status": "pending_supplier"
+          },
+          "capture": "pending-confirmation",
+          "capturePaths": [
+            "/orders/o1"
+          ]
+        },
+        {
+          "operation": "approve_customer",
+          "channel": "customer",
+          "request": {},
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "source": "guest",
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/orders/o1/activation/revision"
+          },
+          "expect": {
+            "/orders/o1/activation/active": true,
+            "/orders/o1/activation/approved/customer": true
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "partner",
+          "request": {
+            "key": "confirm1",
+            "groupId": "cruise"
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/cruise/proposalBlueId"
+          },
+          "unchangedPaths": [
+            "/orders/o1"
+          ],
+          "expectNoEffects": true,
+          "status": "FAILED",
+          "diagnosticContains": "INVALID_TARGET_OPERATION"
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm1",
+            "groupId": "cruise"
+          },
+          "timestampMicros": 1793700000000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/cruise/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/cruise/status": "confirmed",
+            "/orders/o1/reservations/cruise/confirmedStartMicros": 1794679200000000
+          },
+          "absent": [
+            "/orders/o1/reservations/cruise/freeCancellationUntilMicros"
+          ],
+          "capture": "confirmed",
+          "capturePaths": [
+            "/orders/o1"
+          ]
+        }
+      ]
+    }
+  ]
+}

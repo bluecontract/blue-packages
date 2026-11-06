@@ -1,0 +1,43 @@
+name: Payment Observation Clause
+type: Connections/Connected Clause
+description: Relay native events from the selected payment instruction to the containing order so its reseller
+  agreement can account for confirmed receipts. Does not prepare payments or confirm money.
+bindingTypes:
+  instruction: pointer
+actions:
+  observe:
+    automatic:
+      'on': embedded
+      pathBinding: instruction
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Events/Event
+        then:
+        - $return: {}
+    - $appendEvent:
+        $merge:
+        - type: Payment/Payment Event Received
+        - kind:
+            $var:
+              name: trigger
+              path: /kind
+          clause:
+            $const: clauseKey
+          instructionPath:
+            $const:
+              name: bindings
+              path: /instruction
+          event:
+            $objectSet:
+              object: {}
+              key: blueId
+              val:
+                $nodeBlueId:
+                  $event: /event
+    observation: true
