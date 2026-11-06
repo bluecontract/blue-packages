@@ -1,0 +1,372 @@
+{
+  "format": "blue-execution-profile-cases/1",
+  "substitution": "Replace an object with sole key $fixture by the complete named Blue value before admission; these templates are not Blue source.",
+  "parameters": {
+    "profileA": "Installed canonical inline Execution/Profile descriptor A.",
+    "profileB": "A different installed canonical inline descriptor B.",
+    "profileAReference": "Exact reference to canonical descriptor A.",
+    "missingProfileReference": "Syntactically valid exact reference whose content is deliberately unavailable.",
+    "unknownProfile": "Valid resolved descriptor absent from installed catalogue.",
+    "inheritedNodeType": "Exact type that contributes profile A and empty contracts.",
+    "legacyInstance": "Retained source/version instance whose historical binding is A."
+  },
+  "cases": [
+    {
+      "id": "inline",
+      "mode": "profile-aware-source",
+      "input": {
+        "executionProfile": {
+          "$fixture": "profileA"
+        },
+        "contracts": {}
+      },
+      "expect": {
+        "profile": "profileA",
+        "sourcePreserved": true
+      }
+    },
+    {
+      "id": "reference",
+      "mode": "profile-aware-exact",
+      "input": {
+        "executionProfile": {
+          "$fixture": "profileAReference"
+        },
+        "contracts": {}
+      },
+      "expect": {
+        "profile": "profileA",
+        "sourcePreserved": true
+      }
+    },
+    {
+      "id": "inherited",
+      "mode": "profile-aware-source",
+      "input": {
+        "type": {
+          "$fixture": "inheritedNodeType"
+        }
+      },
+      "expect": {
+        "profile": "profileA",
+        "sourcePreserved": true
+      }
+    },
+    {
+      "id": "child-own-profile",
+      "mode": "profile-aware-source",
+      "input": {
+        "executionProfile": {
+          "$fixture": "profileA"
+        },
+        "contracts": {},
+        "child": {
+          "executionProfile": {
+            "$fixture": "profileB"
+          },
+          "contracts": {}
+        }
+      },
+      "expect": {
+        "profile": "profileA",
+        "childProfile": "profileB"
+      }
+    },
+    {
+      "id": "parent-default",
+      "mode": "profile-aware-source",
+      "input": {
+        "contracts": {}
+      },
+      "parentDefault": "profileA",
+      "accountDefault": "profileB",
+      "expect": {
+        "profile": "profileA"
+      }
+    },
+    {
+      "id": "account-default",
+      "mode": "profile-aware-source",
+      "input": {
+        "contracts": {}
+      },
+      "accountDefault": "profileB",
+      "stable": "profileA",
+      "expect": {
+        "profile": "profileB"
+      }
+    },
+    {
+      "id": "stable-default",
+      "mode": "profile-aware-source",
+      "input": {
+        "contracts": {}
+      },
+      "stable": "profileA",
+      "expect": {
+        "profile": "profileA"
+      }
+    },
+    {
+      "id": "explicit-api-confirmation",
+      "mode": "profile-aware-source",
+      "input": {
+        "executionProfile": {
+          "$fixture": "profileA"
+        },
+        "contracts": {}
+      },
+      "apiSelection": "profileA",
+      "expect": {
+        "profile": "profileA"
+      }
+    },
+    {
+      "id": "explicit-api-conflict",
+      "mode": "profile-aware-source",
+      "input": {
+        "executionProfile": {
+          "$fixture": "profileA"
+        },
+        "contracts": {}
+      },
+      "apiSelection": "profileB",
+      "expect": {
+        "errorKind": "conflicting-selection",
+        "phase": "preparation"
+      }
+    },
+    {
+      "id": "missing-content-is-not-default",
+      "mode": "profile-aware-exact",
+      "input": {
+        "executionProfile": {
+          "$fixture": "missingProfileReference"
+        },
+        "contracts": {}
+      },
+      "stable": "profileA",
+      "expect": {
+        "errorKind": "missing-content",
+        "phase": "resolution"
+      }
+    },
+    {
+      "id": "unknown-profile-is-not-default",
+      "mode": "profile-aware-source",
+      "input": {
+        "executionProfile": {
+          "$fixture": "unknownProfile"
+        },
+        "contracts": {}
+      },
+      "stable": "profileA",
+      "expect": {
+        "errorKind": "unknown-profile",
+        "phase": "selection"
+      }
+    },
+    {
+      "id": "legacy-field-is-data",
+      "mode": "legacy-restore",
+      "instance": {
+        "$fixture": "legacyInstance"
+      },
+      "ordinaryField": {
+        "executionProfile": {
+          "$fixture": "profileB"
+        }
+      },
+      "stable": "profileB",
+      "expect": {
+        "profile": "profileA",
+        "sourcePreserved": true
+      }
+    },
+    {
+      "id": "existing-alias-conflict",
+      "mode": "profile-aware-existing-reference",
+      "instance": {
+        "$fixture": "legacyInstance"
+      },
+      "apiSelection": "profileB",
+      "expect": {
+        "errorKind": "conflicting-selection",
+        "phase": "existing-instance",
+        "newIdentity": false
+      }
+    },
+    {
+      "id": "profile-change",
+      "mode": "profile-aware-transition",
+      "instanceProfile": "profileA",
+      "replacementDeclaration": {
+        "$fixture": "profileB"
+      },
+      "expect": {
+        "errorKind": "immutable-profile",
+        "phase": "transition",
+        "publication": false
+      }
+    },
+    {
+      "id": "profile-removal",
+      "mode": "profile-aware-transition",
+      "instanceProfile": "profileA",
+      "removeDeclaration": true,
+      "expect": {
+        "errorKind": "immutable-profile",
+        "phase": "transition",
+        "publication": false
+      },
+      "afterRemovalDefault": "profileB"
+    },
+    {
+      "id": "equivalent-reference",
+      "mode": "profile-aware-transition",
+      "instanceProfile": "profileA",
+      "replacementDeclaration": {
+        "$fixture": "profileAReference"
+      },
+      "expect": {
+        "profile": "profileA"
+      }
+    }
+  ],
+  "descriptorCases": [
+    {
+      "id": "missing-required-field",
+      "mutation": {
+        "remove": "bexSpecification"
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "unknown-field",
+      "mutation": {
+        "set": {
+          "deployment": "latest"
+        }
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "identifier-text-overlay",
+      "mutation": {
+        "addIdentifierField": {
+          "field": "language",
+          "name": "overlay"
+        }
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "unpaired-coordination",
+      "mutation": {
+        "remove": "coordinationSpecification"
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "duplicate-capability",
+      "mutation": {
+        "duplicateFirst": "capabilities"
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "duplicate-native-package",
+      "mutation": {
+        "duplicateFirst": "supportedPackages"
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "capability-order-source",
+      "mode": "profile-aware-source",
+      "mutation": {
+        "reverse": "capabilities"
+      },
+      "expect": "same-effective-profile"
+    },
+    {
+      "id": "capability-order-exact",
+      "mode": "profile-aware-exact",
+      "mutation": {
+        "reverse": "capabilities"
+      },
+      "expect": "same-effective-profile"
+    },
+    {
+      "id": "native-package-order",
+      "mutation": {
+        "reverse": "supportedPackages"
+      },
+      "expect": "same-effective-profile"
+    },
+    {
+      "id": "profile-subclass",
+      "mutation": {
+        "replaceTypeWithDerived": true
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "identifier-text-reference",
+      "mutation": {
+        "referenceTextValue": "language"
+      },
+      "expect": "same-effective-profile"
+    },
+    {
+      "id": "identifier-direct-package-reference",
+      "mutation": {
+        "referenceIdentifierTarget": "language"
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "identifier-text-subclass",
+      "mutation": {
+        "deriveIdentifierTextType": "language"
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "identifier-alias-is-not-id",
+      "mutation": {
+        "set": {
+          "language": "Language"
+        }
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "identifier-missing-text-reference",
+      "mutation": {
+        "unavailableTextValueReference": "language"
+      },
+      "expect": "missing-content"
+    },
+    {
+      "id": "duplicate-carried-package-id",
+      "mutation": {
+        "duplicateFirstAsTextReference": "supportedPackages"
+      },
+      "expect": "invalid-descriptor"
+    },
+    {
+      "id": "identifier-missing-target",
+      "mutation": {
+        "unavailableIdentifierTarget": "supportedPackages"
+      },
+      "expect": "missing-content"
+    }
+  ],
+  "descriptorBase": "profileA",
+  "descriptorPreconditions": {
+    "coordination": true,
+    "capabilitiesMinimum": 2,
+    "supportedPackagesMinimum": 2
+  }
+}

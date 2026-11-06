@@ -6,6 +6,11 @@ Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [exe
 
 The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,000 maximum), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 
+`blue-execution-profile` adds the ordinary Language-only `Execution/Profile`
+schema. Its [integration contract](docs/execution-profile-contract.md) describes
+per-node selection and the separate Core implementation qualification. Adding
+this schema changes neither existing native publications nor deployed defaults.
+
 ## Runtime editions
 
 The standard source tree, build and release preparation use **Access Events**.
