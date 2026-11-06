@@ -1,4 +1,4 @@
-import blue.contracts.*;import blue.coordination.AuthoringRuntime;import blue.core.CompositionPackages;import blue.language.next.*;import java.nio.file.*;import java.util.*;
+import static blue.bex.Values.UNDEFINED;import blue.contracts.*;import blue.coordination.AuthoringRuntime;import blue.core.CompositionPackages;import blue.language.next.*;import java.nio.file.*;import java.util.*;
 /** Native attachment dispatch plus explicit small-state guard/replay models; no hosted finance proof. */
 public final class CommissionAttachmentConformance {
  static Map<String,Object> m(Object...x){return BootstrapPreparationConformance.m(x);}static Map<String,Object> o(Object x){return BootstrapPreparationConformance.obj(x);}
@@ -7,8 +7,8 @@ public final class CommissionAttachmentConformance {
  var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
  try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())){
  var authored=o(WireData.parse(Files.readString(root.resolve("clause-reseller/types/commission-clause.blue")),"yaml"));
- var p=runtime.processor(blue);if(args.length>2&&args[2].equals("models")){checkModels(p,authored,m("type","Documents/Document Attached","clauseId","orders","itemKey","order-1","inResponseTo","order-1"));return;}for(int initialAmount:List.of(10000,0)){var source=BootstrapPreparationConformance.source(null);var cs=o(source.get("clauses"));var params=o(o(cs.get("orders")).get("parameters"));params.put("suppliedParties",List.of());var template=o(params.get("template"));var activation=o(o(o(template.get("clauses")).get("activation")).get("parameters"));o(activation.get("parties")).remove("customer");activation.put("required",List.of("seller"));template.put("payment",m("payment",m("completed",initialAmount,"reversed",0)));
- o(template.get("clauses")).put("testPaymentEvents",paymentEmitter());
+ var p=runtime.processor(blue);if(args.length>2&&args[2].equals("models")){checkModels(p,authored,m("type","Documents/Document Attached","clauseId","orders","itemKey","order-1","inResponseTo","order-1"));return;}for(int initialAmount:args.length>2&&args[2].equals("no-pi")?List.of(-1):List.of(-1,10000,0)){var source=BootstrapPreparationConformance.source(null);var cs=o(source.get("clauses"));var params=o(o(cs.get("orders")).get("parameters"));params.put("suppliedParties",List.of());var template=o(params.get("template"));var activation=o(o(o(template.get("clauses")).get("activation")).get("parameters"));o(activation.get("parties")).remove("customer");activation.put("required",List.of("seller"));if(initialAmount>=0)template.put("payment",m("payment",m("completed",initialAmount,"reversed",0)));
+ if(initialAmount>=0)o(template.get("clauses")).put("testPaymentEvents",paymentEmitter());
  source.put("orders",m());source.put("payouts",m());source.put("terms",m("commissionBps",1200));source.put("attachmentSeen",m());
  cs.put("commission",m("type",authored,"bindings",m("state","/commission","orders","/orders","payouts","/payouts","rate","/terms/commissionBps")));
  cs.put("attachmentObserver",m("type",m("type","Connections/Connected Clause","actions",m("observe",m("automatic",m("on","event","event",m("type","Documents/Document Attached")),"do",List.of(m("$appendChange",m("op","replace","path","/attachmentSeen","val",m("$event","")))))))));
@@ -19,11 +19,12 @@ public final class CommissionAttachmentConformance {
  child=ok(p.process(child.document(),approve,3));if(!Boolean.TRUE.equals(p.read(child.document(),"/activation/active")))throw new AssertionError("Child not active");
  var request=m("type","Documents/Provision Input","key",item.get("key"),"inResponseTo",item.get("requestId"),"requirementRef",item.get("requirementRef"),"document",m("blueId",child.document().blueId()));
  host=ok(p.process(host.document(),BootstrapPreparationConformance.event(host.document(),"provideOrder",request),4));
- var result=m("boundary","Real native prepare/initialize/approve/provide/sharedRefresh/event dispatch in small modeled completed-state fixture; not hosted financial history","status",p.read(host.document(),item.get("itemPath")+"/status"),"attachmentSeen",p.read(host.document(),"/attachmentSeen"),"commission",p.read(host.document(),"/commission"),"completed",p.read(host.document(),"/orders/order-1/payment/payment/completed"));
+ var result=m("boundary","Real native prepare/initialize/approve/provide/sharedRefresh/event dispatch in small modeled completed-state fixture; not hosted financial history","status",p.read(host.document(),item.get("itemPath")+"/status"),"attachmentSeen",p.read(host.document(),"/attachmentSeen"),"commission",p.read(host.document(),"/commission"),"completed",initialAmount<0?"ABSENT_PI":p.read(host.document(),"/orders/order-1/payment/payment/completed"));
  if(args.length>1)Files.writeString(Path.of(args[1]),WireData.write(result));System.out.println(WireData.write(result));
  if(o(result.get("attachmentSeen")).isEmpty())throw new AssertionError("Real local Document Attached not dispatched");
- check(Integer.toString(initialAmount==0?0:1200).equals(p.read(host.document(),"/commission/accrued").toString()),"Attachment must reconcile current net");
+ check(Integer.toString(initialAmount<=0?0:1200).equals(p.read(host.document(),"/commission/accrued").toString()),"Attachment must reconcile current net");
  System.out.println("PASS real native Documents attachment dispatch initialCompleted="+initialAmount);
+ if(initialAmount<0){check(p.read(host.document(),"/orders/order-1/payment")==UNDEFINED,"No PI must remain absent");check("usable".equals(result.get("status")),"No PI attachment must be usable");continue;}
  for(int reversed:List.of(0,0,2500,2500,10000,10000)){
   String childId=NativeRuntime.identity(v.exact(v.select(new Exact.Ref(host.document().blueId()),"/orders/order-1")));
   var paymentEvent=m("source","merchant","operation",m("type","Contracts/Operation Request","channel","seller","operation","testSettle","document",m("blueId",childId),"requireExactDocumentVersion",true,"request",m("completed",10000,"reversed",reversed)));
@@ -53,6 +54,21 @@ public final class CommissionAttachmentConformance {
   var item=m("key",key,"path","/orders/order-1","itemPath",itemPath,"status","usable","requestId",event.get("inResponseTo"),"documentOrigin",origin);
   var order=m("contracts",m("initialized",m("document",original)),"activation",m("active",true,"parties",m()),"payment",m("payment",m("completed",10000,"reversed",0)));
   var model=m("clauses",m("orders",m("bindings",m("collection","/orders"))),"orders",m(key,order),"process_orders",m("entries",m(NativeRuntime.identity(v.source(key)),item)),"terms",m("commissionBps",1200),"commission",m("targets",m(),"accrued",0,"paid",0,"reserved",0,"settlements",m()));
+  var noPi=copy(model);o(o(noPi.get("orders")).get(key)).remove("payment");
+  set(noPi,"/commission",m("targets",m(key,1200),"accrued",1200,"paid",300,"reserved",200,"settlements",m()));
+  set(noPi,"/orders/order-1/process_payment",m("entries",m("pending",m("status","prepared"))));
+  var before=WireData.write(noPi);var absent=run(p,definition,noPi,event,"attached");
+  check(absent.changeset().isEmpty()&&absent.events().isEmpty(),"Absent PI must not reset existing target/accrued/paid/reserved");
+  check(before.equals(WireData.write(noPi)),"Absent PI input remains unchanged");
+  for(Object invalid:List.of(m(),m("payment",m()),m("payment",m("completed",10000)))){
+   var bad=copy(model);set(bad,"/orders/order-1/payment",invalid);boolean rejected=false;
+   try{run(p,definition,bad,event,"attached");}catch(RuntimeException expected){rejected=true;}
+   check(rejected,"Present malformed PI must retain amount rejection");
+  }
+  var inaccessible=copy(model);set(inaccessible,"/orders/order-1/payment",m("blueId",NativeRuntime.identity(v.source(m("unavailablePI",true)))));
+  boolean missing=false;try{run(p,definition,inaccessible,event,"attached");}catch(RuntimeException expected){missing=true;System.out.println("MISSING PI resource retained: "+expected.getClass().getName());}
+  check(missing,"Unavailable PI must not silently succeed");
+  System.out.println("PASS absent PI no-op preserves existing ledger; malformed and unavailable PI remain failures");
   var baseline=run(p,definition,model,event,"attached");check(amount(baseline)==1200,"Passing modeled attachment control: "+baseline);
   apply(model,baseline);check(run(p,definition,model,event,"attached").changeset().isEmpty(),"Attachment replay must not duplicate");
   var completed=m("sourcePath","/orders/order-1","event",m("type","Payment/Payment Event Received","kind","payment-model","clause","payment","instructionPath","/payment","event",m("type","PaymentInstruction/Payment Completed","requestId","capture-model","amountCompleted",10000)));
