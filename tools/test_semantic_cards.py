@@ -51,7 +51,7 @@ def request(blue_id):
     generator = json.loads((cards.ASSETS / 'generator.json').read_text())
     generator['promptSha256'] = digest((cards.ASSETS / 'prompt.md').read_bytes())
     return dict(context=context, definitionDigest=sources.definition_digest(blue_id, DEFINITIONS),
-                sourceDigest=digest(wire(context)), package=deepcopy(PACKAGE), generator=generator)
+                sourceDigest=digest(sources.context_wire(context)), package=deepcopy(PACKAGE), generator=generator)
 
 
 class InfrastructureTests(unittest.TestCase):
@@ -95,23 +95,38 @@ class InfrastructureTests(unittest.TestCase):
 
 
 class SourceTests(unittest.TestCase):
-    def test_large_inline_function_is_required_before_optional_dependencies(self):
-        function = {'body': 'x' * 120_000}
-        original = {'type': {'blueId': B}, 'functions': {'large': function}, 'description': 'y' * 90_000}
-        definitions = {A: original, B: {'description': 'z' * 180_000}, C: deepcopy(function)}
+    def test_compact_context_preserves_inline_functions_and_inheritance(self):
+        function = {'body': [{'name': '界', 'value': True}] * 4000}
+        original = {'type': {'blueId': B}, 'functions': {'large': function}}
+        definitions = {A: original, B: {'description': 'parent'}, C: deepcopy(function)}
         before = deepcopy(definitions)
+        self.assertGreater(len(wire(original)), 200_000)
         context = sources.evidence(A, definitions)
-        self.assertEqual({'blueId': C}, context['definition']['functions']['large'])
-        self.assertEqual([{'blueId': C, 'definition': function}], context['dependencyDefinitions'])
-        self.assertIn(B, context['omittedDependencies'])
-        self.assertNotIn(C, context['omittedDependencies'])
+        self.assertEqual(original, context['definition'])
+        self.assertEqual([{'blueId': B, 'definition': definitions[B]}], context['dependencyDefinitions'])
+        self.assertEqual([], context['omittedDependencies'])
         self.assertEqual(before, definitions)
         self.assertEqual(digest(wire(original)), sources.definition_digest(A, definitions))
 
-    def test_required_function_exceeding_dependency_budget_fails_closed(self):
+    def test_genuinely_large_inline_function_fails_closed(self):
         function = {'body': 'x' * 240_001}
-        with self.assertRaisesRegex(ValueError, 'Required function exceeds semantic dependency budget'):
+        with self.assertRaisesRegex(ValueError, 'Root definition exceeds semantic context budget'):
             sources.evidence(A, {A: {'functions': {'large': function}}, C: function})
+
+    def test_context_budget_counts_utf8_bytes_and_preserves_inheritance_priority(self):
+        prefix = len(sources.context_wire({'body': ''}))
+        exact = {'body': 'x' * (200_000 - prefix)}
+        self.assertEqual(exact, sources.evidence(A, {A: exact})['definition'])
+        with self.assertRaisesRegex(ValueError, 'Root definition exceeds'):
+            sources.evidence(A, {A: {'body': exact['body'] + '界'}})
+        parent = {'body': '界' * 60_000}
+        optional = {'body': 'z' * 70_000}
+        context = sources.evidence(A, {A: {'type': {'blueId': B}, 'helper': {'blueId': C}},
+                                       B: parent, C: optional})
+        self.assertEqual([{'blueId': B, 'definition': parent}], context['dependencyDefinitions'])
+        self.assertEqual([C], context['omittedDependencies'])
+        self.assertEqual(json.loads(sources.context_wire(parent)), parent)
+        self.assertEqual(sources.context_wire({'b': True, 'a': 1}), b'{"a":1,"b":true}')
 
     def test_small_inline_function_context_stays_inline(self):
         function = {'body': 'small'}
@@ -276,18 +291,15 @@ class SourceTests(unittest.TestCase):
             context = sources.evidence(blue_id, definitions)
             self.assertEqual(blue_id, context['blueId'])
             original = sources.compact(definitions[blue_id])
-            restored = deepcopy(context['definition'])
+            self.assertEqual(original, context['definition'])
             dependencies = {item['blueId']: item['definition']
                             for item in context['dependencyDefinitions']}
-            for name, body in original.get('functions', {}).items():
-                selected = restored['functions'][name]
-                if selected != body:
-                    self.assertEqual({'blueId'}, set(selected))
-                    self.assertNotIn(selected['blueId'], context['omittedDependencies'])
-                    restored['functions'][name] = dependencies[selected['blueId']]
-            self.assertEqual(original, restored)
-            self.assertLessEqual(len(wire(context['definition'])), 200_000)
-            self.assertLessEqual(sum(len(wire(v)) for v in dependencies.values()), 240_000)
+            self.assertLessEqual(len(sources.context_wire(context['definition'])), 200_000)
+            self.assertLessEqual(sum(len(sources.context_wire(v)) for v in dependencies.values()), 240_000)
+            if subjects[blue_id]['alias'] == 'Documents/Preparation Functions':
+                inherited = {identity for identity, _ in list(sources.type_chain(blue_id, definitions))[1:]}
+                self.assertTrue(inherited <= dependencies.keys())
+
 
 
 class CardTests(unittest.TestCase):
@@ -303,6 +315,16 @@ class CardTests(unittest.TestCase):
 
     def card(self, blue_id=B):
         return cards.accept(request(blue_id), response(blue_id), self.destination)
+
+    def test_prompt_evidence_uses_compact_exact_request_context(self):
+        cards.prepare(self.root, self.output)
+        request = json.loads((self.output / 'requests' / (B + '.json')).read_bytes())
+        prompt = (self.output / 'requests' / (B + '.txt')).read_text()
+        payload = prompt.split('Evidence (JSON):\n', 1)[1]
+        expected = json.dumps(request['context'], ensure_ascii=False, sort_keys=True,
+                              separators=(',', ':'))
+        self.assertEqual(expected, payload)
+        self.assertEqual(request['context'], json.loads(payload))
 
     def test_local_card_not_uploaded_is_reused_even_after_package_version_changes(self):
         card = self.card()
@@ -406,6 +428,13 @@ class CardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Refusing to replace'):
             cards.accept(request(B), corrected, self.destination)
         self.assertEqual(response(B), cards.read_json(self.destination / (B + '.json')))
+
+    def test_accept_rejects_stale_pre_compact_request_digest(self):
+        stale = request(B)
+        stale['sourceDigest'] = digest(wire(stale['context']))
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            cards.accept(stale, response(B), self.destination, DEFINITIONS)
+        self.assertFalse(self.destination.exists())
 
     def test_restore_rejects_legacy_envelope_before_generation(self):
         store = Mock()

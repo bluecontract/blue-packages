@@ -19,6 +19,12 @@ STRUCTURAL = {'type', 'name', 'description', 'blueId', 'contracts', 'clauses',
               'parameters', 'actionDefinition', 'hookDefinition', 'hookAbi', 'specification'}
 
 
+def context_wire(value):
+    """Deterministic UTF-8 presentation bytes; release wire identities stay unchanged."""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True,
+                      separators=(',', ':')).encode('utf-8')
+
+
 def references(value):
     if isinstance(value, list):
         return set().union(*(references(v) for v in value))
@@ -185,42 +191,19 @@ def pointer(value):
 def evidence(blue_id, definitions):
     root = compact(definitions[blue_id])
     supplied = {}
-    if len(wire(root)) > 200_000 and isinstance(root.get('functions'), dict):
-        # Presentation only: replace inline bodies by existing exact archive records.
-        # Byte equality precedes compaction, so scalar types cannot alias each other.
-        exact = {}
-        for identity, body in sorted(definitions.items()):
-            if identity != blue_id:
-                exact.setdefault(wire(body), identity)
-        candidates = []
-        for name, body in definitions[blue_id]['functions'].items():
-            identity = exact.get(wire(body))
-            if identity is not None:
-                saving = len(wire(root['functions'][name])) - len(wire({'blueId': identity}))
-                if saving > 0:
-                    candidates.append((-saving, name, identity))
-        for _, name, identity in sorted(candidates):
-            if len(wire(root)) <= 200_000:
-                break
-            supplied[identity] = compact(definitions[identity])
-            root['functions'][name] = {'blueId': identity}
-        # Factored bodies were part of the root: never omit them to fit optional refs.
-        require(len(supplied) <= 128 and sum(len(wire(v)) for v in supplied.values()) <= 240_000,
-                'Required function exceeds semantic dependency budget: ' + blue_id)
-    require(len(wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
-    omitted, visited = set(), {blue_id, *supplied}
+    require(len(context_wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
+    omitted, visited = set(), {blue_id}
     # Include inheritance first, so optional event/helper references cannot crowd it out.
     queue = [(identity, 0) for identity, _ in list(type_chain(blue_id, definitions))[1:]]
     queue += [(ref, 1) for ref in sorted(references(root))]
-    queue += [(ref, 1) for body in supplied.values() for ref in sorted(references(body))]
-    size = sum(len(wire(value)) for value in supplied.values())
+    size = 0
     while queue:
         ref, depth = queue.pop(0)
         if ref in visited or ref in PRIMITIVES:
             continue
         visited.add(ref)
         value = compact(definitions[ref]) if ref in definitions else None
-        length = len(wire(value)) if value is not None else 0
+        length = len(context_wire(value)) if value is not None else 0
         if value is None or depth > 3 or len(supplied) >= 128 or size + length > 240_000:
             omitted.add(ref)
             continue

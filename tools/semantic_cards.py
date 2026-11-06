@@ -11,7 +11,7 @@ import tempfile
 from jsonschema import Draft202012Validator
 
 from release import ROOT, digest, local, require, wire
-from semantic_sources import definition_digest, evidence, inventory
+from semantic_sources import context_wire, definition_digest, evidence, inventory
 from semantic_s3 import MAX_CARD_BYTES, Store, card_key
 
 ASSETS = Path(__file__).resolve().parents[1] / 'semantics'
@@ -92,9 +92,9 @@ def prepare(root, output, store=None):
     for blue_id in batch:
         context = evidence(blue_id, definitions)
         request = dict(context=context, definitionDigest=definition_digest(blue_id, definitions),
-                       sourceDigest=digest(wire(context)), package=subjects[blue_id]['package'], generator=generator)
+                       sourceDigest=digest(context_wire(context)), package=subjects[blue_id]['package'], generator=generator)
         (requests / (blue_id + '.json')).write_bytes(wire(request))
-        (requests / (blue_id + '.txt')).write_text(prompt + '\n\nEvidence (JSON):\n' + wire(context).decode())
+        (requests / (blue_id + '.txt')).write_text(prompt + '\n\nEvidence (JSON):\n' + context_wire(context).decode('utf-8'), encoding='utf-8')
     report = dict(format='blue-semantic-plan/1', subjects=list(subjects.values()),
                   ready=sorted(subjects.keys() & cards.keys()), restored=sorted(restored), missing=missing,
                   generate=batch, unpublished=sorted(id for id in cards if store and card_key(id) not in keys),
@@ -105,12 +105,12 @@ def prepare(root, output, store=None):
 
 def accept(request, response, output, definitions=None):
     context = request['context']
-    require(request['sourceDigest'] == digest(wire(context)), 'Generation request checksum mismatch')
+    require(request['sourceDigest'] == digest(context_wire(context)), 'Generation request checksum mismatch')
     if definitions is not None:
         require(context['blueId'] in definitions, 'Generation source is outside current selection')
         require(request['definitionDigest'] == definition_digest(context['blueId'], definitions),
                 'Generation definition digest mismatch')
-        require(request['sourceDigest'] == digest(wire(evidence(context['blueId'], definitions))),
+        require(request['sourceDigest'] == digest(context_wire(evidence(context['blueId'], definitions))),
                 'Generation evidence differs from current source')
     validate_output(response, context)
     validate_card(response, context['blueId'])
