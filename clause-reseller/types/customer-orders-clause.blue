@@ -196,6 +196,7 @@ actionDefinition:
                       - key
                       - description
                       - customer
+                      - customerEmail
                       - groups
                       - requestId
                       - catalogRevision
@@ -205,49 +206,90 @@ actionDefinition:
                 message: UNKNOWN_INPUT_FIELD
         - $failIf:
             cond:
-              $not:
-                $and:
-                - $isKind:
-                    val:
-                      $var:
-                        name: trigger
-                        path: /customer
-                    kind: text
-                - $is:
-                    node:
-                      $var:
-                        name: trigger
-                        path: /customer
-                    pattern:
-                      type: Text
-                      schema:
-                        minLength: 1
-                        maxLength: 256
-            message: CUSTOMER_REQUIRED
-        - $failIf:
-            cond:
               $eq:
-              - $var:
-                  name: trigger
-                  path: /customer
-              - $pointerGet:
+              - $hasKey:
                   object:
-                    $document: /activation/parties/partner
-                  path: /myosAccountId
-                  default: ''
-            message: CUSTOMER_MUST_BE_DISTINCT
-        - $failIf:
+                    $var: trigger
+                  key: customer
+              - $hasKey:
+                  object:
+                    $var: trigger
+                  key: customerEmail
+            message: EXACTLY_ONE_CUSTOMER_REQUIRED
+        - $if:
             cond:
-              $eq:
-              - $var:
-                  name: trigger
-                  path: /customer
-              - $pointerGet:
-                  object:
-                    $document: /activation/parties/seller
-                  path: /myosAccountId
-                  default: ''
-            message: CUSTOMER_MUST_BE_DISTINCT
+              $hasKey:
+                object:
+                  $var: trigger
+                key: customerEmail
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /customerEmail
+                        kind: text
+                    - $is:
+                        node:
+                          $var:
+                            name: trigger
+                            path: /customerEmail
+                        pattern:
+                          type: Text
+                          schema:
+                            minLength: 1
+                            maxLength: 320
+                message: INVALID_CUSTOMER_EMAIL
+            else:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var:
+                            name: trigger
+                            path: /customer
+                        kind: text
+                    - $is:
+                        node:
+                          $var:
+                            name: trigger
+                            path: /customer
+                        pattern:
+                          type: Text
+                          schema:
+                            minLength: 1
+                            maxLength: 256
+                message: CUSTOMER_REQUIRED
+            - $failIf:
+                cond:
+                  $eq:
+                  - $var:
+                      name: trigger
+                      path: /customer
+                  - $pointerGet:
+                      object:
+                        $document: /activation/parties/partner
+                      path: /myosAccountId
+                      default: ''
+                message: CUSTOMER_MUST_BE_DISTINCT
+            - $failIf:
+                cond:
+                  $eq:
+                  - $var:
+                      name: trigger
+                      path: /customer
+                  - $pointerGet:
+                      object:
+                        $document: /activation/parties/seller
+                      path: /myosAccountId
+                      default: ''
+                message: CUSTOMER_MUST_BE_DISTINCT
         - $failIf:
             cond:
               $not:
@@ -281,20 +323,29 @@ actionDefinition:
                   name: trigger
                   path: /key
               fields:
-                orderDescription:
-                  $pointerGet:
-                    object:
-                      $var: trigger
-                    path: /description
-                    default: Order
-                customerAccountId:
-                  $var:
-                    name: trigger
-                    path: /customer
-              customer:
-                $var:
-                  name: trigger
-                  path: /customer
+                $merge:
+                - orderDescription:
+                    $pointerGet:
+                      object:
+                        $var: trigger
+                      path: /description
+                      default: Order
+                - $choose:
+                    cond:
+                      $hasKey:
+                        object:
+                          $var: trigger
+                        key: customerEmail
+                    then:
+                      customerEmail:
+                        $var:
+                          name: trigger
+                          path: /customerEmail
+                    else:
+                      customerAccountId:
+                        $var:
+                          name: trigger
+                          path: /customer
               groups:
                 $pointerGet:
                   object:
@@ -775,16 +826,87 @@ actions:
               path: /outcome
           - duplicate
         then:
-        - $failIf:
+        - $if:
             cond:
-              $ne:
-              - $var:
-                  name: actionResult
-                  path: /item/prepared/customerAccountId
-              - $var:
-                  name: actionResult
-                  path: /candidate/activation/parties/customer/myosAccountId
-            message: ORDER_CUSTOMER_MISMATCH
+              $hasKey:
+                object:
+                  $var:
+                    name: actionResult
+                    path: /item/prepared
+                key: customerEmail
+            then:
+            - $let:
+                name: customerAccountId
+                expr:
+                  $pointerGet:
+                    object:
+                      $var:
+                        name: actionResult
+                        path: /candidate/activation/parties/customer
+                    path: /myosAccountId
+                    default: ''
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $isKind:
+                        val:
+                          $var: customerAccountId
+                        kind: text
+                    - $is:
+                        node:
+                          $var: customerAccountId
+                        pattern:
+                          type: Text
+                          schema:
+                            minLength: 1
+                            maxLength: 256
+                message: CUSTOMER_REQUIRED
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var: customerAccountId
+                  - $pointerGet:
+                      object:
+                        $var:
+                          name: actionResult
+                          path: /candidate/contracts/initialized/document
+                      path: /clauses/activation/parameters/parties/customer/myosAccountId
+                      default: ''
+                message: ORDER_CUSTOMER_MISMATCH
+            - $forEach:
+                item: role
+                in:
+                - seller
+                - partner
+                do:
+                - $failIf:
+                    cond:
+                      $eq:
+                      - $var: customerAccountId
+                      - $pointerGet:
+                          object:
+                            $var:
+                              name: actionResult
+                              path: /candidate/activation/parties
+                          path:
+                            $concat:
+                            - /
+                            - $var: role
+                            - /myosAccountId
+                          default: ''
+                    message: CUSTOMER_MUST_BE_DISTINCT
+            else:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $var:
+                      name: actionResult
+                      path: /item/prepared/customerAccountId
+                  - $var:
+                      name: actionResult
+                      path: /candidate/activation/parties/customer/myosAccountId
+                message: ORDER_CUSTOMER_MISMATCH
     do:
     - $set:
         name: actionResult
@@ -807,6 +929,7 @@ parameters:
   - orderDescription
   - amountMinor
   - customerAccountId
+  - customerEmail
   - quote
   - quoteBlueId
   - orderSnapshot

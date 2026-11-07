@@ -28,6 +28,24 @@ Catalog prices originate in the user handoff. Dates and descriptive text do not 
 
 ## Integration edition
 
+The preview.4 candidate adds a deferred customer selection. `prepareOrder` accepts
+exactly one of `values.customer` (an account ID) or `values.customerEmail` (1–320
+characters of contact and correlation metadata). For example, a partner can
+prepare a basket with `customerEmail: guest@example.test` before a customer
+account exists. The exact text is retained at `/customerEmail` in the prepared
+Order and in its preparation intent. It is not a Party locator or verified
+identity. The actual customer is supplied by the normal bootstrap participant
+mapping, after Business authorizes the checkout/account association.
+
+`provideOrder` retains native Documents request, requirement, source, terms,
+Party, access and activation validation. In the email branch it requires the
+actual initialized/current customer account to be present and distinct from
+seller and partner. It does not compare that account with the contact email.
+The first accepted Order remains immutable and an identical provision remains
+idempotent. Explicit `values.customer` preparations retain their exact account
+pin. Earlier package editions and their pending preparations keep their own
+exact definitions.
+
 The preview.3 candidate removes the agreement-wide limit of 20 distinct Order
 preparations. Each new key can prepare another catalog-priced Order; an identical
 retry retains its existing preparation. Catalog, quantity, pricing and request
