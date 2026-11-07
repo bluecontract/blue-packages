@@ -1714,162 +1714,21 @@ functions:
                             $var: slot
     - $return:
         $var: policy
+  # The original-roster path is the same validator with no admitted cohort.
   validateProviderSlots:
     args:
       original: {}
       candidate: {}
       item: {}
     do:
-    - $let:
-        name: roles
-        expr: 0
-    - $forEach:
-        item: slot
-        in:
-          $var:
-            name: item
-            path: /slots
-        do:
-        - $let:
-            name: originalValue
-            expr:
-              $pointerGet:
-                object:
-                  $var: original
-                path:
-                  $var:
-                    name: slot
-                    path: /path
-        - $call:
-            function: slotWitness
-            args:
-              candidate:
-                datum:
-                  $var: originalValue
-              slot:
-                $var: slot
-        - $if:
-            cond:
-              $eq:
-              - $var:
-                  name: slot
-                  path: /kind
-              - party
-            then:
-            - $set:
-                name: roles
-                expr:
-                  $add:
-                  - $var: roles
-                  - 1
-            - $let:
-                name: currentParty
-                expr:
-                  $pointerGet:
-                    object:
-                      $var: candidate
-                    path:
-                      $concat:
-                      - /activation/parties/
-                      - $var:
-                          name: slot
-                          path: /role
-            - $call:
-                function: slotWitness
-                args:
-                  candidate:
-                    datum:
-                      $var: currentParty
-                  slot:
-                    $var: slot
-            - $call:
-                function: requireSameMainParty
-                args:
-                  left:
-                    $var: originalValue
-                  right:
-                    $var: currentParty
-            - $if:
-                cond:
-                  $not:
-                    $var:
-                      name: slot
-                      path: /supplied
-                then:
-                - $if:
-                    cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}, bootstrap]}
-                    then:
-                    - $forEach:
-                        item: providedParty
-                        in: [{$var: originalValue}, {$var: currentParty}]
-                        do:
-                        - $call:
-                            function: requireSameBootstrapParty
-                            args:
-                              expected: {$pointerGet: {object: {$var: slot}, path: /bootstrapPrimary}}
-                              actual: {$var: providedParty}
-                    else:
-                    - $call:
-                        function: requireSameMainParty
-                        args:
-                          left:
-                            $var:
-                              name: slot
-                              path: /primary
-                          right:
-                            $var: originalValue
-            else:
-            - $let:
-                name: currentValue
-                expr:
-                  $pointerGet:
-                    object:
-                      $var: candidate
-                    path:
-                      $var:
-                        name: slot
-                        path: /path
-            - $call:
-                function: slotWitness
-                args:
-                  candidate:
-                    datum:
-                      $var: currentValue
-                  slot:
-                    $var: slot
-            - $failIf:
-                cond:
-                  $ne:
-                  - $nodeBlueId:
-                      $var: currentValue
-                  - $nodeBlueId:
-                      $var: originalValue
-                message: PREPARATION_PROVIDER_DATA_CHANGED
-    - $failIf:
-        cond:
-          $ne:
-          - $size:
-              $pointerGet:
-                object:
-                  $var: candidate
-                path: /activation/parties
-          - $var: roles
-        message: PREPARATION_UNDECLARED_PARTY
-    - $failIf:
-        cond:
-          $ne:
-          - $pointerGet:
-              object:
-                $var: candidate
-              path: /activation/required
-              default: []
-          - $pointerGet:
-              object:
-                $var: item
-              path: /prepared/clauses/activation/parameters/required
-              default: []
-        message: PREPARATION_APPROVAL_POLICY_CHANGED
-    - $return: true
+    - $return:
+        $call:
+          function: validateProviderSlotsWithAdmission
+          args:
+            admission: {}
+            original: {$var: original}
+            candidate: {$var: candidate}
+            item: {$var: item}
   validateProviderSlotsWithAdmission:
     args:
       admission: {}

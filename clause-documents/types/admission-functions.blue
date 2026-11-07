@@ -1,6 +1,12 @@
 name: Admission Functions
 type: Documents/Factory Functions
 functions:
+  # Selection is separate from commercial activation. Only an authored domain
+  # definition may opt in; the provision request never supplies this policy.
+  maySelectInactiveCandidate:
+    args: {}
+    do:
+    - $return: false
   mappedBootstrapPartyCovered:
     args:
       item: {}
@@ -402,14 +408,33 @@ functions:
                     $var: item
                   path: /consents
                   default: {}
+    - $let:
+        name: selectInactive
+        expr:
+          $call:
+            function: maySelectInactiveCandidate
+            args: {}
+    - $if:
+        cond: {$eq: [{$var: selectInactive}, true]}
+        then:
+        # The hook is part of the exact clause captured by the planner and frozen
+        # at prepare time. A later clause change cannot widen this obligation.
+        - $failIf:
+            cond:
+              $ne:
+              - {$pointerGet: {object: {$var: item}, path: /intent/configuration}}
+              - {$nodeBlueId: {$call: {function: connectionConfiguration, args: {}}}}
+            message: PREPARATION_SELECTION_POLICY_CHANGED
     - $if:
         cond:
-          $ne:
-          - $pointerGet:
-              object:
-                $var: candidate
-              path: /activation/active
-          - true
+          $and:
+          - {$ne: [{$var: selectInactive}, true]}
+          - $ne:
+            - $pointerGet:
+                object:
+                  $var: candidate
+                path: /activation/active
+            - true
         then:
         - $return:
             $merge:

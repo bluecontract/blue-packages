@@ -52,7 +52,7 @@ class BootstrapCompositionTest(unittest.TestCase):
                      'normalizeProvisionSource', 'sharedPrepare', 'prepareMappedChild',
                      'mappedBootstrapPartyCovered']:
             self.assertIn(name, composition['functions'])
-        self.assertEqual(len(composition['functions']), 99)
+        self.assertEqual(len(composition['functions']), 106)
 
     def test_domain_helpers_are_native_references_not_reimplemented_pricing(self):
         composition = json.loads((PACKAGE / 'bootstrap-composition.json').read_text())
@@ -63,7 +63,8 @@ class BootstrapCompositionTest(unittest.TestCase):
             self.assertIn(reference['blueId'], definitions)
         self.assertEqual(set(composition['customFunctions']), {
             'constructDocument', 'prepareCustomerOrder', 'domainPrepare',
-            'domainValidateCandidate', 'domainNextActions', 'suppliedCustomerOrderRoles'})
+            'domainValidateCandidate', 'domainNextActions', 'suppliedCustomerOrderRoles',
+            'maySelectInactiveCandidate'})
 
     def test_ordinary_provision_and_planning_are_not_replaced(self):
         clause = yaml.safe_load((PACKAGE / 'types/customer-orders-bootstrap-clause.blue').read_text())
