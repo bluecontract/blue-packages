@@ -1,0 +1,204 @@
+{
+  "scenarios": [
+    {
+      "name": "Negotiation clears prior approval and activation requires both parties",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [
+              "seller",
+              "partner"
+            ],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "approve_seller",
+          "channel": "seller",
+          "request": {},
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/activation/revision"
+          }
+        },
+        {
+          "operation": "proposeTerms_partner",
+          "channel": "partner",
+          "request": {
+            "commissionBps": 1500,
+            "exclusive": false
+          },
+          "requestFromState": {
+            "revision": "/activation/revision"
+          },
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/terms/commissionBps": 1500,
+            "/activation/approved": {},
+            "/activation/active": false
+          }
+        },
+        {
+          "operation": "approve_seller",
+          "channel": "seller",
+          "request": {},
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/activation/revision"
+          }
+        },
+        {
+          "operation": "approve_partner",
+          "channel": "partner",
+          "request": {},
+          "requireExactDocumentVersion": true,
+          "requestFromState": {
+            "revision": "/activation/revision"
+          },
+          "expect": {
+            "/activation/active": true
+          }
+        },
+        {
+          "operation": "proposeTerms_partner",
+          "channel": "partner",
+          "request": {
+            "commissionBps": 1500,
+            "exclusive": false
+          },
+          "requestFromState": {
+            "revision": "/activation/revision"
+          },
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/terms",
+            "/activation"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invalid initial commission is rejected",
+      "sourcePatch": {
+        "/clauses/activation": {
+          "type": "Activation/Activation Clause",
+          "parameters": {
+            "parties": {
+              "seller": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Dostawca",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Adventures in Paradise"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "seller"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-seller"
+                ]
+              },
+              "partner": {
+                "type": {
+                  "blueId": "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid"
+                },
+                "displayName": "Partner",
+                "business": {
+                  "type": "Parties/Business",
+                  "displayName": "Manatee Bay Inn"
+                },
+                "lead": {
+                  "channel": {
+                    "type": "Contracts/External Channel",
+                    "event": {
+                      "source": "partner"
+                    }
+                  }
+                },
+                "readerKeys": [
+                  "reader-partner"
+                ]
+              }
+            },
+            "required": [
+              "seller",
+              "partner"
+            ],
+            "preActivationOperations": [
+              "proposeTerms_seller",
+              "proposeTerms_partner"
+            ],
+            "preActivationChannels": [
+              "cx.termsValidation.validate._automatic_source"
+            ]
+          }
+        },
+        "/terms/commissionBps": 10001
+      },
+      "initialStatus": "FAILED",
+      "steps": []
+    }
+  ]
+}

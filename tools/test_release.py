@@ -170,7 +170,8 @@ class ReleaseTests(unittest.TestCase):
 
     def test_current_catalogue_and_generated_views_are_consistent(self):
         rows = release.selections(release.ROOT)
-        self.assertEqual(40, len(rows))
+        self.assertEqual(41, len(rows))
+        self.assertEqual(1, sum(row['name'] == 'blue-execution-profile' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'clause-reseller' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'blue-definition-read' for row in rows))
         self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments', 'blue-offers', 'myos-business'} <= {row['name'] for row in rows})

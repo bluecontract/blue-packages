@@ -32,12 +32,28 @@ class BootstrapCompositionTest(unittest.TestCase):
             self.assertIn(metadata['packageBlueId'],
                           {row['packageBlueId'] for row in consumer['packages']})
 
-    def test_historical_exported_sources_are_unchanged(self):
+    def test_import_provenance_and_explicitly_evolved_sources(self):
         source = json.loads((PACKAGE / 'source-import.json').read_text())
         self.assertEqual(len(source['sourceFiles']), 14)
+        # Historical provenance remains immutable. These three authored sources
+        # evolved deliberately: main's optional quotes/catalog bootstrap and the
+        # qualified guarded commission attachment. All other imports stay exact.
+        evolved = {
+            'types/catalog-functions.blue': '0f24eab9c459cd2f58baec2d383ddf3337517554be84417d308c64514126f1eb',
+            'types/customer-orders-clause.blue': 'c77ddfc0332a33026c1b21dab7563136b6c0899d6051e0dd9d5a9c1449e7a091',
+            'types/commission-clause.blue': '326f5b14bd84fbe4d1284a85e3f56450a97acea3a25018856427941cb40861f9',
+        }
+        seen = set()
         for item in source['sourceFiles']:
-            path = PACKAGE / Path(item['path']).relative_to('sources/clause-reseller')
-            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(), item['sha256'], str(path))
+            relative = Path(item['path']).relative_to('sources/clause-reseller')
+            path = PACKAGE / relative
+            key = relative.as_posix()
+            if key in evolved:
+                self.assertNotEqual(evolved[key], item['sha256'])
+                seen.add(key)
+            self.assertEqual(hashlib.sha256(path.read_bytes()).hexdigest(),
+                             evolved.get(key, item['sha256']), str(path))
+        self.assertEqual(seen, set(evolved))
 
     def test_generic_lifecycle_uses_exact_existing_native_function_nodes(self):
         composition = json.loads((PACKAGE / 'bootstrap-composition.json').read_text())
@@ -54,12 +70,20 @@ class BootstrapCompositionTest(unittest.TestCase):
             self.assertIn(name, composition['functions'])
         self.assertEqual(len(composition['functions']), 106)
 
-    def test_domain_helpers_are_native_references_not_reimplemented_pricing(self):
+    def test_domain_helpers_retain_exact_native_identities(self):
         composition = json.loads((PACKAGE / 'bootstrap-composition.json').read_text())
         definitions = records(PACKAGE / 'dist/package.bluepkg')
         clause = yaml.safe_load((PACKAGE / 'types/customer-orders-bootstrap-clause.blue').read_text())
         for name, reference in composition['domainFunctionReferences'].items():
-            self.assertEqual(clause['actionDefinition']['type']['functions'][name], reference)
+            function = clause['actionDefinition']['type']['functions'][name]
+            if name == 'prepareBooking':
+                # Native identity equality for this private quote-based body is
+                # enforced by ResellerBootstrapFunctionPinsConformance.
+                self.assertEqual({'args', 'do'}, set(function))
+                self.assertIn('quoteKey', json.dumps(function))
+                self.assertNotIn('catalogRevision', json.dumps(function))
+            else:
+                self.assertEqual(function, reference)
             self.assertIn(reference['blueId'], definitions)
         self.assertEqual(set(composition['customFunctions']), {
             'constructDocument', 'prepareCustomerOrder', 'domainPrepare',

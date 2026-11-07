@@ -1,0 +1,301 @@
+{
+  "blueId": "4Jo5puA4Rb4yuMr2jAd6PUKVEXzJ72djA1KMeaDaom83",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "38WfjUZyXUA3dW3LbkBGjEnY5yutzb6MFB2iA3xLynfN",
+      "9uaNLT6DfnQ8EXeozaJQZgCy84P3m8E1fkb3YekMUieb",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Cancellation Clause",
+    "limitations": [
+      "Connection configuration and permitted callers are not supplied; supplier-labelled actions contain no supplier-role check.",
+      "Inherited validation helper bodies are omitted, so the complete identifier grammar is not established.",
+      "Timestamp fields establish microsecond units but do not explicitly establish a Unix epoch.",
+      "Settlement records are observations; later payment outcomes and pending reservations can affect their interpretation."
+    ],
+    "parameterRefs": [
+      "bindings.payments",
+      "bindings.requests",
+      "bindings.snapshot",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; do not infer a pending state.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: initialGroups, confirmProposal, acceptProposal, decision functions, fulfilGroup",
+        "id": "groupStatus",
+        "meaning": "pending_supplier/customer await supplier/customer; confirmed, cancelled, declined, expired, no_show, fulfilled record transitions.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Confirmed start is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: confirmProposal, acceptProposal, cancelGroup, noShowGroup",
+        "id": "confirmedStart",
+        "meaning": "Confirmed service-start timestamp in microseconds; gates ordinary cancellation and noShow.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/confirmedStartMicros",
+        "type": "number"
+      },
+      {
+        "absent": "No established cutoff; no free-cancellation inference.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: confirmProposal, acceptProposal, cancelGroup, saveReservation",
+        "id": "freeCancellationUntil",
+        "meaning": "Inclusive free-cancellation cutoff in microseconds, set from confirmed start and policy hours.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/freeCancellationUntilMicros",
+        "type": "number"
+      },
+      {
+        "absent": "No deadline set; expire rejects with NO_DEADLINE.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: setResponseDeadline, expireGroup",
+        "id": "responseDeadline",
+        "meaning": "Response deadline in microseconds; expire permits a pending group at or after it.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/responseDeadlineMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Decision kind is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: cancelGroup, declineGroup, expireGroup, supplierCancelGroup, noShowGroup",
+        "id": "decisionKind",
+        "meaning": "Decision action: cancel, decline, expire, supplierCancel or noShow; distinguishes the two cancellation routes.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/kind",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Current proposal's selected quote lines",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: makeProposal; cancelGroup decision.basisMinor",
+        "id": "decisionBasis",
+        "meaning": "Proposal price used for the decision, in decision.currency minor units; sourced from selected quote-line totals.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/basisMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: cancelGroup, noShowGroup; Rounding: roundBps",
+        "id": "decisionCharge",
+        "meaning": "Assessed cancellation or no-show charge in decision.currency minor units; not confirmed collection.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/chargeMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero or refunded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: cancelGroup decision.releasedMinor; other decision functions",
+        "id": "releasedPrice",
+        "meaning": "Price released after the assessed charge, in decision.currency minor units; not a refund or void outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/releasedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Currency is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: cancelGroup decision.currency; reconcileSettlement",
+        "id": "decisionCurrency",
+        "meaning": "Currency copied from snapshot.quote.currency and required to match the group's Payment Instruction terms.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Decision time is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: cancelGroup decision.timestampMicros; other decision functions",
+        "id": "decisionTime",
+        "meaning": "Decision timestamp in microseconds, copied from the execution timestamp.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/timestampMicros",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; no settlement conclusion.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: cancelGroup decision.settlementStatus; reconcileSettlement",
+        "id": "decisionSettlementMarker",
+        "meaning": "payment_evidence_required marks the decision's need for payment evidence; reconciliation leaves this marker unchanged.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/settlementStatus",
+        "type": "string"
+      },
+      {
+        "absent": "No established refund observation.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement refundStatus mapping",
+        "id": "refundStatus",
+        "meaning": "not_required, not_requested, requested, unknown, completed or failed; requested/unknown await a guarantor outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/refundStatus",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown, not false.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement settlement.cashRefundCompleted",
+        "id": "cashRefundCompleted",
+        "meaning": "True only when the decision-linked refund request was observed as succeeded; not_required yields false.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/cashRefundCompleted",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Group instruction's succeeded capture requests",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement capturedMinor; Payment Functions: confirm",
+        "id": "captured",
+        "meaning": "Observed cumulative successful captures for the group's instruction, in settlement.currency minor units; before refunds.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/capturedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Group instruction's succeeded refund requests",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement refundedMinor; Payment Functions: confirm",
+        "id": "refunded",
+        "meaning": "Observed cumulative successful refunds for the group's instruction, in settlement.currency minor units; excludes voids.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/refundedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Group's confirmed payment and decision charge",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement netPaid, cashRefundDue",
+        "id": "cashRefundDue",
+        "meaning": "Observed net confirmed payment exceeding the decision charge, in settlement.currency minor units; ignores reservations.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/cashRefundDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown, not zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Group's decision charge and confirmed payment",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement remainingCharge",
+        "id": "additionalChargeDue",
+        "meaning": "Observed decision charge still uncovered by net confirmed payment, in settlement.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/additionalChargeDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no authorization release proved.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Group's remaining authorization and additional charge",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement authorizationReleaseDueMinor",
+        "id": "authorizationReleaseDue",
+        "meaning": "Observed remaining secured funds above the additional charge, in settlement.currency minor units; not a completed void.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/authorizationReleaseDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Observation time is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions: reconcileSettlement settlement.observedAtMicros",
+        "id": "settlementObservedAt",
+        "meaning": "Microsecond timestamp of the stored reconciliation observation, not the time of a payment outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/observedAtMicros",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Cancellation Clause\n\nRecords whole-group cancellation, decline, expiry and no-show decisions, then reconciles their financial consequences against a Payment Instruction. This demonstration profile distinguishes a reservation decision, released price, remaining authorization and a completed cash refund.\n\n## Data and requests\n\nFour pointer bindings locate data in the document where the clause executes: `state` defaults to `/reservations` and holds groups keyed by `groupId`; `requests` defaults to `/reservationRequests` and records processed requests; `snapshot` defaults to `/orderSnapshot` and supplies terms and quote currency; `payments` defaults to `/payments` and holds Payment Instructions keyed by group. Overriding a binding changes the corresponding data location.\n\nEvery action requires `key`, `groupId` and `expectedProposalBlueId`. The five decision actions also require `reason`, a text value of 1–1,000 characters. `reconcileSettlement` declares only the three common fields. `key` identifies the request; `expectedProposalBlueId` must match the group's current proposal for a new request.\n\nAn identical recorded request—including action, calling channel and input—returns `duplicate` without reapplying the action or refreshing settlement. Reusing its key with different intent is rejected. New requests require an existing group and fewer than 500 entries in `requests`. Accepted changes save the group and request record, emit `Reservation Changed`, and return `acceptedNew`; this outcome does not confirm payment completion.\n\nThe calling channel is recorded as `actor`. Although `supplierCancel` and `noShow` describe supplier actions, these action bodies do not themselves check a supplier role. Their connection configuration and permitted callers are not established here.\n\n## Decision rules\n\nCancellation decisions read `snapshot.terms.cancellationPolicy` without a fallback. Its defined fields are integer `freeCancellationHoursBeforeStart` from 0 to 8,760 and integer `lateCancellationChargePercent` from 0 to 100. Confirmation can occur without this policy; that does not establish free cancellation rights. Shared saving logic removes `freeCancellationUntilMicros` when the snapshot has no cancellation policy.\n\n- `cancel`: permits withdrawal from `pending_supplier` or `pending_customer` without a charge. A `confirmed` group can be cancelled before `confirmedStartMicros`, or exactly at that start only when `freeCancellationHoursBeforeStart` is zero. Cancellation is free through the inclusive `freeCancellationUntilMicros` cutoff. Later permitted cancellation applies `lateCancellationChargePercent` to the current proposal amount, rounded half-up to a minor currency unit. The resulting status is `cancelled`.\n- `decline`: permits only either pending status, charges zero and sets `declined`.\n- `expire`: permits only either pending status, requires `responseDeadlineMicros`, and permits expiry at or after that deadline. It charges zero and sets `expired`. A deadline alone does not execute this action.\n- `supplierCancel`: permits either pending status or `confirmed`, charges zero and sets `cancelled`. Its body has no service-start cutoff.\n- `noShow`: requires `confirmed` and a timestamp at or after `confirmedStartMicros`. It applies the same rounded percentage charge and sets `no_show`.\n\nOther lifecycle states fail these guards. `pending_supplier` awaits supplier confirmation; `pending_customer` awaits customer acceptance. `fulfilled` is another state established by the shared reservation functions, but this clause does not expose fulfilment.\n\nEach decision records `kind`, `actor`, `reason`, `requestKey`, `groupId`, `proposalBlueId`, `policy` and `timestampMicros`. `basisMinor` is the current proposal's amount, whose source is the sum of its selected quote-line totals. `chargeMinor` is the assessed charge; `releasedMinor` is the portion of that price released by the decision, not money already refunded or authorization already voided. Currency comes from `snapshot.quote.currency`. `decisionBlueId` identifies the recorded decision. Its `settlementStatus` is initially `payment_evidence_required` and is not updated by reconciliation.\n\n## Settlement evidence\n\n`reconcileSettlement` requires a decision and a Payment Instruction at the matching group key. The instruction's terms must match the decision currency and basis amount, with `payerChannel` equal to `customer` and `payeeChannel` equal to `seller`.\n\nIt stores an observation in `settlement`: `capturedMinor` is cumulative confirmed captures, without deducting refunds; `refundedMinor` is cumulative confirmed refunds. Comparing their net result with the decision charge establishes `cashRefundDueMinor` or `additionalChargeDueMinor`. `authorizationReleaseDueMinor` identifies remaining secured funds exceeding the additional charge. These figures use confirmed ledger amounts, without deducting pending reservations. They are observations at `observedAtMicros`, not automatic payment instructions.\n\nThe linked refund request is the payment request whose identifier equals `decisionBlueId`. If present, it must be a `refund`, must match the outstanding refund amount unless already successful, and must not exceed `releasedMinor`. An already successful request requires no remaining cash refund due.\n\n`refundStatus` is `not_requested` when cash is due without a linked request, or `not_required` when none is due and no linked request exists. A linked request maps `pending` to `requested`, `unknown` to `unknown`, `succeeded` to `completed`, and either `declined` or `failed` to `failed`. `cashRefundCompleted` is true only for `completed`; `not_required` is not proof of a completed refund. The observation also records `currency`, `decisionBlueId`, `paymentRequestId` and `paymentInstructionBlueId`.\n\nPayment requests reserve capacity; confirmed amounts change only on successful guarantor outcomes. An unknown outcome retains its reservation. `secured` means remaining authorization, while a successful void releases that authorization without refunding captured money. Neither a cancellation decision nor reconciliation sends a refund, capture or void request.\n\nThe supplied evidence does not establish connection-level authorization or the full identifier-validation rules. Settlement observations can become stale after further payment outcomes."
+}

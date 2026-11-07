@@ -28,6 +28,11 @@ public final class ResellerBootstrapFunctionPinsConformance {
             var metadata = object(WireData.json(Files.readString(root.resolve("clause-documents/dist/package.json"))));
             if (!definition.id().equals(composition.get("sourceDefinition"))) errors.add("sourceDefinition");
             if (!metadata.get("packageBlueId").equals(composition.get("sourcePackageId"))) errors.add("sourcePackageId");
+            // The separate quote-based bootstrap profile owns this unchanged helper
+            // after main's Customer Orders adopts catalogRevision/lines semantics.
+            String bookingId = NativeRuntime.identity(values.source(copied.get("prepareBooking")));
+            String expectedBooking = object(object(composition.get("domainFunctionReferences")).get("prepareBooking")).get("blueId").toString();
+            if (!bookingId.equals(expectedBooking)) errors.add("domainFunction/prepareBooking");
             for (var entry : object(composition.get("functions")).entrySet()) {
                 String name = entry.getKey();
                 String expected = NativeRuntime.identity(values.exact(values.select(definition, "/functions/" + name)));

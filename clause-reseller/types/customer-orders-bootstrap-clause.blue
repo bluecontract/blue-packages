@@ -1030,8 +1030,160 @@ actionDefinition:
         blueId: Fqc3hnFEpfvCSJe1EZwZgR8EqPXuAFqVtZNHXcdDL4dq
       roundBps:
         blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
+      # Exact quote-based helper owned by this separate bootstrap profile.
       prepareBooking:
-        blueId: 5FywWwn8W6XS1MyJE3cTSpx5whRyLHhoA3h9h9r6MXt2
+        args:
+          input: {}
+        do:
+        - $let:
+            name: fields
+            expr:
+              $var:
+                name: input
+                path: /fields
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: input
+                key: quoteKey
+            then:
+            - $call:
+                function: validateIdentifier
+                args:
+                  candidate:
+                    $var:
+                      name: input
+                      path: /quoteKey
+                  error: INVALID_QUOTE_KEY
+            - $let:
+                name: quote
+                expr:
+                  $get:
+                    object:
+                      $document:
+                        $const:
+                          name: bindings
+                          path: /quotes
+                    key:
+                      $var:
+                        name: input
+                        path: /quoteKey
+            - $failIf:
+                cond:
+                  $not:
+                    $exists:
+                      $var: quote
+                message: UNKNOWN_QUOTE
+            - $set:
+                name: fields
+                expr:
+                  $merge:
+                  - $var: fields
+                  - amountMinor:
+                      $var:
+                        name: quote
+                        path: /totalMinor
+                    quote:
+                      $var: quote
+                    quoteBlueId:
+                      $nodeBlueId:
+                        $var: quote
+        - $if:
+            cond:
+              $exists:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /fulfilment
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $hasKey:
+                      object:
+                        $var: input
+                      key: quoteKey
+                message: QUOTE_REQUIRED
+            - $let:
+                name: terms
+                expr:
+                  $merge:
+                  - $document:
+                      $concat:
+                      - $const:
+                          name: bindings
+                          path: /fulfilment
+                      - /terms
+                  - agreementDescription:
+                      $document: /description
+            - $let:
+                name: snapshot
+                expr:
+                  quote:
+                    $var:
+                      name: fields
+                      path: /quote
+                  quoteBlueId:
+                    $var:
+                      name: fields
+                      path: /quoteBlueId
+                  terms:
+                    $var: terms
+                  termsBlueId:
+                    $nodeBlueId:
+                      $var: terms
+                  groups:
+                    $var:
+                      name: input
+                      path: /groups
+            - $call:
+                function: initialGroups
+                args:
+                  snapshot:
+                    $var: snapshot
+            - $forEach:
+                in:
+                  $var:
+                    name: input
+                    path: /groups
+                item: group
+                do:
+                - $if:
+                    cond:
+                      $var:
+                        name: terms
+                        path: /dateRequired
+                    then:
+                    - $failIf:
+                        cond:
+                          $not:
+                            $gt:
+                            - $var:
+                                name: group
+                                path: /proposedStartMicros
+                            - $binding: timestamp
+                        message: START_NOT_FUTURE
+            - $set:
+                name: fields
+                expr:
+                  $merge:
+                  - $var: fields
+                  - orderSnapshot:
+                      $var: snapshot
+            else:
+            - $failIf:
+                cond:
+                  $hasKey:
+                    object:
+                      $var: input
+                    key: groups
+                message: BOOKING_CLAUSE_REQUIRED
+        - $return:
+            $merge:
+            - $var: input
+            - fields:
+                $var: fields
       prepareCustomerOrder:
         args:
           input: {}

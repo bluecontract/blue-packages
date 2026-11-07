@@ -1,0 +1,90 @@
+{
+  "scenarios": [
+    {
+      "name": "Order creation confirmation and cancellation",
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "timestampMicros": 1794574799999990,
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "museum-admission--regular-weekend",
+                "quantity": 2,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          }
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "timestampMicros": 1794574799999991,
+          "requireExactDocumentVersion": true,
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier"
+          },
+          "capture": "pending",
+          "capturePaths": [
+            "/orders/o1/orderSnapshot",
+            "/orders/o1/reservations"
+          ]
+        },
+        {
+          "target": "/orders/o1",
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "timestampMicros": 1794574799999999,
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "confirmed"
+          }
+        },
+        {
+          "target": "/orders/o1",
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "timestampMicros": 1794574800000001,
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "cancelled",
+            "/orders/o1/reservations/trip/decision/chargeMinor": 9500
+          },
+          "capture": "cancelled",
+          "capturePaths": [
+            "/orders/o1/reservations"
+          ]
+        }
+      ]
+    }
+  ]
+}

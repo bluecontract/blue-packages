@@ -1,0 +1,367 @@
+name: Swedish Massage — umowa resellerska
+type: Agreements/Agreement with Clauses
+template:
+  id: reseller-catalog-preview
+  version: 0.1.0-preview.2
+terms:
+  commissionBps: 1000
+  currency: USD
+  exclusive: false
+orders: {}
+payouts: {}
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type:
+            blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+          displayName: Dostawca
+          business:
+            type: Parties/Business
+            displayName: Authentic Thai Massage NYC
+        partner:
+          type:
+            blueId: 8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid
+          displayName: Partner
+          business:
+            type: Parties/Business
+            displayName: Partner przykładowy
+      required:
+      - seller
+      - partner
+      preActivationOperations:
+      - proposeTerms_seller
+      - proposeTerms_partner
+      preActivationChannels:
+      - cx.termsValidation.validate._automatic_source
+  termsValidation:
+    type: Reseller/Commercial Terms Validation Clause
+    bindings:
+      terms: /terms
+  orders:
+    type: Reseller/Customer Orders Clause
+    bindings:
+      template: /orderTemplate
+      collection: /orders
+      fulfilment: /clauses/fulfilment/parameters
+      prepareOrder:
+        prepareOrder:
+          'on': workflow
+          party: partner
+          request:
+            type: Documents/Preparation Input
+          params:
+            $pointerSet:
+              object:
+                $var: trigger
+              path: /type
+              op: remove
+      provideOrder:
+        provideOrder:
+          'on': workflow
+          party: partner
+      catalog: /products
+  payouts:
+    type: Reseller/Commission Payouts Clause
+    bindings:
+      template: /payoutTemplate
+      collection: /payouts
+      commission: /commission
+      parties:
+        seller: seller
+        partner: partner
+      preparePayout:
+        startPayout:
+          'on': workflow
+          party: seller
+  commission:
+    type: Reseller/Commission Clause
+    bindings:
+      state: /commission
+      orders: /orders
+      payouts: /payouts
+      rate: /terms/commissionBps
+  negotiation:
+    type: Reseller/Commercial Terms Negotiation Clause
+    bindings:
+      terms: /terms
+      propose:
+        proposeTerms_seller:
+          'on': workflow
+          party: seller
+        proposeTerms_partner:
+          'on': workflow
+          party: partner
+  catalog:
+    type: Reseller/Catalog Clause
+    parameters:
+      offer:
+        title: Swedish Massage
+        text: A table massage using long, controlled strokes and medium pressure, with pressure and pace adjusted
+          to the client during the session. The business describes it as a relaxation-focused option that can help
+          ease everyday tension and settle the nervous system. Unscented, hypoallergenic oils are used by default,
+          with aromatherapy available on request. Clients are professionally draped throughout, with only the area
+          being worked uncovered. You can ask for lighter or firmer pressure, and the therapist checks in and adjusts.
+          Sessions take place in a private studio room; the 60-, 90-, and 120-minute rate options are published
+          in the studio's service guide.
+        sections:
+        - title: W cenie
+          bullets:
+          - Unscented, hypoallergenic oil by default
+          - Professional draping
+        - title: Warto wiedzieć
+          bullets:
+          - A modified pregnancy-safe session may be arranged after the first trimester; mention pregnancy when
+            booking.
+    bindings:
+      state: /products
+  fulfilment:
+    type: Reseller/Fulfilment Terms Clause
+    parameters:
+      terms:
+        fulfilmentText: Zamówienie wymaga wskazania proponowanego terminu i potwierdzenia przez Authentic Thai Massage
+          NYC. Klient wskazuje proponowany termin przy składaniu zamówienia. Jeżeli dostawca zaproponuje inny termin,
+          klient musi go zaakceptować.
+        confirmationMode: supplier
+        dateRequired: true
+      template:
+        name: Potwierdzenie terminu zamówienia
+        description: Ta klauzula jest dołączana do zamówienia tylko wtedy, gdy umowa zawiera klauzulę fulfilment.
+          Wymagania i proponowany termin są zapisywane w zamówieniu.
+        type: Orders/Order with Clauses
+        clauses:
+          confirmation:
+            type: Reseller/Confirmation Clause
+            bindings:
+              confirm:
+                confirmReservation:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              alternative:
+                proposeAlternative:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              accept:
+                acceptProposal:
+                  'on': workflow
+                  party: customer
+                  params:
+                    $var: trigger
+orderTemplate:
+  name: Guest booking
+  type: Orders/Order with Clauses
+  description: Zamówienie klienta w ramach umowy resellerskiej, z wybranymi produktami i ceną wyliczoną z katalogu.
+  currency: USD
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: Parties/Party
+          partner:
+            type: Parties/Party
+          customer:
+            type: Parties/Party
+        required: []
+        preActivationChannels:
+        - cx.payment.prepare.onOrderCreated_source
+        preActivationOperations:
+        - providePayment
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        obtain: provide
+        template:
+          name: Card payment for the guest booking
+          type: PaymentInstruction/Payment Instruction with Clauses
+          clauses:
+            activation:
+              type: Activation/Activation Clause
+              parameters:
+                parties:
+                  payer:
+                    type: Parties/Party
+                  payee:
+                    type: Parties/Party
+                  guarantor:
+                    type: MyOS/MyOS Party
+                    email: payments@example.test
+                  observer:
+                    type: Parties/Party
+                required: []
+            payment:
+              type: Payment/Payment Process Clause
+              parameters:
+                method: card
+                capture:
+                  mode: workflow
+              bindings:
+                requestAuthorize:
+                  authorize:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+                requestCapture:
+                  pay:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+                requestRefund:
+                  refund:
+                    'on': workflow
+                    party: payee
+                    params:
+                      $object:
+                        $var: trigger
+                requestVoid:
+                  cancel:
+                    'on': workflow
+                    party: payer
+                    params:
+                      $object:
+                        $var: trigger
+          paymentTerms:
+            amountMinor:
+              type: Integer
+            limitMinor:
+              type: Integer
+            currency:
+              type: Text
+            payerChannel: payer
+            payeeChannel: payee
+            guarantorChannel: guarantor
+            allowedPayees:
+            - payee
+            recipientApprovalRequired: false
+          businessContext:
+            description: Płatność kartą za zamówiony usługa.
+        suppliedBy: seller
+        fieldPaths:
+          amountMinor: /paymentTerms/amountMinor
+          limitMinor: /paymentTerms/limitMinor
+          currency: /paymentTerms/currency
+        prepareFor: bootstrap
+        suppliedParties:
+        - guarantor
+      bindings:
+        instruction: /payment
+        parties:
+          payer: customer
+          payee: seller
+          observer: partner
+        prepare:
+          onOrderCreated:
+            'on': initialized
+            params:
+              values:
+                amountMinor:
+                  $document: /amountMinor
+                limitMinor:
+                  $document: /amountMinor
+                currency:
+                  $document: /currency
+        provide:
+          providePayment:
+            'on': workflow
+            party: seller
+    paymentEvents:
+      type: Reseller/Payment Observation Clause
+      bindings:
+        instruction: /payment
+payoutTemplate:
+  name: Partner commission payout
+  type: Agreements/Agreement with Clauses
+  amountMinor: 1000
+  currency: USD
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: Parties/Party
+          partner:
+            type: Parties/Party
+        required: []
+    payment:
+      type: Reseller/Commission Payout Payment Clause
+      parameters:
+        payer: seller
+        payee: partner
+        currency: USD
+      bindings:
+        amount: /amountMinor
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: seller
+        requestAuthorize:
+          authorize:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestCapture:
+          capture:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+        requestRefund:
+          refund:
+            'on': workflow
+            party: partner
+            params:
+              $object:
+                $var: trigger
+        requestVoid:
+          cancel:
+            'on': workflow
+            party: seller
+            params:
+              $object:
+                $var: trigger
+description: Umowa współpracy obejmująca ofertę Swedish Massage.
+products:
+  revision: 1
+  supplierId: seller
+  currency: USD
+  entries:
+    variant-1:
+      label: 60 minutes
+      description: Published standard session length.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 14990
+      guestDiscountPercent: 5
+    variant-2:
+      label: 90 minutes
+      description: Published standard session length.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 20990
+      guestDiscountPercent: 5
+    variant-3:
+      label: 120 minutes
+      description: Published standard session length.
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 29990
+      guestDiscountPercent: 5
