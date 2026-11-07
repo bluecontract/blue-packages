@@ -16,6 +16,10 @@ public final class CommissionHistoryConformance {
     var root = Path.of(args[0]);
     if (args.length > 2) originalProviderSlots = WireData.json(Files.readString(Path.of(args[2])));
     var packages = CompositionPackages.published(root, root.resolve("PACKAGES.json"));
+    if (args.length > 1 && args[1].equals("access")) {
+      BootstrapPreparationConformance.bootstrapAccessGuards(packages);
+      return;
+    }
     for (boolean selectInactive : args.length > 1 && args[1].equals("guards") ? List.of(true) : List.of(false, true)) {
       try (var blue = packages.language(); var runtime = new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
         var p = runtime.processor(blue);
@@ -119,6 +123,50 @@ public final class CommissionHistoryConformance {
             "Unexpected stage denial: " + error);
       }
       System.out.println("PASS native frozen-policy stage " + variant);
+    }
+    provisionGuards(p, root, child, item);
+  }
+
+  static void provisionGuards(Contracts p, Exact host, Contracts.Document child, Map<String,Object> item) {
+    var v = p.execution().values();
+    String step = "/contracts/provideOrder/steps/0";
+    var functions = new LinkedHashMap<>(o(v.bexData(v.select(host, step + "/definition/functions"))));
+    functions.putAll(o(v.bexData(v.select(host, step + "/functions"))));
+    for (var entry : functions.entrySet()) {
+      if (entry.getValue() instanceof Map<?,?> ref && ref.get("blueId") instanceof String id)
+        entry.setValue(v.bexData(new Exact.Ref(id)));
+    }
+    for (String variant : List.of("valid", "wrong-request", "wrong-requirement", "wrong-supplier", "wrong-origin")) {
+      var request = m("key", item.get("key"), "inResponseTo", item.get("requestId"),
+          "requirementRef", item.get("requirementRef"), "document", m("blueId", child.blueId()));
+      String channel = String.valueOf(item.get("supplier"));
+      String reason = switch (variant) {
+        case "wrong-request" -> "PREPARATION_WRONG_REQUEST";
+        case "wrong-requirement" -> "PREPARATION_WRONG_REQUIREMENT";
+        case "wrong-supplier" -> "PREPARATION_WRONG_SUPPLIER";
+        case "wrong-origin" -> "PREPARATION_UNREVIEWED_SOURCE";
+        default -> "";
+      };
+      if (variant.equals("wrong-request")) request.put("inResponseTo", "foreign-request");
+      if (variant.equals("wrong-requirement")) request.put("requirementRef", "foreign-requirement");
+      if (variant.equals("wrong-supplier")) channel = "foreign-supplier";
+      Object input = m("$binding", "call/request");
+      if (variant.equals("wrong-origin")) input = m("$pointerSet", m("object", input,
+          "path", "/document/contracts/initialized/document", "op", "set", "val", m("$document", "/contracts/initialized/document")));
+      var expression = m("functions", functions, "constants", v.bexData(v.select(host, step + "/constants")),
+          "expr", m("$call", m("function", "checkProvision", "args", m("input", input))));
+      var inputExact = v.source(m("channel", channel, "request", request));
+      var expressionExact = v.source(expression);
+      try {
+        var result = p.execution().evaluatePredicate(host, inputExact, "call", expressionExact, 10000000);
+        check(variant.equals("valid"), "Foreign provision must reject " + variant);
+        check("acceptedNew".equals(o(result.value()).get("outcome")), "Full provision positive control");
+        check("ready".equals(o(o(result.value()).get("staged")).get("status")), "Opted-in inactive stage");
+        check(result.events().isEmpty() && result.changeset().isEmpty(), "Pure full provision check");
+      } catch (blue.bex.BexError failure) {
+        check(!variant.equals("valid") && failure.getMessage().contains(reason), "Unexpected provision denial " + failure);
+      }
+      System.out.println("PASS native full provision " + variant);
     }
   }
 
