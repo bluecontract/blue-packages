@@ -14,17 +14,27 @@ alias or commit:
 4. Publish committed cards separately. Uploading a missing object never calls a model.
 
 Changing a README, package version, generator or prompt does not regenerate an
-existing card. A new type BlueId does. Invalid cards fail validation rather than
-being silently replaced. Generated prose still needs review.
+existing card. A new type BlueId does. An explicit local `--refresh BLUE_ID`
+produces a review candidate without replacing the existing card. Invalid cards
+fail validation rather than being silently replaced. Generated semantics still
+need review.
 
 ## Card content
 
-The generated response, committed file and S3 object have the same two fields:
+New generation returns prose and structured metadata:
 
 ```json
 {
   "blueId": "<exact type BlueId>",
-  "semanticText": "# Type name\n\nWhat this type means and does."
+  "semanticText": "# Type name\n\nWhat this type means and does.",
+  "metadata": {
+    "displayLabel": "Type name",
+    "parameterRefs": [],
+    "covers": [],
+    "dependencies": [],
+    "stateFacts": [],
+    "limitations": []
+  }
 }
 ```
 
@@ -51,12 +61,40 @@ Cards contain shared type semantics, not screen layouts, UI components,
 Terms-writing instructions or conversation style. Current values and permissions
 still come from authorized document data, not the card.
 
-Do not add `metadata`, dependency BlueId lists, hashes, package versions, model
-details or review/validation envelopes to cards. Bounded source definitions,
-dependencies and checksums remain in ignored generation requests for grounding
-and source checks. The prompt version remains in `semantics/generator.json`.
-Validation checks the two-field shape, exact identity and size; it does not prove
-that the prose correctly describes execution. Review the meaning against sources.
+The generator and GitHub generation action use
+[`output.schema.json`](../semantics/output.schema.json). `metadata` is mandatory
+for newly generated cards and uses the existing semantic-card registry envelope:
+a display label, parameter and dependency references, source-backed state facts
+and limitations. Older two-field cards and facts without explicit scope or
+aggregate remain readable; they are not silently regenerated. A stateless type
+may return `stateFacts: []`. A stateful type must describe established business
+state, amounts, currencies and important dates, or identify missing evidence.
+The metadata contains no instance values, inferred status enum or display layout.
+
+A state fact names a declared binding and its default, or a source-established
+execution-document path. `/*/` describes arbitrary collection members. A `clause`
+path may contain `{clauseKey}` only when the exact definition constructs that
+path using the compiler's clause key. Fields retain their units, meaning and
+absence semantics; `date-micros` denotes a Unix-microsecond instant, not a duration.
+Every generated fact explicitly declares its scope, path, binding/default,
+suffix, type, meaning, absence semantics, evidence and nullable aggregate
+annotation. An aggregate describes an existing maintained total or a collection
+count; it is not a formula for the consumer to execute. Missing state is unknown;
+an initialization default applies only after initialization executes. Payment
+facts distinguish remaining authorization, cumulative captures, refunds and
+pending reservations. They do not equate a request with its confirmed outcome.
+Consumers relocate these paths using the instance configuration and read current
+authorized data. They must not substitute example keys, values or status mappings.
+
+Do not add model details, hashes or review/validation envelopes to public cards.
+Bounded source definitions, checksums and generation diagnostics remain in ignored
+reports. Generation prioritizes inherited executable definitions within a bounded
+source context. Validation checks shape, identity, size, declared references,
+binding defaults, unique fact IDs, path evidence and numeric aggregate types;
+it does not prove the prose or state meanings, nor completeness of the chosen
+facts. Review both against exact sources. Consumers must include state
+metadata in the card revision fingerprint. Upgrade readers to accept this optional
+field before publishing enriched cards; strict two-field readers reject them.
 
 ## Discovery
 
@@ -161,6 +199,10 @@ codex login
 
 # Generate only missing cards; add --bucket YOUR_BUCKET to reuse S3 as well.
 .venv/bin/python tools/semantic_cards.py generate --jobs 4 --bucket YOUR_BUCKET
+
+# Refresh only the selected exact type; repeat --refresh for multiple IDs.
+# Candidates go to build/semantic-refresh/cards. Review before copying to semantics/cards.
+.venv/bin/python tools/semantic_cards.py generate --refresh TYPE_BLUE_ID --output build/semantic-refresh
 
 .venv/bin/python tools/semantic_cards.py check
 git add semantics/cards

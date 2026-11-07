@@ -15,12 +15,18 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
+    'myos-instruction-types': ('blue.core.MyosInstructionTypesConformance',),
     'access-events-behavior': ('blue.core.AccessEventsConformance',),
     'helper-native': ('OperationInputConformance', 'native'),
     'helper-payment': ('OperationInputConformance', 'payment'),
     'helper-final': ('OperationInputConformance', 'final'),
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
+    'representative-access': ('RepresentativeAccessConformance',),
     'activation-effects': ('ActivationExecutionConformance',),
+    'source-path-declarations': ('SourcePathsDeclarationConformance',),
+    'source-path-observation': ('SourcePathsObservationConformance',),
+    **{'source-path-' + mode: ('SourcePathsObservationConformance', mode)
+       for mode in ('admission', 'collision', 'undeclared', 'foreign-source', 'nonroot', 'escaped-alias')},
     'source-binding': ('SourceBindingConformance',),
     'source-binding-cyclic': ('SourceBindingConformance', 'cyclic'),
     'source-binding-public': ('SourceBindingConformance', 'public', 'cyclic'),
@@ -30,6 +36,8 @@ CASES = {
     'source-binding-routing': ('SourceBindingConformance', 'routing'),
     'document-provision': ('ProvisionInputConformance',),
     'bootstrap-preparation': ('BootstrapPreparationConformance',),
+    'admission-definition': ('AdmissionDefinitionConformance',),
+    'static-identity-predicate': ('StaticIdentityPredicateConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
@@ -72,9 +80,13 @@ def main():
     sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
+    if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance'} & sources:
+        sources.add('BootstrapPreparationConformance')
+    if 'StaticIdentityPredicateConformance' in sources:
+        sources.add('AdmissionConsentDispatchConformance')
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
-    if 'PaymentExecutionConformance' in sources:
+    if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
         sources.add('CurrentOperationScenarios')
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:
         subprocess.run([javac, '-cp', classpath, '-d', classes,

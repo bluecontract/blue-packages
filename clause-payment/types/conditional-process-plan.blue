@@ -481,6 +481,7 @@ functions:
                     $includes:
                       list:
                       - $document
+                      - $nodeBlueId
                       - $eq
                       - $ne
                       - $lt
@@ -501,6 +502,17 @@ functions:
                       val:
                         $var: operator
                 message: PAYMENT_PREDICATE_REQUIRES_STATIC_PURE_DEPENDENCIES
+            - $if:
+                cond: {$eq: [{$var: operator}, $nodeBlueId]}
+                then:
+                - $failIf:
+                    cond:
+                      $not:
+                        $and:
+                        - {$isKind: {val: {$var: operand}, kind: object}}
+                        - {$eq: [{$size: {$var: operand}}, 1]}
+                        - {$hasKey: {object: {$var: operand}, key: $document}}
+                    message: PAYMENT_PREDICATE_STATIC_IDENTITY_REQUIRED
             - $if:
                 cond:
                   $eq:

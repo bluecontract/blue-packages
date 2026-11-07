@@ -178,32 +178,54 @@ def inventory(root):
     return dict(sorted(subjects.items())), definitions
 
 
+def context_wire(value):
+    """Deterministic UTF-8 presentation bytes; release wire identities stay unchanged."""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True,
+                      separators=(',', ':')).encode('utf-8')
+
+
+
 def pointer(value):
     return isinstance(value, str) and value.startswith('/') and len(value) <= 256 and not re.search(r'\s|~(?![01])', value)
 
 
+def executable_references(value):
+    if isinstance(value, list):
+        return set().union(*(executable_references(child) for child in value))
+    if not isinstance(value, dict):
+        return set()
+    return set().union(*(references(child) if key.lower().endswith('definition') or key == 'functions'
+                         else executable_references(child) for key, child in value.items()))
+
+
 def evidence(blue_id, definitions):
     root = compact(definitions[blue_id])
-    require(len(wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
+    require(len(context_wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
     supplied, omitted, visited = {}, set(), {blue_id}
-    # Include inheritance first, so optional event/helper references cannot crowd it out.
-    queue = [(identity, 0) for identity, _ in list(type_chain(blue_id, definitions))[1:]]
+    # Keep the subject's executable specialization ahead of its large framework ancestry.
+    queue = [(ref, 1) for ref in sorted(executable_references(root))]
+    queue += [(identity, 0) for identity, _ in list(type_chain(blue_id, definitions))[1:]]
     queue += [(ref, 1) for ref in sorted(references(root))]
     size = 0
     while queue:
+        # Visit the nearest source first, before a deeper path can mark it omitted.
+        queue.sort(key=lambda item: item[1])
         ref, depth = queue.pop(0)
         if ref in visited or ref in PRIMITIVES:
             continue
         visited.add(ref)
         value = compact(definitions[ref]) if ref in definitions else None
-        length = len(wire(value)) if value is not None else 0
+        length = len(context_wire(value)) if value is not None else 0
         if value is None or depth > 3 or len(supplied) >= 128 or size + length > 240_000:
             omitted.add(ref)
             continue
         supplied[ref] = value
         size += length
+        # Keep inherited executable behavior ahead of incidental events/framework types.
+        queue[:0] = [(identity, depth) for identity, _ in list(type_chain(ref, definitions))[1:]]
+        queue[:0] = [(child, depth + 1) for child in sorted(executable_references(value))]
         queue.extend((child, depth + 1) for child in sorted(references(value)))
-    bindings, parameters, paths = {}, set(), set()
+    bindings, parameters, paths, clause_paths = {}, set(), set(), set()
 
     def fields(node, path, depth=0):
         if depth > 32 or not pointer(path):
@@ -243,6 +265,12 @@ def evidence(blue_id, definitions):
         elif isinstance(value, dict):
             if pointer(value.get('$document')):
                 paths.add(value['$document'])
+            parts = value.get('$concat')
+            if isinstance(parts, list) and {'$const': 'clauseKey'} in parts:
+                chunks = [part if isinstance(part, str) else '{clauseKey}'
+                          if part == {'$const': 'clauseKey'} else None for part in parts]
+                if None not in chunks and pointer(''.join(chunks)):
+                    clause_paths.add(''.join(chunks))
             change = value.get('$appendChange')
             if isinstance(change, dict) and change.get('op') in {'add', 'replace'}:
                 fields(change.get('val'), change.get('path'))
@@ -253,7 +281,8 @@ def evidence(blue_id, definitions):
     return dict(blueId=blue_id, definition=root,
                 bindings=[dict(name=k, defaultPath=v) for k, v in sorted(bindings.items())],
                 parameterRefs=sorted(parameters | {'bindings.' + name for name in bindings}),
-                documentPaths=sorted(paths), referencedBlueIds=sorted((visited | omitted) - {blue_id}),
+                documentPaths=sorted(paths), clausePaths=sorted(clause_paths),
+                referencedBlueIds=sorted((visited | omitted) - {blue_id}),
                 dependencyDefinitions=[dict(blueId=k, definition=v) for k, v in sorted(supplied.items())],
                 omittedDependencies=sorted(omitted))
 

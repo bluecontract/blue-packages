@@ -43,7 +43,9 @@ def subject(blue_id):
 
 
 def response(blue_id):
-    return dict(blueId=blue_id, semanticText='# Fixture\n\nAn exact reusable type description.')
+    return dict(blueId=blue_id, semanticText='# Fixture\n\nAn exact reusable type description.',
+                metadata=dict(displayLabel='Fixture', parameterRefs=[], covers=[],
+                              dependencies=[], stateFacts=[], limitations=[]))
 
 
 def request(blue_id):
@@ -51,7 +53,7 @@ def request(blue_id):
     generator = json.loads((cards.ASSETS / 'generator.json').read_text())
     generator['promptSha256'] = digest((cards.ASSETS / 'prompt.md').read_bytes())
     return dict(context=context, definitionDigest=sources.definition_digest(blue_id, DEFINITIONS),
-                sourceDigest=digest(wire(context)), package=deepcopy(PACKAGE), generator=generator)
+                sourceDigest=digest(sources.context_wire(context)), package=deepcopy(PACKAGE), generator=generator)
 
 
 class InfrastructureTests(unittest.TestCase):
@@ -95,6 +97,54 @@ class InfrastructureTests(unittest.TestCase):
 
 
 class SourceTests(unittest.TestCase):
+    def test_compact_context_preserves_inline_functions_and_inheritance(self):
+        function = {'body': [{'name': '界', 'value': True}] * 4000}
+        original = {'type': {'blueId': B}, 'functions': {'large': function}}
+        definitions = {A: original, B: {'description': 'parent'}, C: deepcopy(function)}
+        before = deepcopy(definitions)
+        self.assertGreater(len(wire(original)), 200_000)
+        context = sources.evidence(A, definitions)
+        self.assertEqual(original, context['definition'])
+        self.assertEqual([{'blueId': B, 'definition': definitions[B]}], context['dependencyDefinitions'])
+        self.assertEqual([], context['omittedDependencies'])
+        self.assertEqual(before, definitions)
+        self.assertEqual(digest(wire(original)), sources.definition_digest(A, definitions))
+
+    def test_genuinely_large_inline_function_fails_closed(self):
+        function = {'body': 'x' * 240_001}
+        with self.assertRaisesRegex(ValueError, 'Root definition exceeds semantic context budget'):
+            sources.evidence(A, {A: {'functions': {'large': function}}, C: function})
+
+    def test_context_budget_counts_utf8_bytes_and_preserves_inheritance_priority(self):
+        prefix = len(sources.context_wire({'body': ''}))
+        exact = {'body': 'x' * (200_000 - prefix)}
+        self.assertEqual(exact, sources.evidence(A, {A: exact})['definition'])
+        with self.assertRaisesRegex(ValueError, 'Root definition exceeds'):
+            sources.evidence(A, {A: {'body': exact['body'] + '界'}})
+        parent = {'body': '界' * 60_000}
+        optional = {'body': 'z' * 70_000}
+        context = sources.evidence(A, {A: {'type': {'blueId': B}, 'helper': {'blueId': C}},
+                                       B: parent, C: optional})
+        self.assertEqual([{'blueId': B, 'definition': parent}], context['dependencyDefinitions'])
+        self.assertEqual([C], context['omittedDependencies'])
+        self.assertEqual(json.loads(sources.context_wire(parent)), parent)
+        self.assertEqual(sources.context_wire({'b': True, 'a': 1}), b'{"a":1,"b":true}')
+
+    def test_small_inline_function_context_stays_inline(self):
+        function = {'body': 'small'}
+        original = {'functions': {'small': function}}
+        context = sources.evidence(A, {A: original, C: function})
+        self.assertEqual(original, context['definition'])
+        self.assertEqual([], context['dependencyDefinitions'])
+        self.assertEqual([], context['referencedBlueIds'])
+        self.assertEqual([], context['omittedDependencies'])
+
+    def test_large_unmatched_function_still_fails_root_budget(self):
+        function = {'body': 'x' * 200_001, 'value': True}
+        with self.assertRaisesRegex(ValueError, 'Root definition exceeds semantic context budget'):
+            sources.evidence(A, {A: {'functions': {'large': function}},
+                                 C: dict(function, value=1)})
+
     def test_inventory_includes_exact_core_access_events_and_current_collection(self):
         subjects, definitions = sources.inventory(ROOT)
         expected = {
@@ -204,6 +254,67 @@ class SourceTests(unittest.TestCase):
         context = sources.evidence(B, {**DEFINITIONS, B: {'defaultBindings': {'inline': {}}}})
         self.assertEqual([dict(name='inline', defaultPath=None)], context['bindings'])
 
+    def test_executable_inheritance_is_kept_before_incidental_dependencies(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B] = {'actionDefinition': {'type': {'blueId': E}}, 'unrelated': {'blueId': D}}
+        definitions[E] = {'type': {'blueId': F}}
+        definitions[F] = {'functions': {'init': {'$appendChange': {
+            'op': 'add', 'path': '/ledger', 'val': {'total': 0}}}}}
+        definitions[D] = {'description': 'x' * 480_000}
+        context = sources.evidence(B, definitions)
+        self.assertIn('/ledger/total', context['documentPaths'])
+        self.assertIn(D, context['omittedDependencies'])
+
+    def test_inline_specialization_is_kept_before_large_parent_definitions(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B] = {'type': {'blueId': A}, 'actionDefinition': {'type': {'blueId': E}}}
+        definitions[A] = {'hookDefinition': {'type': {'blueId': D}}}
+        definitions[D] = {'description': 'x' * 479_000}
+        definitions[E] = {'functions': {'constructOrder': {'blueId': F}}}
+        definitions[F] = {'args': {}, 'do': [{'$return': 'selected-quote'}]}
+        context = sources.evidence(B, definitions)
+        included = {row['blueId'] for row in context['dependencyDefinitions']}
+        self.assertTrue({E, F}.issubset(included))
+
+    def test_clause_paths_require_the_exact_compiler_constant(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B]['functions'] = [
+            {'$concat': ['/process_', {'$const': 'clauseKey'}, '/entries']},
+            {'$concat': ['/process_', {'$var': 'clauseKey'}, '/entries']},
+        ]
+        self.assertEqual(['/process_{clauseKey}/entries'], sources.evidence(B, definitions)['clausePaths'])
+
+    def test_shallow_dependency_is_not_lost_after_a_deeper_reference(self):
+        definitions = deepcopy(DEFINITIONS)
+        g = 'G' * 44
+        definitions[B] = {'type': {'blueId': A}, 'actionDefinition': {'type': {'blueId': E}}}
+        definitions[A] = {'hookDefinition': {'type': {'blueId': D}}}
+        definitions[E] = {'functions': {'deep': {'blueId': F}}}
+        definitions[F] = {'functions': {'deeper': {'blueId': g}}}
+        definitions[g] = {'functions': {'shared': {'blueId': D}}}
+        definitions[D] = {'functions': {'run': {'$appendChange': {
+            'op': 'add', 'path': '/result', 'val': {'timestamp': 0}}}}}
+        context = sources.evidence(B, definitions)
+        self.assertIn('/result/timestamp', context['documentPaths'])
+        self.assertNotIn(D, context['omittedDependencies'])
+
+    def test_payment_evidence_includes_native_ledger_from_inherited_functions(self):
+        _, definitions = sources.inventory(ROOT)
+        for identity in ('E9D2hMTnDHeShhe2r5gaCXRXComc6wxKpAmrRtUQpi2L',
+                         'Gdr3NionS59mbSkTJQZoeBdtCWCmsqrfgfXx1BshdsQJ'):
+            context = sources.evidence(identity, definitions)
+            self.assertTrue({'/payment/accepted', '/payment/rejected', '/payment/secured',
+                             '/payment/completed', '/payment/reversed', '/payment/reserved/void',
+                             '/paymentTerms/currency'} <= set(context['documentPaths']))
+            self.assertLess(len(wire(context)), 1_000_000)
+
+    def test_confirmation_evidence_keeps_inherited_timestamp_semantics(self):
+        _, definitions = sources.inventory(ROOT)
+        context = sources.evidence('EWMrPZWUi46vyUu6gcw3k5xZRPFMxWPfoC9mGwFvXPFz', definitions)
+        self.assertIn('timestamp must be an integer Unix timestamp in microseconds',
+                      json.dumps(context))
+        self.assertLess(len(wire(context)), 1_000_000)
+
 
     def test_added_export_without_rebuild_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -242,6 +353,16 @@ class SourceTests(unittest.TestCase):
         for blue_id in subjects:
             context = sources.evidence(blue_id, definitions)
             self.assertEqual(blue_id, context['blueId'])
+            original = sources.compact(definitions[blue_id])
+            self.assertEqual(original, context['definition'])
+            dependencies = {item['blueId']: item['definition']
+                            for item in context['dependencyDefinitions']}
+            self.assertLessEqual(len(sources.context_wire(context['definition'])), 200_000)
+            self.assertLessEqual(sum(len(sources.context_wire(v)) for v in dependencies.values()), 240_000)
+            if subjects[blue_id]['alias'] == 'Documents/Preparation Functions':
+                inherited = {identity for identity, _ in list(sources.type_chain(blue_id, definitions))[1:]}
+                self.assertTrue(inherited <= dependencies.keys())
+
 
 
 class CardTests(unittest.TestCase):
@@ -257,6 +378,16 @@ class CardTests(unittest.TestCase):
 
     def card(self, blue_id=B):
         return cards.accept(request(blue_id), response(blue_id), self.destination)
+
+    def test_prompt_evidence_uses_compact_exact_request_context(self):
+        cards.prepare(self.root, self.output)
+        request = json.loads((self.output / 'requests' / (B + '.json')).read_bytes())
+        prompt = (self.output / 'requests' / (B + '.txt')).read_text()
+        payload = prompt.split('Evidence (JSON):\n', 1)[1]
+        expected = json.dumps(request['context'], ensure_ascii=False, sort_keys=True,
+                              separators=(',', ':'))
+        self.assertEqual(expected, payload)
+        self.assertEqual(request['context'], json.loads(payload))
 
     def test_local_card_not_uploaded_is_reused_even_after_package_version_changes(self):
         card = self.card()
@@ -318,11 +449,97 @@ class CardTests(unittest.TestCase):
         self.assertEqual({B}, set(cards.cards_in(self.root)))
         self.assertEqual([C], cards.prepare(self.root, self.output)['generate'])
 
-    def test_accept_stores_only_identity_and_text_without_padding_or_fixed_sections(self):
+    def test_accept_stores_generated_metadata_without_padding_or_fixed_sections(self):
         card = self.card()
         self.assertEqual(response(B), card)
         self.assertEqual(wire(response(B)), (self.destination / (B + '.json')).read_bytes())
         self.assertEqual(card, cards.validate_card(card, B))
+
+    def test_legacy_cards_are_readable_but_new_generation_requires_metadata(self):
+        legacy = response(B)
+        legacy.pop('metadata')
+        cards.validate_card(legacy, B)
+        with self.assertRaises(ValidationError):
+            cards.accept(request(B), legacy, self.destination)
+
+    def test_generated_state_facts_are_checked_against_exact_evidence(self):
+        card = response(B)
+        fact = dict(id='counter', scope='document', path='/counter', binding=None,
+                    defaultPath=None, suffix='', type='count', absent='Unknown',
+                    meaning='Recorded counter', evidence='New type.counter', aggregate=None)
+        card['metadata']['stateFacts'] = [fact]
+        cards.validate_output(card, request(B)['context'])
+        invalid = [
+            {'path': '/invented/status'}, {'binding': 'state'},
+            {'type': 'string', 'aggregate': dict(over='Records', operation='count', unit='records')},
+            {'scope': 'clause', 'path': '/invented/{clauseKey}/status'},
+            {'scope': 'binding', 'path': None, 'binding': 'state', 'defaultPath': '/wrong'},
+            {'scope': 'binding', 'path': None, 'binding': 'undeclared'},
+            {'scope': 'binding', 'path': None, 'binding': 'state', 'defaultPath': '/state', 'suffix': '/bad~path'},
+        ]
+        for change in invalid:
+            bad = deepcopy(card)
+            bad['metadata']['stateFacts'][0].update(change)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                cards.validate_output(bad, request(B)['context'])
+        for key in ('scope', 'path', 'aggregate'):
+            old = deepcopy(card)
+            old['metadata']['stateFacts'][0].pop(key)
+            cards.validate_card(old, B)
+            with self.assertRaises(ValidationError):
+                cards.validate_output(old, request(B)['context'])
+        for key, values in [('parameterRefs', ['parameters.unknown']), ('dependencies', [D]),
+                            ('covers', [B]), ('stateFacts', [fact, fact])]:
+            bad = deepcopy(card)
+            bad['metadata'][key] = values
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                cards.validate_output(bad, request(B)['context'])
+
+    def test_generated_facts_accept_inherited_bindings_and_compiler_clause_paths(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[B]['functions'] = {'path': {'$concat': ['/run_', {'$const': 'clauseKey'}]}}
+        context = sources.evidence(C, definitions)
+        card = response(C)
+        card['metadata']['parameterRefs'] = ['parameters.amount', 'bindings.state']
+        card['metadata']['dependencies'] = [B]
+        fact = dict(id='boundTotal', scope='binding', path=None, binding='state',
+                    defaultPath='/state', suffix='/total', type='number', absent='Unknown',
+                    meaning='Bound total', evidence='Inherited state binding', aggregate=None)
+        card['metadata']['stateFacts'] = [fact, dict(fact, id='status', scope='clause',
+                                                   path='/run_{clauseKey}/status', binding=None,
+                                                   defaultPath=None, suffix='', type='string')]
+        cards.validate_output(card, context)
+
+    def test_refresh_generates_only_selected_candidates_and_preserves_existing_cards(self):
+        original = self.card()
+        regenerated = response(B)
+        regenerated['semanticText'] += '\n\nUpdated explanation.'
+
+        def run(command, **kwargs):
+            Path(command[-2]).write_bytes(wire(regenerated))
+            return subprocess.CompletedProcess(command, 0)
+
+        version = request(B)['generator']['codexVersion']
+        with patch.object(cards.subprocess, 'check_output', return_value='codex-cli ' + version), \
+             patch.object(cards.subprocess, 'run', side_effect=run):
+            plan = cards.generate(self.root, self.output, 1, refresh=[B])
+        self.assertEqual([B], plan['generate'])
+        self.assertEqual(original, cards.read_json(self.destination / (B + '.json')))
+        self.assertEqual(regenerated, cards.read_json(self.output / 'cards' / (B + '.json')))
+        with self.assertRaisesRegex(ValueError, 'outside'):
+            cards.prepare(self.root, self.output, refresh=[D])
+
+    def test_published_card_can_include_typed_state_metadata(self):
+        metadata = dict(displayLabel='Fixture', parameterRefs=[], covers=[], dependencies=[],
+                        stateFacts=[dict(id='status', scope='binding', path=None,
+                                         binding='state', defaultPath='/records', suffix='/*/status',
+                                         type='string', absent='Unknown', meaning='Recorded status',
+                                         evidence='Exact definition', aggregate=None)], limitations=[])
+        card = dict(response(B), metadata=metadata)
+        self.assertEqual(card, cards.validate_card(card, B))
+        metadata['stateFacts'][0]['type'] = 'executable'
+        with self.assertRaises(ValidationError):
+            cards.validate_card(card, B)
 
     def test_validation_rejects_wrong_identity_and_symlinks(self):
         card = self.card()
@@ -360,6 +577,13 @@ class CardTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'Refusing to replace'):
             cards.accept(request(B), corrected, self.destination)
         self.assertEqual(response(B), cards.read_json(self.destination / (B + '.json')))
+
+    def test_accept_rejects_stale_pre_compact_request_digest(self):
+        stale = request(B)
+        stale['sourceDigest'] = digest(wire(stale['context']))
+        with self.assertRaisesRegex(ValueError, 'checksum'):
+            cards.accept(stale, response(B), self.destination, DEFINITIONS)
+        self.assertFalse(self.destination.exists())
 
     def test_restore_rejects_legacy_envelope_before_generation(self):
         store = Mock()

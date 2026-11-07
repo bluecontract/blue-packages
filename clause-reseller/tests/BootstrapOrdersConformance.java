@@ -85,6 +85,10 @@ public final class BootstrapOrdersConformance {
       require(!obj(prepared.getOrDefault("contracts",m())).containsKey("initialized"),"Requirement remains uninitialized");
       equal(p.read(current.document(),path+"/clauses/activation/parameters/required"),required,"Template required approvers preserved");
       equal(prepared.get("quote"),fixture.get("quote"),"Frozen quote");equal(prepared.get("customerAccountId"),"customer-account","Frozen customer");
+      if(fulfilment) {
+        equal(obj(prepared.get("orderSnapshot")).get("seller"),m("myosAccountId","seller-account"),"Snapshot seller is identity data only");
+        equal(obj(prepared.get("orderSnapshot")).get("customer"),m("myosAccountId","customer-account"),"Snapshot customer is identity data only");
+      }
       for(String role:List.of("seller","partner")) {
         var mapped=obj(p.read(current.document(),path+"/clauses/activation/parameters/parties/"+role));
         require(!obj(mapped.getOrDefault("lead",m())).containsKey("channel"),"No parent lead channel");
@@ -111,6 +115,85 @@ public final class BootstrapOrdersConformance {
       System.out.println("PASS "+id);
     }
   }
+  static void fixedSuppliedParty(CompositionPackages packages,Path root) throws Exception {
+    var fixture=obj(WireData.json(Files.readString(root.resolve("clause-reseller/tests/fixtures/01-cruise/catalogue.json"))));
+    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      var p=runtime.processor(packages.language());
+      var source=source(fixture,false,List.of());
+      var parties=obj(obj(obj(obj(source.get("orderTemplate")).get("clauses")).get("activation")).get("parameters"));
+      obj(parties.get("parties")).put("guarantor",m("type","Parties/Party","myosAccountId","guarantor-account"));
+      obj(obj(source.get("clauses")).get("orders")).put("parameters",m("suppliedParties",List.of("customer","guarantor")));
+      var current=applied(p.initialize(source));
+      current=applied(p.process(current.document(),event(current.document(),"createQuote",obj(fixture.get("quote")).get("intent")),1));
+      current=applied(p.process(current.document(),event(current.document(),"newOrder",m("key","fixed","requestId","fixed","customer","customer-account","quoteKey","family-quote")),2));
+      var pending=item(p,current.document());String path=pending.get("itemPath")+"/prepared";
+      equal(p.read(current.document(),path+"/clauses/activation/parameters/parties/guarantor/myosAccountId"),"guarantor-account","Fixed child account preserved");
+      require(!obj(p.read(current.document(),"/activation/parties")).containsKey("guarantor"),"No parent guarantor access");
+      equal(pending.get("status"),"awaiting_provider","Ordinary hosted bootstrap still required");
+      fixedSlotGuards(p,source,obj(literal(p,current.document(),pending.get("itemPath").toString())));
+      System.out.println("PASS fixed supplied guarantor without parent membership");
+    }
+  }
+  static void suppliedRoleGuards(CompositionPackages packages) throws Exception {
+    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      var values=runtime.processor(packages.language()).execution().values();
+      var definition=values.source(m("type","Reseller/Customer Orders Bootstrap Clause"),"definition");
+      var all=obj(values.bexData(values.select(definition,"/actionDefinition/type/functions")));
+      var code=m("do",List.of(m("$return",m("$call",m("function","suppliedCustomerOrderRoles","args",m())))));
+      for(String variant:List.of("fixed","customer-only","missing-account","unknown-role","mapped-role","duplicate","missing-customer","invalid-role","invalid-account","supplied-seller")) {
+        var functions=new LinkedHashMap<>(all);functions.keySet().retainAll(Set.of("suppliedCustomerOrderRoles","validPartyName"));var child=obj(template(List.of()));
+        var declarations=obj(obj(obj(obj(child.get("clauses")).get("activation")).get("parameters")).get("parties"));
+        declarations.put("guarantor",m("type","Parties/Party","myosAccountId","guarantor-account"));
+        Object roles=List.of("customer","guarantor");var mapping=m("seller","seller","partner","partner");
+        switch(variant) {
+          case "customer-only" -> roles=List.of("customer");
+          case "missing-account" -> obj(declarations.get("guarantor")).remove("myosAccountId");
+          case "unknown-role" -> roles=List.of("customer","unknown");
+          case "mapped-role" -> mapping.put("guarantor","seller");
+          case "duplicate" -> roles=List.of("customer","guarantor","guarantor");
+          case "missing-customer" -> roles=List.of("guarantor");
+          case "invalid-role" -> roles=List.of("customer","a/b");
+          case "supplied-seller" -> {roles=List.of("customer","seller");mapping.remove("seller");obj(declarations.get("seller")).put("myosAccountId","seller-account");}
+          case "invalid-account" -> obj(declarations.get("guarantor")).put("myosAccountId",42);
+        }
+        functions.put("configurationParameters",m("args",m(),"do",List.of(m("$return",m("$literal",m("suppliedParties",roles))))));
+        functions.put("configuredTemplate",m("args",m(),"do",List.of(m("$return",m("$literal",child)))));
+        var bex=new Bex(BexProfile.current());var program=bex.compile(code,m("functions",functions,"constants",m("bindings",m("parties",mapping))),null);
+        var context=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m(),"/",null,
+            (a,pattern)->values.matches(a,values.source(pattern,"definition")),(a,g)->NativeRuntime.identity(values.source(Values.blueValue(a))));
+        boolean denied=false;try{bex.execute(program,context,1000000);}catch(BexError failure){denied=true;if(variant.equals("fixed")||variant.equals("customer-only"))throw failure;}
+        require(denied!=List.of("fixed","customer-only").contains(variant),"Supplied role configuration "+variant);
+      }
+      System.out.println("PASS supplied role configuration 2 positives / 8 negatives");
+    }
+  }
+  static void fixedSlotGuards(Contracts p,Map<String,Object> source,Map<String,Object> item) {
+    var values=p.execution().values();
+    var definition=values.source(m("type","Reseller/Customer Orders Bootstrap Clause"),"definition");
+    var functions=new LinkedHashMap<>(obj(values.bexData(values.select(definition,"/actionDefinition/type/functions"))));
+    functions.keySet().retainAll(Set.of("validateProviderSlots","slotWitness","configuredConstraint","requireSameMainParty","requireSameBootstrapParty","requireSameBootstrapPrimary"));
+    functions.put("configuredTemplate",m("args",m(),"do",List.of(m("$return",m("$literal",source.get("orderTemplate"))))));
+    var slot=((List<?>)item.get("slots")).stream().map(BootstrapOrdersConformance::obj).filter(x->"guarantor".equals(x.get("role"))).findFirst().orElseThrow();
+    require(Boolean.TRUE.equals(slot.get("supplied")),"Fixed role uses genuine supplied-party slot");
+    var scoped=m("slots",List.of(slot),"prepareFor","bootstrap","prepared",m("clauses",m("activation",m("parameters",m("required",List.of())))));
+    var primary=BootstrapPreparationConformance.party("guarantor-timeline");primary.put("myosAccountId","guarantor-account");
+    var original=m("clauses",m("activation",m("parameters",m("parties",m("guarantor",primary)))));
+    var code=m("do",List.of(m("$return",m("$call",m("function","validateProviderSlots","args",m(
+        "original",m("$binding","call/request/original"),"candidate",m("$binding","call/request/candidate"),"item",m("$binding","call/request/item")))))));
+    var bex=new Bex(BexProfile.current());var program=bex.compile(code,m("functions",functions),null);
+    for(String variant:List.of("exact","changed-actor","changed-readers","changed-account")) {
+      var current=obj(copy(primary));
+      if(variant.equals("changed-actor"))obj(obj(current.get("lead")).get("channel")).put("actor","stranger");
+      if(variant.equals("changed-readers"))current.put("readerKeys",List.of("stranger-reader"));
+      if(variant.equals("changed-account"))current.put("myosAccountId","stranger-account");
+      var candidate=m("activation",m("parties",m("guarantor",current),"required",List.of()));
+      var context=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m("call",m("request",m("original",original,"candidate",candidate,"item",scoped))),"/",null,
+          (a,pattern)->values.matches(a,values.source(pattern,"definition")),(a,g)->NativeRuntime.identity(values.source(Values.blueValue(a))));
+      boolean denied=false;try{bex.execute(program,context,1000000);}catch(RuntimeException failure){if(variant.equals("exact"))throw failure;denied=true;}
+      require(denied!=variant.equals("exact"),"Fixed supplied slot guard "+variant);
+    }
+    System.out.println("PASS fixed supplied slot actor/readers/account guards (component; hosted origin separate)");
+  }
   static void domainGuards(Contracts processor,Map<String,Object> prepared,Map<String,Object> frozen) throws Exception {
     var values=processor.execution().values();
     var definition=values.source(m("type","Reseller/Customer Orders Bootstrap Clause"),"definition");
@@ -119,19 +202,21 @@ public final class BootstrapOrdersConformance {
     var code=m("do",List.of(m("$return",m("$call",m("function","domainValidateCandidate","args",m(
         "frozenTerms",m("$binding","call/request/frozen"),"candidate",m("$binding","call/request/candidate")))))));
     var bex=new Bex(BexProfile.current());var program=bex.compile(code,library,null);
-    for(String variant:List.of("exact","changed-current-customer","changed-origin-customer","missing-origin-customer","changed-quote","changed-price","changed-fulfilment")) {
+    for(String variant:List.of("exact","changed-current-customer","changed-origin-customer","missing-origin-customer","changed-quote","changed-price","changed-fulfilment","changed-current-seller","changed-origin-seller")) {
       var candidate=obj(copy(prepared));var initial=obj(copy(prepared));
       var initialCustomer=obj(obj(obj(obj(initial.get("clauses")).get("activation")).get("parameters")).get("parties"));
       // The generic bootstrap requirement deliberately leaves the supplied customer slot open.
       // This isolated domain test models the Core-bound origin; the hosted proof supplies it for real.
       initialCustomer.put("customer",m("myosAccountId","customer-account"));
       candidate.put("contracts",m("initialized",m("document",initial)));
-      candidate.put("activation",m("parties",m("customer",m("myosAccountId","customer-account"))));
+      candidate.put("activation",m("parties",m("customer",m("myosAccountId","customer-account"),"seller",m("myosAccountId","seller-account"))));
       String reason="CUSTOMER_ORDER_COMMERCIAL_TERMS_CHANGED";
       switch(variant) {
         case "changed-current-customer" -> {obj(obj(candidate.get("activation")).get("parties")).put("customer",m("myosAccountId","foreign"));reason="CUSTOMER_ORDER_IDENTITY_CHANGED";}
         case "changed-origin-customer" -> {obj(initialCustomer.get("customer")).put("myosAccountId","foreign");reason="CUSTOMER_ORDER_BOOTSTRAP_IDENTITY_CHANGED";}
         case "missing-origin-customer" -> {obj(initialCustomer.get("customer")).remove("myosAccountId");reason="CUSTOMER_ORDER_BOOTSTRAP_IDENTITY_CHANGED";}
+        case "changed-current-seller" -> {if(!frozen.containsKey("orderSnapshot"))continue;obj(obj(candidate.get("activation")).get("parties")).put("seller",m("myosAccountId","foreign"));reason="CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED";}
+        case "changed-origin-seller" -> {if(!frozen.containsKey("orderSnapshot"))continue;obj(initialCustomer.get("seller")).put("myosAccountId","foreign");reason="CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED";}
         case "changed-quote" -> candidate.put("quote",m("totalMinor",1));
         case "changed-price" -> candidate.put("amountMinor",1);
         case "changed-fulfilment" -> {candidate.put("orderSnapshot",m("changed",true));reason="CUSTOMER_ORDER_FULFILMENT_CHANGED";}
@@ -154,6 +239,10 @@ public final class BootstrapOrdersConformance {
     obj(selection.get("mounts")).put("Reseller",m("path","clause-reseller/dist/package.bluepkg","blueId",reseller.blueId(),"archiveSha256",sha));
     Path selectionFile=reports.resolve("selection.json");Files.writeString(selectionFile,WireData.write(selection));
     var packages=CompositionPackages.published(root,selectionFile);
+    if(args.length>2 && args[2].equals("known")){scenario(packages,root,reports,"01-cruise",true,List.of());return;}
+    suppliedRoleGuards(packages);
+    fixedSuppliedParty(packages,root);
+    if(args.length>2 && args[2].equals("fixed"))return;
     BootstrapPreparationConformance.bootstrapPartyGuards(packages);
     BootstrapPreparationConformance.bootstrapAccessGuards(packages);
     for(String example:List.of("01-cruise","02-massage","03-watersports"))scenario(packages,root,reports,example,true,List.of());

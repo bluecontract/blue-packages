@@ -1,6 +1,79 @@
 name: Admission Functions
 type: Documents/Factory Functions
 functions:
+  # Selection is separate from commercial activation. Only an authored domain
+  # definition may opt in; the provision request never supplies this policy.
+  maySelectInactiveCandidate:
+    args: {}
+    do:
+    - $return: false
+  mappedBootstrapPartyCovered:
+    args:
+      item: {}
+      candidate: {}
+      role: {type: Text}
+      party: {}
+    do:
+    - $if:
+        cond: {$ne: [{$pointerGet: {object: {$var: item}, path: /prepareFor}}, bootstrap]}
+        then:
+        - $return: false
+    - $let:
+        name: slots
+        expr:
+          $filter:
+            in: {$pointerGet: {object: {$var: item}, path: /slots, default: []}}
+            item: slot
+            where:
+              $and:
+              - {$eq: [{$pointerGet: {object: {$var: slot}, path: /kind}}, party]}
+              - {$eq: [{$pointerGet: {object: {$var: slot}, path: /role}}, {$var: role}]}
+              - {$eq: [{$pointerGet: {object: {$var: slot}, path: /supplied}}, false]}
+              - {$exists: {$pointerGet: {object: {$var: slot}, path: /bootstrapPrimary}}}
+    - $if:
+        cond: {$ne: [{$size: {$var: slots}}, 1]}
+        then:
+        - $return: false
+    - $let:
+        name: expected
+        expr: {$pointerGet: {object: {$var: slots}, path: /0/bootstrapPrimary}}
+    - $let:
+        name: matches
+        expr: 0
+    - $forEach:
+        item: hostParty
+        key: hostRole
+        in: {$document: /activation/parties}
+        do:
+        - $if:
+            cond: {$eq: [{$nodeBlueId: {$var: expected}}, {$nodeBlueId: {$var: hostParty}}]}
+            then:
+            - $set:
+                name: matches
+                expr: {$add: [{$var: matches}, 1]}
+    - $if:
+        cond: {$ne: [{$var: matches}, 1]}
+        then:
+        - $return: false
+    # The frozen mapped witness must survive native bootstrap in both versions.
+    # This does not install an alias in the host or grant it host authority.
+    - $call:
+        function: requireSameBootstrapParty
+        args:
+          expected: {$var: expected}
+          actual:
+            $get:
+              object:
+                $pointerGet:
+                  object: {$pointerGet: {object: {$var: candidate}, path: /contracts/initialized/document}}
+                  path: /clauses/activation/parameters/parties
+              key: {$var: role}
+    - $call:
+        function: requireSameBootstrapParty
+        args:
+          expected: {$var: expected}
+          actual: {$var: party}
+    - $return: true
   candidateStage:
     args:
       checked: {}
@@ -60,6 +133,94 @@ functions:
                 name: needsHost
                 expr: true
         key: alias
+    - $let:
+        name: declaredSourcePaths
+        expr:
+          $pointerGet:
+            object:
+              $call:
+                function: configurationParameters
+                args: {}
+            path: /sourcePaths
+            default: {}
+    - $forEach:
+        key: alias
+        item: declaration
+        in:
+          $call:
+            function: configuredSources
+            args: {}
+        do:
+        - $if:
+            cond:
+              $and:
+              - $hasKey:
+                  object:
+                    $var: declaredSourcePaths
+                  key:
+                    $var: alias
+              - $eq:
+                - $get:
+                    object:
+                      $var: declaredSourcePaths
+                    key:
+                      $var: alias
+                - ''
+            then:
+            - $let:
+                name: escapedAlias
+                expr:
+                  $join:
+                    list:
+                      $split:
+                        text:
+                          $join:
+                            list:
+                              $split:
+                                text:
+                                  $var: alias
+                                separator: '~'
+                            separator: ~0
+                        separator: /
+                    separator: ~1
+            - $let:
+                name: source
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: candidate
+                    path:
+                      $concat:
+                      - /sources/
+                      - $var: escapedAlias
+            - $failIf:
+                cond:
+                  $ne:
+                  - $call:
+                      function: processOrigin
+                      args:
+                        document:
+                          $var: source
+                  - $call:
+                      function: processOrigin
+                      args:
+                        document:
+                          $document: ''
+                message: SOURCE_IDENTITY_MISMATCH
+            - $failIf:
+                cond:
+                  $not:
+                    $call:
+                      function: sourceDeclarationMatches
+                      args:
+                        alias:
+                          $var: alias
+                        source:
+                          $var: source
+                message: SOURCE_DECLARATION_MISMATCH
+            - $set:
+                name: needsHost
+                expr: true
     - $if:
         cond:
           $var: needsHost
@@ -74,19 +235,28 @@ functions:
             do:
             - $if:
                 cond:
-                  $not:
-                    $call:
-                      function: rosterCovers
-                      args:
-                        required:
-                          $objectSet:
-                            object: {}
-                            key:
-                              $var: role
-                            val:
-                              $var: party
-                        available:
-                          $document: /activation/parties
+                  $and:
+                  - $not:
+                      $call:
+                        function: rosterCovers
+                        args:
+                          required:
+                            $objectSet:
+                              object: {}
+                              key:
+                                $var: role
+                              val:
+                                $var: party
+                          available:
+                            $document: /activation/parties
+                  - $not:
+                      $call:
+                        function: mappedBootstrapPartyCovered
+                        args:
+                          item: {$var: item}
+                          candidate: {$var: candidate}
+                          role: {$var: role}
+                          party: {$var: party}
                 then:
                 - $let:
                     name: hostRole
@@ -238,14 +408,33 @@ functions:
                     $var: item
                   path: /consents
                   default: {}
+    - $let:
+        name: selectInactive
+        expr:
+          $call:
+            function: maySelectInactiveCandidate
+            args: {}
+    - $if:
+        cond: {$eq: [{$var: selectInactive}, true]}
+        then:
+        # The hook is part of the exact clause captured by the planner and frozen
+        # at prepare time. A later clause change cannot widen this obligation.
+        - $failIf:
+            cond:
+              $ne:
+              - {$pointerGet: {object: {$var: item}, path: /intent/configuration}}
+              - {$nodeBlueId: {$call: {function: connectionConfiguration, args: {}}}}
+            message: PREPARATION_SELECTION_POLICY_CHANGED
     - $if:
         cond:
-          $ne:
-          - $pointerGet:
-              object:
-                $var: candidate
-              path: /activation/active
-          - true
+          $and:
+          - {$ne: [{$var: selectInactive}, true]}
+          - $ne:
+            - $pointerGet:
+                object:
+                  $var: candidate
+                path: /activation/active
+            - true
         then:
         - $return:
             $merge:
@@ -384,6 +573,24 @@ functions:
                     default: []
         then:
         - $return: false
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: item, path: /status}}, admission_pending]}
+            - {$eq: [{$var: {name: item, path: /admissionToken/activationRevision}}, {$document: /activation/revision}]}
+            - {$eq: [{$var: {name: item, path: /admissionRef}}, {$nodeBlueId: {$var: {name: item, path: /admissionToken}}}]}
+            - {$eq: [{$document: {$concat: [/process_, {$const: clauseKey}, /admission/ledger/history/, {$var: {name: item, path: /admissionRef}}]}}, true]}
+            - {$eq: [{$document: {$concat: [/process_, {$const: clauseKey}, /admission/grants/, {$var: {name: item, path: /admissionRef}}]}}, {$var: {name: item, path: /admissionToken}}]}
+        then:
+        - $return: false
+    - $if:
+        cond: {$not: {$exists: {$document: /activation/admissionConsentOperations}}}
+        then:
+        - $appendChange:
+            op: add
+            path: /activation/admissionConsentOperations
+            val: {}
     - $forEach:
         item: party
         in:
@@ -518,6 +725,30 @@ functions:
                   - $var: operation
                 val:
                   $var: handler
+        - $let:
+            name: registration
+            expr:
+              operationId: {$nodeBlueId: {$var: handler}}
+              channel: {$var: channel}
+              channelId: {$nodeBlueId: {$var: channelDeclaration}}
+              itemPath: {$var: {name: item, path: /itemPath}}
+              admissionRef: {$var: {name: item, path: /admissionRef}}
+              party: {$var: role}
+              activationRevision: {$var: {name: item, path: /admissionToken/activationRevision}}
+        - $let:
+            name: registrationPath
+            expr: {$concat: [/activation/admissionConsentOperations/, {$var: operation}]}
+        - $if:
+            cond: {$exists: {$document: {$var: registrationPath}}}
+            then:
+            - $failIf:
+                cond: {$ne: [{$nodeBlueId: {$document: {$var: registrationPath}}}, {$nodeBlueId: {$var: registration}}]}
+                message: ADMISSION_CONSENT_REGISTRATION_CONFLICT
+            else:
+            - $appendChange:
+                op: add
+                path: {$var: registrationPath}
+                val: {$var: registration}
         key: role
     - $return: true
   nextAdmissionRequest:
@@ -884,6 +1115,8 @@ functions:
                         val: installing
                     - $return:
                         ready: true
+                        previousTermsRef:
+                          $document: /activation/terms/ref
                         itemPath:
                           $var:
                             name: item
@@ -944,6 +1177,14 @@ functions:
           - status: linking
             admittedRevision:
               $document: /activation/revision
+            admittedTerms:
+              previousRef: {$var: {name: input, path: /previousTermsRef}}
+              previousRevision: {$var: {name: input, path: /request/expectedRevision}}
+              ref: {$document: /activation/terms/ref}
+              revision: {$document: /activation/revision}
+              candidateOrigin: {$var: {name: item, path: /candidateOrigin}}
+              requirementRef: {$var: {name: item, path: /requirementRef}}
+              admissionRef: {$var: {name: item, path: /admissionRef}}
     - $appendEvent:
         $merge:
         - type: Documents/Document Admission Progress

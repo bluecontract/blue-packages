@@ -1,0 +1,3908 @@
+{
+  "format": "blue-native-reseller-scenarios/1",
+  "scenarios": [
+    {
+      "name": "X01 inclusive microsecond cutoff",
+      "requirements": [
+        "C01",
+        "X01",
+        "F01",
+        "F03"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "cancelled",
+            "/orders/o1/reservations/trip/decision/chargeMinor": 0,
+            "/orders/o1/reservations/trip/decision/releasedMinor": 10000,
+            "/orders/o1/reservations/trip/decision/settlementStatus": "payment_evidence_required"
+          }
+        }
+      ]
+    },
+    {
+      "name": "X02 inclusive microsecond cutoff",
+      "requirements": [
+        "C01",
+        "X02",
+        "F01",
+        "F03"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "cancelled",
+            "/orders/o1/reservations/trip/decision/chargeMinor": 0,
+            "/orders/o1/reservations/trip/decision/releasedMinor": 10000,
+            "/orders/o1/reservations/trip/decision/settlementStatus": "payment_evidence_required"
+          }
+        }
+      ]
+    },
+    {
+      "name": "X03 inclusive microsecond cutoff",
+      "requirements": [
+        "C01",
+        "X03",
+        "F01",
+        "F03"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "cancelled",
+            "/orders/o1/reservations/trip/decision/chargeMinor": 10000,
+            "/orders/o1/reservations/trip/decision/releasedMinor": 0,
+            "/orders/o1/reservations/trip/decision/settlementStatus": "payment_evidence_required"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Pending withdrawal and cancel-before-confirm",
+      "requirements": [
+        "X04",
+        "I07"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "cancelled",
+            "/orders/o1/reservations/trip/decision/chargeMinor": 0
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "50 percent uses discounted accepted price",
+      "requirements": [
+        "X05"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/catalog/entries/service/guestDiscountPercent": 5,
+        "/resellerTerms/cancellationPolicy/lateCancellationChargePercent": 50
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/proposal/amountMinor": 9500
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 4750,
+            "/orders/o1/reservations/trip/decision/releasedMinor": 4750
+          }
+        }
+      ]
+    },
+    {
+      "name": "Half-up rounds five minor units to three",
+      "requirements": [
+        "X13"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/catalog/entries/service/unitAmountMinor": 5,
+        "/resellerTerms/cancellationPolicy/lateCancellationChargePercent": 50
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/proposal/amountMinor": 5
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 3,
+            "/orders/o1/reservations/trip/decision/releasedMinor": 2
+          }
+        }
+      ]
+    },
+    {
+      "name": "Supplier cancellation releases the whole price",
+      "requirements": [
+        "X06"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelBySupplier",
+          "channel": "seller",
+          "request": {
+            "key": "seller-cancel",
+            "groupId": "trip",
+            "reason": "Unsafe conditions"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 0,
+            "/orders/o1/reservations/trip/decision/releasedMinor": 10000
+          }
+        }
+      ]
+    },
+    {
+      "name": "No-show requires supplier and reached confirmed start",
+      "requirements": [
+        "X07",
+        "X08"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "reportNoShow",
+          "channel": "seller",
+          "request": {
+            "key": "no-show",
+            "groupId": "trip",
+            "reason": "Absent"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "reportNoShow",
+          "channel": "seller",
+          "request": {
+            "key": "no-show",
+            "groupId": "trip",
+            "reason": "Absent"
+          },
+          "timestampMicros": 1794661199999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "reportNoShow",
+          "channel": "customer",
+          "request": {
+            "key": "no-show",
+            "groupId": "trip",
+            "reason": "Absent"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "reportNoShow",
+          "channel": "seller",
+          "request": {
+            "key": "no-show",
+            "groupId": "trip",
+            "reason": "Absent"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "no_show",
+            "/orders/o1/reservations/trip/decision/chargeMinor": 10000
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fulfilled service cannot be cancelled",
+      "requirements": [
+        "X09"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "fulfilGroup",
+          "channel": "seller",
+          "request": {
+            "key": "fulfil",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794661199999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "fulfilGroup",
+          "channel": "seller",
+          "request": {
+            "key": "fulfil",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794661200000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "cancelBySupplier",
+          "channel": "seller",
+          "request": {
+            "key": "supplier-cancel",
+            "groupId": "trip",
+            "reason": "Too late"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Ordinary cancellation after start rejects",
+      "requirements": [
+        "X10"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Client cannot supply time fee policy or actor",
+      "requirements": [
+        "X11"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans",
+            "nowMicros": 1794574799999999
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans",
+            "chargeMinor": 0
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans",
+            "policy": {}
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans",
+            "actor": "seller"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Zero-hour cutoff includes the exact start",
+      "requirements": [
+        "X12"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/cancellationPolicy/freeCancellationHoursBeforeStart": 0
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794661200000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "Zero percent never creates a late charge",
+      "requirements": [
+        "X12"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/cancellationPolicy/lateCancellationChargePercent": 0
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "Late confirmation requires explicit current consent",
+      "requirements": [
+        "C06"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_customer"
+          }
+        },
+        {
+          "operation": "acceptProposal",
+          "channel": "customer",
+          "request": {
+            "key": "accept-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "acceptProposal",
+          "channel": "customer",
+          "request": {
+            "key": "accept-1",
+            "groupId": "trip",
+            "acceptImmediateCharge": true
+          },
+          "timestampMicros": 1794574800000002,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "confirmed",
+            "/orders/o1/reservations/trip/confirmedStartMicros": 1794661200000000
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000003,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 10000
+          }
+        }
+      ]
+    },
+    {
+      "name": "Alternative quote waits for exact customer acceptance",
+      "requirements": [
+        "C02",
+        "C03",
+        "I02"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          },
+          "remember": {
+            "firstProposal": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "proposeAlternative",
+          "channel": "seller",
+          "request": {
+            "key": "alternative-1",
+            "groupId": "trip",
+            "catalog": {
+              "revision": 1,
+              "supplierId": "seller",
+              "currency": "USD",
+              "entries": {
+                "service": {
+                  "label": "Boat service",
+                  "description": "Supplier-operated service",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": true,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 10000,
+                  "guestDiscountPercent": 0,
+                  "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+                },
+                "alternative": {
+                  "label": "Alternative boat service",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": true,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 12000
+                },
+                "voucher": {
+                  "label": "Undated voucher",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": false,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 5000
+                }
+              }
+            },
+            "lines": [
+              {
+                "itemId": "alternative",
+                "quantity": 1,
+                "serviceDate": "2026-11-15"
+              }
+            ],
+            "proposedStartMicros": 1794747600000000
+          },
+          "timestampMicros": 1794574799999995,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_customer",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 12000
+          }
+        },
+        {
+          "operation": "acceptProposal",
+          "channel": "customer",
+          "request": {
+            "key": "accept-stale",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999997,
+          "target": "/orders/o1",
+          "requestFromRemembered": {
+            "expectedProposalBlueId": "firstProposal"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "acceptProposal",
+          "channel": "customer",
+          "request": {
+            "key": "accept-new",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999998,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "confirmed",
+            "/orders/o1/reservations/trip/confirmedStartMicros": 1794747600000000
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 12000
+          }
+        }
+      ]
+    },
+    {
+      "name": "Partner has no supplier or customer authority",
+      "requirements": [
+        "C04"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "partner",
+          "request": {
+            "key": "forged-confirm",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "partner",
+          "request": {
+            "key": "forged-cancel",
+            "groupId": "trip",
+            "reason": "Forged"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "proposeAlternative",
+          "channel": "partner",
+          "request": {
+            "key": "forged-alternative",
+            "groupId": "trip",
+            "catalog": {
+              "revision": 1,
+              "supplierId": "seller",
+              "currency": "USD",
+              "entries": {
+                "service": {
+                  "label": "Boat service",
+                  "description": "Supplier-operated service",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": true,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 10000,
+                  "guestDiscountPercent": 0,
+                  "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+                },
+                "alternative": {
+                  "label": "Alternative boat service",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": true,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 12000
+                },
+                "voucher": {
+                  "label": "Undated voucher",
+                  "pricingUnit": "per_unit",
+                  "dateRequired": false,
+                  "maxQuantity": 20,
+                  "unitAmountMinor": 5000
+                }
+              }
+            },
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ],
+            "proposedStartMicros": 1794661200000000
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Undated products retain unknown start",
+      "requirements": [
+        "C07",
+        "I09"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "voucher",
+                "quantity": 1
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ]
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 5000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/decision/chargeMinor": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "Past start cannot be confirmed",
+      "requirements": [
+        "C09"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794661200000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Explicit deadline prevents resurrection",
+      "requirements": [
+        "C08"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "setResponseDeadline",
+          "channel": "seller",
+          "request": {
+            "key": "deadline-1",
+            "groupId": "trip",
+            "deadlineMicros": 1794574800000000
+          },
+          "timestampMicros": 1794574799999990,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "expireReservation",
+          "channel": "customer",
+          "request": {
+            "key": "expire-1",
+            "groupId": "trip",
+            "reason": "No answer"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        },
+        {
+          "operation": "expireReservation",
+          "channel": "customer",
+          "request": {
+            "key": "expire-1",
+            "groupId": "trip",
+            "reason": "No answer"
+          },
+          "timestampMicros": 1794574800000000,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "expect": {
+            "/orders/o1/reservations/trip/status": "expired"
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Cold restore retry preserves one decision",
+      "requirements": [
+        "I05",
+        "I06"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000100,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "restore": true,
+          "unchangedPaths": [
+            "/orders/o1/reservations/trip",
+            "/orders/o1/reservationRequests"
+          ],
+          "expectNoEffects": true
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Different intention"
+          },
+          "timestampMicros": 1794574800000100,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Two dates are independent fulfilment groups",
+      "requirements": [
+        "I03"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              },
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-15"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              },
+              {
+                "id": "other",
+                "lineIndices": [
+                  1
+                ],
+                "proposedStartMicros": 1794747600000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "pending_supplier",
+            "/orders/o1/reservations/trip/proposal/amountMinor": 10000
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-1",
+            "groupId": "trip"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          }
+        },
+        {
+          "operation": "confirmReservation",
+          "channel": "seller",
+          "request": {
+            "key": "confirm-other",
+            "groupId": "other"
+          },
+          "timestampMicros": 1794574799999999,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/other/proposalBlueId"
+          }
+        },
+        {
+          "operation": "cancelReservation",
+          "channel": "customer",
+          "request": {
+            "key": "cancel-1",
+            "groupId": "trip",
+            "reason": "Changed plans"
+          },
+          "timestampMicros": 1794574800000001,
+          "target": "/orders/o1",
+          "requestFromState": {
+            "expectedProposalBlueId": "/orders/o1/reservations/trip/proposalBlueId"
+          },
+          "unchangedPaths": [
+            "/orders/o1/reservations/other"
+          ],
+          "expect": {
+            "/orders/o1/reservations/trip/decision/basisMinor": 10000,
+            "/orders/o1/reservations/other/status": "confirmed"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invalid group partition overlap",
+      "requirements": [
+        "I04"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              },
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-15"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ]
+              },
+              {
+                "id": "other",
+                "lineIndices": [
+                  0,
+                  1
+                ]
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invalid group partition ungrouped",
+      "requirements": [
+        "I04"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              },
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-15"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ]
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Invalid group partition mixed dates",
+      "requirements": [
+        "I04"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              },
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-15"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0,
+                  1
+                ]
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Foreign seller quote cannot become this order",
+      "requirements": [
+        "I04"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "foreign-seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        }
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Automatic without readiness",
+      "requirements": [
+        "C05",
+        "C06"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/confirmationMode": "automatic"
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ],
+            "acceptImmediateCharge": false
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Automatic with readiness",
+      "requirements": [
+        "C05",
+        "C06"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/confirmationMode": "automatic"
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "approveAvailability",
+          "channel": "seller",
+          "request": {
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ],
+            "reference": "Explicit supplier fixture, not live inventory"
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ],
+            "acceptImmediateCharge": false
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "confirmed",
+            "/orders/o1/reservations/trip/confirmedStartMicros": 1794661200000000
+          }
+        }
+      ]
+    },
+    {
+      "name": "Automatic late without consent",
+      "requirements": [
+        "C05",
+        "C06"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/confirmationMode": "automatic"
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "approveAvailability",
+          "channel": "seller",
+          "request": {
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ],
+            "reference": "Explicit supplier fixture, not live inventory"
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ],
+            "acceptImmediateCharge": false
+          },
+          "timestampMicros": 1794574800000001,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Automatic late accepted",
+      "requirements": [
+        "C05",
+        "C06"
+      ],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/confirmationMode": "automatic"
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "approveAvailability",
+          "channel": "seller",
+          "request": {
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ],
+            "reference": "Explicit supplier fixture, not live inventory"
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ],
+            "acceptImmediateCharge": true
+          },
+          "timestampMicros": 1794574800000001,
+          "requireExactDocumentVersion": true,
+          "expect": {
+            "/orders/o1/reservations/trip/status": "confirmed",
+            "/orders/o1/reservations/trip/confirmedStartMicros": 1794661200000000
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reject invalid policy freeCancellationHoursBeforeStart -1",
+      "requirements": [],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/cancellationPolicy/freeCancellationHoursBeforeStart": -1
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reject invalid policy freeCancellationHoursBeforeStart 8761",
+      "requirements": [],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/cancellationPolicy/freeCancellationHoursBeforeStart": 8761
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reject invalid policy lateCancellationChargePercent -1",
+      "requirements": [],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/cancellationPolicy/lateCancellationChargePercent": -1
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reject invalid policy lateCancellationChargePercent 101",
+      "requirements": [],
+      "sourcePatch": {
+        "/catalog": {
+          "revision": 1,
+          "supplierId": "seller",
+          "currency": "USD",
+          "entries": {
+            "service": {
+              "label": "Boat service",
+              "description": "Supplier-operated service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 10000,
+              "guestDiscountPercent": 0,
+              "dateSelectionHint": "Preferred date; availability requires supplier confirmation."
+            },
+            "alternative": {
+              "label": "Alternative boat service",
+              "pricingUnit": "per_unit",
+              "dateRequired": true,
+              "maxQuantity": 20,
+              "unitAmountMinor": 12000
+            },
+            "voucher": {
+              "label": "Undated voucher",
+              "pricingUnit": "per_unit",
+              "dateRequired": false,
+              "maxQuantity": 20,
+              "unitAmountMinor": 5000
+            }
+          }
+        },
+        "/resellerTerms/cancellationPolicy/lateCancellationChargePercent": 101
+      },
+      "steps": [
+        {
+          "operation": "createQuote",
+          "channel": "partner",
+          "request": {
+            "key": "q1",
+            "catalogRevision": 1,
+            "lines": [
+              {
+                "itemId": "service",
+                "quantity": 1,
+                "serviceDate": "2026-11-14"
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900
+        },
+        {
+          "operation": "placeOrder",
+          "channel": "customer",
+          "request": {
+            "key": "o1",
+            "quoteKey": "q1",
+            "groups": [
+              {
+                "id": "trip",
+                "lineIndices": [
+                  0
+                ],
+                "proposedStartMicros": 1794661200000000
+              }
+            ]
+          },
+          "timestampMicros": 1794574799999900,
+          "requireExactDocumentVersion": true,
+          "status": "FAILED",
+          "expectNoEffects": true,
+          "unchangedPaths": [
+            "/orders",
+            "/orderIntents"
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -4,6 +4,13 @@ actionDefinition:
   type:
     type: Ledger/Balance Functions
     functions:
+      # Exact shared readiness helpers; maintained conformance rejects stale pins.
+      namedSourcesReady:
+        blueId: EXZMLDv4TxmYaH7L8yrVKDahRDzM3AeKJv44D8P9WxFC
+      processOrigin:
+        blueId: 5UMRb3G6CPCKmkQKBLBhntAgaA5qjoJSLBbjS4kjS3VB
+      rosterCovers:
+        blueId: 2VRjCVXah8NQpo69uGhaMJZobwh36J77t6rz4edzv1ii
       reconcile:
         args:
           input: {}
@@ -360,6 +367,123 @@ actions:
                           $const:
                             name: bindings
                             path: /rate
+  attached:
+    resultContract: outcome-v1
+    automatic:
+      'on': event
+      event:
+        type: Documents/Document Attached
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node: {$event: ''}
+              pattern: {type: Documents/Document Attached}
+        then:
+        - $return: {}
+    - $let: {name: key, expr: {$event: /itemKey}}
+    - $let: {name: producer, expr: {$event: /clauseId}}
+    - $forEach:
+        item: part
+        in: [{$var: key}, {$var: producer}]
+        do:
+        - $if:
+            cond: {$not: {$isKind: {val: {$var: part}, kind: text}}}
+            then:
+            - $return: {}
+        - $if:
+            cond:
+              $or:
+              - {$eq: [{$var: part}, '']}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: /}}}, 1]}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: '~'}}}, 1]}
+            then:
+            - $return: {}
+    - $let: {name: collection, expr: {$const: {name: bindings, path: /orders}}}
+    - $if:
+        cond:
+          $ne:
+          - {$document: {$concat: [/clauses/, {$var: producer}, /bindings/collection]}}
+          - {$var: collection}
+        then:
+        - $return: {}
+    - $let:
+        name: itemPath
+        expr: {$concat: [/process_, {$var: producer}, /entries/, {$nodeBlueId: {$var: key}}]}
+    - $let: {name: item, expr: {$document: {$var: itemPath}}}
+    - $let: {name: orderPath, expr: {$concat: [{$var: collection}, /, {$var: key}]}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: item, path: /key}}, {$var: key}]}
+            - {$eq: [{$var: {name: item, path: /itemPath}}, {$var: itemPath}]}
+            - {$eq: [{$var: {name: item, path: /path}}, {$var: orderPath}]}
+            - {$eq: [{$var: {name: item, path: /status}}, usable]}
+            - {$exists: {$var: {name: item, path: /requestId}}}
+            - {$eq: [{$var: {name: item, path: /requestId}}, {$event: /inResponseTo}]}
+            - {$exists: {$var: {name: item, path: /documentOrigin}}}
+            - {$eq: [{$var: {name: item, path: /documentOrigin}}, {$event: /documentOrigin}]}
+        then:
+        - $return: {}
+    - $let: {name: order, expr: {$document: {$var: orderPath}}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$exists: {$var: {name: order, path: /contracts/initialized/document}}}
+            - {$eq: [{$var: {name: order, path: /activation/active}}, true]}
+        then:
+        - $return: {}
+    - $if:
+        cond:
+          $ne:
+          - {$nodeBlueId: {$var: {name: order, path: /contracts/initialized/document}}}
+          - {$var: {name: item, path: /documentOrigin}}
+        then:
+        - $return: {}
+    - $if:
+        cond:
+          $not:
+            $call:
+              function: namedSourcesReady
+              args: {document: {$var: order}}
+        then:
+        - $return: {}
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $var: {name: order, path: /payment}
+        then:
+        - $return: {}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$isKind: {val: {$var: {name: order, path: /payment/payment/completed}}, kind: integer}}
+            - {$isKind: {val: {$var: {name: order, path: /payment/payment/reversed}}, kind: integer}}
+            - {$gte: [{$var: {name: order, path: /payment/payment/completed}}, 0]}
+            - {$gte: [{$var: {name: order, path: /payment/payment/reversed}}, 0]}
+        message: INVALID_COMMISSION_INPUT
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: setTarget
+            args:
+              input:
+                key: {$var: key}
+                amountMinor:
+                  $call:
+                    function: roundBps
+                    args:
+                      basis:
+                        $subtract:
+                        - {$var: {name: order, path: /payment/payment/completed}}
+                        - {$var: {name: order, path: /payment/payment/reversed}}
+                      bps: {$document: {$const: {name: bindings, path: /rate}}}
   opened:
     resultContract: outcome-v1
     automatic:
