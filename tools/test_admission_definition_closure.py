@@ -21,7 +21,7 @@ def calls(value):
 
 class AdmissionDefinitionClosureTest(unittest.TestCase):
     def test_every_admission_step_has_complete_exact_function_selection(self):
-        plan = yaml.safe_load((ROOT/'clause-documents/types/preparation-plan.blue').read_text())
+        plan = yaml.safe_load((ROOT/'clause-documents/types/admission-plan-function.blue').read_text())
         definitions = {}
         for folder in ['blue-parties/types', 'clause-documents/types']:
             for path in (ROOT/folder).glob('*.blue'):
@@ -49,5 +49,32 @@ class AdmissionDefinitionClosureTest(unittest.TestCase):
                     pending.extend(calls(definitions[name]))
                 self.assertEqual(set(selected), reached)
                 self.assertEqual(len(selected), len(set(selected)))
+
+    def test_refresh_selection_is_the_complete_shared_refresh_closure(self):
+        libraries = {}
+        for path in (ROOT/'clause-documents/types').glob('*.blue'):
+            node = yaml.safe_load(path.read_text())
+            if isinstance(node, dict) and 'name' in node:
+                libraries['Documents/' + node['name']] = node
+        refresh = libraries['Documents/Refresh Functions']['functions']
+        def body(node):
+            if '$blue:functionFrom' not in node:
+                return node
+            link = node['$blue:functionFrom']
+            library = libraries[link['type']]
+            return body(library['functions'][link['function']])
+        pending, reached = ['sharedRefresh'], set()
+        while pending:
+            name = pending.pop()
+            if name in reached:
+                continue
+            reached.add(name)
+            pending.extend(calls(body(refresh[name])))
+        self.assertEqual(reached, set(refresh))
+        plan = libraries['Documents/Preparation Plan']['functions']['plan']['do']
+        selection = next(step['$let']['expr']['$call']['args']['names'] for step in plan
+                         if step.get('$let', {}).get('name') == 'refreshDefinition')
+        self.assertEqual(set(selection), reached)
+        self.assertEqual(len(selection), len(reached))
 
 if __name__ == '__main__': unittest.main()

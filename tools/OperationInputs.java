@@ -93,15 +93,24 @@ public final class OperationInputs {
   /** Authoring-time exact reference, not a runtime function loader or a typed instance. */
   private static Object functionReference(Object raw,Blue blue,String path) {
     try {
-      if(!(raw instanceof Map<?,?> link)||!link.keySet().equals(Set.of("type"))
+      if(!(raw instanceof Map<?,?> link)||!(link.keySet().equals(Set.of("type"))||link.keySet().equals(Set.of("type","function")))
           ||!(link.get("type") instanceof String alias)||alias.isBlank())
-        throw new IllegalArgumentException("Expected exactly one named function type");
-      var wrapper=blue.admitDefinition(WireData.write(link));
+        throw new IllegalArgumentException("Expected a named type and optional function selector");
+      var wrapper=blue.admitDefinition(WireData.write(Map.of("type",alias)));
       var runtime=new NativeRuntime(blue);
       var selected=NativeRuntime.recipe(NativeRuntime.exactOf(wrapper));
       String typeId=NativeRuntime.head(selected,runtime).type;
       if(typeId==null)throw new IllegalArgumentException("Function type is missing");
       selected=NativeRuntime.recipe(new Exact.Ref(typeId));
+      if(link.containsKey("function")) {
+        if(!(link.get("function") instanceof String function)||function.isBlank())
+          throw new IllegalArgumentException("Invalid function selector");
+        for(String field:List.of("functions",function)) {
+          var parent=NativeRuntime.head(selected,runtime);
+          if(!parent.fields.containsKey(field))throw new IllegalArgumentException("Missing declared field "+field);
+          selected=NativeRuntime.child(parent,field);
+        }
+      }
       var head=NativeRuntime.head(selected,runtime);
       if(!head.fields.containsKey("args")||(!head.fields.containsKey("do")&&!head.fields.containsKey("expr")))
         throw new IllegalArgumentException("Referenced definition is not a function");

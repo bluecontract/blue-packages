@@ -1,6 +1,8 @@
 name: Preparation Plan
 type: Connections/Connection Planning Functions
 constants:
+  refreshCanonicalDefinition:
+    type: Documents/Refresh Functions
   admissionCanonicalDefinition:
     type: Documents/Admission Functions
 functions:
@@ -35,6 +37,27 @@ functions:
       canonicalPath: {type: Text}
       names: []
     do:
+    - $return:
+        $call:
+          function: projectCanonicalDefinition
+          args:
+            definition: {$var: definition}
+            definitionPath: {$var: definitionPath}
+            canonicalPath: {$var: canonicalPath}
+            names: {$var: names}
+            canonicalId:
+              $nodeBlueId:
+                $get:
+                  object: {$literal: {type: Documents/Admission Functions}}
+                  key: type
+  projectCanonicalDefinition:
+    args:
+      definition: {}
+      definitionPath: {type: Text}
+      canonicalPath: {type: Text}
+      names: []
+      canonicalId: {type: Text}
+    do:
     # Project only the canonical library. Custom subtype implementations keep their
     # complete definition, including any additional helper functions they introduce.
     - $if:
@@ -45,10 +68,7 @@ functions:
         cond:
           $ne:
           - {$nodeBlueId: {$document: {$var: canonicalPath}}}
-          - $nodeBlueId:
-              $get:
-                object: {$literal: {type: Documents/Admission Functions}}
-                key: type
+          - {$var: canonicalId}
         then:
         - $return: {$var: definition}
     - $let: {name: selected, expr: {}}
@@ -156,6 +176,23 @@ functions:
                   - /clauseRuntime/work/candidate/
                   - $const: clauseKey
                   - /type/actionDefinition/type
+    - $let:
+        name: refreshDefinition
+        expr:
+          $call:
+            function: projectCanonicalDefinition
+            args:
+              definition: {$var: definition}
+              definitionPath:
+                $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/actionDefinition/type]
+              canonicalPath:
+                $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/hookDefinition/type/constants/refreshCanonicalDefinition/type]
+              canonicalId:
+                $nodeBlueId:
+                  $get:
+                    object: {$literal: {type: Documents/Refresh Functions}}
+                    key: type
+              names: [sharedRefresh, processStatePath, checkedDomainNextActions, domainNextActions, namedSourcesReady, processOrigin, rosterCovers]
     - $set:
         name: plan
         expr:
@@ -209,7 +246,7 @@ functions:
                   - $merge:
                     - type: Contracts/Compute
                     - definition:
-                        $var: definition
+                        $var: refreshDefinition
                       constants:
                         clauseKey:
                           $const: clauseKey
