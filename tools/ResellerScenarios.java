@@ -2,6 +2,7 @@ package blue.packages;
 
 import blue.bex.Values;
 import blue.contracts.Contracts;
+import blue.contracts.ContractsExecution;
 import blue.contracts.RuntimeBindings;
 import blue.language.next.Blue;
 import blue.language.next.BluePackage;
@@ -86,6 +87,7 @@ public final class ResellerScenarios {
       Map<String, Object> evidence = map("name", name, "passed", false);
       long started = System.nanoTime();
       try (Runner runner = new Runner()) {
+        evidence.put("captures", runner.captures);
         Map<String, Object> source = object(parse(sourcePath));
         for (var entry : object(scenario.getOrDefault("sourcePatch", map())).entrySet()) {
           updateExisting(source, entry.getKey(), entry.getValue(), false);
@@ -208,8 +210,24 @@ public final class ResellerScenarios {
       equal(1, entries.size(), "Expected one prepared instruction");
       var entry = object(entries.values().iterator().next());
       equal("awaiting_provider", entry.get("status"), "Instruction must await its supplier");
+      retainMemberHistories(document);
       var result = processor.initialize(map("blueId", entry.get("requirementRef")));
       equal("APPLIED", result.status(), "Prepared instruction bootstrap: " + diagnostic(result));
+      for (var binding : object(step.getOrDefault("bindPreparedSources", map())).entrySet()) {
+        var values = processor.execution().values();
+        String sourceVersion = NativeRuntime.identity(values.exact(
+            values.select(new Exact.Ref(document.blueId()), text(binding.getValue()))));
+        Object request = map("type", "Documents/Source Binding Input", "alias", binding.getKey(),
+            "document", map("blueId", sourceVersion));
+        Object input = map("source", step.get("sourceBindingSource"), "operation", map(
+            "type", "Contracts/Operation Request", "document", map("blueId", result.document().blueId()),
+            "operation", step.get("sourceBindingOperation"), "channel", step.get("sourceBindingChannel"),
+            "request", request));
+        result = processor.process(result.document(), input,
+            Long.parseLong(WireData.write(step.get("timestampMicros"))));
+        equal("APPLIED", result.status(), "Prepared source binding: " + diagnostic(result));
+      }
+      retainMemberHistories(result.document());
       for (var expectation : object(step.getOrDefault("expectBootstrapped", map())).entrySet()) {
         sameValue(expectation.getValue(), processor.read(result.document(), expectation.getKey()),
             "Bootstrapped instruction " + expectation.getKey());
@@ -224,7 +242,18 @@ public final class ResellerScenarios {
       System.out.println("BOOTSTRAP " + name + " status=" + result.status() + " gas=" + result.gas());
     }
 
+    void retainMemberHistories(Contracts.Document source) {
+      var execution = processor.execution();
+      var snapshot = execution.snapshot(source);
+      var outgoing = ContractsExecution.outgoing(snapshot);
+      for (var member : snapshot.documents.values())
+        execution.chooseHistory(member.blueId,
+            ContractsExecution.rooted(snapshot, member.key, outgoing));
+    }
+
     void operation(Map<String, Object> step, int timestamp) {
+      // A prepared source may pin the version immediately before this operation.
+      retainMemberHistories(document);
       Map<String, Object> before = new LinkedHashMap<>();
       for (Object rawPath : array(step.getOrDefault("unchangedPaths", List.of()))) {
         String path = text(rawPath);

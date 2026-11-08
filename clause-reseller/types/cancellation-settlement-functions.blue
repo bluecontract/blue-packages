@@ -1,0 +1,331 @@
+name: Cancellation Settlement Functions
+description: Whole-PI reconciliation of immutable cancellation decisions from its bound Order. All covered
+  groups contribute to the retained amount; unresolved groups prevent additional capture or authorization release.
+type: PaymentInstruction/Payment Protocol Functions
+functions:
+  cancellationPlan:
+    args:
+      snapshot: {}
+      groups: {}
+      terms: {}
+      payment: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq: [{$var: {name: snapshot, path: /quoteBlueId}}, {$nodeBlueId: {$var: {name: snapshot, path: /quote}}}]
+            - $eq: [{$var: {name: snapshot, path: /quote/currency}}, {$var: {name: terms, path: /currency}}]
+            - $eq: [{$var: {name: snapshot, path: /quote/totalMinor}}, {$var: {name: terms, path: /amountMinor}}]
+            - $eq: [{$size: {$var: groups}}, {$size: {$var: {name: snapshot, path: /groups}}}]
+        message: CANCELLATION_PAYMENT_ORDER_MISMATCH
+    - $let: {name: target, expr: 0}
+    - $let: {name: basis, expr: 0}
+    - $let: {name: decisions, expr: {}}
+    - $let: {name: resolved, expr: true}
+    - $forEach:
+        item: spec
+        in: {$var: {name: snapshot, path: /groups}}
+        do:
+        - $let:
+            name: group
+            expr: {$get: {object: {$var: groups}, key: {$var: {name: spec, path: /id}}}}
+        - $let: {name: amount, expr: {$var: {name: group, path: /proposal/amountMinor}}}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind: {val: {$var: amount}, kind: integer}
+                - $gte: [{$var: amount}, 0]
+                - $eq: [{$var: {name: group, path: /proposalBlueId}}, {$nodeBlueId: {$var: {name: group, path: /proposal}}}]
+                - $eq: [{$var: {name: group, path: /originalLineIndices}}, {$var: {name: spec, path: /lineIndices}}]
+            message: CANCELLATION_PAYMENT_GROUP_MISMATCH
+        - $set: {name: basis, expr: {$add: [{$var: basis}, {$var: amount}]}}
+        - $if:
+            cond: {$exists: {$var: {name: group, path: /decisionBlueId}}}
+            then:
+            - $let: {name: decision, expr: {$var: {name: group, path: /decision}}}
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $includes: {list: [cancelled, declined, expired, no_show], val: {$var: {name: group, path: /status}}}
+                    - $eq: [{$nodeBlueId: {$var: decision}}, {$var: {name: group, path: /decisionBlueId}}]
+                    - $eq: [{$var: {name: decision, path: /groupId}}, {$var: {name: spec, path: /id}}]
+                    - $eq: [{$var: {name: decision, path: /proposalBlueId}}, {$var: {name: group, path: /proposalBlueId}}]
+                    - $eq: [{$var: {name: decision, path: /currency}}, {$var: {name: terms, path: /currency}}]
+                    - $eq: [{$var: {name: decision, path: /basisMinor}}, {$var: amount}]
+                    - $isKind: {val: {$var: {name: decision, path: /chargeMinor}}, kind: integer}
+                    - $gte: [{$var: {name: decision, path: /chargeMinor}}, 0]
+                    - $lte: [{$var: {name: decision, path: /chargeMinor}}, {$var: amount}]
+                    - $eq:
+                      - {$add: [{$var: {name: decision, path: /chargeMinor}}, {$var: {name: decision, path: /releasedMinor}}]}
+                      - {$var: amount}
+                message: CANCELLATION_PAYMENT_INVALID_DECISION
+            - $set:
+                name: decisions
+                expr:
+                  $objectSet:
+                    object: {$var: decisions}
+                    key: {$var: {name: spec, path: /id}}
+                    val: {$var: {name: group, path: /decisionBlueId}}
+            - $set: {name: target, expr: {$add: [{$var: target}, {$var: {name: decision, path: /chargeMinor}}]}}
+            else:
+            - $failIf:
+                cond:
+                  $not:
+                    $includes: {list: [pending_supplier, pending_customer, confirmed, fulfilled], val: {$var: {name: group, path: /status}}}
+                message: CANCELLATION_PAYMENT_DECISION_REQUIRED
+            - $set: {name: target, expr: {$add: [{$var: target}, {$var: amount}]}}
+            - $if:
+                cond: {$includes: {list: [pending_supplier, pending_customer], val: {$var: {name: group, path: /status}}}}
+                then:
+                - $set: {name: resolved, expr: false}
+    - $failIf:
+        cond: {$ne: [{$var: basis}, {$var: {name: terms, path: /amountMinor}}]}
+        message: CANCELLATION_PAYMENT_COVERAGE_MISMATCH
+    - $let:
+        name: net
+        expr: {$subtract: [{$var: {name: payment, path: /completed}}, {$var: {name: payment, path: /reversed}}]}
+    - $let:
+        name: chargeDue
+        expr: {$choose: {cond: {$gt: [{$var: target}, {$var: net}]}, then: {$subtract: [{$var: target}, {$var: net}]}, else: 0}}
+    - $return:
+        decisionBlueIds: {$var: decisions}
+        currency: {$var: {name: terms, path: /currency}}
+        basisMinor: {$var: basis}
+        targetMinor: {$var: target}
+        allGroupsResolved: {$var: resolved}
+        capturedMinor: {$var: {name: payment, path: /completed}}
+        refundedMinor: {$var: {name: payment, path: /reversed}}
+        authorizedMinor: {$var: {name: payment, path: /secured}}
+        netPaidMinor: {$var: net}
+        refundDueMinor: {$choose: {cond: {$gt: [{$var: net}, {$var: target}]}, then: {$subtract: [{$var: net}, {$var: target}]}, else: 0}}
+        additionalChargeDueMinor: {$var: chargeDue}
+        authorizationReleaseDueMinor:
+          $choose:
+            cond: {$gt: [{$var: {name: payment, path: /secured}}, {$var: chargeDue}]}
+            then: {$subtract: [{$var: {name: payment, path: /secured}}, {$var: chargeDue}]}
+            else: 0
+  saveCancellationSettlement:
+    args:
+      state: {}
+    do:
+    - $if:
+        cond: {$eq: [{$document: {$const: {name: bindings, path: /state}}}, {$var: state}]}
+        then:
+        - $return: {outcome: duplicate}
+    - $appendChange:
+        op: replace
+        path: {$const: {name: bindings, path: /state}}
+        val: {$var: state}
+    - $appendEvent:
+        $merge:
+        - type: Events/Event
+        - kind: Cancellation Settlement Changed
+          clause: {$const: clauseKey}
+          status: {$var: {name: state, path: /status}}
+          decisionBlueIds: {$var: {name: state, path: /decisionBlueIds}}
+    - $return: {outcome: acceptedNew}
+  reconcileCancellationPayment:
+    args: {}
+    do:
+    - $let: {name: orderPath, expr: {$const: {name: bindings, path: /order}}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - $exists: {$document: {$concat: [{$var: orderPath}, /contracts/initialized/document]}}
+            - $exists: {$document: {$concat: [{$var: orderPath}, /orderSnapshot]}}
+            - $exists: {$document: /payment/completed}
+            - $ne: [{$document: /sourceLinks/ready}, false]
+        then:
+        - $return: {outcome: duplicate}
+    - $let: {name: payment, expr: {$document: /payment}}
+    - $let: {name: previousState, expr: {$document: {$const: {name: bindings, path: /state}}}}
+    - $let:
+        name: state
+        expr:
+          $merge:
+          - $call:
+              function: cancellationPlan
+              args:
+                snapshot: {$document: {$concat: [{$var: orderPath}, /orderSnapshot]}}
+                groups: {$document: {$concat: [{$var: orderPath}, /reservations]}}
+                terms: {$document: /paymentTerms}
+                payment: {$var: payment}
+          - orderOrigin: {$nodeBlueId: {$document: {$concat: [{$var: orderPath}, /contracts/initialized/document]}}}
+            status: not_applicable
+            lastRequestId: {$pointerGet: {object: {$var: previousState}, path: /lastRequestId, default: ''}}
+    - $if:
+        cond: {$eq: [{$size: {$var: {name: state, path: /decisionBlueIds}}}, 0]}
+        then:
+        - $return: {$call: {function: saveCancellationSettlement, args: {state: {$var: state}}}}
+    - $let: {name: status, expr: settled}
+    - $let: {name: unresolved, expr: false}
+    - $forEach:
+        item: request
+        key: paymentRequestKey
+        in: {$var: {name: payment, path: /requests}}
+        do:
+        - $if:
+            cond: {$includes: {list: [pending, unknown], val: {$var: {name: request, path: /status}}}}
+            then:
+            - $set: {name: unresolved, expr: true}
+    - $let: {name: action, expr: ''}
+    - $let: {name: amount, expr: 0}
+    - $if:
+        cond: {$var: unresolved}
+        then:
+        - $set: {name: status, expr: waiting_payment}
+        - $let:
+            name: outstanding
+            expr: {$get: {object: {$var: {name: payment, path: /requests}}, key: {$var: {name: state, path: /lastRequestId}}}}
+        - $if:
+            cond: {$includes: {list: [pending, unknown], val: {$var: {name: outstanding, path: /status}}}}
+            then:
+            - $set:
+                name: status
+                expr: {$choose: {cond: {$eq: [{$var: {name: outstanding, path: /status}}, unknown]}, then: unknown, else: requested}}
+            - $set:
+                name: state
+                expr:
+                  $merge:
+                  - {$var: state}
+                  - action: {$var: {name: outstanding, path: /intent/action}}
+                    requestedMinor: {$var: {name: outstanding, path: /intent/amountMinor}}
+        else:
+        - $if:
+            cond: {$gt: [{$var: {name: state, path: /refundDueMinor}}, 0]}
+            then:
+            - $set: {name: action, expr: refund}
+            - $set: {name: amount, expr: {$var: {name: state, path: /refundDueMinor}}}
+            else:
+            - $if:
+                cond: {$not: {$var: {name: state, path: /allGroupsResolved}}}
+                then:
+                - $set: {name: status, expr: waiting_order}
+                else:
+                - $if:
+                    cond: {$gt: [{$var: {name: state, path: /additionalChargeDueMinor}}, 0]}
+                    then:
+                    - $set: {name: action, expr: capture}
+                    - $set: {name: amount, expr: {$var: {name: state, path: /additionalChargeDueMinor}}}
+                    else:
+                    - $if:
+                        cond: {$gt: [{$var: {name: payment, path: /secured}}, 0]}
+                        then:
+                        - $set: {name: action, expr: void}
+                        - $set: {name: amount, expr: {$var: {name: payment, path: /secured}}}
+    - $if:
+        cond: {$ne: [{$var: action}, '']}
+        then:
+        - $let:
+            name: requestId
+            expr:
+              $concat:
+              - cancellation-
+              - $nodeBlueId:
+                - {$const: clauseKey}
+                - {$var: {name: state, path: /decisionBlueIds}}
+                - {$var: action}
+                - {$var: amount}
+                - {$var: {name: payment, path: /completed}}
+                - {$var: {name: payment, path: /reversed}}
+                - {$var: {name: payment, path: /secured}}
+        - $let: {name: previous, expr: {$get: {object: {$var: {name: payment, path: /requests}}, key: {$var: requestId}}}}
+        - $let: {name: gate, expr: {$pointerGet: {object: {$document: /paymentTerms}, path: /captureGate, default: ''}}}
+        - $set: {name: status, expr: requested}
+        - $if:
+            cond:
+              $or:
+              - $ne: [{$document: /activation/active}, true]
+              - $ne: [{$var: {name: payment, path: /accepted}}, true]
+              - $eq: [{$var: {name: payment, path: /transactionId}}, '']
+            then:
+            - $set: {name: status, expr: waiting_payment_setup}
+        - $if:
+            cond:
+              $or:
+              - $eq: [{$get: {object: {$var: {name: payment, path: /locks}}, key: {$var: action}}}, true]
+              - $and:
+                - $eq: [{$var: action}, capture]
+                - $or:
+                  - $eq: [{$var: {name: payment, path: /closed}}, true]
+                  - $lt: [{$var: {name: payment, path: /secured}}, {$var: amount}]
+                  - $gt: [{$add: [{$var: amount}, {$var: {name: payment, path: /completed}}]}, {$var: {name: payment, path: /targetMinor}}]
+                  - $eq: [{$var: {name: payment, path: /payeeChannel}}, '']
+                  - $and:
+                    - {$document: /paymentTerms/recipientApprovalRequired}
+                    - $ne: [{$var: {name: payment, path: /recipientApproved}}, true]
+                  - $and:
+                    - $ne: [{$var: gate}, '']
+                    - $ne: [{$document: {$var: gate}}, true]
+            then:
+            - $set: {name: status, expr: blocked}
+        - $if:
+            cond: {$exists: {$var: previous}}
+            then:
+            - $set:
+                name: status
+                expr: {$choose: {cond: {$includes: {list: [failed, declined], val: {$var: {name: previous, path: /status}}}}, then: failed, else: waiting_payment}}
+        - $set:
+            name: state
+            expr:
+              $merge:
+              - {$var: state}
+              - lastRequestId: {$var: requestId}
+                action: {$var: action}
+                requestedMinor: {$var: amount}
+        - $if:
+            cond: {$eq: [{$var: status}, requested]}
+            then:
+            - $call:
+                function: request
+                args:
+                  action: {$var: action}
+                  input:
+                    requestId: {$var: requestId}
+                    amountMinor: {$var: amount}
+                    reason: Order cancellation settlement
+    - $return:
+        $call:
+          function: saveCancellationSettlement
+          args:
+            state: {$merge: [{$var: state}, {status: {$var: status}}]}
+  observeCancellationSettlement:
+    args: {}
+    do:
+    - $let: {name: instruction, expr: {$document: {$const: {name: bindings, path: /instruction}}}}
+    - $let: {name: state, expr: {$document: {$const: {name: bindings, path: /settlement}}}}
+    - $if:
+        cond: {$not: {$exists: {$var: {name: state, path: /orderOrigin}}}}
+        then:
+        - $return: {outcome: duplicate}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $is: {node: {$var: instruction}, pattern: {type: PaymentInstruction/Payment Instruction}}
+            - $eq: [{$var: {name: state, path: /orderOrigin}}, {$nodeBlueId: {$document: /contracts/initialized/document}}]
+        message: CANCELLATION_SETTLEMENT_SOURCE_MISMATCH
+    - $let:
+        name: expected
+        expr:
+          $call:
+            function: cancellationPlan
+            args:
+              snapshot: {$document: /orderSnapshot}
+              groups: {$document: /reservations}
+              terms: {$var: {name: instruction, path: /paymentTerms}}
+              payment: {$var: {name: instruction, path: /payment}}
+    - $forEach:
+        key: field
+        item: expectedValue
+        in: {$var: expected}
+        do:
+        - $if:
+            cond: {$ne: [{$var: expectedValue}, {$get: {object: {$var: state}, key: {$var: field}}}]}
+            then:
+            - $return: {outcome: duplicate}
+    - $return: {$call: {function: saveCancellationSettlement, args: {state: {$var: state}}}}

@@ -1,0 +1,584 @@
+name: Native cancellation settlement component fixture
+description: Explicit native participant channels; independent PI preparation and initialization. No hosted admission
+  or PSP.
+type: Agreements/Agreement with Clauses
+template:
+  id: catalog-pricing-prototype
+  version: 0.2.0
+catalog:
+  revision: 1
+  supplierId: seller
+  currency: USD
+  entries:
+    service:
+      label: service
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 6000
+      guestDiscountPercent: 0
+    equipment:
+      label: equipment
+      pricingUnit: per_unit
+      dateRequired: false
+      maxQuantity: 20
+      unitAmountMinor: 4000
+      guestDiscountPercent: 0
+quotes: {}
+contracts:
+  seller:
+    type: Contracts/External Channel
+    event:
+      source: seller
+  partner:
+    type: Contracts/External Channel
+    event:
+      source: partner
+  customer:
+    type: Contracts/External Channel
+    event:
+      source: customer
+  guarantor:
+    type: Contracts/External Channel
+    event:
+      source: guarantor
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: Parties/Party
+          displayName: Supplier
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: seller
+          readerKeys:
+          - reader-seller
+        partner:
+          type: Parties/Party
+          displayName: Hotel partner
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: partner
+          readerKeys:
+          - reader-partner
+        customer:
+          type: Parties/Party
+          displayName: Customer
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: customer
+          readerKeys:
+          - reader-customer
+        guarantor:
+          type: Parties/Party
+          displayName: Local payment guarantor fixture
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: guarantor
+          readerKeys:
+          - reader-guarantor
+      required: []
+      preActivationChannels:
+      - cx.catalog.validate._automatic_source
+  catalog:
+    type: Reseller/Catalog Clause
+    bindings:
+      state: /catalog
+      quotes: /quotes
+      publish:
+        publishApprovedCatalog:
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Amendment Applied
+            clause: catalogAmendments
+          params:
+            $document: /catalogUpdate
+      quote:
+        createQuote:
+          'on': workflow
+          party: partner
+          params:
+            $var: trigger
+        quoteForCustomer:
+          'on': workflow
+          party: customer
+          params:
+            $var: trigger
+  fulfilment:
+    type: Reseller/Fulfilment Terms Clause
+    bindings:
+      place:
+        placeOrder:
+          'on': workflow
+          party: customer
+          params:
+            $var: trigger
+      approveAvailability:
+        approveAvailability:
+          'on': workflow
+          party: seller
+          params:
+            $var: trigger
+  orders:
+    type: Documents/Documents Clause
+    parameters:
+      allowedFields:
+      - orderSnapshot
+      template:
+        name: Reseller service order
+        type: Orders/Order with Clauses
+        orderSnapshot: {}
+        reservations: {}
+        reservationRequests: {}
+        clauses:
+          activation:
+            type: Activation/Activation Clause
+            parameters:
+              parties:
+                seller:
+                  type: Parties/Party
+                customer:
+                  type: Parties/Party
+                partner:
+                  type: Parties/Party
+                guarantor:
+                  type: Parties/Party
+              required: []
+              preActivationChannels:
+              - cx.confirmation.initialize._automatic_source
+          confirmation:
+            type: Reseller/Confirmation Clause
+            bindings:
+              confirm:
+                confirmReservation:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              alternative:
+                proposeAlternative:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              accept:
+                acceptProposal:
+                  'on': workflow
+                  party: customer
+                  params:
+                    $var: trigger
+              deadline:
+                setResponseDeadline:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              fulfil:
+                fulfilGroup:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+          cancellation:
+            type: Reseller/Cancellation Clause
+            bindings:
+              cancel:
+                cancelReservation:
+                  'on': workflow
+                  party: customer
+                  params:
+                    $var: trigger
+              supplierCancel:
+                cancelBySupplier:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              noShow:
+                reportNoShow:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              decline:
+                declineReservation:
+                  'on': workflow
+                  party: seller
+                  params:
+                    $var: trigger
+              expire:
+                expireReservation:
+                  'on': workflow
+                  party: customer
+                  params:
+                    $var: trigger
+              reconcileSettlement:
+                reconcileSettlement:
+                  'on': workflow
+                  party: customer
+                  params:
+                    $var: trigger
+          payment:
+            type: Payment/Payment Clause
+            parameters:
+              obtain: provide
+              template:
+                name: Native card cancellation settlement
+                type: PaymentInstruction/Payment Instruction with Clauses
+                clauses:
+                  activation:
+                    type: Activation/Activation Clause
+                    parameters:
+                      parties:
+                        payer:
+                          type: Parties/Party
+                        payee:
+                          type: Parties/Party
+                        guarantor:
+                          type: Parties/Party
+                        observer:
+                          type: Parties/Party
+                      required: []
+                  payment:
+                    type: Payment/Payment Process Clause
+                    parameters:
+                      method: card
+                      capture:
+                        mode: workflow
+                      conditions:
+                        requestCapture:
+                          $eq:
+                          - $pointerGet:
+                              object:
+                                $document: /cancellationSettlement
+                              path: /status
+                              default: not_applicable
+                          - not_applicable
+                    bindings:
+                      requestAuthorize:
+                        authorize:
+                          'on': workflow
+                          party: payer
+                          params:
+                            $pointerSet:
+                              object:
+                                $object:
+                                  $var: trigger
+                              path: /type
+                              op: remove
+                          request:
+                            type: PaymentInstruction/Payment Request Input
+                            requestId:
+                              type: Text
+                      requestCapture:
+                        capture:
+                          'on': workflow
+                          party: payer
+                          params:
+                            $pointerSet:
+                              object:
+                                $object:
+                                  $var: trigger
+                              path: /type
+                              op: remove
+                          request:
+                            type: PaymentInstruction/Payment Request Input
+                            requestId:
+                              type: Text
+                      requestRefund:
+                        refund:
+                          'on': workflow
+                          party: payee
+                          params:
+                            $pointerSet:
+                              object:
+                                $object:
+                                  $var: trigger
+                              path: /type
+                              op: remove
+                          request:
+                            type: PaymentInstruction/Payment Request Input
+                            requestId:
+                              type: Text
+                      requestVoid:
+                        void:
+                          'on': workflow
+                          party: payee
+                          params:
+                            $pointerSet:
+                              object:
+                                $object:
+                                  $var: trigger
+                              path: /type
+                              op: remove
+                          request:
+                            type: PaymentInstruction/Payment Request Input
+                            requestId:
+                              type: Text
+                  cancellation:
+                    type: Reseller/Cancellation Payment Clause
+                    bindings:
+                      order: /sources/order
+                      reconcile:
+                        captureConditionChanged:
+                          'on': change
+                          path: /captureAllowed
+                        activationChanged:
+                          'on': change
+                          path: /activation
+                        sourceLinked:
+                          'on': change
+                          path: /sources
+                        sourceReady:
+                          'on': change
+                          path: /sourceLinks
+                        paymentOutcome:
+                          'on': event
+                          event:
+                            type: PaymentInstruction/Payment Response
+                        paymentRequest:
+                          'on': event
+                          event:
+                            type: PaymentInstruction/Payment Request
+                        paymentEvent:
+                          'on': event
+                          event:
+                            type: PaymentInstruction/Payment Event
+                  testCaptureGate:
+                    type: Features/Feature Clause
+                    parameters:
+                      actions:
+                        setGate:
+                          do:
+                          - $appendChange:
+                              op: replace
+                              path: /captureAllowed
+                              val:
+                                $var:
+                                  name: params
+                                  path: /allowed
+                    bindings:
+                      setGate:
+                        setCaptureGate:
+                          'on': workflow
+                          party: payee
+                          params:
+                            $var: trigger
+                paymentTerms:
+                  amountMinor:
+                    type: Integer
+                  limitMinor:
+                    type: Integer
+                  currency:
+                    type: Text
+                  payerChannel: payer
+                  payeeChannel: payee
+                  guarantorChannel: guarantor
+                  allowedPayees:
+                  - payee
+                  recipientApprovalRequired: false
+                  captureGate: /captureAllowed
+                businessContext:
+                  description: Card payment for the selected catalog items.
+                sources:
+                  order: {}
+                captureAllowed: true
+              suppliedBy: seller
+              fieldPaths:
+                amountMinor: /paymentTerms/amountMinor
+                limitMinor: /paymentTerms/limitMinor
+                currency: /paymentTerms/currency
+              suppliedParties: []
+            bindings:
+              instruction: /payment
+              parties:
+                payer: customer
+                payee: seller
+                observer: partner
+                guarantor: guarantor
+              prepare:
+                startPayment:
+                  'on': workflow
+                  party: customer
+                  params:
+                    values:
+                      amountMinor:
+                        $document: /orderSnapshot/quote/totalMinor
+                      limitMinor:
+                        $document: /orderSnapshot/quote/totalMinor
+                      currency:
+                        $document: /orderSnapshot/quote/currency
+              provide:
+                providePayment:
+                  'on': workflow
+                  party: seller
+              sources:
+                order: self
+          paymentEvents:
+            type: Reseller/Payment Observation Clause
+            bindings:
+              instruction: /payment
+          cancellationSettlement:
+            type: Reseller/Cancellation Settlement Clause
+            bindings:
+              instruction: /payment
+              settlement: /payment/cancellationSettlement
+    bindings:
+      collection: /orders
+      start:
+        fromSnapshot:
+          'on': event
+          event:
+            type: Commerce/Domain Event
+            kind: Reseller Order Prepared
+            clause: fulfilment
+          params:
+            key:
+              $event: /key
+            fields:
+              orderSnapshot:
+                $event: /snapshot
+      parties:
+        seller: seller
+        customer: customer
+        partner: partner
+        guarantor: guarantor
+      template: /clauses/orders/parameters/template
+  amendments:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers:
+      - seller
+      - partner
+      paths:
+      - /resellerTerms
+    bindings:
+      propose:
+        proposeTerms:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+            type: Amendments/Amendment Input
+            expectedRevision:
+              type: Integer
+              description: Current amendment revision from authorized state.
+            path:
+              type: Text
+              description: Configured path of the terms being amended.
+            replacement:
+              description: User-selected replacement value for those terms.
+      approve:
+        sellerApprove:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+        partnerApprove:
+          'on': workflow
+          party: partner
+          params:
+            $object:
+              $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+  catalogAmendments:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers:
+      - seller
+      - partner
+      paths:
+      - /catalogUpdate
+    bindings:
+      propose:
+        proposeCatalog:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+            type: Amendments/Amendment Input
+            expectedRevision:
+              type: Integer
+              description: Current amendment revision from authorized state.
+            path:
+              type: Text
+              description: Configured path of the terms being amended.
+            replacement:
+              description: User-selected replacement value for those terms.
+      approve:
+        sellerApproveCatalog:
+          'on': workflow
+          party: seller
+          params:
+            $object:
+              $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+        partnerApproveCatalog:
+          'on': workflow
+          party: partner
+          params:
+            $object:
+              $var: trigger
+          request:
+            description: Reviewed public input for this configured operation.
+            proposalId:
+              type: Text
+              description: Identifier of the proposal selected by the user.
+      state: /catalogAmendments
+orderIntents: {}
+orders: {}
+supplierReadiness: {}
+resellerTerms:
+  fulfilmentText: '## Fulfilment
+
+    Meet at Pier A, 15 minutes before your agreed start. The supplier provides the booked service. Fuel inclusion
+    has not been specified.
+
+
+    ## Supplier deposit
+
+    The operator may hold USD 500 on arrival under its separately confirmed conditions. MyOS does not collect this
+    deposit.'
+  confirmationMode: supplier
+  cancellationPolicy:
+    freeCancellationHoursBeforeStart: 24
+    lateCancellationChargePercent: 20
+termsEditable: true
+catalogUpdate: {}

@@ -68,3 +68,30 @@ The task's native component tests and upstream reservation/catalog examples have
 separate qualification boundaries. Package selection and semantic cards alone do
 not establish hosted execution or financial acceptance. No semantic model call is
 required to build or verify the native archive.
+
+## Automatic cancellation settlement
+
+The Cancellation Clause records the commercial decision on the Order, including
+the amount to retain. It does not confirm that money moved. Configure
+[Cancellation Payment Clause](types/cancellation-payment-clause.blue) on the PI
+with `bindings.order: /sources/order` and
+[Cancellation Settlement Clause](types/cancellation-settlement-clause.blue) on
+the Order with `bindings.instruction: /payment`. Both use
+[Cancellation Settlement Functions](types/cancellation-settlement-functions.blue).
+
+The PI observes the exact bound Order and reconciles its cancellation decision
+against the confirmed payment ledger. It requests a refund of confirmed excess,
+captures only a retained fee when permitted by the existing capture gate, and
+releases unused authorization. Only a guarantor outcome changes settled money.
+Pending or unknown requests keep their reservations; replay and repeated
+cancellation cannot create a second refund. The Order observes that settlement
+separately and remains cancelled while it is pending, blocked or failed.
+
+All 16 [native scenarios](../examples/reseller/tests/cancellation-settlement.case.json)
+pass against the current package selection and Core 64abcd6de. They exercise full and partial refunds, void, fee retention, multiple groups, pending
+and failed outcomes, replay, and unauthorized refund confirmation. Their
+[fixture](../examples/reseller/cancellation-settlement-native.blue) uses the legacy
+embedded factory only to qualify the settlement clauses; new hosted Orders use
+the `prepareOrder` / independent bootstrap / `provideOrder` contract above.
+One PI covers the complete Order. This does not implement installments, calendar
+availability, provider checkout, or a Business UI integration.

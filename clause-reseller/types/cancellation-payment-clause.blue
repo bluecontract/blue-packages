@@ -1,0 +1,51 @@
+name: Cancellation Payment Clause
+description: Reconcile an observed Order cancellation against this PI's confirmed ledger. Requests refund,
+  capture of the retained charge, or release of the remaining authorization; only the guarantor confirms money.
+type: Connections/Connected Clause
+actionDefinition:
+  type: Reseller/Cancellation Settlement Functions
+bindingTypes:
+  order: pointer
+  state: pointer
+defaultBindings:
+  order: /sources/order
+  state: /cancellationSettlement
+  reconcile:
+    paymentOutcome:
+      'on': event
+      event:
+        type: PaymentInstruction/Payment Response
+    paymentRequest:
+      'on': event
+      event:
+        type: PaymentInstruction/Payment Request
+    paymentEvent:
+      'on': event
+      event:
+        type: PaymentInstruction/Payment Event
+    activationChanged:
+      'on': change
+      path: /activation
+    sourceLinked:
+      'on': change
+      path: /sources
+    sourceReady:
+      'on': change
+      path: /sourceLinks
+initialState:
+  state: {}
+embeds:
+- order
+actions:
+  reconcile:
+    observation: true
+    automatic:
+      'on': embedded
+      pathBinding: order
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reconcileCancellationPayment
+            args: {}
