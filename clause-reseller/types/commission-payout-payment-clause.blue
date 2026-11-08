@@ -8,93 +8,191 @@ actionDefinition:
         args: {}
         do:
         - $let:
-            name: p
+            name: terms
             expr:
-              $document:
-                $concat:
-                - /clauses/
-                - $const: clauseKey
-                - /parameters
+              $document: /payoutTerms
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: terms
+                    kind: object
+                - $eq:
+                  - $document: /amountMinor
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /netMinor
+            message: PAYOUT_TERMS_REQUIRED
         - $let:
-            name: recipient
+            name: operator
             expr:
               $pointerGet:
                 object:
-                  $var: p
-                path: /payee
-                default: seller
+                  $var: terms
+                path: /operator
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - test
+                  - stripe
+                  val:
+                    $var: operator
+            message: PAYOUT_OPERATOR_UNSUPPORTED
         - $let:
             name: result
             expr:
               $call:
                 function: buildInstruction
                 args:
-                  configOverride:
-                    guarantor:
-                      $var: recipient
+                  configOverride: {}
                   details:
-                    method: manual-bank-transfer
-                    confirmation: recipient
+                    method: myos-account-to-account
+                    payoutTerms:
+                      $var: terms
                   methodClauses:
                     $literal:
-                      settlementPolicy:
+                      method:
+                        type: MyOS/Payment Method Events
+                      accountSettlement:
                         type: Features/Feature Clause
                         parameters:
                           actions:
-                            initialize:
-                              automatic:
-                                'on': initialized
-                                once: true
+                            confirm:
                               do:
-                              - $appendChange:
-                                  op: add
-                                  path: /settlementOpen
-                                  val: true
-                            retire:
-                              do:
-                              - $forEach:
-                                  item: financialRequest
-                                  in:
-                                    $document: /payment/requests
-                                  do:
-                                  - $failIf:
-                                      cond:
-                                        $includes:
-                                          list:
-                                          - pending
-                                          - unknown
-                                          val:
-                                            $var:
-                                              name: financialRequest
-                                              path: /status
-                                      message: PAYOUT_OUTCOME_UNRESOLVED
+                              - $let:
+                                  name: terms
+                                  expr:
+                                    $document: /paymentDetails/payoutTerms
                               - $failIf:
                                   cond:
-                                    $ne:
-                                    - $add:
-                                      - $document: /payment/reserved/secure
-                                      - $document: /payment/reserved/capture
-                                      - $document: /payment/reserved/void
-                                      - $document: /payment/reserved/refund
-                                    - 0
-                                  message: PAYOUT_OUTCOME_UNRESOLVED
+                                    $not:
+                                      $and:
+                                      - $eq:
+                                        - $document: /payment/accepted
+                                        - true
+                                      - $isKind:
+                                          val:
+                                            $var:
+                                              name: params
+                                              path: /debitReference
+                                          kind: text
+                                      - $ne:
+                                        - $var:
+                                            name: params
+                                            path: /debitReference
+                                        - ''
+                                      - $isKind:
+                                          val:
+                                            $var:
+                                              name: params
+                                              path: /transferReference
+                                          kind: text
+                                      - $ne:
+                                        - $var:
+                                            name: params
+                                            path: /transferReference
+                                        - ''
+                                  message: ACCOUNT_SETTLEMENT_INVALID
+                              - $let:
+                                  name: record
+                                  expr:
+                                    payoutKey:
+                                      $pointerGet:
+                                        object:
+                                          $var: terms
+                                        path: /payoutKey
+                                    grossMinor:
+                                      $pointerGet:
+                                        object:
+                                          $var: terms
+                                        path: /grossMinor
+                                    feeMinor:
+                                      $pointerGet:
+                                        object:
+                                          $var: terms
+                                        path: /feeMinor
+                                    netMinor:
+                                      $pointerGet:
+                                        object:
+                                          $var: terms
+                                        path: /netMinor
+                                    currency:
+                                      $pointerGet:
+                                        object:
+                                          $var: terms
+                                        path: /currency
+                                    transactionId:
+                                      $document: /payment/transactionId
+                                    debitReference:
+                                      $var:
+                                        name: params
+                                        path: /debitReference
+                                    transferReference:
+                                      $var:
+                                        name: params
+                                        path: /transferReference
+                              - $if:
+                                  cond:
+                                    $exists:
+                                      $document: /accountSettlement
+                                  then:
+                                  - $failIf:
+                                      cond:
+                                        $ne:
+                                        - $document: /accountSettlement
+                                        - $var: record
+                                      message: ACCOUNT_SETTLEMENT_CONFLICT
+                                  - $return: {}
                               - $appendChange:
-                                  op: replace
-                                  path: /settlementOpen
-                                  val: false
+                                  op: add
+                                  path: /accountSettlement
+                                  val:
+                                    $var: record
                               - $appendEvent:
                                   $merge:
                                   - type: Events/Event
-                                  - kind: Payout Retired
+                                  - kind: Account Settlement Confirmed
+                                    settlement:
+                                      $var: record
                         bindings:
-                          retire:
-                            retirePayout:
+                          confirm:
+                            confirmAccountSettlement:
                               'on': workflow
-                              party: partner
-                  termsOverride:
-                    captureGate: /settlementOpen
-                  instructionPatch: {}
+                              party: guarantor
+                              params:
+                                debitReference:
+                                  $var:
+                                    name: trigger
+                                    path: /debitReference
+                                transferReference:
+                                  $var:
+                                    name: trigger
+                                    path: /transferReference
+                  termsOverride: {}
+                  instructionPatch:
+                    rootType:
+                      $choose:
+                        cond:
+                          $eq:
+                          - $var: operator
+                          - test
+                        then:
+                          $get:
+                            object:
+                              type: MyOS/MyOS Test Account to Account Payment Instruction
+                            key: type
+                        else:
+                          $get:
+                            object:
+                              type: MyOS/MyOS Stripe Account to Account Payment Instruction
+                            key: type
         - $return:
             $var: result
-description: Manual commission payout whose recipient confirms receipt. Retiring the payout is guarded by unresolved
-  requests and reserved funds.
+description: Commission payout paid by a MyOS account-to-account transfer of N from seller to partner. The
+  operator secures and debits G from the seller, transfers N and retains the MyOS fee F, then reports the
+  split once with confirmAccountSettlement.

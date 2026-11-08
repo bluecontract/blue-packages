@@ -1,10 +1,66 @@
 name: Commission Payouts Clause
 type: Documents/Documents Clause
-description: Prepare one commission payout using native document preparation. Guard unresolved prior payouts
-  and record an accepted new payout once.
+description: Prepare one MyOS account-to-account commission payout using native document preparation. The
+  settled commission G is reserved once; the payout freezes the MyOS fee F and the partner transfer N = G - F
+  with both payment accounts and the Agreement operator. Guard unresolved prior payouts.
+actionDefinition:
+  type:
+    type: Documents/Document Preparation Functions
+    functions:
+      # Exact shared Money/Rounding.roundBps; the fee uses the same rounding as commission accrual.
+      roundBps:
+        blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
+      resolvePayoutTerms:
+        args:
+          grossMinor:
+            type: Integer
+        do:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /terms/payoutFeePolicy
+              - myos-commission-fee-v1
+            message: PAYOUT_FEE_POLICY_UNSUPPORTED
+        # The only definition of the current MyOS fee rate (20%).
+        - $let:
+            name: feeBps
+            expr: 2000
+        - $let:
+            name: feeMinor
+            expr:
+              $call:
+                function: roundBps
+                args:
+                  basis:
+                    $var: grossMinor
+                  bps:
+                    $var: feeBps
+        - $let:
+            name: netMinor
+            expr:
+              $subtract:
+              - $var: grossMinor
+              - $var: feeMinor
+        - $failIf:
+            cond:
+              $lt:
+              - $var: netMinor
+              - 1
+            message: PAYOUT_NET_NOT_POSITIVE
+        - $return:
+            feePolicy: myos-commission-fee-v1
+            feeBps:
+              $var: feeBps
+            grossMinor:
+              $var: grossMinor
+            feeMinor:
+              $var: feeMinor
+            netMinor:
+              $var: netMinor
 parameters:
   allowedFields:
   - amountMinor
+  - payoutTerms
   parties: []
 bindingTypes:
   commission: pointer
@@ -30,6 +86,8 @@ actions:
                   list:
                   - key
                   - amountMinor
+                  - payerPaymentAccountId
+                  - recipientPaymentAccountId
                   val:
                     $var: field
             message: UNKNOWN_INPUT_FIELD
@@ -91,6 +149,65 @@ actions:
                   - /reserved
               - 0
             message: PAYOUT_ALREADY_UNRESOLVED
+    - $forEach:
+        item: accountField
+        in:
+        - payerPaymentAccountId
+        - recipientPaymentAccountId
+        do:
+        - $let:
+            name: accountId
+            expr:
+              $pointerGet:
+                object:
+                  $var: trigger
+                path:
+                  $concat:
+                  - /
+                  - $var: accountField
+                default: null
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: accountId
+                    kind: text
+                - $ne:
+                  - $var: accountId
+                  - ''
+            message: INVALID_PAYMENT_ACCOUNT
+    - $failIf:
+        cond:
+          $eq:
+          - $var:
+              name: trigger
+              path: /payerPaymentAccountId
+          - $var:
+              name: trigger
+              path: /recipientPaymentAccountId
+        message: INVALID_PAYMENT_ACCOUNT
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - test
+              - stripe
+              val:
+                $document: /terms/payoutOperator
+        message: PAYOUT_OPERATOR_UNSUPPORTED
+    - $let:
+        name: split
+        expr:
+          $call:
+            function: resolvePayoutTerms
+            args:
+              grossMinor:
+                $var:
+                  name: trigger
+                  path: /amountMinor
     - $set:
         name: params
         expr:
@@ -101,8 +218,27 @@ actions:
           fields:
             amountMinor:
               $var:
-                name: trigger
-                path: /amountMinor
+                name: split
+                path: /netMinor
+            payoutTerms:
+              $merge:
+              - $var: split
+              - payoutKey:
+                  $var:
+                    name: trigger
+                    path: /key
+                currency:
+                  $document: /terms/currency
+                operator:
+                  $document: /terms/payoutOperator
+                payerPaymentAccountId:
+                  $var:
+                    name: trigger
+                    path: /payerPaymentAccountId
+                recipientPaymentAccountId:
+                  $var:
+                    name: trigger
+                    path: /recipientPaymentAccountId
     - $set:
         name: actionResult
         expr:

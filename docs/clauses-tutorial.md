@@ -5186,6 +5186,173 @@ Walkthrough: [`29-payment-rejection.case.yaml`](../examples/apps/29-payment-reje
 | 6 | guarantor | Main | acceptPaymentInstruction | `{}` | Rejected; no state change |
 | 7 | guarantor | Main | recordTransactionInitiated | `{"transactionId":"forbidden"}` | Rejected; no state change |
 
+### 30-commission-a2a-payout
+
+Source: [`30-commission-a2a-payout.blue`](../examples/apps/30-commission-a2a-payout.blue).
+
+```yaml
+name: Reseller commission settled by a MyOS account-to-account payout
+type: Agreements/Agreement with Clauses
+terms:
+  commissionBps: 1000
+  currency: EUR
+  payoutOperator: test
+  payoutFeePolicy: myos-commission-fee-v1
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: MyOS/MyOS Party
+          displayName: Seller
+          myosAccountId: test-seller
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: seller
+        partner:
+          type: MyOS/MyOS Party
+          displayName: Partner
+          myosAccountId: test-partner
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: partner
+        guarantor:
+          type: MyOS/MyOS Party
+          displayName: MyOS payment operator
+          myosAccountId: test-guarantor
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: guarantor
+      required:
+      - seller
+      - partner
+      - guarantor
+  commission:
+    type: Reseller/Commission Clause
+    bindings:
+      state: /commission
+      orders: /orders
+      payouts: /payouts
+      rate: /terms/commissionBps
+  payouts:
+    type: Reseller/Commission Payouts Clause
+    bindings:
+      template: /payoutTemplate
+      collection: /payouts
+      commission: /commission
+      parties:
+        seller: seller
+        partner: partner
+        guarantor: guarantor
+      preparePayout:
+        startPayout:
+          'on': workflow
+          party: seller
+orders: {}
+# Fixture: commission already accrued from one confirmed order (covered by the hosted Core order tests).
+commission:
+  targets:
+    o1: 1000
+    o2: 1000
+  accrued: 2000
+  paid: 0
+  reserved: 0
+  settlements: {}
+payouts: {}
+payoutTemplate:
+  name: Partner commission payout
+  type: Agreements/Agreement with Clauses
+  amountMinor: 1
+  payoutTerms: {}
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: MyOS/MyOS Party
+          partner:
+            type: MyOS/MyOS Party
+          guarantor:
+            type: MyOS/MyOS Party
+        required: []
+    payment:
+      type: Reseller/Commission Payout Payment Clause
+      parameters:
+        payer: seller
+        payee: partner
+        currency: EUR
+      bindings:
+        amount: /amountMinor
+        instruction: /payment
+        start:
+          startPayment:
+            'on': workflow
+            party: seller
+        requestAuthorize:
+          securePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-secure
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Secures the complete frozen partner transfer; no input fields.
+        requestCapture:
+          capturePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-capture
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Transfers the complete frozen partner amount; no input fields.
+```
+
+Walkthrough: [`30-commission-a2a-payout.case.yaml`](../examples/apps/30-commission-a2a-payout.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 2 | partner | Main | approve_partner | `{"revision":1}` | Processed |
+| 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
+| 4 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000,"payerPaymentAccountId":"pa-seller-test","recipientPaymentAccountId":"pa-partner-test"}` | Processed; `{"/commission/reserved":1000,"/commission/paid":0,"/payouts/p1/amountMinor":800,"/payouts/p1/payoutTerms/grossMinor":1000,"/payouts/p1/payoutTerms/feeMinor":200,"/payouts/p1/payoutTerms/netMinor":800,"/payouts/p1/payoutTerms/feeBps":2000,"/payouts/p1/payoutTerms/operator":"test"}` |
+| 5 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000,"payerPaymentAccountId":"pa-seller-test","recipientPaymentAccountId":"pa-partner-test"}` | Processed; `{"/commission/reserved":1000,"/payouts/p1/amountMinor":800}` |
+| 6 | seller | Main | startPayout | `{"key":"p2","amountMinor":1000,"feeMinor":0,"payerPaymentAccountId":"pa-seller-test","recipientPaymentAccountId":"pa-partner-test"}` | Rejected; no state change |
+| 7 | seller | Main | startPayout | `{"key":"p2","amountMinor":500,"payerPaymentAccountId":"pa-seller-test","recipientPaymentAccountId":"pa-partner-test"}` | Rejected; no state change |
+| 8 | seller | /payouts/p1 | startPayment | `{}` | Processed; `{"/payouts/p1/payment/paymentTerms/amountMinor":800,"/payouts/p1/payment/paymentDetails/method":"myos-account-to-account","/payouts/p1/payment/paymentDetails/payoutTerms/feeMinor":200}` |
+| 9 | guarantor | /payouts/p1/payment | acceptPaymentInstruction | `{}` | Processed |
+| 10 | guarantor | /payouts/p1/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"payout-p1","railType":"myos-account-to-account","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 11 | guarantor | /payouts/p1/payment | securePayout | `{}` | Processed |
+| 12 | guarantor | /payouts/p1/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-secure","amountSecured":800}` | Processed |
+| 13 | guarantor | /payouts/p1/payment | capturePayout | `{}` | Processed |
+| 14 | guarantor | /payouts/p1/payment | confirmAccountSettlement | `{"debitReference":"test-debit-p1","transferReference":"test-transfer-p1"}` | Processed; `{"/payouts/p1/payment/accountSettlement/feeMinor":200,"/commission/paid":0,"/commission/reserved":1000}` |
+| 15 | guarantor | /payouts/p1/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-capture","amountCompleted":800}` | Processed; `{"/payouts/p1/payment/payment/completed":800,"/commission/paid":1000,"/commission/reserved":0,"/commission/settlements/p1/status":"closed","/commission/settlements/p1/paidMinor":1000,"/commission/settlements/p1/transferredMinor":800,"/commission/settlements/p1/feeMinor":200}` |
+| 16 | guarantor | /payouts/p1/payment | confirmAccountSettlement | `{"debitReference":"test-debit-p1","transferReference":"test-transfer-p1"}` | Processed; `{"/commission/paid":1000}` |
+| 17 | guarantor | /payouts/p1/payment | confirmAccountSettlement | `{"debitReference":"other-debit","transferReference":"test-transfer-p1"}` | Rejected; no state change |
+| 18 | seller | Main | startPayout | `{"key":"p2","amountMinor":1001,"payerPaymentAccountId":"pa-seller-test","recipientPaymentAccountId":"pa-partner-test"}` | Rejected; no state change |
+| 19 | seller | Main | startPayout | `{"key":"p2","amountMinor":500,"payerPaymentAccountId":"pa-seller-test","recipientPaymentAccountId":"pa-partner-test"}` | Processed; `{"/commission/reserved":500,"/payouts/p2/payoutTerms/feeMinor":100,"/payouts/p2/amountMinor":400}` |
+| 20 | seller | /payouts/p2 | startPayment | `{}` | Processed |
+| 21 | guarantor | /payouts/p2/payment | rejectPaymentInstruction | `{"reason":"payment_account_unavailable"}` | Processed; `{"/commission/reserved":0,"/commission/paid":1000,"/commission/settlements/p2/status":"closed","/commission/settlements/p2/paidMinor":0,"/commission/settlements/p2/feeMinor":0}` |
+| 22 | seller | Main | startPayout | `{"key":"p3","amountMinor":500,"payerPaymentAccountId":"pa-seller-test","recipientPaymentAccountId":"pa-partner-test"}` | Processed; `{"/commission/reserved":500}` |
+| 23 | seller | /payouts/p3 | startPayment | `{}` | Processed |
+| 24 | guarantor | /payouts/p3/payment | acceptPaymentInstruction | `{}` | Processed |
+| 25 | guarantor | /payouts/p3/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"payout-p3","railType":"myos-account-to-account","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 26 | guarantor | /payouts/p3/payment | securePayout | `{}` | Processed |
+| 27 | guarantor | /payouts/p3/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-secure","amountSecured":400}` | Processed |
+| 28 | guarantor | /payouts/p3/payment | capturePayout | `{}` | Processed |
+| 29 | guarantor | /payouts/p3/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-capture","amountCompleted":400}` | Processed; `{"/commission/paid":1000,"/commission/reserved":500}` |
+| 30 | guarantor | /payouts/p3/payment | confirmAccountSettlement | `{"debitReference":"test-debit-p3","transferReference":"test-transfer-p3"}` | Processed; `{"/commission/paid":1500,"/commission/reserved":0,"/commission/settlements/p3/transferredMinor":400,"/commission/settlements/p3/feeMinor":100}` |
+
 ## 10. Source of truth and compatibility
 
 Use the package identities from `PACKAGES.json`, not a similarly named package from an earlier preview. An authored name such as `Payment/Payment Clause` is resolved to an exact definition before execution. Existing deployed documents keep their historical exact packages. Replacing the current unpublished candidate does not migrate their state or revise previously accepted terms.

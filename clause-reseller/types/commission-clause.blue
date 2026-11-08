@@ -22,21 +22,24 @@ actionDefinition:
                 name: input
                 path: /key
         - $let:
-            name: path
+            name: payout
             expr:
-              $concat:
-              - $concat:
-                - $const:
-                    name: bindings
-                    path: /payouts
-                - /
-              - $var: key
-              - /payment
+              $document:
+                $concat:
+                - $concat:
+                  - $const:
+                      name: bindings
+                      path: /payouts
+                  - /
+                - $var: key
         - $let:
             name: pi
             expr:
-              $document:
-                $var: path
+              $pointerGet:
+                object:
+                  $var: payout
+                path: /payment
+                default: {}
         - $let:
             name: s
             expr:
@@ -60,6 +63,54 @@ actionDefinition:
                 $exists:
                   $var: old
             message: UNKNOWN_SETTLEMENT
+        - $if:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: old
+                  path: /status
+              - reserved
+            then:
+            - $return:
+                outcome: duplicate
+        - $let:
+            name: terms
+            expr:
+              $pointerGet:
+                object:
+                  $var: payout
+                path: /payoutTerms
+        - $let:
+            name: gross
+            expr:
+              $pointerGet:
+                object:
+                  $var: old
+                path: /amountMinor
+        # The frozen split must settle exactly the reserved commission.
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /grossMinor
+                  - $var: gross
+                - $eq:
+                  - $add:
+                    - $pointerGet:
+                        object:
+                          $var: terms
+                        path: /feeMinor
+                    - $pointerGet:
+                        object:
+                          $var: terms
+                        path: /netMinor
+                  - $var: gross
+            message: INVALID_PAYOUT_TERMS
         - $let:
             name: state
             expr:
@@ -67,129 +118,153 @@ actionDefinition:
                 object:
                   $var: pi
                 path: /payment
+                default: {}
         - $let:
-            name: net
-            expr:
-              $subtract:
-              - $pointerGet:
-                  object:
-                    $var: state
-                  path: /completed
-              - $pointerGet:
-                  object:
-                    $var: state
-                  path: /reversed
-        - $failIf:
-            cond:
-              $not:
-                $and:
-                - $isKind:
+            name: unresolved
+            expr: false
+        - $forEach:
+            item: financialRequest
+            in:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /requests
+                default: {}
+            do:
+            - $if:
+                cond:
+                  $includes:
+                    list:
+                    - pending
+                    - unknown
                     val:
-                      $var: net
-                    kind: integer
-                - $gte:
-                  - $var: net
-                  - 0
-                - $lte:
-                  - $var: net
-                  - $pointerGet:
-                      object:
-                        $var: old
-                      path: /amountMinor
-            message: INVALID_CONFIRMED_PAYOUT
+                      $var:
+                        name: financialRequest
+                        path: /status
+                then:
+                - $set:
+                    name: unresolved
+                    expr: true
+        - $if:
+            cond:
+              $var: unresolved
+            then:
+            - $return:
+                outcome: duplicate
         - $let:
-            name: terminal
+            name: completed
             expr:
-              $or:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /completed
+                default: 0
+        - $let:
+            name: settlement
+            expr:
+              $pointerGet:
+                object:
+                  $var: pi
+                path: /accountSettlement
+                default: {}
+        # Settlement needs both the operator split report and the ordinary completion of N, in either order.
+        - $let:
+            name: settled
+            expr:
+              $and:
+              - $isKind:
+                  val:
+                    $var: settlement
+                  kind: object
               - $eq:
                 - $pointerGet:
                     object:
-                      $var: pi
-                    path: /settlementOpen
-                - false
+                      $var: settlement
+                    path: /grossMinor
+                    default: null
+                - $var: gross
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: settlement
+                    path: /netMinor
+                    default: null
+                - $pointerGet:
+                    object:
+                      $var: terms
+                    path: /netMinor
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: settlement
+                    path: /feeMinor
+                    default: null
+                - $pointerGet:
+                    object:
+                      $var: terms
+                    path: /feeMinor
+              - $eq:
+                - $var: completed
+                - $pointerGet:
+                    object:
+                      $var: terms
+                    path: /netMinor
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /reversed
+                    default: 0
+                - 0
+        # The operator rejected the instruction before any effect: no debit, no transfer, no fee.
+        - $let:
+            name: returned
+            expr:
+              $and:
               - $eq:
                 - $pointerGet:
                     object:
                       $var: state
                     path: /rejected
+                    default: false
                 - true
+              - $eq:
+                - $var: completed
+                - 0
               - $eq:
                 - $pointerGet:
                     object:
                       $var: state
-                    path: /closed
-                - true
-              - $eq:
-                - $pointerGet:
-                    object:
-                      $var: state
-                    path: /completed
-                - $pointerGet:
-                    object:
-                      $var: old
-                    path: /amountMinor
+                    path: /secured
+                    default: 0
+                - 0
         - $if:
             cond:
               $not:
-                $var: terminal
+                $or:
+                - $var: settled
+                - $var: returned
             then:
             - $return:
                 outcome: duplicate
-        - $if:
-            cond:
-              $ne:
-              - $add:
-                - $pointerGet:
-                    object:
-                      $var: state
-                    path: /reserved/secure
-                - $pointerGet:
-                    object:
-                      $var: state
-                    path: /reserved/capture
-                - $pointerGet:
-                    object:
-                      $var: state
-                    path: /reserved/void
-                - $pointerGet:
-                    object:
-                      $var: state
-                    path: /reserved/refund
-              - 0
-            then:
-            - $return:
-                outcome: duplicate
-        - $let:
-            name: previousPaid
-            expr:
-              $pointerGet:
-                object:
-                  $var: old
-                path: /paidMinor
-                default: 0
-        - $if:
-            cond:
-              $and:
-              - $eq:
-                - $pointerGet:
-                    object:
-                      $var: old
-                    path: /status
-                - closed
-              - $eq:
-                - $var: previousPaid
-                - $var: net
-            then:
-            - $return:
-                outcome: duplicate
-        - $if:
-            cond:
-              $eq:
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $const:
+                  name: bindings
+                  path: /state
+              - /reserved
+            val:
+              $subtract:
               - $pointerGet:
                   object:
-                    $var: old
-                  path: /status
-              - reserved
+                    $var: s
+                  path: /reserved
+              - $var: gross
+        - $if:
+            cond:
+              $var: settled
             then:
             - $appendChange:
                 op: replace
@@ -198,34 +273,14 @@ actionDefinition:
                   - $const:
                       name: bindings
                       path: /state
-                  - /reserved
+                  - /paid
                 val:
-                  $subtract:
+                  $add:
                   - $pointerGet:
                       object:
                         $var: s
-                      path: /reserved
-                  - $pointerGet:
-                      object:
-                        $var: old
-                      path: /amountMinor
-        - $appendChange:
-            op: replace
-            path:
-              $concat:
-              - $const:
-                  name: bindings
-                  path: /state
-              - /paid
-            val:
-              $add:
-              - $pointerGet:
-                  object:
-                    $var: s
-                  path: /paid
-              - $subtract:
-                - $var: net
-                - $var: previousPaid
+                      path: /paid
+                  - $var: gross
         - $appendChange:
             op: replace
             path:
@@ -238,17 +293,40 @@ actionDefinition:
               - $var: key
             val:
               amountMinor:
-                $pointerGet:
-                  object:
-                    $var: old
-                  path: /amountMinor
+                $var: gross
               paidMinor:
-                $var: net
+                $choose:
+                  cond:
+                    $var: settled
+                  then:
+                    $var: gross
+                  else: 0
+              transferredMinor:
+                $choose:
+                  cond:
+                    $var: settled
+                  then:
+                    $var: completed
+                  else: 0
+              feeMinor:
+                $choose:
+                  cond:
+                    $var: settled
+                  then:
+                    $pointerGet:
+                      object:
+                        $var: terms
+                      path: /feeMinor
+                  else: 0
               status: closed
         - $appendEvent:
             $merge:
             - type: Events/Event
             - kind: Payout Reconciled
+              key:
+                $var: key
+              settled:
+                $var: settled
         - $return:
             outcome: acceptedNew
 actions:
@@ -552,8 +630,9 @@ actions:
                         name: bindings
                         path: /payouts
                     - /
-description: Accrue the configured commission on confirmed net order receipts, reserve payouts and reconcile
-  their confirmed net results.
+description: Accrue the configured commission on confirmed net order receipts and reserve payouts. A payout
+  settles its reserved commission G only after the operator reports the account-to-account split and the
+  instruction completes the partner transfer N; MyOS retains F = G - N.
 bindingTypes:
   orders: pointer
   payouts: pointer
