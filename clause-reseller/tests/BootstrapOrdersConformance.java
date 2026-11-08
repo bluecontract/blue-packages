@@ -231,14 +231,54 @@ public final class BootstrapOrdersConformance {
       require(rejected!=variant.equals("exact"),"Frozen native domain guard "+variant);
     }
   }
+  static void refreshPlanProjection(Path root) throws Exception {
+    var clause=obj(WireData.parse(Files.readString(root.resolve("clause-reseller/types/customer-orders-bootstrap-clause.blue")),"yaml"));
+    var hook=obj(clause.get("hookDefinition"));
+    for(String key:List.of("orders","hostedOrders")) {
+      var functions=m("plan",copy(obj(hook.get("functions")).get("plan")));var constants=obj(copy(hook.get("constants")));constants.put("clauseKey",key);
+      var full=m();for(Object raw:(List<?>)constants.get("refreshFunctionNames")){String name=(String)raw;full.put(name,m("args",m(),"do",List.of(m("$return",name+"-selected-body"))));}
+      full.put("unrelatedBootstrap",m("args",m(),"do",List.of(m("$return",false))));
+      var definition=m("functions",full,"constants",m("retained","exact"));
+      var contracts=m();for(String prefix:List.of("refreshProcesses_","refreshEmbeddedProcesses_"))contracts.put(prefix+key,m("kind","handler","contract",m("channel",prefix+"channel","steps",List.of(m("definition",m("whole","library"),"do",List.of())))));
+      contracts.put("prepare",m("untouched",true));var base=m("contracts",contracts,"states",m("untouched",true));
+      functions.put("basePreparationPlan",m("args",m(),"do",List.of(m("$return",m("$literal",base)))));
+      var document=m("clauseRuntime",m("work",m("candidate",m(key,m("type",m("actionDefinition",m("type",definition)))))));
+      var bex=new Bex(BexProfile.current());var program=bex.compile(m("do",List.of(m("$return",m("$call",m("function","plan","args",m()))))),m("constants",constants,"functions",functions),null);
+      var result=bex.execute(program,new BexContext(document,m(),m(),Values.UNDEFINED,m(),m(),"/",null,null,null),1_000_000);
+      var selected=obj(copy(full));selected.remove("unrelatedBootstrap");var expected=obj(copy(base));
+      for(String prefix:List.of("refreshProcesses_","refreshEmbeddedProcesses_")){
+        var contract=obj(obj(obj(expected.get("contracts")).get(prefix+key)).get("contract"));
+        obj(((List<?>)contract.get("steps")).getFirst()).put("definition",m("constants",m("retained","exact"),"functions",selected));
+      }
+      equal(expected,result.value(),"Only two refresh definitions change; selected function bodies and constants remain exact");
+      require(result.changeset().isEmpty()&&result.events().isEmpty(),"Planning produces no document effects");
+    }
+    System.out.println("PASS refresh plan projection: exact two-handler replacement, constants and selected bodies, two clause keys");
+  }
   public static void main(String[] args) throws Exception {
     Path root=Path.of(args[0]),reports=Path.of(args[1]);Files.createDirectories(reports);
+    refreshPlanProjection(root);
+    if(args.length>2 && args[2].equals("refresh"))return;
     var selection=obj(WireData.json(Files.readString(root.resolve("PACKAGES.json"))));
     Path archive=root.resolve("clause-reseller/dist/package.bluepkg");var reseller=BluePackage.open(archive);
     String sha="sha256:"+HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(archive)));
     obj(selection.get("mounts")).put("Reseller",m("path","clause-reseller/dist/package.bluepkg","blueId",reseller.blueId(),"archiveSha256",sha));
     Path selectionFile=reports.resolve("selection.json");Files.writeString(selectionFile,WireData.write(selection));
     var packages=CompositionPackages.published(root,selectionFile);
+    if(args.length>2 && args[2].equals("refresh-initialize")) {
+      var fixture=obj(WireData.json(Files.readString(root.resolve("clause-reseller/tests/fixtures/01-cruise/catalogue.json"))));
+      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+        var p=runtime.processor(packages.language());var initial=applied(p.initialize(source(fixture,true,List.of())));
+        var values=p.execution().values();var expected=Set.of("sharedRefresh","processStatePath","namedSourcesReady","processOrigin","rosterCovers","checkedDomainNextActions","domainNextActions");
+        for(String handler:List.of("refreshProcesses_orders","refreshEmbeddedProcesses_orders")) {
+          var definition=values.select(new Exact.Ref(initial.document().blueId()),"/contracts/"+handler+"/steps/0/definition/functions");
+          equal(obj(values.bexData(definition)).keySet(),expected,"Actual native plan selects complete refresh closure");
+        }
+        require(Boolean.TRUE.equals(p.read(initial.document(),"/activation/active")),"Parent remains active");
+        System.out.println("PASS real authored hook initialization and both refresh definitions, gas="+initial.gas());
+      }
+      return;
+    }
     if(args.length>2 && args[2].equals("known")){scenario(packages,root,reports,"01-cruise",true,List.of());return;}
     suppliedRoleGuards(packages);
     fixedSuppliedParty(packages,root);

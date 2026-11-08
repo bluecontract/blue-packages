@@ -37,11 +37,11 @@ class BootstrapCompositionTest(unittest.TestCase):
         self.assertEqual(len(source['sourceFiles']), 14)
         # Historical provenance remains immutable. These three authored sources
         # evolved deliberately: main's optional quotes/catalog bootstrap and the
-        # qualified guarded commission attachment. All other imports stay exact.
+        # qualified commission attachment and event filters. All other imports stay exact.
         evolved = {
             'types/catalog-functions.blue': '0f24eab9c459cd2f58baec2d383ddf3337517554be84417d308c64514126f1eb',
             'types/customer-orders-clause.blue': 'c77ddfc0332a33026c1b21dab7563136b6c0899d6051e0dd9d5a9c1449e7a091',
-            'types/commission-clause.blue': '326f5b14bd84fbe4d1284a85e3f56450a97acea3a25018856427941cb40861f9',
+            'types/commission-clause.blue': '3d5905f1c9d8d74f687738c9fc384dce6db1d5b497d301d156e5725bf17a80a0',
         }
         seen = set()
         for item in source['sourceFiles']:
@@ -90,12 +90,18 @@ class BootstrapCompositionTest(unittest.TestCase):
             'domainValidateCandidate', 'domainNextActions', 'suppliedCustomerOrderRoles',
             'maySelectInactiveCandidate'})
 
-    def test_ordinary_provision_and_planning_are_not_replaced(self):
+    def test_ordinary_provision_and_base_planning_are_preserved(self):
         clause = yaml.safe_load((PACKAGE / 'types/customer-orders-bootstrap-clause.blue').read_text())
         base = yaml.safe_load((ROOT / 'clause-documents/types/base.blue').read_text())
         for action in ['provide', 'resume', 'cancel']:
             self.assertEqual(clause['actions'][action], base['actions'][action])
-        self.assertEqual(clause['hookDefinition'], base['hookDefinition'])
+        # Hosted refresh narrows its repeated library after the unchanged native plan.
+        definitions = records(ROOT / 'clause-documents/dist/package.bluepkg')
+        metadata = json.loads((ROOT / 'clause-documents/dist/package.json').read_text())
+        plan_id = next(row['blueId'] for row in metadata['exports'] if row['alias'] == base['hookDefinition']['type'])
+        canonical = json.loads(definitions[plan_id]['text'])['functions']['plan']
+        delegated = clause['hookDefinition']['functions']['basePreparationPlan']['blueId']
+        self.assertEqual(json.loads(definitions[delegated]['text']), canonical)
         self.assertEqual(clause['actions']['prepare'], clause['actions']['startOrder'])
 
     def test_only_the_three_corrected_examples_remove_customer_activation_approval(self):

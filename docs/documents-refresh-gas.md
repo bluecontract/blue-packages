@@ -47,6 +47,13 @@ Existing documents keep their pinned definitions. To use this optimization, new
 instances must select the rebuilt packages; changing local source does not rewrite
 already-created agreements.
 
+The merge of upstream `a639c3c` retains its bounded legacy Customer Orders Bootstrap
+hook. Its delegated Preparation Plan and admission projection now reference this
+candidate's exact native functions, including `projectCanonicalDefinition`, with
+both canonical anchors present. Static closure/composition checks and real native
+hook initialization pass; the latter uses 1,326,079 gas. The earlier commission
+event-filter source change also has its explicit provenance checksum refreshed.
+
 ## Comparison and tradeoffs
 
 For the same four-event fixture on both tested Core revisions:
