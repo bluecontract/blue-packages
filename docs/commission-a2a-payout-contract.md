@@ -9,8 +9,8 @@ Reviewed bases (all on `codex/payments-minimal-alignment-20261104`):
 | Repository | Base SHA |
 | --- | --- |
 | blue-packages | `a639c3c6164d022c356b308fee4f443feaeaddf6` |
-| myos-core | `7fbb70164da7e551ccb27b867e25c07cd43c9092` |
-| myos-business | `af496d132b17fbb16fe7e6ddf399c6a567db3f59` |
+| myos-core | `f796e2160c89eaab871d2a6ec9a30284324ebe1c` (initially `7fbb70164da7e551ccb27b867e25c07cd43c9092`) |
+| myos-business | `38d169cefc49bcdce0c472e89d931dbca61c2b22` (initially `af496d132b17fbb16fe7e6ddf399c6a567db3f59`) |
 
 ## 1. Current state (verified at these bases)
 
@@ -80,17 +80,23 @@ The PI identities already exist and are reused unchanged:
 concrete A2A root type from the frozen operator.
 
 Decision (review 2026-11-08): the manual payout is **replaced in place**, not
-kept beside a new profile. `Reseller/Commission Payout Payment Clause` builds
-the A2A PI instead of `manual-bank-transfer` (the recipient-confirmed `retire`
-path is removed); `Commission Payouts Clause` and `Commission Clause` gain the
-fee snapshot and the G/F/N reconcile. Rebuilding gives these
-types new BlueIds; documents created earlier keep their pinned runtime, so
-historical manual payouts remain readable but are not reinterpreted.
+kept beside a new profile. `Reseller/Commission Payout Payment Clause` (manual
+`manual-bank-transfer` PI with the recipient-confirmed `retire` path) is
+removed. Rebuilding gives the Reseller types new BlueIds; documents created
+earlier keep their pinned runtime.
 
-Only additions: `resolvePayoutTerms` (payouts clause function) and the operator split
-report `confirmAccountSettlement` with its event, added as a PI method clause
-through `Payment Setup` `methodClauses`, so the concrete A2A instruction types
-keep their identities.
+Decision (review 2026-11-08, implementation): the payout PI is a **separate
+document**, bootstrapped like the order PI, not embedded in the Agreement.
+Embedded documents inherit the parent's parties, and every parent party must be
+represented in each child, so an operator party in the Agreement would also be
+required in every Order. The Agreement therefore stays private to `{seller,
+partner}`; the MyOS operator joins only the payout PI as its hosting-supplied
+`guarantor`.
+
+Additions: `resolvePayoutTerms` (payouts clause function) and
+`Reseller/Commission Payout Settlement Clause` (operator split report
+`confirmAccountSettlement` with its event), declared by the payout PI template.
+The concrete A2A instruction types keep their identities.
 
 The Agreement terms carry the accepted policy by name, not by rate:
 `payoutFeePolicy: myos-commission-fee-v1` means "transfer of N to the partner
@@ -99,43 +105,49 @@ Test or Stripe. The rate itself exists only in `resolvePayoutTerms`.
 
 ## 5. Prepare (`startPayout` → `preparePayout`, seller channel)
 
-Input whitelist: `key` and `amountMinor` (G). A fee, rate, payment account or any
-other field is rejected (`UNKNOWN_INPUT_FIELD`).
+`Commission Payouts Clause` is a `Documents/Document Base` clause:
+`prepareFor: bootstrap`, `obtain: provide`, `suppliedBy: seller`,
+`suppliedParties: [guarantor]`, keyed collection `/payouts`, template
+`/payoutTemplate`. Input whitelist: `key` and `amountMinor` (G). A fee, rate,
+payment account or any other field is rejected (`UNKNOWN_INPUT_FIELD`).
 
-1. Existing checks: `1 ≤ G ≤ 100000000`, one unresolved payout
-   (`PAYOUT_ALREADY_UNRESOLVED`), at most 20 payouts, and the reservation of G
-   cannot exceed the available commission (`INSUFFICIENT_UNRESERVED_OBLIGATION`).
-2. Payment accounts are not chosen by a request. The operator debits the payer
-   party's and credits the payee party's own payment account for the Agreement
-   operator (one per MyOS account and provider), verified before any effect.
-   Review decision (2026-11-08, implementation): a seller cannot name the partner's
-   account, so freezing request-supplied account IDs was replaced by this rule.
-3. The Agreement terms name the operator and the accepted fee policy:
+1. Checks: `1 ≤ G ≤ 100000000`, one unresolved payout
+   (`PAYOUT_ALREADY_UNRESOLVED`), at most 20 payouts (`DOCUMENT_LIMIT_REACHED`),
+   and the reservation of G cannot exceed the available commission
+   (`INSUFFICIENT_UNRESERVED_OBLIGATION`). An identical retry of an existing key
+   reuses its preparation.
+2. The Agreement terms name the operator and the accepted fee policy:
    `payoutOperator: test|stripe` (`PAYOUT_OPERATOR_UNSUPPORTED`) and
    `payoutFeePolicy: myos-commission-fee-v1` (`PAYOUT_FEE_POLICY_UNSUPPORTED`).
-4. `resolvePayoutTerms(G)` freezes `/payouts/<key>/payoutTerms`:
-   `feePolicy, feeBps, grossMinor, feeMinor, netMinor, payoutKey, currency,
-   operator`, and sets the
-   payout `amountMinor = N`.
-5. `Commission Payout Opened.amountMinor = G` reserves G. An identical retry of
-   the same key reads the existing payout. No PI exists yet.
+3. `resolvePayoutTerms(G)` freezes the prepared PI's
+   `/paymentDetails/payoutTerms`: `feePolicy, feeBps, grossMinor, feeMinor,
+   netMinor, payoutKey, currency, operator`, and sets
+   `paymentTerms.amountMinor = limitMinor = N`.
+4. `domainPrepare` requires the template to be the Test/Stripe A2A type matching
+   the operator, method `myos-account-to-account`, matching currency, and payer,
+   payee and guarantor channels declared as PI parties
+   (`PAYOUT_INSTRUCTION_INVALID`).
+5. `Commission Payout Opened.amountMinor = G` reserves G.
+6. Payment accounts are not chosen by a request. The operator debits the payer
+   party's and credits the payee party's own payment account for the operator
+   (one per MyOS account and provider), verified before any effect.
 
-## 6. Confirm and execute
+## 6. Bootstrap, provide and execute
 
-- The seller's `startPayment` on the exact reviewed payout version is the
-  confirmation; it creates the PI from the frozen snapshot only.
-- PI: concrete Test/Stripe A2A type from `payoutTerms.operator`,
-  `paymentDetails = {method: myos-account-to-account, payoutTerms}`, payer
-  seller, payee partner, guarantor the MyOS operator party,
-  `paymentTerms.amountMinor = N`.
+- The seller bootstraps the prepared PI (seller and partner mapped from the
+  Agreement, guarantor supplied by hosting as the MyOS operator) and provides
+  it with `providePayout`. `domainValidateCandidate` rejects a candidate whose
+  `paymentTerms` or `paymentDetails` differ from the frozen terms
+  (`PAYOUT_TERMS_MISMATCH`). Provision embeds the PI at `/payouts/<key>` and emits
+  `Documents/Document Attached`; `Commission Clause.payoutAttached` reconciles.
+- PI: concrete Test/Stripe A2A type, `paymentDetails = {method:
+  myos-account-to-account, payoutTerms}`, payer seller, payee partner,
+  guarantor the MyOS operator, `paymentTerms.amountMinor = N`.
 - Financial requests are guarantor-only connections with fixed request IDs and
   the full amount: `securePayout` (`payout-secure`, N) and `capturePayout`
-  (`payout-capture`, N). The payout template binds no refund, void, payee,
-  details or final-amount request, so neither a party nor a direct Core call can
-  request a partial amount, a reversal or a recipient change.
-- Embedded documents inherit channels from the Agreement. The MyOS operator is
-  therefore a declared (non-approving) Agreement party; it is the only route by
-  which the operator can execute and report on the embedded payout PI.
+  (`payout-capture`, N). The template binds no refund, void, payee, details or
+  final-amount request, so neither a party nor a direct Core call can request a
+  partial amount, a reversal or a recipient change.
 
 ## 7. Settlement and closure
 
@@ -145,25 +157,34 @@ debitReference, transferReference` (the split comes from the frozen terms, the
 references from the operator). Identical repeat → no-op; different →
 `ACCOUNT_SETTLEMENT_CONFLICT`. It emits `Account Settlement Confirmed`.
 
-`Commission Clause.reconcile` settles a reserved payout only when the payout
-terms match G (`INVALID_PAYOUT_TERMS` otherwise), no request is
-pending/unknown, the settlement record matches G/F/N, `completed = N` and
-`reversed = 0`. Then `reserved −= G`, `paid += G`, and the settlement records
-`paidMinor = G, transferredMinor = N, feeMinor = F, status: closed`. The report
-and `Payment Completed` may arrive in either order.
+`Commission Clause.reconcile` reads the attached PI at `/payouts/<key>` and
+settles a reserved payout only when its payout terms match G
+(`INVALID_PAYOUT_TERMS` otherwise), no request is pending/unknown, the
+settlement record matches G/F/N, `completed = N` and `reversed = 0`. Then
+`reserved −= G`, `paid += G`, and the settlement records `paidMinor = G,
+transferredMinor = N, feeMinor = F, status: closed`. The report and `Payment
+Completed` may arrive in either order.
 
 Closure without payout: an operator `rejectPaymentInstruction` with nothing
 secured or completed releases G with `paidMinor = feeMinor = 0`. Nothing else
 (timeouts, `reserved = 0`, `secured = 0`) releases G; there is no manual retire.
 
-Not in this slice: cancelling a prepared payout before its PI, and void after
-securing (both need an operator-confirmed return path).
+Not in this slice: cancelling a prepared or never-provided payout, a declined
+secure, and void after securing (all keep G reserved until an operator-confirmed
+return path exists).
 
-Native evidence: `examples/apps/30-commission-a2a-payout.case.yaml` (29 inputs,
-replay checked): 1000/200/800 settlement in both report orders, idempotent and
-conflicting reports, fee injection, second unresolved payout, over-available
-amount and operator rejection. Preparation uses about 7.7M of the 10M gas
-limit in this fixture.
+Native evidence:
+
+- `examples/apps/30-commission-a2a-payout.case.yaml` (6 inputs, replay checked):
+  approvals, preparation 1000/200/800, idempotent retry, fee injection and a
+  second unresolved payout.
+- `tools/CommissionPayoutConformance.java` (`check_operation_inputs.py --case
+  commission-payout`): real preparation and initialization of the prepared PI
+  with the supplied operator; then, from a modeled provided state (the PI under
+  `/payouts/p1`), real operator operations: split report plus completion settles
+  G once (F = 200, N = 800), conflicting and identical reports, the over-available
+  amount, and operator rejection. Bootstrap provision compares Timeline actors,
+  which the native runner cannot express; the hosted Core test covers it.
 
 ## 8. Delivery and validation
 

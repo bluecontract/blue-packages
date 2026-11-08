@@ -5221,15 +5221,6 @@ clauses:
               type: Contracts/External Channel
               event:
                 source: partner
-        guarantor:
-          type: MyOS/MyOS Party
-          displayName: MyOS payment operator
-          myosAccountId: test-guarantor
-          lead:
-            channel:
-              type: Contracts/External Channel
-              event:
-                source: guarantor
       required:
       - seller
       - partner
@@ -5249,9 +5240,12 @@ clauses:
       parties:
         seller: seller
         partner: partner
-        guarantor: guarantor
       preparePayout:
         startPayout:
+          'on': workflow
+          party: seller
+      provide:
+        providePayout:
           'on': workflow
           party: seller
 orders: {}
@@ -5265,11 +5259,27 @@ commission:
   reserved: 0
   settlements: {}
 payouts: {}
+# The MyOS operator is not an Agreement party: Core supplies it as the guarantor when the seller bootstraps
+# the prepared payout instruction, which the seller then provides back with providePayout.
 payoutTemplate:
   name: Partner commission payout
-  type: Agreements/Agreement with Clauses
-  amountMinor: 1
-  payoutTerms: {}
+  type: MyOS/MyOS Test Account to Account Payment Instruction
+  paymentTerms:
+    amountMinor:
+      type: Integer
+    limitMinor:
+      type: Integer
+    currency: EUR
+    payerChannel: seller
+    payeeChannel: partner
+    guarantorChannel: guarantor
+    allowedPayees:
+    - partner
+    captureGate: ''
+    recipientApprovalRequired: false
+  paymentDetails:
+    method: myos-account-to-account
+    payoutTerms: {}
   clauses:
     activation:
       type: Activation/Activation Clause
@@ -5283,18 +5293,8 @@ payoutTemplate:
             type: MyOS/MyOS Party
         required: []
     payment:
-      type: Reseller/Commission Payout Payment Clause
-      parameters:
-        payer: seller
-        payee: partner
-        currency: EUR
+      type: PaymentInstruction/Payment Request Actions
       bindings:
-        amount: /amountMinor
-        instruction: /payment
-        start:
-          startPayment:
-            'on': workflow
-            party: seller
         requestAuthorize:
           securePayout:
             'on': workflow
@@ -5315,6 +5315,24 @@ payoutTemplate:
                 $document: /paymentTerms/amountMinor
             request:
               description: Transfers the complete frozen partner amount; no input fields.
+    method:
+      type: MyOS/Payment Method Events
+    accountSettlement:
+      type: Reseller/Commission Payout Settlement Clause
+      bindings:
+        confirm:
+          confirmAccountSettlement:
+            'on': workflow
+            party: guarantor
+            params:
+              debitReference:
+                $var:
+                  name: trigger
+                  path: /debitReference
+              transferReference:
+                $var:
+                  name: trigger
+                  path: /transferReference
 ```
 
 Walkthrough: [`30-commission-a2a-payout.case.yaml`](../examples/apps/30-commission-a2a-payout.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
@@ -5323,33 +5341,10 @@ Walkthrough: [`30-commission-a2a-payout.case.yaml`](../examples/apps/30-commissi
 |---|---|---|---|---|---|
 | 1 | seller | Main | approve_seller | `{"revision":1}` | Processed |
 | 2 | partner | Main | approve_partner | `{"revision":1}` | Processed |
-| 3 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000}` | Processed; `{"/commission/reserved":1000,"/commission/paid":0,"/payouts/p1/amountMinor":800,"/payouts/p1/payoutTerms/grossMinor":1000,"/payouts/p1/payoutTerms/feeMinor":200,"/payouts/p1/payoutTerms/netMinor":800,"/payouts/p1/payoutTerms/feeBps":2000,"/payouts/p1/payoutTerms/operator":"test"}` |
-| 4 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000}` | Processed; `{"/commission/reserved":1000,"/payouts/p1/amountMinor":800}` |
+| 3 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000}` | Processed; `{"/commission/reserved":1000,"/commission/paid":0}` |
+| 4 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000}` | Processed; `{"/commission/reserved":1000}` |
 | 5 | seller | Main | startPayout | `{"key":"p2","amountMinor":1000,"feeMinor":0}` | Rejected; no state change |
 | 6 | seller | Main | startPayout | `{"key":"p2","amountMinor":500}` | Rejected; no state change |
-| 7 | seller | /payouts/p1 | startPayment | `{}` | Processed; `{"/payouts/p1/payment/paymentTerms/amountMinor":800,"/payouts/p1/payment/paymentDetails/method":"myos-account-to-account","/payouts/p1/payment/paymentDetails/payoutTerms/feeMinor":200}` |
-| 8 | guarantor | /payouts/p1/payment | acceptPaymentInstruction | `{}` | Processed |
-| 9 | guarantor | /payouts/p1/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"payout-p1","railType":"myos-account-to-account","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 10 | guarantor | /payouts/p1/payment | securePayout | `{}` | Processed |
-| 11 | guarantor | /payouts/p1/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-secure","amountSecured":800}` | Processed |
-| 12 | guarantor | /payouts/p1/payment | capturePayout | `{}` | Processed |
-| 13 | guarantor | /payouts/p1/payment | confirmAccountSettlement | `{"debitReference":"test-debit-p1","transferReference":"test-transfer-p1"}` | Processed; `{"/payouts/p1/payment/accountSettlement/feeMinor":200,"/commission/paid":0,"/commission/reserved":1000}` |
-| 14 | guarantor | /payouts/p1/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-capture","amountCompleted":800}` | Processed; `{"/payouts/p1/payment/payment/completed":800,"/commission/paid":1000,"/commission/reserved":0,"/commission/settlements/p1/status":"closed","/commission/settlements/p1/paidMinor":1000,"/commission/settlements/p1/transferredMinor":800,"/commission/settlements/p1/feeMinor":200}` |
-| 15 | guarantor | /payouts/p1/payment | confirmAccountSettlement | `{"debitReference":"test-debit-p1","transferReference":"test-transfer-p1"}` | Processed; `{"/commission/paid":1000}` |
-| 16 | guarantor | /payouts/p1/payment | confirmAccountSettlement | `{"debitReference":"other-debit","transferReference":"test-transfer-p1"}` | Rejected; no state change |
-| 17 | seller | Main | startPayout | `{"key":"p2","amountMinor":1001}` | Rejected; no state change |
-| 18 | seller | Main | startPayout | `{"key":"p2","amountMinor":500}` | Processed; `{"/commission/reserved":500,"/payouts/p2/payoutTerms/feeMinor":100,"/payouts/p2/amountMinor":400}` |
-| 19 | seller | /payouts/p2 | startPayment | `{}` | Processed |
-| 20 | guarantor | /payouts/p2/payment | rejectPaymentInstruction | `{"reason":"payment_account_unavailable"}` | Processed; `{"/commission/reserved":0,"/commission/paid":1000,"/commission/settlements/p2/status":"closed","/commission/settlements/p2/paidMinor":0,"/commission/settlements/p2/feeMinor":0}` |
-| 21 | seller | Main | startPayout | `{"key":"p3","amountMinor":500}` | Processed; `{"/commission/reserved":500}` |
-| 22 | seller | /payouts/p3 | startPayment | `{}` | Processed |
-| 23 | guarantor | /payouts/p3/payment | acceptPaymentInstruction | `{}` | Processed |
-| 24 | guarantor | /payouts/p3/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"payout-p3","railType":"myos-account-to-account","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 25 | guarantor | /payouts/p3/payment | securePayout | `{}` | Processed |
-| 26 | guarantor | /payouts/p3/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-secure","amountSecured":400}` | Processed |
-| 27 | guarantor | /payouts/p3/payment | capturePayout | `{}` | Processed |
-| 28 | guarantor | /payouts/p3/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-capture","amountCompleted":400}` | Processed; `{"/commission/paid":1000,"/commission/reserved":500}` |
-| 29 | guarantor | /payouts/p3/payment | confirmAccountSettlement | `{"debitReference":"test-debit-p3","transferReference":"test-transfer-p3"}` | Processed; `{"/commission/paid":1500,"/commission/reserved":0,"/commission/settlements/p3/transferredMinor":400,"/commission/settlements/p3/feeMinor":100}` |
 
 ## 10. Source of truth and compatibility
 
