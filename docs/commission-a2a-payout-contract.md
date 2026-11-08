@@ -157,7 +157,7 @@ secured or completed releases G with `paidMinor = feeMinor = 0`. Nothing else
 Not in this slice: cancelling a prepared payout before its PI, and void after
 securing (both need an operator-confirmed return path).
 
-Native evidence: `examples/apps/30-commission-a2a-payout.case.yaml` (30 inputs,
+Native evidence: `examples/apps/30-commission-a2a-payout.case.yaml` (29 inputs,
 replay checked): 1000/200/800 settlement in both report orders, idempotent and
 conflicting reports, fee injection, second unresolved payout, over-available
 amount and operator rejection. Preparation uses about 7.7M of the 10M gas
