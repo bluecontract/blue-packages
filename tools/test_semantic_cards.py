@@ -309,8 +309,11 @@ class SourceTests(unittest.TestCase):
             self.assertLess(len(wire(context)), 1_000_000)
 
     def test_confirmation_evidence_keeps_inherited_timestamp_semantics(self):
-        _, definitions = sources.inventory(ROOT)
-        context = sources.evidence('EWMrPZWUi46vyUu6gcw3k5xZRPFMxWPfoC9mGwFvXPFz', definitions)
+        subjects, definitions = sources.inventory(ROOT)
+        confirmation, = [blue_id for blue_id, subject in subjects.items()
+                         if subject['alias'] == 'Reseller/Confirmation Clause'
+                         and 'current' in subject['collections']]
+        context = sources.evidence(confirmation, definitions)
         self.assertIn('timestamp must be an integer Unix timestamp in microseconds',
                       json.dumps(context))
         self.assertLess(len(wire(context)), 1_000_000)
