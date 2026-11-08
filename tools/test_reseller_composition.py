@@ -47,4 +47,4 @@ class ResellerCompositionTest(unittest.TestCase):
                 self.assertNotIn('guarantor', order['payment']['bindings']['parties'])
                 guarantor = order['payment']['parameters']['template']['clauses']['activation']['parameters']['parties']['guarantor']
                 self.assertEqual('payments@example.test', guarantor['email'])
-                self.assertEqual('initialized', order['payment']['bindings']['prepare']['onOrderCreated']['on'])
+                self.assertEqual('timer', order['payment']['bindings']['prepare']['onOrderCreated']['on'])

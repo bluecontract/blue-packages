@@ -23,7 +23,7 @@ The Adventures in Paradise example has two catalog lines in one order: two child
 
 ## Card Payment Instruction
 
-The order uses the existing `Payment/Payment Clause`, with `obtain: provide`, `suppliedBy: seller`, `prepare.onOrderCreated.on: initialized` and seller-only `providePayment`. The PI template uses `PaymentInstruction/Payment Instruction with Clauses` and `Payment/Payment Process Clause` with `method: card`. Its amount, limit and currency are mapped from the created order; a zero-price order has no payment clause or PI.
+The order uses the existing `Payment/Payment Clause`, with `obtain: provide`, `suppliedBy: seller`, an immediate one-shot preparation after native Order initialization and seller-only `providePayment`. The PI template uses `PaymentInstruction/Payment Instruction with Clauses` and `Payment/Payment Process Clause` with `method: card`. Its amount, limit and currency are mapped from the created order; a zero-price order has no payment clause or PI.
 
 The example follows MyOS Core's `examples/independent-processes/corpus/payments/12-agreement-orders-payments.blue` for party bindings and `14-existing-authorized-card-pi.blue` for the card process. `payments@example.test` is the example MyOS account constrained in the PI template’s guarantor declaration. The guarantor is a supplied party at bootstrap, so no channel from another document is copied. It is not a production payment service. Replace it with the admitted guarantor account for an actual integration; the guarantor does not become a party to the reseller agreement.
 
@@ -38,3 +38,19 @@ The integration must handle `Documents/Document Provision Requested`, retrieve t
 Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `preview-booking.case.json` covers conditional booking requirements and the free variant; `preview-card.case.json` covers card preparation/provision and a renamed fulfilment clause; `preview-clauses.case.json` covers bilateral approval and invalid commercial terms.
 
 The local generated document, clause definitions, semantic cards, Overview and Terms are in `reports/reseller-20261103/business-preview/index.html`. These are local review artifacts, not a deployed agreement or proof of real card processing. The separate broader settlement qualification remains incomplete.
+
+The `onOrderCreated` binding uses `on: timer`, `timestamp: 0` and requires the
+initialized marker and an empty preparation registry. The PI retains the Order
+as a named source, so preparing it inside Order initialization is too early:
+that source does not yet have a native process origin. The timer starts the same
+prepare step immediately after initialization, without customer approval or a
+manual payment action. The Activation configuration permits the timer and its
+arming channel while ordinary consent and access requirements remain in force.
+
+The [cancellation-enabled Agreement](cancellation-enabled-agreement.blue) adds
+Order settlement observation and the PI cancellation reconciliation clauses.
+The automatic preparation was qualified on Core 64abcd6de with the current
+package selection: one multi-product Order of 93.10 USD initialized and prepared
+exactly one PI. The former `on: initialized` version fails Order initialization.
+Capture in this example still uses its explicit workflow binding; this result
+does not establish automatic capture or a complete Business checkout.
