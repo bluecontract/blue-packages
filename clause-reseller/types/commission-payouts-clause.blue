@@ -2,7 +2,8 @@ name: Commission Payouts Clause
 type: Documents/Documents Clause
 description: Prepare one MyOS account-to-account commission payout using native document preparation. The
   settled commission G is reserved once; the payout freezes the MyOS fee F and the partner transfer N = G - F
-  with both payment accounts and the Agreement operator. Guard unresolved prior payouts.
+  with the Agreement operator; the operator debits the seller's and credits the partner's own payment accounts.
+  Guard unresolved prior payouts.
 actionDefinition:
   type:
     type: Documents/Document Preparation Functions
@@ -86,8 +87,6 @@ actions:
                   list:
                   - key
                   - amountMinor
-                  - payerPaymentAccountId
-                  - recipientPaymentAccountId
                   val:
                     $var: field
             message: UNKNOWN_INPUT_FIELD
@@ -149,45 +148,6 @@ actions:
                   - /reserved
               - 0
             message: PAYOUT_ALREADY_UNRESOLVED
-    - $forEach:
-        item: accountField
-        in:
-        - payerPaymentAccountId
-        - recipientPaymentAccountId
-        do:
-        - $let:
-            name: accountId
-            expr:
-              $pointerGet:
-                object:
-                  $var: trigger
-                path:
-                  $concat:
-                  - /
-                  - $var: accountField
-                default: null
-        - $failIf:
-            cond:
-              $not:
-                $and:
-                - $isKind:
-                    val:
-                      $var: accountId
-                    kind: text
-                - $ne:
-                  - $var: accountId
-                  - ''
-            message: INVALID_PAYMENT_ACCOUNT
-    - $failIf:
-        cond:
-          $eq:
-          - $var:
-              name: trigger
-              path: /payerPaymentAccountId
-          - $var:
-              name: trigger
-              path: /recipientPaymentAccountId
-        message: INVALID_PAYMENT_ACCOUNT
     - $failIf:
         cond:
           $not:
@@ -231,14 +191,6 @@ actions:
                   $document: /terms/currency
                 operator:
                   $document: /terms/payoutOperator
-                payerPaymentAccountId:
-                  $var:
-                    name: trigger
-                    path: /payerPaymentAccountId
-                recipientPaymentAccountId:
-                  $var:
-                    name: trigger
-                    path: /recipientPaymentAccountId
     - $set:
         name: actionResult
         expr:

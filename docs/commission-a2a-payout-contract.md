@@ -99,21 +99,23 @@ Test or Stripe. The rate itself exists only in `resolvePayoutTerms`.
 
 ## 5. Prepare (`startPayout` → `preparePayout`, seller channel)
 
-Input whitelist: `key`, `amountMinor` (G), `payerPaymentAccountId`,
-`recipientPaymentAccountId`. A fee, rate or any other field is rejected
-(`UNKNOWN_INPUT_FIELD`).
+Input whitelist: `key` and `amountMinor` (G). A fee, rate, payment account or any
+other field is rejected (`UNKNOWN_INPUT_FIELD`).
 
 1. Existing checks: `1 ≤ G ≤ 100000000`, one unresolved payout
    (`PAYOUT_ALREADY_UNRESOLVED`), at most 20 payouts, and the reservation of G
    cannot exceed the available commission (`INSUFFICIENT_UNRESERVED_OBLIGATION`).
-2. Payment accounts are non-empty, distinct text (`INVALID_PAYMENT_ACCOUNT`).
-   Ownership is verified by the operator before any effect (Core).
+2. Payment accounts are not chosen by a request. The operator debits the payer
+   party's and credits the payee party's own payment account for the Agreement
+   operator (one per MyOS account and provider), verified before any effect.
+   Review decision (2026-11-08, implementation): a seller cannot name the partner's
+   account, so freezing request-supplied account IDs was replaced by this rule.
 3. The Agreement terms name the operator and the accepted fee policy:
    `payoutOperator: test|stripe` (`PAYOUT_OPERATOR_UNSUPPORTED`) and
    `payoutFeePolicy: myos-commission-fee-v1` (`PAYOUT_FEE_POLICY_UNSUPPORTED`).
 4. `resolvePayoutTerms(G)` freezes `/payouts/<key>/payoutTerms`:
    `feePolicy, feeBps, grossMinor, feeMinor, netMinor, payoutKey, currency,
-   operator, payerPaymentAccountId, recipientPaymentAccountId`, and sets the
+   operator`, and sets the
    payout `amountMinor = N`.
 5. `Commission Payout Opened.amountMinor = G` reserves G. An identical retry of
    the same key reads the existing payout. No PI exists yet.
