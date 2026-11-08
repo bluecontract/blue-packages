@@ -86,11 +86,12 @@ The existing `documents-paymentPreparation` case fails with gas exhaustion on
 both the unchanged PR #31 baseline and this candidate. It is not counted as a pass
 and was not weakened or assigned a larger budget.
 
-## Hosted integration boundary
+## Hosted integration boundary and subsequent Core fix
 
 The matched baseline stops in Agreement during late-guarantor replay with
 `GAS_LIMIT_EXCEEDED`. The candidate passes that stage, replays Order and PI,
-installs the guarantor's consent, then encounters a separate Core failure when
+installs the guarantor's consent, then on the older Core revisions encounters a
+separate failure when
 Agreement receives the Order change that attaches PI:
 `SOURCE_BIRTH_REQUIRES_OWNER_COMMIT`.
 
@@ -118,7 +119,23 @@ idempotency. Amounts are USD minor units. This isolates a working Order/PI cycle
 it does **not** qualify Agreement observation or commission accrual/reversal.
 Skipping the Agreement attachment is a test control, not a product workaround.
 
+On 2026-11-08 the complete hosted probe passed on Core `64abcd6de`, which includes
+the owner-commit-aware source adoption fix `3d2e548cf` from Core PR #965, with this
+package candidate `7ad57a7`. Agreement observed Order throughout; PI attachment,
+new-guarantor admission, authorization, seller confirmation, capture (9,310),
+automatic full-refund request, confirmed refund (9,310), and Order settlement
+passed. Agreement accrued 931 commission units after capture and returned to zero
+after the full refund. Repeated cancellation did not create another refund.
+This qualifies the combined Core/package fixes; neither disables observation or
+raises the gas limit. The earlier failed runs above remain valid baseline evidence.
+PI preparation and capture were explicitly invoked in this probe; initialization
+triggers and automatic capture on confirmation were not qualified. Business UI,
+real PSP calls and recovery of previously failed persisted agreements were not tested.
+
 Hosted evidence is retained under
 `reports/pr31-reseller-cancellation/{latest-baseline,candidate-complete,latest-core-full,latest-core-detached-order}`.
 The matched gas logs, native qualification reports and comparison are under
 `reports/gas-refresh`. These are local probe artifacts, not published packages.
+The passing full probe is in
+`reports/pr31-reseller-cancellation/source-birth-fixed-full`; durable local copies
+are in `reports/reseller-20261103/source-birth-20261108` in the main workspace.
