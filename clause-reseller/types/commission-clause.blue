@@ -32,14 +32,19 @@ actionDefinition:
                       path: /payouts
                   - /
                 - $var: key
+        # The provided payout Payment Instruction is the collection item itself; before provision nothing settles.
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $var: payout
+            then:
+            - $return:
+                outcome: duplicate
         - $let:
             name: pi
             expr:
-              $pointerGet:
-                object:
-                  $var: payout
-                path: /payment
-                default: {}
+              $var: payout
         - $let:
             name: s
             expr:
@@ -79,8 +84,8 @@ actionDefinition:
             expr:
               $pointerGet:
                 object:
-                  $var: payout
-                path: /payoutTerms
+                  $var: pi
+                path: /paymentDetails/payoutTerms
         - $let:
             name: gross
             expr:
@@ -570,6 +575,61 @@ actions:
                         - {$var: {name: order, path: /payment/payment/completed}}
                         - {$var: {name: order, path: /payment/payment/reversed}}
                       bps: {$document: {$const: {name: bindings, path: /rate}}}
+  payoutAttached:
+    resultContract: outcome-v1
+    automatic:
+      'on': event
+      event:
+        type: Documents/Document Attached
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node: {$event: ''}
+              pattern: {type: Documents/Document Attached}
+        then:
+        - $return: {}
+    - $let: {name: key, expr: {$event: /itemKey}}
+    - $let: {name: producer, expr: {$event: /clauseId}}
+    - $forEach:
+        item: part
+        in: [{$var: key}, {$var: producer}]
+        do:
+        - $if:
+            cond: {$not: {$isKind: {val: {$var: part}, kind: text}}}
+            then:
+            - $return: {}
+        - $if:
+            cond:
+              $or:
+              - {$eq: [{$var: part}, '']}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: /}}}, 1]}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: '~'}}}, 1]}
+            then:
+            - $return: {}
+    - $if:
+        cond:
+          $ne:
+          - {$document: {$concat: [/clauses/, {$var: producer}, /bindings/collection]}}
+          - {$const: {name: bindings, path: /payouts}}
+        then:
+        - $return: {}
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document: {$concat: [{$const: {name: bindings, path: /state}}, /settlements/, {$var: key}]}
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reconcile
+            args:
+              input:
+                key: {$var: key}
   opened:
     resultContract: outcome-v1
     automatic:
@@ -603,7 +663,7 @@ actions:
       'on': collection
       pathBinding: payouts
       event:
-        type: Payment/Payment Event Received
+        type: Events/Event
     do:
     - $if:
         cond:
@@ -612,7 +672,7 @@ actions:
               node:
                 $event: /event
               pattern:
-                type: Payment/Payment Event Received
+                type: Events/Event
         then:
         - $return: {}
     - $set:
@@ -631,8 +691,8 @@ actions:
                         path: /payouts
                     - /
 description: Accrue the configured commission on confirmed net order receipts and reserve payouts. A payout
-  settles its reserved commission G only after the operator reports the account-to-account split and the
-  instruction completes the partner transfer N; MyOS retains F = G - N.
+  settles its reserved commission G only after its provided account-to-account Payment Instruction records the
+  operator's split report and completes the partner transfer N; MyOS retains F = G - N.
 bindingTypes:
   orders: pointer
   payouts: pointer

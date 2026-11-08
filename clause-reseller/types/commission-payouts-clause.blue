@@ -1,12 +1,12 @@
 name: Commission Payouts Clause
-type: Documents/Documents Clause
-description: Prepare one MyOS account-to-account commission payout using native document preparation. The
-  settled commission G is reserved once; the payout freezes the MyOS fee F and the partner transfer N = G - F
-  with the Agreement operator; the operator debits the seller's and credits the partner's own payment accounts.
-  Guard unresolved prior payouts.
+type: Documents/Document Base
+description: Prepare one MyOS account-to-account commission payout as an independent Payment Instruction. The settled
+  commission G is reserved once; the instruction freezes the MyOS fee F and the partner transfer N = G - F with
+  the Agreement operator. The seller bootstraps it with the MyOS operator as its supplied guarantor and provides
+  it back; the operator debits the seller's and credits the partner's own payment accounts. Guard unresolved payouts.
 actionDefinition:
   type:
-    type: Documents/Document Preparation Functions
+    type: Documents/Preparation Functions
     functions:
       # Exact shared Money/Rounding.roundBps; the fee uses the same rounding as commission accrual.
       roundBps:
@@ -58,15 +58,190 @@ actionDefinition:
               $var: feeMinor
             netMinor:
               $var: netMinor
+      domainPrepare:
+        args:
+          prepared: {}
+        do:
+        - $let:
+            name: terms
+            expr:
+              $pointerGet:
+                object:
+                  $var: prepared
+                path: /paymentTerms
+        - $let:
+            name: details
+            expr:
+              $pointerGet:
+                object:
+                  $var: prepared
+                path: /paymentDetails
+        - $let:
+            name: split
+            expr:
+              $pointerGet:
+                object:
+                  $var: details
+                path: /payoutTerms
+        - $let:
+            name: parties
+            expr:
+              $pointerGet:
+                object:
+                  $var: prepared
+                path: /clauses/activation/parameters/parties
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq:
+                  - $nodeBlueId:
+                      $pointerGet:
+                        object:
+                          $var: prepared
+                        path: /type
+                  - $nodeBlueId:
+                      $choose:
+                        cond:
+                          $eq:
+                          - $document: /terms/payoutOperator
+                          - test
+                        then:
+                          $get:
+                            object:
+                              type: MyOS/MyOS Test Account to Account Payment Instruction
+                            key: type
+                        else:
+                          $get:
+                            object:
+                              type: MyOS/MyOS Stripe Account to Account Payment Instruction
+                            key: type
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: details
+                      path: /method
+                  - myos-account-to-account
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /amountMinor
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /netMinor
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /limitMinor
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /netMinor
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /currency
+                  - $document: /terms/currency
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /currency
+                  - $document: /terms/currency
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /operator
+                  - $document: /terms/payoutOperator
+                - $hasKey:
+                    object:
+                      $var: parties
+                    key:
+                      $pointerGet:
+                        object:
+                          $var: terms
+                        path: /payerChannel
+                - $hasKey:
+                    object:
+                      $var: parties
+                    key:
+                      $pointerGet:
+                        object:
+                          $var: terms
+                        path: /payeeChannel
+                - $hasKey:
+                    object:
+                      $var: parties
+                    key:
+                      $pointerGet:
+                        object:
+                          $var: terms
+                        path: /guarantorChannel
+            message: PAYOUT_INSTRUCTION_INVALID
+        - $return:
+            paymentTerms:
+              $var: terms
+            paymentDetails:
+              $var: details
+      domainValidateCandidate:
+        args:
+          frozenTerms: {}
+          candidate: {}
+        do:
+        - $failIf:
+            cond:
+              $or:
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /paymentTerms
+                - $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /paymentTerms
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /paymentDetails
+                - $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /paymentDetails
+            message: PAYOUT_TERMS_MISMATCH
+        - $return: true
+      domainNextActions:
+        args:
+          documentRef: {}
+        do:
+        - $return: []
+cardinality: keyed
+destinationBinding: collection
 parameters:
-  allowedFields:
-  - amountMinor
-  - payoutTerms
-  parties: []
+  prepareFor: bootstrap
+  obtain: provide
+  suppliedBy: seller
+  suppliedParties:
+  - guarantor
+  allowedFields: []
+  fieldPaths:
+    amountMinor: /paymentTerms/amountMinor
+    limitMinor: /paymentTerms/limitMinor
+    payoutTerms: /paymentDetails/payoutTerms
 bindingTypes:
+  collection: pointer
   commission: pointer
 defaultBindings:
+  collection: /payouts
   commission: /commission
+embedsCollections:
+- collection
 actions:
   preparePayout:
     resultContract: outcome-v1
@@ -117,14 +292,13 @@ actions:
             $exists:
               $document:
                 $concat:
-                - $concat:
-                  - $const:
-                      name: bindings
-                      path: /collection
-                  - /
-                - $var:
-                    name: trigger
-                    path: /key
+                - /process_
+                - $const: clauseKey
+                - /entries/
+                - $nodeBlueId:
+                    $var:
+                      name: trigger
+                      path: /key
         then:
         - $failIf:
             cond:
@@ -132,9 +306,10 @@ actions:
               - $size:
                   $keys:
                     $document:
-                      $const:
-                        name: bindings
-                        path: /collection
+                      $concat:
+                      - /process_
+                      - $const: clauseKey
+                      - /entries
               - 20
             message: DOCUMENT_LIMIT_REACHED
         - $failIf:
@@ -175,8 +350,12 @@ actions:
             $var:
               name: trigger
               path: /key
-          fields:
+          values:
             amountMinor:
+              $var:
+                name: split
+                path: /netMinor
+            limitMinor:
               $var:
                 name: split
                 path: /netMinor

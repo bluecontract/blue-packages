@@ -14,7 +14,7 @@ steps:
     revision: 1
   requireExactDocumentVersion: true
 - operation: startPayout
-  label: Seller prepares G=1000; MyOS fee 20% freezes F=200 and partner transfer N=800
+  label: Seller prepares G=1000; MyOS fee 20% freezes F=200 and the payout instruction amount N=800
   channel: seller
   request:
     key: p1
@@ -23,14 +23,8 @@ steps:
   expect:
     /commission/reserved: 1000
     /commission/paid: 0
-    /payouts/p1/amountMinor: 800
-    /payouts/p1/payoutTerms/grossMinor: 1000
-    /payouts/p1/payoutTerms/feeMinor: 200
-    /payouts/p1/payoutTerms/netMinor: 800
-    /payouts/p1/payoutTerms/feeBps: 2000
-    /payouts/p1/payoutTerms/operator: test
 - operation: startPayout
-  label: An identical retry reads the existing payout
+  label: An identical retry reuses the prepared payout instruction
   channel: seller
   request:
     key: p1
@@ -38,7 +32,6 @@ steps:
   requireExactDocumentVersion: true
   expect:
     /commission/reserved: 1000
-    /payouts/p1/amountMinor: 800
 - operation: startPayout
   label: A client cannot supply the fee
   channel: seller
@@ -56,203 +49,3 @@ steps:
     amountMinor: 500
   requireExactDocumentVersion: true
   status: FAILED
-- operation: startPayment
-  label: Seller confirms the reviewed payout and creates the account-to-account instruction
-  channel: seller
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p1
-  expect:
-    /payouts/p1/payment/paymentTerms/amountMinor: 800
-    /payouts/p1/payment/paymentDetails/method: myos-account-to-account
-    /payouts/p1/payment/paymentDetails/payoutTerms/feeMinor: 200
-- operation: acceptPaymentInstruction
-  channel: guarantor
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-- operation: recordTransactionInitiated
-  channel: guarantor
-  request:
-    type: PaymentInstruction/Transaction Initiation Input
-    transactionId: payout-p1
-    railType: myos-account-to-account
-    attachmentPoint: instruction
-    providerReference: test
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-- operation: securePayout
-  channel: guarantor
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-- operation: secureFunds
-  channel: guarantor
-  request:
-    type: PaymentInstruction/Payment Outcome Input
-    requestId: payout-secure
-    amountSecured: 800
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-- operation: capturePayout
-  channel: guarantor
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-- operation: confirmAccountSettlement
-  label: The operator split report alone does not settle G
-  channel: guarantor
-  request:
-    debitReference: test-debit-p1
-    transferReference: test-transfer-p1
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-  expect:
-    /payouts/p1/payment/accountSettlement/feeMinor: 200
-    /commission/paid: 0
-    /commission/reserved: 1000
-- operation: completePayment
-  label: Completion of N together with the split report settles G exactly once
-  channel: guarantor
-  request:
-    type: PaymentInstruction/Payment Outcome Input
-    requestId: payout-capture
-    amountCompleted: 800
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-  expect:
-    /payouts/p1/payment/payment/completed: 800
-    /commission/paid: 1000
-    /commission/reserved: 0
-    /commission/settlements/p1/status: closed
-    /commission/settlements/p1/paidMinor: 1000
-    /commission/settlements/p1/transferredMinor: 800
-    /commission/settlements/p1/feeMinor: 200
-- operation: confirmAccountSettlement
-  label: An identical report is idempotent
-  channel: guarantor
-  request:
-    debitReference: test-debit-p1
-    transferReference: test-transfer-p1
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-  expect:
-    /commission/paid: 1000
-- operation: confirmAccountSettlement
-  label: A conflicting report is rejected
-  channel: guarantor
-  request:
-    debitReference: other-debit
-    transferReference: test-transfer-p1
-  requireExactDocumentVersion: true
-  target: /payouts/p1/payment
-  status: FAILED
-- operation: startPayout
-  label: A payout cannot exceed the available commission
-  channel: seller
-  request:
-    key: p2
-    amountMinor: 1001
-  requireExactDocumentVersion: true
-  status: FAILED
-- operation: startPayout
-  label: Second payout G=500 freezes F=100 and N=400
-  channel: seller
-  request:
-    key: p2
-    amountMinor: 500
-  requireExactDocumentVersion: true
-  expect:
-    /commission/reserved: 500
-    /payouts/p2/payoutTerms/feeMinor: 100
-    /payouts/p2/amountMinor: 400
-- operation: startPayment
-  channel: seller
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p2
-- operation: rejectPaymentInstruction
-  label: Operator rejection before any effect releases G without a fee
-  channel: guarantor
-  request:
-    reason: payment_account_unavailable
-  requireExactDocumentVersion: true
-  target: /payouts/p2/payment
-  expect:
-    /commission/reserved: 0
-    /commission/paid: 1000
-    /commission/settlements/p2/status: closed
-    /commission/settlements/p2/paidMinor: 0
-    /commission/settlements/p2/feeMinor: 0
-- operation: startPayout
-  label: Third payout settles with completion before the split report
-  channel: seller
-  request:
-    key: p3
-    amountMinor: 500
-  requireExactDocumentVersion: true
-  expect:
-    /commission/reserved: 500
-- operation: startPayment
-  channel: seller
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p3
-- operation: acceptPaymentInstruction
-  channel: guarantor
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p3/payment
-- operation: recordTransactionInitiated
-  channel: guarantor
-  request:
-    type: PaymentInstruction/Transaction Initiation Input
-    transactionId: payout-p3
-    railType: myos-account-to-account
-    attachmentPoint: instruction
-    providerReference: test
-  requireExactDocumentVersion: true
-  target: /payouts/p3/payment
-- operation: securePayout
-  channel: guarantor
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p3/payment
-- operation: secureFunds
-  channel: guarantor
-  request:
-    type: PaymentInstruction/Payment Outcome Input
-    requestId: payout-secure
-    amountSecured: 400
-  requireExactDocumentVersion: true
-  target: /payouts/p3/payment
-- operation: capturePayout
-  channel: guarantor
-  request: {}
-  requireExactDocumentVersion: true
-  target: /payouts/p3/payment
-- operation: completePayment
-  label: Completion of N without the split report does not settle G
-  channel: guarantor
-  request:
-    type: PaymentInstruction/Payment Outcome Input
-    requestId: payout-capture
-    amountCompleted: 400
-  requireExactDocumentVersion: true
-  target: /payouts/p3/payment
-  expect:
-    /commission/paid: 1000
-    /commission/reserved: 500
-- operation: confirmAccountSettlement
-  label: The later split report completes settlement
-  channel: guarantor
-  request:
-    debitReference: test-debit-p3
-    transferReference: test-transfer-p3
-  requireExactDocumentVersion: true
-  target: /payouts/p3/payment
-  expect:
-    /commission/paid: 1500
-    /commission/reserved: 0
-    /commission/settlements/p3/transferredMinor: 400
-    /commission/settlements/p3/feeMinor: 100

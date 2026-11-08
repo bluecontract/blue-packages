@@ -1,0 +1,104 @@
+name: Commission Payout Settlement Clause
+type: Features/Feature Clause
+description: 'The MyOS operator reports the executed account-to-account split of one commission payout exactly once:
+  the seller debit of G, the partner transfer of N and the retained MyOS fee F, all from the frozen payout terms.
+  An identical report is idempotent; a different one is rejected.'
+parameters:
+  actions:
+    confirm:
+      do:
+      - $let:
+          name: terms
+          expr:
+            $document: /paymentDetails/payoutTerms
+      - $failIf:
+          cond:
+            $not:
+              $and:
+              - $eq:
+                - $document: /payment/accepted
+                - true
+              - $isKind:
+                  val:
+                    $var:
+                      name: params
+                      path: /debitReference
+                  kind: text
+              - $ne:
+                - $var:
+                    name: params
+                    path: /debitReference
+                - ''
+              - $isKind:
+                  val:
+                    $var:
+                      name: params
+                      path: /transferReference
+                  kind: text
+              - $ne:
+                - $var:
+                    name: params
+                    path: /transferReference
+                - ''
+          message: ACCOUNT_SETTLEMENT_INVALID
+      - $let:
+          name: record
+          expr:
+            payoutKey:
+              $pointerGet:
+                object:
+                  $var: terms
+                path: /payoutKey
+            grossMinor:
+              $pointerGet:
+                object:
+                  $var: terms
+                path: /grossMinor
+            feeMinor:
+              $pointerGet:
+                object:
+                  $var: terms
+                path: /feeMinor
+            netMinor:
+              $pointerGet:
+                object:
+                  $var: terms
+                path: /netMinor
+            currency:
+              $pointerGet:
+                object:
+                  $var: terms
+                path: /currency
+            transactionId:
+              $document: /payment/transactionId
+            debitReference:
+              $var:
+                name: params
+                path: /debitReference
+            transferReference:
+              $var:
+                name: params
+                path: /transferReference
+      - $if:
+          cond:
+            $exists:
+              $document: /accountSettlement
+          then:
+          - $failIf:
+              cond:
+                $ne:
+                - $document: /accountSettlement
+                - $var: record
+              message: ACCOUNT_SETTLEMENT_CONFLICT
+          - $return: {}
+      - $appendChange:
+          op: add
+          path: /accountSettlement
+          val:
+            $var: record
+      - $appendEvent:
+          $merge:
+          - type: Events/Event
+          - kind: Account Settlement Confirmed
+            settlement:
+              $var: record

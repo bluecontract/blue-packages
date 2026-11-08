@@ -12,7 +12,9 @@ class CommissionEventFiltersTest(unittest.TestCase):
         expected = {
             'confirmed': {'type': 'Payment/Payment Event Received', 'event': {'type': 'PaymentInstruction/Payment Completed'}},
             'reversed': {'type': 'Payment/Payment Event Received', 'event': {'type': 'PaymentInstruction/Payment Reversed After Completion'}},
-            'observed': {'type': 'Payment/Payment Event Received'},
+            # Each /payouts item is the provided payout Payment Instruction itself: both its payment events and
+            # its operator split report (Account Settlement Confirmed) reconcile, so any event of an item counts.
+            'observed': {'type': 'Events/Event'},
         }
         for action, pattern in expected.items():
             with self.subTest(action=action):

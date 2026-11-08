@@ -28,15 +28,6 @@ clauses:
               type: Contracts/External Channel
               event:
                 source: partner
-        guarantor:
-          type: MyOS/MyOS Party
-          displayName: MyOS payment operator
-          myosAccountId: test-guarantor
-          lead:
-            channel:
-              type: Contracts/External Channel
-              event:
-                source: guarantor
       required:
       - seller
       - partner
@@ -56,9 +47,12 @@ clauses:
       parties:
         seller: seller
         partner: partner
-        guarantor: guarantor
       preparePayout:
         startPayout:
+          'on': workflow
+          party: seller
+      provide:
+        providePayout:
           'on': workflow
           party: seller
 orders: {}
@@ -72,11 +66,27 @@ commission:
   reserved: 0
   settlements: {}
 payouts: {}
+# The MyOS operator is not an Agreement party: Core supplies it as the guarantor when the seller bootstraps
+# the prepared payout instruction, which the seller then provides back with providePayout.
 payoutTemplate:
   name: Partner commission payout
-  type: Agreements/Agreement with Clauses
-  amountMinor: 1
-  payoutTerms: {}
+  type: MyOS/MyOS Test Account to Account Payment Instruction
+  paymentTerms:
+    amountMinor:
+      type: Integer
+    limitMinor:
+      type: Integer
+    currency: EUR
+    payerChannel: seller
+    payeeChannel: partner
+    guarantorChannel: guarantor
+    allowedPayees:
+    - partner
+    captureGate: ''
+    recipientApprovalRequired: false
+  paymentDetails:
+    method: myos-account-to-account
+    payoutTerms: {}
   clauses:
     activation:
       type: Activation/Activation Clause
@@ -90,18 +100,8 @@ payoutTemplate:
             type: MyOS/MyOS Party
         required: []
     payment:
-      type: Reseller/Commission Payout Payment Clause
-      parameters:
-        payer: seller
-        payee: partner
-        currency: EUR
+      type: PaymentInstruction/Payment Request Actions
       bindings:
-        amount: /amountMinor
-        instruction: /payment
-        start:
-          startPayment:
-            'on': workflow
-            party: seller
         requestAuthorize:
           securePayout:
             'on': workflow
@@ -122,3 +122,21 @@ payoutTemplate:
                 $document: /paymentTerms/amountMinor
             request:
               description: Transfers the complete frozen partner amount; no input fields.
+    method:
+      type: MyOS/Payment Method Events
+    accountSettlement:
+      type: Reseller/Commission Payout Settlement Clause
+      bindings:
+        confirm:
+          confirmAccountSettlement:
+            'on': workflow
+            party: guarantor
+            params:
+              debitReference:
+                $var:
+                  name: trigger
+                  path: /debitReference
+              transferReference:
+                $var:
+                  name: trigger
+                  path: /transferReference

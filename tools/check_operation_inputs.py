@@ -16,6 +16,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
     'myos-instruction-types': ('blue.core.MyosInstructionTypesConformance',),
+    'commission-payout': ('blue.core.CommissionPayoutConformance',),
     'access-events-behavior': ('blue.core.AccessEventsConformance',),
     'helper-native': ('OperationInputConformance', 'native'),
     'helper-payment': ('OperationInputConformance', 'payment'),

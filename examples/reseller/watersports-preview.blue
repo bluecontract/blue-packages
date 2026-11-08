@@ -6,6 +6,8 @@ template:
 terms:
   commissionBps: 1000
   currency: USD
+  payoutOperator: test
+  payoutFeePolicy: myos-commission-fee-v1
   exclusive: false
 orders: {}
 payouts: {}
@@ -74,6 +76,10 @@ clauses:
         partner: partner
       preparePayout:
         startPayout:
+          'on': workflow
+          party: seller
+      provide:
+        providePayout:
           'on': workflow
           party: seller
   commission:
@@ -280,60 +286,76 @@ orderTemplate:
         instruction: /payment
 payoutTemplate:
   name: Partner commission payout
-  type: Agreements/Agreement with Clauses
-  amountMinor: 1000
-  currency: USD
+  type: MyOS/MyOS Test Account to Account Payment Instruction
+  paymentTerms:
+    amountMinor:
+      type: Integer
+    limitMinor:
+      type: Integer
+    currency: USD
+    payerChannel: seller
+    payeeChannel: partner
+    guarantorChannel: guarantor
+    allowedPayees:
+    - partner
+    captureGate: ''
+    recipientApprovalRequired: false
+  paymentDetails:
+    method: myos-account-to-account
+    payoutTerms: {}
   clauses:
     activation:
       type: Activation/Activation Clause
       parameters:
         parties:
           seller:
-            type: Parties/Party
+            type: MyOS/MyOS Party
           partner:
-            type: Parties/Party
+            type: MyOS/MyOS Party
+          guarantor:
+            type: MyOS/MyOS Party
         required: []
     payment:
-      type: Reseller/Commission Payout Payment Clause
-      parameters:
-        payer: seller
-        payee: partner
-        currency: USD
+      type: PaymentInstruction/Payment Request Actions
       bindings:
-        amount: /amountMinor
-        instruction: /payment
-        start:
-          startPayment:
-            'on': workflow
-            party: seller
         requestAuthorize:
-          authorize:
+          securePayout:
             'on': workflow
-            party: seller
+            party: guarantor
             params:
-              $object:
-                $var: trigger
+              requestId: payout-secure
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Secures the complete frozen partner transfer; no input fields.
         requestCapture:
-          capture:
+          capturePayout:
             'on': workflow
-            party: seller
+            party: guarantor
             params:
-              $object:
-                $var: trigger
-        requestRefund:
-          refund:
+              requestId: payout-capture
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Transfers the complete frozen partner amount; no input fields.
+    method:
+      type: MyOS/Payment Method Events
+    accountSettlement:
+      type: Reseller/Commission Payout Settlement Clause
+      bindings:
+        confirm:
+          confirmAccountSettlement:
             'on': workflow
-            party: partner
+            party: guarantor
             params:
-              $object:
-                $var: trigger
-        requestVoid:
-          cancel:
-            'on': workflow
-            party: seller
-            params:
-              $object:
-                $var: trigger
+              debitReference:
+                $var:
+                  name: trigger
+                  path: /debitReference
+              transferReference:
+                $var:
+                  name: trigger
+                  path: /transferReference
 description: Umowa współpracy obejmująca ofertę Sea-Doo jet ski rental.
 products:
   revision: 1
