@@ -90,12 +90,18 @@ class BootstrapCompositionTest(unittest.TestCase):
             'domainValidateCandidate', 'domainNextActions', 'suppliedCustomerOrderRoles',
             'maySelectInactiveCandidate'})
 
-    def test_ordinary_provision_and_planning_are_not_replaced(self):
+    def test_ordinary_provision_and_base_planning_are_preserved(self):
         clause = yaml.safe_load((PACKAGE / 'types/customer-orders-bootstrap-clause.blue').read_text())
         base = yaml.safe_load((ROOT / 'clause-documents/types/base.blue').read_text())
         for action in ['provide', 'resume', 'cancel']:
             self.assertEqual(clause['actions'][action], base['actions'][action])
-        self.assertEqual(clause['hookDefinition'], base['hookDefinition'])
+        # Hosted refresh narrows its repeated library after the unchanged native plan.
+        definitions = records(ROOT / 'clause-documents/dist/package.bluepkg')
+        metadata = json.loads((ROOT / 'clause-documents/dist/package.json').read_text())
+        plan_id = next(row['blueId'] for row in metadata['exports'] if row['alias'] == base['hookDefinition']['type'])
+        canonical = json.loads(definitions[plan_id]['text'])['functions']['plan']
+        delegated = clause['hookDefinition']['functions']['basePreparationPlan']['blueId']
+        self.assertEqual(json.loads(definitions[delegated]['text']), canonical)
         self.assertEqual(clause['actions']['prepare'], clause['actions']['startOrder'])
 
     def test_only_the_three_corrected_examples_remove_customer_activation_approval(self):

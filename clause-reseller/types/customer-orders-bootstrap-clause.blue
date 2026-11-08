@@ -1569,7 +1569,93 @@ defaultBindings:
   sources: {}
 hookAbi: document-context-1
 hookDefinition:
-  type: Documents/Preparation Plan
+  type: Contracts/Compute Definition
+  constants:
+    admissionCanonicalDefinition:
+      type: Documents/Admission Functions
+    refreshFunctionNames:
+    - sharedRefresh
+    - processStatePath
+    - namedSourcesReady
+    - processOrigin
+    - rosterCovers
+    - checkedDomainNextActions
+    - domainNextActions
+  functions:
+    # Exact native planning helpers; Blue list inheritance cannot replace plan.do.
+    admissionDefinition:
+      blueId: 4t1otJ87jq5GBEZHMeQhcip5fV36Ke8y5CCUriqDn5n9
+    assembleAdmissionDefinition:
+      blueId: ASULsdYfJW3pQQj9UYYeYTcE7uYFP2CPUxKbMzFda5eh
+    assembleAdmissionPlan:
+      blueId: BA8iDtnANQmweL36cZkkZpw9jbn8dNk6J4cQquCdReZX
+    planAdmission:
+      blueId: 3wDYKekMcji3ctJZb5J5bQHWrQWQMfMs1m1VnMQqkueN
+    planConnections:
+      blueId: cYKrbtZvTnUHvpWBBgi3XYbZWhYysY8Rt48hjW48mAC
+    planDocumentAccess:
+      blueId: 7Mae12hDsTqKzMsP6oBFzibGeXci69LqW3PZCVGPytej
+    planSourceValidators:
+      blueId: 5RdDuEUgW6FXpk2XVJgDYekxZ7AEaZmvw3egggAgRB1Q
+    selector:
+      blueId: 3LazSQ1eisk6wbzi54nBzwaWu153K8exPAciyH7PCCw7
+    validName:
+      blueId: 8fmZg8oChQT88KfKzazPPyPMp7a3HHjyR7qG1FcTyezy
+    validateConfiguration:
+      blueId: GXvXb8FD5nDD7mWgs3XbiU8u38KNXTJufLH7DhsC4P77
+    validateConnectionsConfiguration:
+      blueId: 89Q9GYWLAKtPKtzjbhkPga6xuTZVzY7Ra1f6paLx7Ksv
+    validateTransition:
+      blueId: EWcQ9fxz6PwLGLGHZarggwPdcSAbLfYELWpJGQeR7e6p
+    # Preserve the complete native plan; narrow only the repeated refresh library.
+    basePreparationPlan:
+      blueId: HEdqDwp1ACWuuYbGWVYm99otNM93F5S7jePWM95maeAh
+    plan:
+      args: {}
+      do:
+      - $let:
+          name: plan
+          expr: {$call: {function: basePreparationPlan, args: {}}}
+      - $let:
+          name: definitionPath
+          expr:
+            $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/actionDefinition/type]
+      - $let: {name: refreshFunctions, expr: {}}
+      - $forEach:
+          item: functionName
+          in: {$const: refreshFunctionNames}
+          do:
+          - $set:
+              name: refreshFunctions
+              expr:
+                $objectSet:
+                  object: {$var: refreshFunctions}
+                  key: {$var: functionName}
+                  val:
+                    $document:
+                      $concat: [{$var: definitionPath}, /functions/, {$var: functionName}]
+      - $let:
+          name: refreshDefinition
+          expr:
+            constants:
+              $choose:
+                cond: {$exists: {$document: {$concat: [{$var: definitionPath}, /constants]}}}
+                then: {$document: {$concat: [{$var: definitionPath}, /constants]}}
+                else: {}
+            functions: {$var: refreshFunctions}
+      - $forEach:
+          item: handlerPrefix
+          in: [refreshProcesses_, refreshEmbeddedProcesses_]
+          do:
+          - $set:
+              name: plan
+              expr:
+                $pointerSet:
+                  object: {$var: plan}
+                  path:
+                    $concat: [/contracts/, {$var: handlerPrefix}, {$const: clauseKey}, /contract/steps/0/definition]
+                  val: {$var: refreshDefinition}
+      - $return: {$var: plan}
 readParametersFromDocument: true
 optionalBindings:
 - template
