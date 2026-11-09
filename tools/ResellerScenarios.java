@@ -436,6 +436,7 @@ public final class ResellerScenarios {
   }
 
   private static void sameValue(Object expected, Object actual, String label) {
+    check(actual != Values.UNDEFINED, label + ": expected field is absent");
     equal(WireData.write(expected), WireData.write(actual), label);
   }
 

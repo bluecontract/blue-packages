@@ -7,7 +7,7 @@
 - `Customer Orders Clause` reads the template, order collection, catalog and optional fulfilment parameters through pointer bindings. Moving or renaming these fields requires updating a binding, not copying implementation. Removing the fulfilment clause removes the date and confirmation requirement from new orders.
 - `Commercial Terms Negotiation Clause` invalidates earlier approvals when terms change before activation. Both parties must approve the resulting version. `Commercial Terms Validation Clause` checks the commission range and this example's USD currency.
 - `Commission Clause` reads confirmed net payment results and the configured commission rate. `Commission Payouts Clause` prepares a payout and reserves its amount once. A payout document is not evidence of a completed transfer.
-- `Catalog Clause` owns the authored offer description and points to the catalog and quote collections. Descriptive content does not introduce executable booking requirements.
+- `Catalog Clause` owns the authored offer description and points to the catalog. These agreements do not configure a separate quote collection. Descriptive content does not introduce executable booking requirements.
 
 ## Independent customer orders
 
@@ -35,9 +35,9 @@ The integration must handle `Documents/Document Provision Requested`, retrieve t
 
 ## Local verification and preview
 
-Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `preview-booking.case.json` covers conditional booking requirements and the free variant; `preview-card.case.json` covers card preparation/provision and a renamed fulfilment clause; `preview-clauses.case.json` covers bilateral approval and invalid commercial terms.
+Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `bootstrap-preparation.case.json` covers the current independent Order preparation; `cancellation-settlement.case.json` qualifies native settlement and retries. The older preview cases retain evidence for the former embedded factory, not the current hosted flow.
 
-The local generated document, clause definitions, semantic cards, Overview and Terms are in `reports/reseller-20261103/business-preview/index.html`. These are local review artifacts, not a deployed agreement or proof of real card processing. The separate broader settlement qualification remains incomplete.
+The local generated document, clause definitions, semantic cards, Overview and Terms are in `reports/reseller-20261103/business-preview/index.html`. These are local review artifacts, not a deployed agreement or proof of real card processing.
 
 The `onOrderCreated` binding uses `on: timer`, `timestamp: 0` and requires the
 initialized marker and an empty preparation registry. The PI retains the Order
@@ -52,5 +52,40 @@ Order settlement observation and the PI cancellation reconciliation clauses.
 The automatic preparation was qualified on Core 64abcd6de with the current
 package selection: one multi-product Order of 93.10 USD initialized and prepared
 exactly one PI. The former `on: initialized` version fails Order initialization.
-Capture in this example still uses its explicit workflow binding; this result
-does not establish automatic capture or a complete Business checkout.
+The cancellation-enabled example now requests full capture when all reservation
+groups are confirmed and authorization is available. It uses the existing
+Payment Process `requestCapture` event binding and the validated Order state
+already maintained by Cancellation Payment Clause. Both confirmation before
+authorization and authorization before confirmation work. A repeated confirmation
+does not create another request. The manual capture action applies the same
+confirmation condition.
+
+Cancellation reconciliation retains its separate request path: a full-price
+capture condition must not prevent collection of a valid cancellation fee.
+The mandatory `paymentTerms.captureGate` points to
+`/cancellationSettlement/allGroupsResolved`. This native result blocks every
+capture route while any group awaits confirmation, and permits reconciliation
+of a cancellation charge once all groups are resolved. A managed provider must
+honor this declared PI policy rather than assume that confirmation always uses
+Activation approval; the reciprocal document and frozen-terms checks still apply.
+Payment preparation freezes the native Order origin, revision and terms reference
+in `businessContext`. The terms reference is a `Text` field: an empty object
+cannot be refined with its string value. These template slots remain unfilled
+until the Order exists; marking them required in the nested Agreement template
+would reject that Agreement before preparation can supply them.
+The payment process and top-level `sources/order` use the same Order type
+declaration. Different declarations for that alias are rejected by Documents.
+`tools/test_reseller_automatic_capture.py` uses the example's actual payment
+configuration with the native component fixture. Seven cases cover both orderings,
+multiple reservation groups, cold restoration, cancellation before capture and
+fee capture after a failed full-price request, later recipient approval and
+rejection of conflicting source declarations.
+Payment state changes also wake the capture binding, so a changed payment lock
+or recipient approval cannot leave an otherwise eligible request asleep.
+Separate local Business evidence on 9 November verifies the multi-product flow:
+partner preparation, independent Order bootstrap and provision, seller PI creation,
+managed Test authorization of USD 93.10, seller confirmation, automatic capture,
+customer cancellation, automatic full refund, settled Order and reversed commission.
+Core used `2f44c4f1d` with the imported package selection from `766f39d`; Business
+retains the browser ledger and results in `reports/cancellation-flow/`.
+This is managed Test-provider evidence, not a real card or Stripe qualification.

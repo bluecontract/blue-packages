@@ -247,17 +247,20 @@ orderTemplate:
               type: Payment/Payment Process Clause
               parameters:
                 method: card
+                sources:
+                  order:
+                    type: Orders/Order with Clauses
                 capture:
                   mode: workflow
                 conditions:
                   requestCapture:
-                    $eq:
-                    - $pointerGet:
-                        object:
-                          $document: /cancellationSettlement
-                        path: /status
-                        default: not_applicable
-                    - not_applicable
+                    $and:
+                    - $eq:
+                      - $document: /cancellationSettlement/allGroupsResolved
+                      - true
+                    - $eq:
+                      - $document: /cancellationSettlement/status
+                      - not_applicable
               bindings:
                 requestAuthorize:
                   authorize:
@@ -267,6 +270,113 @@ orderTemplate:
                       $object:
                         $var: trigger
                 requestCapture:
+                  afterConfirmation:
+                    'on': event
+                    event:
+                      type: Events/Event
+                      kind: Cancellation Settlement Changed
+                      clause: cancellation
+                    when:
+                      $and:
+                      - $eq:
+                        - $document: /activation/active
+                        - true
+                      - $ne:
+                        - $document: /sourceLinks/ready
+                        - false
+                      - $eq:
+                        - $document: /cancellationSettlement/allGroupsResolved
+                        - true
+                      - $eq:
+                        - $document: /cancellationSettlement/status
+                        - not_applicable
+                      - $eq:
+                        - $document: /payment/accepted
+                        - true
+                      - $ne:
+                        - $document: /payment/transactionId
+                        - ''
+                      - $eq:
+                        - $document: /payment/closed
+                        - false
+                      - $eq:
+                        - $document: /payment/locks/capture
+                        - false
+                      - $eq:
+                        - $document: /payment/cancellationPending
+                        - false
+                      - $gte:
+                        - $subtract:
+                          - $document: /payment/secured
+                          - $document: /payment/reserved/capture
+                          - $document: /payment/reserved/void
+                        - $document: /paymentTerms/amountMinor
+                      - $or:
+                        - $eq:
+                          - $document: /paymentTerms/recipientApprovalRequired
+                          - false
+                        - $eq:
+                          - $document: /payment/recipientApproved
+                          - true
+                      - $not:
+                          $exists:
+                            $document: /payment/requests/confirmed-order
+                    params:
+                      requestId: confirmed-order
+                      amountMinor:
+                        $document: /paymentTerms/amountMinor
+                  afterPaymentChange:
+                    'on': change
+                    path: /payment
+                    when:
+                      $and:
+                      - $eq:
+                        - $document: /activation/active
+                        - true
+                      - $ne:
+                        - $document: /sourceLinks/ready
+                        - false
+                      - $eq:
+                        - $document: /cancellationSettlement/allGroupsResolved
+                        - true
+                      - $eq:
+                        - $document: /cancellationSettlement/status
+                        - not_applicable
+                      - $eq:
+                        - $document: /payment/accepted
+                        - true
+                      - $ne:
+                        - $document: /payment/transactionId
+                        - ''
+                      - $eq:
+                        - $document: /payment/closed
+                        - false
+                      - $eq:
+                        - $document: /payment/locks/capture
+                        - false
+                      - $eq:
+                        - $document: /payment/cancellationPending
+                        - false
+                      - $gte:
+                        - $subtract:
+                          - $document: /payment/secured
+                          - $document: /payment/reserved/capture
+                          - $document: /payment/reserved/void
+                        - $document: /paymentTerms/amountMinor
+                      - $or:
+                        - $eq:
+                          - $document: /paymentTerms/recipientApprovalRequired
+                          - false
+                        - $eq:
+                          - $document: /payment/recipientApproved
+                          - true
+                      - $not:
+                          $exists:
+                            $document: /payment/requests/confirmed-order
+                    params:
+                      requestId: confirmed-order
+                      amountMinor:
+                        $document: /paymentTerms/amountMinor
                   pay:
                     'on': workflow
                     party: payer
@@ -304,8 +414,14 @@ orderTemplate:
             allowedPayees:
             - payee
             recipientApprovalRequired: false
+            captureGate: /cancellationSettlement/allGroupsResolved
           businessContext:
             description: Płatność kartą za zamówiony rejs.
+            orderOrigin: {}
+            orderRevision:
+              type: Integer
+            orderTermsRef:
+              type: Text
           sources:
             order:
               type: Orders/Order with Clauses
@@ -314,6 +430,9 @@ orderTemplate:
           amountMinor: /paymentTerms/amountMinor
           limitMinor: /paymentTerms/limitMinor
           currency: /paymentTerms/currency
+          orderOrigin: /businessContext/orderOrigin
+          orderRevision: /businessContext/orderRevision
+          orderTermsRef: /businessContext/orderTermsRef
         suppliedParties:
         - guarantor
         sourcePaths:
@@ -344,6 +463,12 @@ orderTemplate:
                   $document: /amountMinor
                 currency:
                   $document: /currency
+                orderOrigin:
+                  $document: /contracts/initialized/document
+                orderRevision:
+                  $document: /activation/revision
+                orderTermsRef:
+                  $document: /activation/terms/ref
         provide:
           providePayment:
             'on': workflow
