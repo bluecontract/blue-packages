@@ -136,11 +136,14 @@ payment account or any other field is rejected (`UNKNOWN_INPUT_FIELD`).
 
 - The seller bootstraps the prepared PI (seller and partner mapped from the
   Agreement, guarantor supplied by hosting as the MyOS operator) and provides
-  it with `providePayout`. Only after the Agreement accepted the provision does
-  the seller approve the PI (`approve_seller`): the payer approves its own debit,
-  and payment, including the operator's acceptance request, starts only on an
-  active PI. An approval before provision is the seller's own choice; Business
-  sends it only after provision. `domainValidateCandidate` rejects a candidate whose
+  it with `providePayout`. Documents verifies the inactive PI in full (frozen
+  preparation, roster, domain terms) and holds it as `awaiting_activation` with
+  its `candidateOrigin`; no other instruction can replace it. Only then does the
+  seller approve the PI (`approve_seller`): the payer approves its own debit, and
+  payment, including the operator's acceptance request, starts only on an active
+  PI. Providing the approved PI again links it under `/payouts/<key>`. An
+  approval before provision is the seller's own choice; Business sends it only
+  once the Agreement holds the PI. `domainValidateCandidate` rejects a candidate whose
   `paymentTerms` or `paymentDetails` differ from the frozen terms
   (`PAYOUT_TERMS_MISMATCH`). Provision embeds the PI at `/payouts/<key>` and emits
   `Documents/Document Attached`; `Commission Clause.payoutAttached` reconciles.
