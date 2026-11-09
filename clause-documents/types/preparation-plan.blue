@@ -1,5 +1,8 @@
 name: Preparation Plan
 type: Connections/Connection Planning Functions
+constants:
+  admissionStepDefinition:
+    type: Documents/Admission Step Functions
 functions:
   validateConfiguration:
     args: {}
@@ -222,6 +225,31 @@ functions:
         - $return:
             $var: base
     - $let:
+        name: admissionDefinition
+        expr:
+          $var: definition
+    - $if:
+        cond:
+          $and:
+          - $isKind:
+              val:
+                $var: definition
+              kind: object
+          - $call:
+              function: matchesAdmissionStepFunctions
+              args:
+                definition:
+                  $var: definition
+        then:
+        - $set:
+            name: admissionDefinition
+            expr:
+              $objectFromEntries:
+              - key: blueId
+                val:
+                  $nodeBlueId:
+                    $const: admissionStepDefinition
+    - $let:
         name: seen
         expr: []
     - $forEach:
@@ -309,7 +337,7 @@ functions:
           - type: Contracts/Compute
           - name: nextAdmission
             definition:
-              $var: definition
+              $var: admissionDefinition
             constants:
               $var: sharedConstants
             do:
@@ -352,7 +380,7 @@ functions:
           - type: Contracts/Compute
           - name: installAdmission
             definition:
-              $var: definition
+              $var: admissionDefinition
             constants:
               $var: sharedConstants
             do:
@@ -403,7 +431,7 @@ functions:
           - type: Contracts/Compute
           - name: finishAdmission
             definition:
-              $var: definition
+              $var: admissionDefinition
             constants:
               $var: sharedConstants
             do:
@@ -887,3 +915,295 @@ functions:
                           $var: compute
     - $return:
         $var: base
+  isAdmissionDefinitionReference:
+    args:
+      candidateRef: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: candidateRef
+              kind: object
+        then:
+        - $return: false
+    - $return:
+        $and:
+        - $eq:
+          - $size:
+              $keys:
+                $var: candidateRef
+          - 1
+        - $isKind:
+            val:
+              $pointerGet:
+                object:
+                  $var: candidateRef
+                path: /blueId
+                default: ''
+            kind: text
+        - $hasKey:
+            object:
+              $var: candidateRef
+            key: blueId
+  matchesAdmissionStepFunctions:
+    args:
+      definition: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $call:
+              function: isAdmissionDefinitionReference
+              args:
+                candidateRef:
+                  $var: definition
+        then:
+        - $return: false
+    - $let:
+        name: clauseTypePath
+        expr:
+          $concat:
+          - /clauseRuntime/work/candidate/
+          - $const: clauseKey
+          - /type
+    - $let:
+        name: actionDefinitionPath
+        expr:
+          $concat:
+          - $var: clauseTypePath
+          - /actionDefinition/type
+    - $let:
+        name: scopeDefinitionPath
+        expr:
+          $concat:
+          - $var: clauseTypePath
+          - /hookDefinition/constants/admissionStepDefinition/type
+    - $let:
+        name: effectiveDefinition
+        expr:
+          $document:
+            $var: actionDefinitionPath
+    - $if:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: effectiveDefinition
+              kind: object
+        then:
+        - $return: false
+    - $if:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: definition
+                path: /blueId
+                default: ''
+            - $nodeBlueId:
+                $var: effectiveDefinition
+        then:
+        - $return: false
+    - $if:
+        cond:
+          $and:
+          - $eq:
+            - $var: definition
+            - $pointerGet:
+                object:
+                  type: Documents/Document Preparation Functions
+                path: /type
+          - $eq:
+            - $const: admissionStepDefinition
+            - type: Documents/Admission Step Functions
+        then:
+        - $return: true
+    - $forEach:
+        item: field
+        in:
+          $keys:
+            $var: effectiveDefinition
+        do:
+        - $if:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - type
+                  - name
+                  - description
+                  - constants
+                  - functions
+                  - specification
+                  - order
+                  val:
+                    $var: field
+            then:
+            - $return: false
+    - $let:
+        name: effectiveConstants
+        expr:
+          $document:
+            $concat:
+            - $var: actionDefinitionPath
+            - /constants
+    - $if:
+        cond:
+          $exists:
+            $var: effectiveConstants
+        then:
+        - $if:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: effectiveConstants
+                  kind: object
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $not:
+                $eq:
+                - $size:
+                    $keys:
+                      $var: effectiveConstants
+                - 0
+            then:
+            - $return: false
+    - $let:
+        name: scopeConstants
+        expr:
+          $document:
+            $concat:
+            - $var: scopeDefinitionPath
+            - /constants
+    - $if:
+        cond:
+          $exists:
+            $var: scopeConstants
+        then:
+        - $if:
+            cond:
+              $not:
+                $isKind:
+                  val:
+                    $var: scopeConstants
+                  kind: object
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $not:
+                $eq:
+                - $size:
+                    $keys:
+                      $var: scopeConstants
+                - 0
+            then:
+            - $return: false
+    - $let:
+        name: scopeFunctionNames
+        expr:
+          $keys:
+            $document:
+              $concat:
+              - $var: scopeDefinitionPath
+              - /functions
+    - $if:
+        cond:
+          $not:
+            $eq:
+            - $size:
+                $var: scopeFunctionNames
+            - 12
+        then:
+        - $return: false
+    - $forEach:
+        item: functionName
+        in:
+        - accessRecordsValid
+        - accessValid
+        - admissionInstallRequest
+        - finishAdmission
+        - installAdmissionConsentOperations
+        - nextAdmissionRequest
+        - readerGroups
+        - requireRosterCoverage
+        - requireSameMainParty
+        - retireAdmission
+        - retireInvalidAdmission
+        - transports
+        do:
+        - $if:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $var: scopeFunctionNames
+                  val:
+                    $var: functionName
+            then:
+            - $return: false
+        - $let:
+            name: expectedFunction
+            expr:
+              $document:
+                path:
+                  $concat:
+                  - $var: scopeDefinitionPath
+                  - /functions/
+                  - $var: functionName
+                view: definition
+        - $let:
+            name: actualFunction
+            expr:
+              $document:
+                path:
+                  $concat:
+                  - $var: actionDefinitionPath
+                  - /functions/
+                  - $var: functionName
+                view: definition
+        - $if:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: expectedFunction
+                    kind: object
+                - $call:
+                    function: isAdmissionDefinitionReference
+                    args:
+                      candidateRef:
+                        $var: expectedFunction
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: actualFunction
+                    kind: object
+                - $call:
+                    function: isAdmissionDefinitionReference
+                    args:
+                      candidateRef:
+                        $var: actualFunction
+            then:
+            - $return: false
+        - $if:
+            cond:
+              $not:
+                $eq:
+                - $var: actualFunction
+                - $var: expectedFunction
+            then:
+            - $return: false
+    - $return: true

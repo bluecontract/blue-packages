@@ -76,6 +76,14 @@ execution-document path. `/*/` describes arbitrary collection members. A `clause
 path may contain `{clauseKey}` only when the exact definition constructs that
 path using the compiler's clause key. Fields retain their units, meaning and
 absence semantics; `date-micros` denotes a Unix-microsecond instant, not a duration.
+The generator chooses this semantic type even when the source stores an integer,
+including copied timestamps and cutoffs derived from an established instant.
+Durations and offsets retain numeric types and explicit units. Field names and
+numeric magnitude alone do not establish a date; unknown or unsupported numeric
+epoch units remain numeric with a limitation. This rule applies to every exact
+type, independently of its name or operation. Prompt changes govern new or
+explicitly refreshed candidates; existing incorrectly typed cards still require
+a reviewed correction before publication.
 Every generated fact explicitly declares its scope, path, binding/default,
 suffix, type, meaning, absence semantics, evidence and nullable aggregate
 annotation. An aggregate describes an existing maintained total or a collection
