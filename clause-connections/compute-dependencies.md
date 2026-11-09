@@ -75,6 +75,12 @@ local constants can be proven safe; arbitrary variables are not guessed. AST
 traversal has a conservative 32-level bound; reaching it means fallback, never
 truncated dependencies. The original specification identity is preserved.
 
+This is not a whole-document equivalence proof. Another handler can read
+`/contracts` and observe the smaller generated definition even when the selected
+handler never reads it. Checking the selected handler and its standard planner
+alone does not rule out that observation. The prototype is therefore **not ready
+for automatic adoption, including documents with a qualified standard planner**.
+
 ## Validation and measurements
 
 Run after building the candidate with the qualified native runtime classpath:
@@ -116,3 +122,42 @@ evidence that initialization plus one operation is cheaper, and cache warmth is
 not a semantic discount. Keep the existing manual optimizations until a real
 flow comparison demonstrates a net benefit. Broader proof would require
 interprocedural value/branch analysis or a separately specified runtime approach.
+
+## Final experiment handover (2026-11-09)
+
+Source candidate: `afc2583a4a2312ee713377dd4399f5e05e130678`; baseline:
+`d26d70428eeafeea2c39bfce2515a1d9b0e90215`. Standalone native measurements used
+the same runtime artifacts and the unchanged 10M limit:
+
+- Isolated Compute: **1,439 → 645 gas**, with equal results and equal charged
+  gas on a warm repeat.
+- Actual Connections-generated handler: initialization **83,344 → 129,416**;
+  operation **2,315 → 1,521**. Initialization plus one operation is worse:
+  **85,659 → 130,937**. For this fixture the initialization overhead pays back
+  after **59 operations**; this is not a general break-even guarantee.
+- Existing reseller `prepareOrder`: initialization **2,641,858 → 2,798,515**;
+  operation **1,780,677 → 1,818,546**. The combined cost rises from
+  **4,422,535 to 4,617,061**. Both arms are `APPLIED` and retain the same complete
+  quote, USD 93.10, one preparation and `awaiting_provider` status. This prototype
+  **does not meet the goal of reducing our reseller `prepareOrder` gas**.
+
+These figures are logical gas, not a CPU benchmark. The ignored local artifacts
+in `reports/compute-dependencies/` contain `measurement-manifest.json`,
+`artifacts.json`, `conformance-final.log` and `reseller.json`, including runtime
+and package hashes. They are not part of the source commit. Candidate archives
+were retained there, while tracked generated archives, locks and `PACKAGES.json`
+were restored. This is a source prototype, not a package publication or a
+deployment to Core/Business. Existing manual optimizations remain in place.
+
+A possible later integration point is the final Compute **after all hooks**:
+[`Prepare Amendment Step`](../blue-clauses/types/prepare-amendment-step.blue#L463)
+appends Commit Amendment after the configuration hooks;
+[`Commit Amendment Step`](../blue-clauses/types/commit-amendment-step.blue#L114)
+receives their completed plans and holds the final `wanted` contracts before
+[installation](../blue-clauses/types/commit-amendment-step.blue#L1375). Selection
+after its ownership/conflict/channel checks could cover custom planners, provided
+it preserves those checks and fully validates the final composed program. This
+is an unimplemented proposal: it needs a lower-layer or Clauses-owned selector
+to avoid an import cycle, and separate initialization/amendment cost measurements.
+Moving selection there does **not** by itself solve dynamic reads or another
+handler's observation of the whole document or `/contracts`.
