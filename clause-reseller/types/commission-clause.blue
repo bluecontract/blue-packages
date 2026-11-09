@@ -221,18 +221,30 @@ actionDefinition:
                     path: /reversed
                     default: 0
                 - 0
-        # The operator rejected the instruction before any effect: no debit, no transfer, no fee.
+        # The operator rejected the instruction, or its fixed securing request (payout-secure) was declined or
+        # failed, before any effect: no debit, no transfer, no fee.
         - $let:
             name: returned
             expr:
               $and:
-              - $eq:
-                - $pointerGet:
-                    object:
-                      $var: state
-                    path: /rejected
-                    default: false
-                - true
+              - $or:
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /rejected
+                      default: false
+                  - true
+                - $includes:
+                    list:
+                    - declined
+                    - failed
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: state
+                        path: /requests/payout-secure/status
+                        default: null
               - $eq:
                 - $var: completed
                 - 0

@@ -5291,7 +5291,9 @@ payoutTemplate:
             type: MyOS/MyOS Party
           guarantor:
             type: MyOS/MyOS Party
-        required: []
+        # The seller approves its own debit; the operator acts only on an active instruction.
+        required:
+        - seller
     payment:
       type: PaymentInstruction/Payment Request Actions
       bindings:

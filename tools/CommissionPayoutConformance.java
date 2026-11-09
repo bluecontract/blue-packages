@@ -78,13 +78,14 @@ public final class CommissionPayoutConformance {
     channels(prepared,List.of("seller","partner","guarantor"));
     return prepared;
   }
-  void settle(String key,long net,String debit) {
-    String pi=embedded("/payouts/"+key);
-    apply("guarantor","acceptPaymentInstruction",pi,m());
-    pi=embedded("/payouts/"+key);
-    apply("guarantor","recordTransactionInitiated",pi,m("type","PaymentInstruction/Transaction Initiation Input","transactionId","payout-"+key,
+  void initiate(String key) {
+    apply("guarantor","acceptPaymentInstruction",embedded("/payouts/"+key),m());
+    apply("guarantor","recordTransactionInitiated",embedded("/payouts/"+key),m("type","PaymentInstruction/Transaction Initiation Input","transactionId","payout-"+key,
         "railType","myos-account-to-account","attachmentPoint","instruction","providerReference","test"));
     apply("guarantor","securePayout",embedded("/payouts/"+key),m());
+  }
+  void settle(String key,long net,String debit) {
+    initiate(key);
     apply("guarantor","secureFunds",embedded("/payouts/"+key),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","amountSecured",net));
     apply("guarantor","capturePayout",embedded("/payouts/"+key),m());
     apply("guarantor","confirmAccountSettlement",embedded("/payouts/"+key),m("debitReference",debit,"transferReference","test-transfer-"+key));
@@ -116,15 +117,32 @@ public final class CommissionPayoutConformance {
       t.deny("seller","startPayout",t.host.blueId(),m("key","p2","amountMinor",500,"feeMinor",0));
       System.out.println("PASS prepare freezes G=1000 F=200 N=800, reserves G once and guards a second unresolved payout");
 
+      // A template whose instruction the payer would not approve cannot be prepared.
+      var unconsented=o(WireData.json(WireData.write(source)));
+      o(o(o(o(unconsented.get("payoutTemplate")).get("clauses")).get("activation")).get("parameters")).put("required",List.of());
+      var u=new CommissionPayoutConformance(t.p);u.host=u.init(unconsented);
+      u.root("seller","approve_seller",m("revision",1));u.root("partner","approve_partner",m("revision",1));
+      u.deny("seller","startPayout",u.host.blueId(),m("key","p1","amountMinor",1000));
+      check(u.number("/commission/reserved")==0,"Nothing is reserved for an unconsented payout");
+      System.out.println("PASS a payout instruction the seller would not approve is rejected at preparation");
+
       var instruction=t.supplied(p1);
       var standalone=t.p.initialize(instruction);
       check(standalone.commits(),"The prepared instruction initializes with the supplied operator: "+ClauseGasProbe.diagnostic(standalone));
       check(Long.valueOf(800).equals(((Number)t.p.read(standalone.document(),"/paymentTerms/amountMinor")).longValue()),"Initialized N");
+      check(Boolean.FALSE.equals(t.p.read(standalone.document(),"/activation/active"))
+          &&List.of("seller").equals(t.p.read(standalone.document(),"/activation/required")),"The payout stays inactive until the seller approves it");
+      check(o(t.p.read(standalone.document(),"/payment")).isEmpty()&&"AWAITING_ACCEPTANCE".equals(t.p.read(standalone.document(),"/activation/status")),
+          "Payment does not start before the seller approves it");
       System.out.println("PASS the prepared instruction initializes with the MyOS operator as its supplied guarantor");
 
       // Modeled provided state: the same instruction under /payouts/p1 with the commission as reserved above.
       var commission=t.literal("/commission");
-      var provided=o(WireData.json(WireData.write(source)));provided.put("commission",commission);provided.put("payouts",m("p1",instruction));
+      // The modeled embedding cannot run the instruction's own activation: it stands for the instruction after the
+      // seller approved it (payer approval is qualified above and in hosted Core).
+      var approved=o(WireData.json(WireData.write(instruction)));
+      o(o(o(approved.get("clauses")).get("activation")).get("parameters")).put("required",List.of());
+      var provided=o(WireData.json(WireData.write(source)));provided.put("commission",commission);provided.put("payouts",m("p1",approved));
       var b=new CommissionPayoutConformance(t.p);b.host=b.init(provided);
       b.root("seller","approve_seller",m("revision",1));b.root("partner","approve_partner",m("revision",1));
       check(b.number("/commission/reserved")==1000&&b.number("/commission/paid")==0,"Provision alone settles nothing");
@@ -148,6 +166,18 @@ public final class CommissionPayoutConformance {
       check(c.number("/commission/reserved")==0&&c.number("/commission/paid")==0,"Operator rejection releases G");
       check(Long.valueOf(0).equals(((Number)o(c.read("/commission/settlements/p1")).get("paidMinor")).longValue()),"A rejected payout pays nothing");
       System.out.println("PASS operator rejection releases G without settlement");
+
+      var d=new CommissionPayoutConformance(t.p);d.host=d.init(provided);
+      d.root("seller","approve_seller",m("revision",1));d.root("partner","approve_partner",m("revision",1));
+      d.initiate("p1");
+      check(d.number("/commission/reserved")==1000,"A pending secure keeps G reserved");
+      d.apply("guarantor","declineSecureFunds",d.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","reason","payment_insufficient_funds"));
+      var declined=o(d.read("/commission/settlements/p1"));
+      check(d.number("/commission/reserved")==0&&d.number("/commission/paid")==0&&"closed".equals(declined.get("status"))
+          &&Long.valueOf(0).equals(((Number)declined.get("paidMinor")).longValue()),"A declined secure releases G and pays nothing: "+declined);
+      d.root("seller","startPayout",m("key","p2","amountMinor",500));
+      check(d.number("/commission/reserved")==500,"The released commission can be paid out again");
+      System.out.println("PASS a declined secure releases G and a new payout can start");
     }
   }
 }

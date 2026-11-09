@@ -124,9 +124,9 @@ payment account or any other field is rejected (`UNKNOWN_INPUT_FIELD`).
    netMinor, payoutKey, currency, operator`, and sets
    `paymentTerms.amountMinor = limitMinor = N`.
 4. `domainPrepare` requires the template to be the Test/Stripe A2A type matching
-   the operator, method `myos-account-to-account`, matching currency, and payer,
-   payee and guarantor channels declared as PI parties
-   (`PAYOUT_INSTRUCTION_INVALID`).
+   the operator, method `myos-account-to-account`, matching currency, payer,
+   payee and guarantor channels declared as PI parties, and the payer in the
+   instruction's Activation `required` list (`PAYOUT_INSTRUCTION_INVALID`).
 5. `Commission Payout Opened.amountMinor = G` reserves G.
 6. Payment accounts are not chosen by a request. The operator debits the payer
    party's and credits the payee party's own payment account for the operator
@@ -136,13 +136,23 @@ payment account or any other field is rejected (`UNKNOWN_INPUT_FIELD`).
 
 - The seller bootstraps the prepared PI (seller and partner mapped from the
   Agreement, guarantor supplied by hosting as the MyOS operator) and provides
-  it with `providePayout`. `domainValidateCandidate` rejects a candidate whose
+  it with `providePayout`. Only after the Agreement accepted the provision does
+  the seller approve the PI (`approve_seller`): the payer approves its own debit,
+  and payment, including the operator's acceptance request, starts only on an
+  active PI. An approval before provision is the seller's own choice; Business
+  sends it only after provision. `domainValidateCandidate` rejects a candidate whose
   `paymentTerms` or `paymentDetails` differ from the frozen terms
   (`PAYOUT_TERMS_MISMATCH`). Provision embeds the PI at `/payouts/<key>` and emits
   `Documents/Document Attached`; `Commission Clause.payoutAttached` reconciles.
 - PI: concrete Test/Stripe A2A type, `paymentDetails = {method:
   myos-account-to-account, payoutTerms}`, payer seller, payee partner,
   guarantor the MyOS operator, `paymentTerms.amountMinor = N`.
+- Payer consent (review 2026-11-08): the operator acts only on a PI whose
+  native Activation clause (`HRac84i2MqGQmcHdysnrmKjw3pQpLw7Fd82m4MJv8CZP`)
+  requires the payer and is active with the payer's approval. Document content
+  alone proves nothing, since any account can bootstrap a PI that names another
+  account as payer; hosting binds each declared party's channel to that party's
+  own timeline, and Activation records an approval only from the party's channel.
 - Financial requests are guarantor-only connections with fixed request IDs and
   the full amount: `securePayout` (`payout-secure`, N) and `capturePayout`
   (`payout-capture`, N). The template binds no refund, void, payee, details or
@@ -165,12 +175,16 @@ settlement record matches G/F/N, `completed = N` and `reversed = 0`. Then
 transferredMinor = N, feeMinor = F, status: closed`. The report and `Payment
 Completed` may arrive in either order.
 
-Closure without payout: an operator `rejectPaymentInstruction` with nothing
-secured or completed releases G with `paidMinor = feeMinor = 0`. Nothing else
-(timeouts, `reserved = 0`, `secured = 0`) releases G; there is no manual retire.
+Closure without payout: an operator `rejectPaymentInstruction`, or a declined or
+failed fixed securing request (`payout-secure`), with nothing secured or
+completed releases G with `paidMinor = feeMinor = 0`; a new payout can then
+start. The operator rejects at acceptance any approved PI whose split
+contradicts it, terms it cannot execute (currency, missing or shared accounts,
+the MyOS fee account as a party) and insufficient funds. Nothing else (timeouts,
+`reserved = 0`, `secured = 0`) releases G; there is no manual retire.
 
-Not in this slice: cancelling a prepared or never-provided payout, a declined
-secure, and void after securing (all keep G reserved until an operator-confirmed
+Not in this slice: cancelling a prepared, never-provided or never-approved
+payout, and void after securing (all keep G reserved until an operator-confirmed
 return path exists).
 
 Native evidence:
@@ -179,11 +193,13 @@ Native evidence:
   approvals, preparation 1000/200/800, idempotent retry, fee injection and a
   second unresolved payout.
 - `tools/CommissionPayoutConformance.java` (`check_operation_inputs.py --case
-  commission-payout`): real preparation and initialization of the prepared PI
-  with the supplied operator; then, from a modeled provided state (the PI under
-  `/payouts/p1`), real operator operations: split report plus completion settles
-  G once (F = 200, N = 800), conflicting and identical reports, the over-available
-  amount, and operator rejection. Bootstrap provision compares Timeline actors,
+  commission-payout`): real preparation (a template without the payer's approval
+  is rejected) and initialization of the prepared PI with the supplied operator,
+  which stays inactive with no payment until the seller approves it; then, from a
+  modeled provided and approved state (the PI under `/payouts/p1`), real operator
+  operations: split report plus completion settles G once (F = 200, N = 800),
+  conflicting and identical reports, the over-available amount, operator
+  rejection, and a declined secure that releases G for a new payout. Bootstrap provision compares Timeline actors,
   which the native runner cannot express; the hosted Core test covers it.
 
 ## 8. Delivery and validation
