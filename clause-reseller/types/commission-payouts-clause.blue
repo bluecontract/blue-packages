@@ -2,8 +2,10 @@ name: Commission Payouts Clause
 type: Documents/Document Base
 description: Prepare one MyOS account-to-account commission payout as an independent Payment Instruction. The settled
   commission G is reserved once; the instruction freezes the MyOS fee F and the partner transfer N = G - F with
-  the Agreement operator. The seller bootstraps it with the MyOS operator as its supplied guarantor and provides
-  it back; the operator debits the seller's and credits the partner's own payment accounts. Guard unresolved payouts.
+  the Agreement operator, its MyOS operator account and this Agreement's origin. The seller bootstraps it with
+  that operator as its supplied guarantor and provides it back; any other guarantor is refused. The operator
+  debits the seller's and credits the partner's own payment accounts only for a payout this Agreement linked.
+  Before linking the seller may cancel the preparation natively, which releases G once. Guard unresolved payouts.
 actionDefinition:
   type:
     type: Documents/Preparation Functions
@@ -228,6 +230,24 @@ actionDefinition:
                       $var: candidate
                     path: /paymentDetails
             message: PAYOUT_TERMS_MISMATCH
+        # The seller supplies the guarantor at bootstrap; only the Agreement's MyOS operator is accepted.
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: candidate
+                  path:
+                    $concat:
+                    - /activation/parties/
+                    - $pointerGet:
+                        object:
+                          $var: candidate
+                        path: /paymentTerms/guarantorChannel
+                    - /myosAccountId
+                  default: ''
+              - $document: /terms/payoutOperatorAccountId
+            message: PAYOUT_OPERATOR_MISMATCH
         - $return: true
       domainNextActions:
         args:
@@ -346,6 +366,19 @@ actions:
               val:
                 $document: /terms/payoutOperator
         message: PAYOUT_OPERATOR_UNSUPPORTED
+    # The accepted Agreement names the MyOS operator account; only that guarantor may execute and report payouts.
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $document: /terms/payoutOperatorAccountId
+                kind: text
+            - $ne:
+              - $document: /terms/payoutOperatorAccountId
+              - ''
+        message: PAYOUT_OPERATOR_ACCOUNT_REQUIRED
     - $let:
         name: split
         expr:
@@ -383,6 +416,12 @@ actions:
                   $document: /terms/currency
                 operator:
                   $document: /terms/payoutOperator
+                operatorAccountId:
+                  $document: /terms/payoutOperatorAccountId
+                # The operator executes only a payout this Agreement has linked under /payouts/<payoutKey>.
+                agreementOrigin:
+                  $nodeBlueId:
+                    $document: /contracts/initialized/document
     - $set:
         name: actionResult
         expr:

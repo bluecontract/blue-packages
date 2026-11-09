@@ -8,6 +8,7 @@ terms:
   currency: USD
   payoutOperator: test
   payoutFeePolicy: myos-commission-fee-v1
+  payoutOperatorAccountId: myos-payment-guarantor
   exclusive: false
 orders: {}
 payouts: {}
@@ -80,6 +81,10 @@ clauses:
           party: seller
       provide:
         providePayout:
+          'on': workflow
+          party: seller
+      cancel:
+        cancelPayout:
           'on': workflow
           party: seller
   commission:
@@ -346,6 +351,16 @@ payoutTemplate:
                 $document: /paymentTerms/amountMinor
             request:
               description: Transfers the complete frozen partner amount; no input fields.
+        requestVoid:
+          voidPayout:
+            'on': workflow
+            party: seller
+            params:
+              requestId: payout-void
+              amountMinor:
+                $document: /payment/secured
+            request:
+              description: Returns the complete secured debit to the seller before the partner transfer; no input fields.
     method:
       type: MyOS/Payment Method Events
     accountSettlement:

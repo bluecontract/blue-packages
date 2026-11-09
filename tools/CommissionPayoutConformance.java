@@ -111,6 +111,7 @@ public final class CommissionPayoutConformance {
       check(Map.of("grossMinor",1000L,"feeMinor",200L,"netMinor",800L,"feeBps",2000L).entrySet().stream()
           .allMatch(e->e.getValue().equals(((Number)split.get(e.getKey())).longValue())),"Frozen G/F/N: "+split);
       check(!o(frozen.get("clauses")).containsKey("orders"),"Only the payout instruction is prepared");
+      check("test-guarantor".equals(split.get("operatorAccountId"))&&t.embedded("/contracts/initialized/document").equals(split.get("agreementOrigin")),"The payout names the operator and this Agreement: "+split);
       t.root("seller","startPayout",m("key","p1","amountMinor",1000));
       check(t.number("/commission/reserved")==1000,"A repeated preparation is idempotent");
       t.deny("seller","startPayout",t.host.blueId(),m("key","p2","amountMinor",500));
@@ -178,6 +179,28 @@ public final class CommissionPayoutConformance {
       d.root("seller","startPayout",m("key","p2","amountMinor",500));
       check(d.number("/commission/reserved")==500,"The released commission can be paid out again");
       System.out.println("PASS a declined secure releases G and a new payout can start");
+
+      // Void before the partner transfer: only the whole secured debit, only with no capture pending.
+      var e=new CommissionPayoutConformance(t.p);e.host=e.init(provided);
+      e.root("seller","approve_seller",m("revision",1));e.root("partner","approve_partner",m("revision",1));
+      e.initiate("p1");
+      e.deny("seller","voidPayout",e.embedded("/payouts/p1"),m());
+      e.apply("guarantor","secureFunds",e.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","amountSecured",800));
+      e.deny("partner","voidPayout",e.embedded("/payouts/p1"),m());
+      e.apply("seller","voidPayout",e.embedded("/payouts/p1"),m());
+      e.deny("guarantor","capturePayout",e.embedded("/payouts/p1"),m());
+      check(e.number("/commission/reserved")==1000,"A pending void keeps G reserved until the operator confirms it");
+      e.apply("guarantor","cancelBeforeCompletion",e.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-void","amountCancelled",800));
+      var voided=o(e.read("/commission/settlements/p1"));
+      check(e.number("/commission/reserved")==0&&e.number("/commission/paid")==0&&"closed".equals(voided.get("status"))
+          &&Long.valueOf(0).equals(((Number)voided.get("feeMinor")).longValue()),"A confirmed void releases G without a fee: "+voided);
+      var f=new CommissionPayoutConformance(t.p);f.host=f.init(provided);
+      f.root("seller","approve_seller",m("revision",1));f.root("partner","approve_partner",m("revision",1));
+      f.initiate("p1");
+      f.apply("guarantor","secureFunds",f.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","amountSecured",800));
+      f.apply("guarantor","capturePayout",f.embedded("/payouts/p1"),m());
+      f.deny("seller","voidPayout",f.embedded("/payouts/p1"),m());
+      System.out.println("PASS the seller voids only the whole secured debit before capture; a confirmed void releases G, fee 0");
     }
   }
 }

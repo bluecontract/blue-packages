@@ -5,6 +5,7 @@ terms:
   currency: EUR
   payoutOperator: test
   payoutFeePolicy: myos-commission-fee-v1
+  payoutOperatorAccountId: test-guarantor
 clauses:
   activation:
     type: Activation/Activation Clause
@@ -53,6 +54,11 @@ clauses:
           party: seller
       provide:
         providePayout:
+          'on': workflow
+          party: seller
+      # Native cancellation of a preparation the Agreement has not linked; Commission releases G once.
+      cancel:
+        cancelPayout:
           'on': workflow
           party: seller
 orders: {}
@@ -124,6 +130,17 @@ payoutTemplate:
                 $document: /paymentTerms/amountMinor
             request:
               description: Transfers the complete frozen partner amount; no input fields.
+        # The seller may return the whole secured debit before the partner transfer; the operator confirms it.
+        requestVoid:
+          voidPayout:
+            'on': workflow
+            party: seller
+            params:
+              requestId: payout-void
+              amountMinor:
+                $document: /payment/secured
+            request:
+              description: Returns the complete secured debit to the seller before the partner transfer; no input fields.
     method:
       type: MyOS/Payment Method Events
     accountSettlement:

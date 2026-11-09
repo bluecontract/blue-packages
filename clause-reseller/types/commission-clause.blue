@@ -222,7 +222,8 @@ actionDefinition:
                     default: 0
                 - 0
         # The operator rejected the instruction, or its fixed securing request (payout-secure) was declined or
-        # failed, before any effect: no debit, no transfer, no fee.
+        # failed, before any effect: no debit, no transfer, no fee. Or the operator confirmed the void
+        # (payout-void) that returned the whole secured debit G to the seller before any partner transfer.
         - $let:
             name: returned
             expr:
@@ -245,6 +246,13 @@ actionDefinition:
                           $var: state
                         path: /requests/payout-secure/status
                         default: null
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /requests/payout-void/status
+                      default: null
+                  - succeeded
               - $eq:
                 - $var: completed
                 - 0
@@ -642,6 +650,89 @@ actions:
             args:
               input:
                 key: {$var: key}
+  # The seller cancelled a payout preparation that no Agreement-linked instruction executes: the operator
+  # executes only a payout linked under /payouts/<key>, and native cancellation refuses a linked preparation.
+  payoutCancelled:
+    resultContract: outcome-v1
+    automatic:
+      'on': event
+      event:
+        type: Documents/Preparation Cancellation Requested
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node: {$event: ''}
+              pattern: {type: Documents/Preparation Cancellation Requested}
+        then:
+        - $return: {}
+    - $let: {name: key, expr: {$event: /itemKey}}
+    - $let: {name: producer, expr: {$event: /clauseId}}
+    - $forEach:
+        item: part
+        in: [{$var: key}, {$var: producer}]
+        do:
+        - $if:
+            cond: {$not: {$isKind: {val: {$var: part}, kind: text}}}
+            then:
+            - $return: {}
+        - $if:
+            cond:
+              $or:
+              - {$eq: [{$var: part}, '']}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: /}}}, 1]}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: '~'}}}, 1]}
+            then:
+            - $return: {}
+    - $if:
+        cond:
+          $ne:
+          - {$document: {$concat: [/clauses/, {$var: producer}, /bindings/collection]}}
+          - {$const: {name: bindings, path: /payouts}}
+        then:
+        - $return: {}
+    - $let:
+        name: item
+        expr: {$document: {$concat: [/process_, {$var: producer}, /entries/, {$nodeBlueId: {$var: key}}]}}
+    - $let: {name: s, expr: {$document: {$const: {name: bindings, path: /state}}}}
+    - $let: {name: old, expr: {$pointerGet: {object: {$var: s}, path: {$concat: [/settlements/, {$var: key}]}}}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: item, path: /key}}, {$var: key}]}
+            - {$eq: [{$var: {name: item, path: /status}}, cancellation_requested]}
+            - {$not: {$exists: {$var: {name: item, path: /documentOrigin}}}}
+            - {$not: {$exists: {$document: {$concat: [{$const: {name: bindings, path: /payouts}}, /, {$var: key}]}}}}
+            - {$exists: {$var: old}}
+            - {$eq: [{$var: {name: old, path: /status}}, reserved]}
+        then:
+        - $return: {}
+    - $let: {name: gross, expr: {$var: {name: old, path: /amountMinor}}}
+    - $appendChange:
+        op: replace
+        path: {$concat: [{$const: {name: bindings, path: /state}}, /reserved]}
+        val: {$subtract: [{$var: {name: s, path: /reserved}}, {$var: gross}]}
+    - $appendChange:
+        op: replace
+        path: {$concat: [{$const: {name: bindings, path: /state}}, /settlements/, {$var: key}]}
+        val:
+          amountMinor: {$var: gross}
+          paidMinor: 0
+          transferredMinor: 0
+          feeMinor: 0
+          status: closed
+    - $appendEvent:
+        $merge:
+        - type: Events/Event
+        - kind: Payout Reconciled
+          key: {$var: key}
+          settled: false
+    - $set:
+        name: actionResult
+        expr:
+          outcome: acceptedNew
   opened:
     resultContract: outcome-v1
     automatic:
@@ -704,7 +795,8 @@ actions:
                     - /
 description: Accrue the configured commission on confirmed net order receipts and reserve payouts. A payout
   settles its reserved commission G only after its provided account-to-account Payment Instruction records the
-  operator's split report and completes the partner transfer N; MyOS retains F = G - N.
+  operator's split report and completes the partner transfer N; MyOS retains F = G - N. A cancelled unlinked
+  preparation, an operator rejection, a declined secure or a confirmed void releases G once without a fee.
 bindingTypes:
   orders: pointer
   payouts: pointer
