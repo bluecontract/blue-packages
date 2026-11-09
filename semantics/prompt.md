@@ -78,9 +78,23 @@ metadata makes the same semantics available as structured, read-only facts:
   defaultPath=null and suffix="". Never guess an instance key or an array index.
 - Use /*/ only for arbitrary collection members established by the source.
   money-minor means a numeric amount in minor currency units; identify its
-  currency source in meaning. date-micros means Unix microseconds only when
-  established by the source, never an interval. Missing state is unknown unless
-  the source proves otherwise; initialization defaults apply only after it runs.
+  currency source in meaning. Missing state is unknown unless the source proves
+  otherwise; initialization defaults apply only after it runs.
+- Choose fact.type from its meaning and units, not its primitive storage type.
+  A source-established Unix-microsecond instant MUST use date-micros, never
+  number, even when its stored value is an integer. Follow inherited timestamp
+  contracts and the source of copied values. A deadline or cutoff calculated by
+  adding/subtracting a duration to/from such an instant is still date-micros.
+  Apply this to every type and operation, including recorded starts, decisions
+  and observations; no particular field name or cancellation implementation is
+  required. ISO date/date-time strings use date when established by the source.
+- Durations, offsets and time windows remain number with their units explained,
+  even when measured in microseconds. Never infer an instant or its units from a
+  field name or numeric magnitude alone. If the source leaves the temporal units
+  unknown or uses an unsupported numeric epoch unit, retain number and state the
+  limitation; never relabel seconds or milliseconds as date-micros. Before
+  returning, check that each temporal fact's type agrees with its meaning and
+  source evidence.
 - aggregate is null for a non-aggregate fact, otherwise {over,operation,unit} for
   an existing maintained total/balance or a collection read as a count. Use count,
   sum or balance and explain the population, confirmed/requested basis and units.
