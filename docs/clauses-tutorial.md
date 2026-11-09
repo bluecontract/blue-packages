@@ -5198,6 +5198,7 @@ terms:
   currency: EUR
   payoutOperator: test
   payoutFeePolicy: myos-commission-fee-v1
+  payoutOperatorAccountId: test-guarantor
 clauses:
   activation:
     type: Activation/Activation Clause
@@ -5246,6 +5247,11 @@ clauses:
           party: seller
       provide:
         providePayout:
+          'on': workflow
+          party: seller
+      # Native cancellation of a preparation the Agreement has not linked; Commission releases G once.
+      cancel:
+        cancelPayout:
           'on': workflow
           party: seller
 orders: {}
@@ -5317,6 +5323,17 @@ payoutTemplate:
                 $document: /paymentTerms/amountMinor
             request:
               description: Transfers the complete frozen partner amount; no input fields.
+        # The seller may return the whole secured debit before the partner transfer; the operator confirms it.
+        requestVoid:
+          voidPayout:
+            'on': workflow
+            party: seller
+            params:
+              requestId: payout-void
+              amountMinor:
+                $document: /payment/secured
+            request:
+              description: Returns the complete secured debit to the seller before the partner transfer; no input fields.
     method:
       type: MyOS/Payment Method Events
     accountSettlement:
@@ -5347,6 +5364,10 @@ Walkthrough: [`30-commission-a2a-payout.case.yaml`](../examples/apps/30-commissi
 | 4 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000}` | Processed; `{"/commission/reserved":1000}` |
 | 5 | seller | Main | startPayout | `{"key":"p2","amountMinor":1000,"feeMinor":0}` | Rejected; no state change |
 | 6 | seller | Main | startPayout | `{"key":"p2","amountMinor":500}` | Rejected; no state change |
+| 7 | seller | Main | cancelPayout | `{"key":"p1"}` | Processed; `{"/commission/reserved":0,"/commission/paid":0,"/commission/settlements/p1/status":"closed","/commission/settlements/p1/paidMinor":0,"/commission/settlements/p1/feeMinor":0}` |
+| 8 | seller | Main | cancelPayout | `{"key":"p1"}` | Processed; `{"/commission/reserved":0}` |
+| 9 | seller | Main | startPayout | `{"key":"p2","amountMinor":500}` | Processed; `{"/commission/reserved":500}` |
+| 10 | partner | Main | cancelPayout | `{"key":"p2"}` | Rejected; no state change |
 
 ## 10. Source of truth and compatibility
 

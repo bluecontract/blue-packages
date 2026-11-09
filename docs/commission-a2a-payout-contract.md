@@ -4,6 +4,10 @@ Status: implemented Blue contract of the commission A2A plan (revision 3,
 2026-11-08), reviewed with the owner on 2026-11-08. Core operator execution and
 Business presentation consume it.
 
+Operator stage: **Test** is implemented end to end. **Stripe** (Account Debit
+of G, Transfer of N, return of G on void) is still missing; Core rejects a
+Stripe payout before any effect, which releases G.
+
 Reviewed bases (all on `codex/payments-minimal-alignment-20261104`):
 
 | Repository | Base SHA |
@@ -116,12 +120,16 @@ payment account or any other field is rejected (`UNKNOWN_INPUT_FIELD`).
    and the reservation of G cannot exceed the available commission
    (`INSUFFICIENT_UNRESERVED_OBLIGATION`). An identical retry of an existing key
    reuses its preparation.
-2. The Agreement terms name the operator and the accepted fee policy:
-   `payoutOperator: test|stripe` (`PAYOUT_OPERATOR_UNSUPPORTED`) and
+2. The Agreement terms name the operator, its MyOS operator account and the
+   accepted fee policy: `payoutOperator: test|stripe`
+   (`PAYOUT_OPERATOR_UNSUPPORTED`), `payoutOperatorAccountId`
+   (`PAYOUT_OPERATOR_ACCOUNT_REQUIRED`) and
    `payoutFeePolicy: myos-commission-fee-v1` (`PAYOUT_FEE_POLICY_UNSUPPORTED`).
+   Both parties accept these terms with the Agreement.
 3. `resolvePayoutTerms(G)` freezes the prepared PI's
    `/paymentDetails/payoutTerms`: `feePolicy, feeBps, grossMinor, feeMinor,
-   netMinor, payoutKey, currency, operator`, and sets
+   netMinor, payoutKey, currency, operator, operatorAccountId,
+   agreementOrigin` (this Agreement's document identity), and sets
    `paymentTerms.amountMinor = limitMinor = N`.
 4. `domainPrepare` requires the template to be the Test/Stripe A2A type matching
    the operator, method `myos-account-to-account`, matching currency, payer,
@@ -145,7 +153,19 @@ payment account or any other field is rejected (`UNKNOWN_INPUT_FIELD`).
   approval before provision is the seller's own choice; Business sends it only
   once the Agreement holds the PI. `domainValidateCandidate` rejects a candidate whose
   `paymentTerms` or `paymentDetails` differ from the frozen terms
-  (`PAYOUT_TERMS_MISMATCH`). Provision embeds the PI at `/payouts/<key>` and emits
+  (`PAYOUT_TERMS_MISMATCH`) and a candidate whose guarantor is not the
+  Agreement's `payoutOperatorAccountId` (`PAYOUT_OPERATOR_MISMATCH`): the
+  seller supplies the guarantor at bootstrap, so without this check a
+  seller-chosen "operator" could report a settlement or a decline itself.
+- Operator gate (Core): the operator executes only a payout this Agreement has
+  linked. Before any effect it verifies, with a narrow Core read of the
+  Agreement named by `agreementOrigin`, that `/payouts/<payoutKey>` is exactly
+  this PI and the Agreement parties are the PI payer and payee. Until then it
+  waits; it rejects the PI (no effect) when the preparation was cancelled.
+  Linking is irreversible and native cancellation refuses a linked
+  preparation, so cancellation and execution exclude each other. An
+  interruption after approval and before the second provision therefore
+  moves no funds; sending again links the same PI. Provision embeds the PI at `/payouts/<key>` and emits
   `Documents/Document Attached`; `Commission Clause.payoutAttached` reconciles.
 - PI: concrete Test/Stripe A2A type, `paymentDetails = {method:
   myos-account-to-account, payoutTerms}`, payer seller, payee partner,
@@ -158,9 +178,12 @@ payment account or any other field is rejected (`UNKNOWN_INPUT_FIELD`).
   own timeline, and Activation records an approval only from the party's channel.
 - Financial requests are guarantor-only connections with fixed request IDs and
   the full amount: `securePayout` (`payout-secure`, N) and `capturePayout`
-  (`payout-capture`, N). The template binds no refund, void, payee, details or
+  (`payout-capture`, N). The seller's only financial request is `voidPayout`
+  (`payout-void`, the whole secured amount), which the PI protocol accepts only
+  with funds secured and no secure or capture pending, and which blocks any
+  later secure or capture. The template binds no refund, payee, details or
   final-amount request, so neither a party nor a direct Core call can request a
-  partial amount, a reversal or a recipient change.
+  partial amount, a reversal of a completed payout or a recipient change.
 
 ## 7. Settlement and closure
 
@@ -178,23 +201,39 @@ settlement record matches G/F/N, `completed = N` and `reversed = 0`. Then
 transferredMinor = N, feeMinor = F, status: closed`. The report and `Payment
 Completed` may arrive in either order.
 
-Closure without payout: an operator `rejectPaymentInstruction`, or a declined or
-failed fixed securing request (`payout-secure`), with nothing secured or
-completed releases G with `paidMinor = feeMinor = 0`; a new payout can then
-start. The operator rejects at acceptance any approved PI whose split
-contradicts it, terms it cannot execute (currency, missing or shared accounts,
-the MyOS fee account as a party) and insufficient funds. Nothing else (timeouts,
-`reserved = 0`, `secured = 0`) releases G; there is no manual retire.
+Closure without payout releases G exactly once with `paidMinor = feeMinor =
+0` (settlement `status: closed`); a new payout can then start:
 
-Not in this slice: cancelling a prepared, never-provided or never-approved
-payout, and void after securing (all keep G reserved until an operator-confirmed
-return path exists).
+- Cancellation before linking: the seller's `cancelPayout` is the native
+  Documents cancellation. It is refused once the preparation is linked
+  (`PREPARATION_SELECTED_PROCESS_REQUIRES_DOMAIN_CANCELLATION`) and closes the
+  requirement (`cancellation_requested`) so the key can never be provided
+  again. `Commission Clause.payoutCancelled` releases G only for that state,
+  with nothing under `/payouts/<key>`. A bootstrapped or held instruction of a
+  cancelled preparation is never executed (operator gate above). Closing a UI
+  window releases nothing.
+- Operator rejection (`rejectPaymentInstruction`), or a declined or failed
+  fixed securing request (`payout-secure`), with nothing secured or completed.
+  The operator rejects at acceptance any approved PI whose split contradicts
+  it, terms it cannot execute (currency, missing or shared accounts, the MyOS
+  fee account as a party) and insufficient funds, and declines a secure only
+  on a confirmed refusal with no hold. A timeout, a lost response or a worker
+  failure is retried with the same execution identity, never reported as a
+  decline.
+- Confirmed void (`payout-void` succeeded via the operator's
+  `cancelBeforeCompletion`), which returned the whole secured G to the seller
+  before any partner transfer; nothing secured or completed remains.
+
+Nothing else (timeouts, `reserved = 0`, `secured = 0`, a pending or unknown
+request) releases G; there is no manual retire.
 
 Native evidence:
 
-- `examples/apps/30-commission-a2a-payout.case.yaml` (6 inputs, replay checked):
-  approvals, preparation 1000/200/800, idempotent retry, fee injection and a
-  second unresolved payout.
+- `examples/apps/30-commission-a2a-payout.case.yaml` (10 inputs, replay checked):
+  approvals, preparation 1000/200/800, idempotent retry, fee injection, a
+  second unresolved payout, cancellation before linking that releases G once
+  (a repeat releases nothing), a new payout after it, and a partner refused
+  cancellation.
 - `tools/CommissionPayoutConformance.java` (`check_operation_inputs.py --case
   commission-payout`): real preparation (a template without the payer's approval
   is rejected) and initialization of the prepared PI with the supplied operator,
@@ -202,7 +241,9 @@ Native evidence:
   modeled provided and approved state (the PI under `/payouts/p1`), real operator
   operations: split report plus completion settles G once (F = 200, N = 800),
   conflicting and identical reports, the over-available amount, operator
-  rejection, and a declined secure that releases G for a new payout. Bootstrap provision compares Timeline actors,
+  rejection, a declined secure that releases G for a new payout, and a void: refused before securing, by the
+  partner and with a capture pending; while pending it blocks capture and keeps G reserved; confirmed, it
+  releases G with fee 0. The frozen terms name the operator account and this Agreement. Bootstrap provision compares Timeline actors,
   which the native runner cannot express; the hosted Core test covers it.
 
 ## 8. Delivery and validation
