@@ -1,0 +1,49 @@
+{
+  "blueId": "3WTV7iipp1s7Ewk1SxJf9n4Giajy6ezbzT5QHyNMYEeW",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "CJgGWmocYCpqmt9isfL6aJab4Qs4i62qhUt7T7QubHoo",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Method Events",
+    "limitations": [
+      "The supplied definition reads paymentDetails but does not establish its required fields, method schema or complete set of method values.",
+      "External execution and payment outcomes are not established by these emitted requests; no payment outcome state is defined here."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no method default is declared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Method Events.actions.announce.do and actions.request.do",
+        "id": "paymentMethod",
+        "meaning": "Selects the myos-customer announcement branch and is forwarded as method in execution requests.",
+        "path": "/paymentDetails/method",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and once guard/write",
+        "id": "automaticAnnouncementFired",
+        "meaning": "True marks completed automatic announcement execution and suppresses repeats; it does not confirm payment.",
+        "path": "/connectionState_{clauseKey}/announce._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Method Events\n\nA connected clause that announces payment instructions and forwards payment requests as `Payment Event` messages. It reads `/paymentDetails` from the document where it executes; these details are read afresh for each action.\n\n## Automatic events\n\n- **`announce`** listens for `Clauses Initialized`, indicating successful initial clause installation. It emits `details` containing `/paymentDetails`. When `/paymentDetails/method` equals `myos-customer`, its `kind` is `Customer Payment Session Requested`; otherwise, its `kind` is `Account Payment Instruction Created`. This alternative branch is not a default payment method or validation of another method. The automatic connection has `once: true`: after its execution reaches the completion marker, later matching triggers are skipped.\n- **`request`** listens for an `Event` matching `kind: Payment Requested`. It emits `kind: MyOS Execution Requested`, with `details` from `/paymentDetails`, `method` from `/paymentDetails/method`, and `request` containing the triggering event. This automatic connection is repeatable; no request deduplication is declared.\n\nThese messages announce instructions or request execution. They do not confirm that a customer session exists, that external execution succeeded, or that funds were authorized, captured or refunded. Event authority comes from its authenticated input or document origin, not its `kind` text.\n\n## Configuration and state\n\nThe type declares no action arguments, payment-detail defaults or data bindings. Its action bodies are fixed by the exact type. Inherited action bindings can add named connections to `announce` or `request`; `_automatic` is reserved and cannot override the built-in connection. A connection's `when` condition can skip execution. Clause `parameters.conditions` can impose conditions keyed by action name; a false condition rejects execution with `ACTION_CONDITION_FAILED`, and an unknown action name is rejected during planning. Connection `before` and `after` hooks surround the action body. Changing an installed clause's configuration requires a new clause key.\n\nThe automatic announcement's `fired` marker starts as `false` when connection state is initialized and becomes `true` after execution reaches that marker. It records connection execution, not payment success. Additional connections have their own execution tracking. Missing state is unknown, not an initialization default."
+}

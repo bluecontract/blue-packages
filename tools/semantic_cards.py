@@ -137,7 +137,7 @@ def prepare(root, output, store=None, refresh=()):
         context = evidence(blue_id, definitions)
         request = dict(context=context, definitionDigest=definition_digest(blue_id, definitions),
                        sourceDigest=digest(context_wire(context)), package=subjects[blue_id]['package'], generator=generator)
-        (requests / (blue_id + '.json')).write_bytes(wire(request))
+        (requests / (blue_id + '.json')).write_bytes(context_wire(request))
         (requests / (blue_id + '.txt')).write_text(prompt + '\n\nEvidence (JSON):\n' + context_wire(context).decode('utf-8'), encoding='utf-8')
     report = dict(format='blue-semantic-plan/1', subjects=list(subjects.values()),
                   ready=sorted(subjects.keys() & cards.keys()), restored=sorted(restored), missing=missing,

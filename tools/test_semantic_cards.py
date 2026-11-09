@@ -145,6 +145,21 @@ class SourceTests(unittest.TestCase):
             sources.evidence(A, {A: {'functions': {'large': function}},
                                  C: dict(function, value=1)})
 
+    def test_prepared_request_fits_limit_when_compact_context_fits_budget(self):
+        definition = {'items': [{'value': True}] * 10000}
+        for _ in range(12):
+            definition = {'nested': definition}
+        self.assertGreater(len(wire(definition)), 1_000_000)
+        definitions = {A: definition}
+        with tempfile.TemporaryDirectory() as tmp, \
+                patch.object(cards, 'inventory', return_value=({A: subject(A)}, definitions)), \
+                patch.object(cards, 'cards_in', return_value={}):
+            output = Path(tmp)
+            cards.prepare(ROOT, output)
+            request = cards.read_json(output / 'requests' / (A + '.json'), 1_000_000)
+            self.assertEqual(definition, request['context']['definition'])
+            cards.accept(request, response(A), output / 'accepted', definitions)
+
     def test_inventory_includes_exact_core_access_events_and_current_collection(self):
         subjects, definitions = sources.inventory(ROOT)
         expected = {
@@ -220,6 +235,42 @@ class SourceTests(unittest.TestCase):
                     ({A: subject(A)}, {A: {'name': 'Changed'}})]):
             with self.assertRaisesRegex(ValueError, 'Conflicting exact definition across collections'):
                 sources.inventory(ROOT)
+
+    def test_collections_accept_exact_reference_as_inline_and_keep_current_bytes(self):
+        function = {'args': {'documentRef': {}}, 'do': [{'$return': []}]}
+        for current, retained in (
+            ({'functions': [{'blueId': B}]}, {'functions': [function]}),
+            ({'functions': [function]}, {'functions': [{'blueId': B}]}),
+        ):
+            with self.subTest(current=current), \
+                    patch.object(sources, 'source_collections', return_value=[('current', [], False), ('old', [], True)]), \
+                    patch.object(sources, 'collection_inventory', side_effect=[
+                        ({A: subject(A)}, {A: current, B: function}),
+                        ({A: subject(A)}, {A: retained, B: function})]):
+                subjects, definitions = sources.inventory(ROOT)
+                self.assertEqual(['current', 'old'], subjects[A]['collections'])
+                self.assertEqual(sources.context_wire(current), sources.context_wire(definitions[A]))
+                self.assertEqual(digest(wire(current)), sources.definition_digest(A, definitions))
+
+    def test_collection_equivalence_rejects_changed_missing_cyclic_or_decorated_reference(self):
+        for current, retained in (
+            ({A: {'value': True}}, {A: {'value': 1}}),
+            ({A: {'value': 1}}, {A: {'value': 1.0}}),
+            ({A: {'function': {'blueId': B}}}, {A: {'function': {'do': []}}}),
+            ({A: {'function': {'blueId': B}}, B: {'do': [False]}}, {A: {'function': {'do': [0]}}}),
+            ({A: {'function': {'blueId': B}}, B: {'blueId': C}, C: {'blueId': B}},
+             {A: {'function': {'do': []}}}),
+            ({A: {'function': {'blueId': B, 'name': 'Changed'}}, B: {'do': []}},
+             {A: {'function': {'do': []}}}),
+            ({A: {'function': {'blueId': B}}, B: {'do': []}},
+             {A: {'function': {'blueId': B}}, B: {'do': [{'$return': True}]}}),
+        ):
+            with self.subTest(current=current, retained=retained), \
+                    patch.object(sources, 'source_collections', return_value=[('current', [], False), ('old', [], True)]), \
+                    patch.object(sources, 'collection_inventory', side_effect=[
+                        ({A: subject(A)}, current), ({A: subject(A)}, retained)]):
+                with self.assertRaisesRegex(ValueError, 'Conflicting exact definition across collections'):
+                    sources.inventory(ROOT)
 
     def test_discovers_new_inherited_clause_host_and_template_without_name_catalogue(self):
         exports = {key: subject(key) for key in DEFINITIONS}

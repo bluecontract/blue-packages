@@ -1,0 +1,22 @@
+{
+  "blueId": "9YXbLyEY6njCQjyuqmiVLEFL4wqFBod7ZVLDp66azq2w",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Observation Clause",
+    "limitations": [
+      "The supplied evidence does not define the selected instruction's financial state or payment-specific event kinds. A relayed event alone does not establish confirmed payment."
+    ],
+    "parameterRefs": [
+      "bindings.instruction"
+    ],
+    "stateFacts": []
+  },
+  "semanticText": "# Payment Observation Clause\n\nRelays events from a selected payment instruction to its containing order, enabling downstream reseller-agreement accounting. It does not prepare payments, confirm money or maintain financial totals.\n\n`bindings.instruction` is required and has no default. It must be a non-root JSON Pointer: text beginning with `/`, other than `/` itself. It selects the instruction within the containing document. The inherited connection planner includes that path for embedded processing and automatically connects `observe` to its embedded events.\n\nFor each automatic observation, `observe` checks the embedded payload against `Event`. A nonmatching payload is ignored. A matching payload causes a `Payment Event Received` event with:\n\n- `clause`: this clause's key.\n- `event`: an exact BlueId reference to the observed payload.\n- `instructionPath`: the configured `instruction` pointer.\n- `kind`: the observed payload's `kind`, without a default or payment-specific interpretation.\n\nThe guard accepts `Event`, which can represent a fact or an intention; it does not specifically require a confirmed receipt. Consequently, `Payment Event Received` establishes relay of the underlying event, not payment success. Authority comes from authenticated input or document origin, not an event's name.\n\nInherited connection configuration can add named connections under `bindings.observe`; `_automatic` is reserved. Connection `when` can skip execution, `before` and `after` surround the action body, and `once` defaults to `false`. When enabled, `once` suppresses later runs after that connection completes its body and after-actions; an early return for a nonmatching payload does not mark it fired. `parameters.conditions.observe`, when supplied, must pass or execution fails with `ACTION_CONDITION_FAILED`. The built-in automatic connection has no one-time or duplicate-event suppression.\n\nClause keys must be nonempty and contain no `.`, `/` or `~`. Changing an installed clause's configuration requires a new clause key."
+}
