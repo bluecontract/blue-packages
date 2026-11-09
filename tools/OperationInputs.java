@@ -1,7 +1,7 @@
 import blue.language.next.*;
 import java.util.*;
 
-/** Authoring-only explicit input links. Native Language owns inheritance and exact type resolution. */
+/** Publication-time authoring links and qualified Compute dependencies. Native Language owns inheritance. */
 public final class OperationInputs {
   private OperationInputs() {}
   // Reserved package-authoring namespace; ordinary requestFrom is always user data.
@@ -9,7 +9,7 @@ public final class OperationInputs {
   private static final String FUNCTION_LINK = "$blue:functionFrom";
 
   static Map<String,Object> publish(String namespace,Map<String,Object> definitions,Map<String,BluePackage> imports) {
-    if(!containsLink(definitions))return definitions;
+    if(!containsLink(definitions)&&!containsActionDefinition(definitions))return definitions;
     var orderingDefinitions=new LinkedHashMap<String,Object>();
     definitions.forEach((name,value)->orderingDefinitions.put(name,withoutSelfLinks(value,namespace+"/"+name)));
     var ordered=new LinkedHashSet<String>();
@@ -32,7 +32,7 @@ public final class OperationInputs {
         builder.alias(ownAlias,provisionalId);
       }
       try(var blue=builder.build()) {
-        Object transformed=transform(definitions.get(name),blue,ownAlias);
+        Object transformed=ComputeDependencies.qualify(blue,transform(definitions.get(name),blue,ownAlias));
         if(provisionalId!=null&&referencesId(transformed,provisionalId))
           throw new IllegalArgumentException("Input link requires a provisional self type in "+ownAlias);
         var admitted=blue.admitDefinition(WireData.write(transformed));provider.store(admitted);
@@ -68,6 +68,11 @@ public final class OperationInputs {
   private static boolean containsLink(Object value) {
     if(value instanceof Map<?,?> map)return (map.containsKey(LINK)||map.containsKey(FUNCTION_LINK))||map.values().stream().anyMatch(OperationInputs::containsLink);
     return value instanceof List<?> list&&list.stream().anyMatch(OperationInputs::containsLink);
+  }
+
+  private static boolean containsActionDefinition(Object value) {
+    if(value instanceof Map<?,?> map)return map.containsKey("actionDefinition")||map.values().stream().anyMatch(OperationInputs::containsActionDefinition);
+    return value instanceof List<?> list&&list.stream().anyMatch(OperationInputs::containsActionDefinition);
   }
 
   private static Object transform(Object value,Blue blue,String path) {

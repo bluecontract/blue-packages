@@ -40,6 +40,8 @@ CASES = {
     'documents-refresh': ('DocumentsRefreshConformance',),
     'static-identity-predicate': ('StaticIdentityPredicateConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
+    'compute-dependencies': ('ComputeDependenciesConformance',),
+    'compute-dependencies-reseller': ('ComputeDependenciesResellerConformance',),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
     'payment-effects': ('blue.core.PaymentExecutionConformance',),
@@ -78,7 +80,7 @@ def main():
         'sourceDirtyDiffSha256': hashlib.sha256(subprocess.check_output(['git', 'diff', '--binary', 'HEAD'], cwd=ROOT)).hexdigest(),
         'cases': [],
     }
-    sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
+    sources = {'QualificationRuntime', 'ComputeDependencies', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
     if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance', 'DocumentsRefreshConformance'} & sources:
@@ -89,6 +91,8 @@ def main():
         sources.add('OperationCatalogConformance')
     if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
         sources.add('CurrentOperationScenarios')
+    if 'ComputeDependenciesResellerConformance' in sources:
+        sources.add('ComputeDependenciesConformance')
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:
         subprocess.run([javac, '-cp', classpath, '-d', classes,
                         *[str(ROOT / 'tools' / (name + '.java')) for name in sorted(sources)]], check=True)

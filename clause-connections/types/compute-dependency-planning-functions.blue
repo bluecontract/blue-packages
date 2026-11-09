@@ -1,0 +1,1080 @@
+name: Compute Dependency Planning Functions
+type: Contracts/Compute Definition
+description: Select complete published function and constant dependencies before a Connections handler executes.
+  Unqualified definitions and introspective code retain the full definition.
+constants:
+  computeDependencyIndexes: {}
+functions:
+  selectConnectionCompute:
+    args:
+      compute: {}
+    do:
+    - $let:
+        name: index
+        expr:
+          $pointerGet:
+            object:
+              $const: computeDependencyIndexes
+            path:
+              $concat:
+              - /
+              - $pointerGet:
+                  object:
+                    $var: compute
+                  path: /definition/blueId
+                  default: missing
+            default: {}
+    - $if:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $var: index
+              key: plannerFunctionsId
+        then:
+        - $return:
+            $var: compute
+    - $let:
+        name: hookPath
+        expr:
+          $pointerJoin:
+          - clauseRuntime
+          - work
+          - candidate
+          - $const: clauseKey
+          - type
+          - hookDefinition
+    - $if:
+        cond:
+          $not:
+            $eq:
+            - $nodeBlueId:
+                $document:
+                  $concat:
+                  - $var: hookPath
+                  - /functions
+            - $var:
+                name: index
+                path: /plannerFunctionsId
+        then:
+        - $return:
+            $var: compute
+    - $forEach:
+        item: constantName
+        in:
+          $keys:
+            $var:
+              name: index
+              path: /plannerConstants
+        do:
+        - $let:
+            name: constantPath
+            expr:
+              $concat:
+              - $var: hookPath
+              - $pointerJoin:
+                - constants
+                - $var: constantName
+        - $let:
+            name: expectedId
+            expr:
+              $get:
+                object:
+                  $var:
+                    name: index
+                    path: /plannerConstants
+                key:
+                  $var: constantName
+        - $if:
+            cond:
+              $eq:
+              - $var: expectedId
+              - ''
+            then:
+            - $if:
+                cond:
+                  $exists:
+                    $document:
+                      $var: constantPath
+                then:
+                - $return:
+                    $var: compute
+            else:
+            - $if:
+                cond:
+                  $not:
+                    $exists:
+                      $document:
+                        $var: constantPath
+                then:
+                - $return:
+                    $var: compute
+            - $if:
+                cond:
+                  $not:
+                    $eq:
+                    - $nodeBlueId:
+                        $document:
+                          $var: constantPath
+                    - $var: expectedId
+                then:
+                - $return:
+                    $var: compute
+    - $return:
+        $call:
+          function: selectComputeDefinition
+          args:
+            compute:
+              $var: compute
+            index:
+              $var: index
+  dependencyReadSafe:
+    args:
+      read: {}
+      constants: {}
+    do:
+    - $let:
+        name: path
+        expr:
+          $var: read
+    - $let:
+        name: exact
+        expr: true
+    - $if:
+        cond:
+          $isKind:
+            val:
+              $var: path
+            kind: object
+        then:
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: path
+                key: path
+            then:
+            - $set:
+                name: path
+                expr:
+                  $get:
+                    object:
+                      $var: path
+                    key: path
+    - $if:
+        cond:
+          $isKind:
+            val:
+              $var: path
+            kind: object
+        then:
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: path
+                key: $concat
+            then:
+            - $set:
+                name: path
+                expr:
+                  $listGet:
+                    list:
+                      $get:
+                        object:
+                          $var: path
+                        key: $concat
+                    index: 0
+            - $set:
+                name: exact
+                expr: false
+    - $if:
+        cond:
+          $isKind:
+            val:
+              $var: path
+            kind: object
+        then:
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var: path
+                key: $const
+            then:
+            - $let:
+                name: constantRead
+                expr:
+                  $get:
+                    object:
+                      $var: path
+                    key: $const
+            - $let:
+                name: constantName
+                expr:
+                  $choose:
+                    cond:
+                      $isKind:
+                        val:
+                          $var: constantRead
+                        kind: text
+                    then:
+                      $var: constantRead
+                    else:
+                      $pointerGet:
+                        object:
+                          $var: constantRead
+                        path: /name
+                        default: ''
+            - $if:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $var: constantName
+                      kind: text
+                then:
+                - $return: false
+            - $let:
+                name: constantPath
+                expr:
+                  $choose:
+                    cond:
+                      $isKind:
+                        val:
+                          $var: constantRead
+                        kind: text
+                    then: ''
+                    else:
+                      $pointerGet:
+                        object:
+                          $var: constantRead
+                        path: /path
+                        default: ''
+            - $if:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $var: constantPath
+                      kind: text
+                then:
+                - $return: false
+            - $let:
+                name: constantValue
+                expr:
+                  $choose:
+                    cond:
+                      $hasKey:
+                        object:
+                          $var: constants
+                        key:
+                          $var: constantName
+                    then:
+                      $get:
+                        object:
+                          $var: constants
+                        key:
+                          $var: constantName
+                    else: false
+            - $set:
+                name: path
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: constantValue
+                    path:
+                      $var: constantPath
+                    default: false
+    - $if:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $var: path
+              kind: text
+        then:
+        - $return: false
+    - $if:
+        cond:
+          $not:
+            $startsWith:
+            - $var: path
+            - /
+        then:
+        - $return: false
+    - $let:
+        name: parts
+        expr:
+          $split:
+            text:
+              $var: path
+            separator: /
+    - $if:
+        cond:
+          $lte:
+          - $size:
+              $var: parts
+          - 1
+        then:
+        - $return: false
+    - $let:
+        name: first
+        expr:
+          $listGet:
+            list:
+              $var: parts
+            index: 1
+    - $return:
+        $and:
+        - $not:
+            $eq:
+            - $var: first
+            - ''
+        - $not:
+            $eq:
+            - $var: first
+            - contracts
+        - $or:
+          - $var: exact
+          - $gt:
+            - $size:
+                $var: parts
+            - 2
+          - $not:
+              $startsWith:
+              - contracts
+              - $var: first
+  dependencyReferences:
+    args:
+      code: {}
+      constants: {}
+    do:
+    - $let:
+        name: pending
+        expr:
+        - $var: code
+    - $let:
+        name: functions
+        expr: {}
+    - $let:
+        name: usedConstants
+        expr: {}
+    - $forEach:
+        item: depth
+        in:
+        - 0
+        - 1
+        - 2
+        - 3
+        - 4
+        - 5
+        - 6
+        - 7
+        - 8
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+        - 15
+        - 16
+        - 17
+        - 18
+        - 19
+        - 20
+        - 21
+        - 22
+        - 23
+        - 24
+        - 25
+        - 26
+        - 27
+        - 28
+        - 29
+        - 30
+        - 31
+        do:
+        - $if:
+            cond:
+              $eq:
+              - $size:
+                  $var: pending
+              - 0
+            then:
+            - $return:
+                safe: true
+                functions:
+                  $var: functions
+                constants:
+                  $var: usedConstants
+        - $let:
+            name: next
+            expr: []
+        - $forEach:
+            item: node
+            in:
+              $var: pending
+            do:
+            - $if:
+                cond:
+                  $isKind:
+                    val:
+                      $var: node
+                    kind: list
+                then:
+                - $set:
+                    name: next
+                    expr:
+                      $listConcat:
+                      - $var: next
+                      - $var: node
+                else:
+                - $if:
+                    cond:
+                      $isKind:
+                        val:
+                          $var: node
+                        kind: object
+                    then:
+                    - $if:
+                        cond:
+                          $not:
+                            $and:
+                            - $eq:
+                              - $size:
+                                  $keys:
+                                    $var: node
+                              - 1
+                            - $hasKey:
+                                object:
+                                  $var: node
+                                key: $literal
+                        then:
+                        - $if:
+                            cond:
+                              $eq:
+                              - $size:
+                                  $keys:
+                                    $var: node
+                              - 1
+                            then:
+                            - $if:
+                                cond:
+                                  $hasKey:
+                                    object:
+                                      $var: node
+                                    key: $currentContract
+                                then:
+                                - $return:
+                                    safe: false
+                                    functions: {}
+                                    constants: {}
+                            - $forEach:
+                                item: readName
+                                in:
+                                - $document
+                                - $resultValue
+                                do:
+                                - $if:
+                                    cond:
+                                      $hasKey:
+                                        object:
+                                          $var: node
+                                        key:
+                                          $var: readName
+                                    then:
+                                    - $if:
+                                        cond:
+                                          $not:
+                                            $call:
+                                              function: dependencyReadSafe
+                                              args:
+                                                read:
+                                                  $get:
+                                                    object:
+                                                      $var: node
+                                                    key:
+                                                      $var: readName
+                                                constants:
+                                                  $var: constants
+                                        then:
+                                        - $return:
+                                            safe: false
+                                            functions: {}
+                                            constants: {}
+                            - $if:
+                                cond:
+                                  $hasKey:
+                                    object:
+                                      $var: node
+                                    key: $call
+                                then:
+                                - $let:
+                                    name: dependencyName
+                                    expr:
+                                      $pointerGet:
+                                        object:
+                                          $var: node
+                                        path: /$call/function
+                                        default: false
+                                - $if:
+                                    cond:
+                                      $not:
+                                        $isKind:
+                                          val:
+                                            $var: dependencyName
+                                          kind: text
+                                    then:
+                                    - $return:
+                                        safe: false
+                                        functions: {}
+                                        constants: {}
+                                - $set:
+                                    name: functions
+                                    expr:
+                                      $objectSet:
+                                        object:
+                                          $var: functions
+                                        key:
+                                          $var: dependencyName
+                                        val: true
+                            - $if:
+                                cond:
+                                  $hasKey:
+                                    object:
+                                      $var: node
+                                    key: $const
+                                then:
+                                - $let:
+                                    name: dependencyName
+                                    expr:
+                                      $get:
+                                        object:
+                                          $var: node
+                                        key: $const
+                                - $if:
+                                    cond:
+                                      $isKind:
+                                        val:
+                                          $var: dependencyName
+                                        kind: object
+                                    then:
+                                    - $set:
+                                        name: dependencyName
+                                        expr:
+                                          $pointerGet:
+                                            object:
+                                              $var: dependencyName
+                                            path: /name
+                                            default: false
+                                - $if:
+                                    cond:
+                                      $not:
+                                        $isKind:
+                                          val:
+                                            $var: dependencyName
+                                          kind: text
+                                    then:
+                                    - $return:
+                                        safe: false
+                                        functions: {}
+                                        constants: {}
+                                - $set:
+                                    name: usedConstants
+                                    expr:
+                                      $objectSet:
+                                        object:
+                                          $var: usedConstants
+                                        key:
+                                          $var: dependencyName
+                                        val: true
+                        - $forEach:
+                            item: key
+                            in:
+                              $keys:
+                                $var: node
+                            do:
+                            - $if:
+                                cond:
+                                  $not:
+                                    $includes:
+                                      list:
+                                      - type
+                                      - itemType
+                                      - keyType
+                                      - valueType
+                                      - schema
+                                      - blue
+                                      val:
+                                        $var: key
+                                then:
+                                - $set:
+                                    name: next
+                                    expr:
+                                      $listConcat:
+                                      - $var: next
+                                      - - $get:
+                                            object:
+                                              $var: node
+                                            key:
+                                              $var: key
+        - $set:
+            name: pending
+            expr:
+              $var: next
+    - $return:
+        safe: false
+        functions: {}
+        constants: {}
+  selectComputeDefinition:
+    args:
+      compute: {}
+      index: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: index
+                path: /format
+                default: ''
+            - connections-compute-dependencies/1
+        then:
+        - $return:
+            $var: compute
+    - $if:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: compute
+                path: /definition/blueId
+                default: ''
+            - $pointerGet:
+                object:
+                  $var: index
+                path: /definitionId
+                default: missing
+        then:
+        - $return:
+            $var: compute
+    - $let:
+        name: localFunctions
+        expr:
+          $pointerGet:
+            object:
+              $var: compute
+            path: /functions
+            default: {}
+    - $let:
+        name: localConstants
+        expr:
+          $pointerGet:
+            object:
+              $var: compute
+            path: /constants
+            default: {}
+    - $forEach:
+        item: dependencyName
+        in:
+          $pointerGet:
+            object:
+              $var: index
+            path: /requiredConstants
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $or:
+                - $hasKey:
+                    object:
+                      $var: localConstants
+                    key:
+                      $var: dependencyName
+                - $hasKey:
+                    object:
+                      $var:
+                        name: index
+                        path: /constants
+                    key:
+                      $var: dependencyName
+            then:
+            - $return:
+                $var: compute
+    - $forEach:
+        item: dependencyName
+        in:
+          $pointerGet:
+            object:
+              $var: index
+            path: /requiredFunctions
+            default: []
+        do:
+        - $if:
+            cond:
+              $not:
+                $or:
+                - $hasKey:
+                    object:
+                      $var: localFunctions
+                    key:
+                      $var: dependencyName
+                - $hasKey:
+                    object:
+                      $var:
+                        name: index
+                        path: /functions
+                    key:
+                      $var: dependencyName
+            then:
+            - $return:
+                $var: compute
+    - $forEach:
+        item: dependencyName
+        in:
+          $keys:
+            $var: localFunctions
+        do:
+        - $if:
+            cond:
+              $hasKey:
+                object:
+                  $var:
+                    name: index
+                    path: /functions
+                key:
+                  $var: dependencyName
+            then:
+            - $if:
+                cond:
+                  $not:
+                    $eq:
+                    - $nodeBlueId:
+                        $pointerGet:
+                          object:
+                            $get:
+                              object:
+                                $var: localFunctions
+                              key:
+                                $var: dependencyName
+                          path: /args
+                          default: {}
+                    - $get:
+                        object:
+                          $get:
+                            object:
+                              $var:
+                                name: index
+                                path: /functions
+                            key:
+                              $var: dependencyName
+                        key: argsId
+                then:
+                - $return:
+                    $var: compute
+    - $let:
+        name: references
+        expr:
+          $call:
+            function: dependencyReferences
+            args:
+              code:
+                do:
+                  $pointerGet:
+                    object:
+                      $var: compute
+                    path: /do
+                    default: []
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: compute
+                    path: /expr
+                    default: false
+                functions:
+                  $var: localFunctions
+              constants:
+                $var: localConstants
+    - $if:
+        cond:
+          $not:
+            $var:
+              name: references
+              path: /safe
+        then:
+        - $return:
+            $var: compute
+    - $let:
+        name: pending
+        expr:
+          $var:
+            name: references
+            path: /functions
+    - $let:
+        name: usedConstants
+        expr:
+          $var:
+            name: references
+            path: /constants
+    - $if:
+        cond:
+          $hasKey:
+            object:
+              $var: compute
+            key: entry
+        then:
+        - $set:
+            name: pending
+            expr:
+              $objectSet:
+                object:
+                  $var: pending
+                key:
+                  $get:
+                    object:
+                      $var: compute
+                    key: entry
+                val: true
+    - $let:
+        name: selected
+        expr: {}
+    - $let:
+        name: seen
+        expr: {}
+    - $forEach:
+        item: round
+        in:
+          $listConcat:
+          - $keys:
+              $var:
+                name: index
+                path: /functions
+          - $keys:
+              $var: localFunctions
+        do:
+        - $let:
+            name: next
+            expr: {}
+        - $forEach:
+            item: dependencyName
+            in:
+              $keys:
+                $var: pending
+            do:
+            - $if:
+                cond:
+                  $not:
+                    $hasKey:
+                      object:
+                        $var: seen
+                      key:
+                        $var: dependencyName
+                then:
+                - $set:
+                    name: seen
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: seen
+                        key:
+                          $var: dependencyName
+                        val: true
+                - $if:
+                    cond:
+                      $not:
+                        $hasKey:
+                          object:
+                            $var: localFunctions
+                          key:
+                            $var: dependencyName
+                    then:
+                    - $if:
+                        cond:
+                          $not:
+                            $hasKey:
+                              object:
+                                $var:
+                                  name: index
+                                  path: /functions
+                              key:
+                                $var: dependencyName
+                        then:
+                        - $return:
+                            $var: compute
+                    - $let:
+                        name: function
+                        expr:
+                          $get:
+                            object:
+                              $var:
+                                name: index
+                                path: /functions
+                            key:
+                              $var: dependencyName
+                    - $if:
+                        cond:
+                          $not:
+                            $var:
+                              name: function
+                              path: /safe
+                        then:
+                        - $return:
+                            $var: compute
+                    - $set:
+                        name: selected
+                        expr:
+                          $objectSet:
+                            object:
+                              $var: selected
+                            key:
+                              $var: dependencyName
+                            val:
+                              $objectSet:
+                                object: {}
+                                key: blueId
+                                val:
+                                  $var:
+                                    name: function
+                                    path: /id
+                    - $forEach:
+                        item: called
+                        in:
+                          $var:
+                            name: function
+                            path: /functions
+                        do:
+                        - $set:
+                            name: next
+                            expr:
+                              $objectSet:
+                                object:
+                                  $var: next
+                                key:
+                                  $var: called
+                                val: true
+                    - $forEach:
+                        item: constant
+                        in:
+                          $var:
+                            name: function
+                            path: /constants
+                        do:
+                        - $set:
+                            name: usedConstants
+                            expr:
+                              $objectSet:
+                                object:
+                                  $var: usedConstants
+                                key:
+                                  $var: constant
+                                val: true
+        - $set:
+            name: pending
+            expr:
+              $var: next
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $var: pending
+          - 0
+        then:
+        - $return:
+            $var: compute
+    - $let:
+        name: constants
+        expr: {}
+    - $forEach:
+        item: dependencyName
+        in:
+          $keys:
+            $var: usedConstants
+        do:
+        - $if:
+            cond:
+              $not:
+                $hasKey:
+                  object:
+                    $var: localConstants
+                  key:
+                    $var: dependencyName
+            then:
+            - $if:
+                cond:
+                  $not:
+                    $hasKey:
+                      object:
+                        $var:
+                          name: index
+                          path: /constants
+                      key:
+                        $var: dependencyName
+                then:
+                - $return:
+                    $var: compute
+            - $set:
+                name: constants
+                expr:
+                  $objectSet:
+                    object:
+                      $var: constants
+                    key:
+                      $var: dependencyName
+                    val:
+                      $objectSet:
+                        object: {}
+                        key: blueId
+                        val:
+                          $get:
+                            object:
+                              $var:
+                                name: index
+                                path: /constants
+                            key:
+                              $var: dependencyName
+    - $let:
+        name: definition
+        expr:
+          functions:
+            $var: selected
+          constants:
+            $var: constants
+    - $if:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: index
+                path: /specificationId
+                default: ''
+            - ''
+        then:
+        - $set:
+            name: definition
+            expr:
+              $objectSet:
+                object:
+                  $var: definition
+                key: specification
+                val:
+                  $objectSet:
+                    object: {}
+                    key: blueId
+                    val:
+                      $var:
+                        name: index
+                        path: /specificationId
+    - $return:
+        $objectSet:
+          object:
+            $var: compute
+          key: definition
+          val:
+            $var: definition

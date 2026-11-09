@@ -1,5 +1,9 @@
 # Clause connections preview
 
+The candidate supports [qualified Compute dependency selection](compute-dependencies.md).
+It remains experimental for the reseller flow; initialization and operation gas
+must be evaluated separately before adoption.
+
 Directly authored BEX, lowered by `Connected Clause` into existing Contracts and
 Time definitions during the ordinary clause planning hook. There is no JavaScript
 or Python business-code generator. `Hello Clause` is a tiny reusable action.
