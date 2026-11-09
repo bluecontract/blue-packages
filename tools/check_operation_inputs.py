@@ -42,6 +42,7 @@ CASES = {
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
     'compute-dependencies': ('ComputeDependenciesConformance',),
     'compute-dependencies-reseller': ('ComputeDependenciesResellerConformance',),
+    'compute-preparation-v1': ('ComputePreparationConformance',),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
     'payment-effects': ('blue.core.PaymentExecutionConformance',),
@@ -91,6 +92,8 @@ def main():
         sources.add('OperationCatalogConformance')
     if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
         sources.add('CurrentOperationScenarios')
+    if 'ComputePreparationConformance' in sources:
+        sources.add('ComputeDependenciesResellerConformance')
     if 'ComputeDependenciesResellerConformance' in sources:
         sources.add('ComputeDependenciesConformance')
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:

@@ -15,6 +15,9 @@ public final class ComputeDependenciesResellerConformance {
     parent.put(parts[parts.length-1],value);
   }
   static Map<String,Object> run(Path root,Path baseline)throws Exception {
+    return run(root,baseline,RuntimeBindings.accessEvents().withDefinitionReadV1());
+  }
+  static Map<String,Object> run(Path root,Path baseline,RuntimeBindings bindings)throws Exception {
     var bundle=PackageBundle.builder();
     var replacements=Map.of("Connections","connections.bluepkg","Documents","clause-documents.bluepkg","Reseller","clause-reseller.bluepkg");
     for(var mount:obj(obj(read(root.resolve("PACKAGES.json"))).get("mounts")).entrySet()) {
@@ -27,7 +30,7 @@ public final class ComputeDependenciesResellerConformance {
     obj(scenario.get("sourcePatch")).forEach((path,value)->patch(source,path,value));
     var step=obj(((List<?>)scenario.get("steps")).getFirst());
     try(var blue=Blue.builder().packages(bundle.build()).build()) {
-      var p=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1());
+      var p=new Contracts(blue,bindings);
       var initialized=p.initialize(source);
       var row=m("arm",baseline==null?"candidate":"baseline","initializationStatus",initialized.status(),"initializationGas",initialized.gas());
       System.out.println(WireData.write(row));
@@ -40,6 +43,8 @@ public final class ComputeDependenciesResellerConformance {
       var entries=obj(p.read(result.document(),"/process_orders/entries"));check(entries.size()==1,"One frozen preparation");
       var entry=obj(entries.values().iterator().next());var prepared=obj(entry.get("prepared"));
       row.put("amountMinor",prepared.get("amountMinor"));row.put("quote",prepared.get("quote"));row.put("status",entry.get("status"));
+      row.put("documentBlueId",result.document().blueId());
+      row.put("events",p.emitted(result));
       check(prepared.get("amountMinor").toString().equals("9310"),"USD 93.10 unchanged");
       check(entry.get("status").equals("awaiting_provider"),"Prepare does not bootstrap the order");
       return row;

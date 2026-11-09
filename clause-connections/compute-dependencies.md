@@ -161,3 +161,47 @@ is an unimplemented proposal: it needs a lower-layer or Clauses-owned selector
 to avoid an import cycle, and separate initialization/amendment cost measurements.
 Moving selection there does **not** by itself solve dynamic reads or another
 handler's observation of the whole document or `/contracts`.
+
+## Runtime follow-up: 9 November 2026
+
+`tools/ComputeGasBoundaryConformance.java` now supplies the missing native
+counterexample. With just one used and one unused function, an independent
+handler observes two functions in the full program and one after selection,
+both through `/contracts` and a whole-document read. A smaller result from the
+selected handler is therefore insufficient for automatic pruning adoption.
+
+The separate Core branch `codex/compute-demand-v1-20261109` implements an
+experimental, explicitly selected `withComputePreparationV1()` runtime policy.
+It keeps full validation and the original document, then charges the shared
+dependencies reported by the complete compiler once per member/contextual
+definition in an invocation. The matching candidate rules are in
+[`compute-preparation-v1.md`](../blue-contracts/spec/compute-preparation-v1.md).
+The candidate is not a published replacement for the current Contracts package.
+
+Using the unchanged baseline archives in this worktree, real `prepareOrder`
+falls **1,780,677 → 705,939 gas**, initialization **2,641,858 → 1,570,923**, and
+the combined first-use cost **4,422,535 → 2,276,862**. Complete captures, quote,
+ordered events and document BlueIds match exactly. The first two existing
+bootstrap-preparation scenarios also preserve catalogue update behavior, two
+cold restores, idempotency and rejected changes/private channels. Runtime
+selection and gas differ explicitly; document identities are not normalized.
+
+Run the isolated first preparation with the candidate runtime jars:
+
+```sh
+python3 tools/check_operation_inputs.py --case compute-preparation-v1
+```
+
+`ComputePreparationScenarios SOURCE SCENARIOS REPORT RUNTIME_CONFIG` runs the
+maintained native scenario assertions with the new explicit selection. The
+ordinary `ResellerScenarios` entrypoint retains its preceding selection.
+`reports/compute-preparation-v1/source-final/measurement-manifest.json` binds the
+local sources, jars and scenario evidence. The exact local comparison script is
+`reports/compute-preparation-v1/reproduce.py CORE_CHECKOUT OUTPUT_DIRECTORY`.
+
+**Retain for qualification; do not adopt yet.** Complete validation, projection
+and compilation still cost CPU on each use. There is no physical speedup claim.
+Compiler resource admission, the hosted provide/confirmation/cancellation flow
+and finalized account/runtime publication remain unqualified. Nothing is
+deployed, no package archive is changed, and the original selector remains
+unqualified for automatic adoption.

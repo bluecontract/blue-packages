@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Runs authored source through the unmodified native Blue Contracts implementation.
+ * Runs authored source through an explicitly selected native Blue Contracts runtime.
  * Does not evaluate pricing, compile BEX, replace channels, or supply business results.
  * The runtime configuration contains independently verified exact provider records
  * and aliases. It is not a substitute for package release qualification.
@@ -32,11 +32,12 @@ public final class ResellerScenarios {
   private final Path reportPath;
   private final Path runtimePath;
   private final Map<String, Object> runtime;
-  private final RuntimeBindings bindings = QualificationRuntime.bindings();
+  private final RuntimeBindings bindings;
   private final PackageBundle bundle;
   private final List<Object> packageEvidence = new ArrayList<>();
 
-  private ResellerScenarios(String[] args) throws Exception {
+  private ResellerScenarios(String[] args, RuntimeBindings bindings) throws Exception {
+    this.bindings = bindings;
     if (args.length != 4) {
       throw new IllegalArgumentException(
           "Usage: ResellerScenarios SOURCE SCENARIOS REPORT RUNTIME_CONFIG");
@@ -62,8 +63,12 @@ public final class ResellerScenarios {
   }
 
   public static void main(String[] args) throws Exception {
-    int failures = new ResellerScenarios(args).run();
+    int failures = run(args, QualificationRuntime.bindings());
     if (failures != 0) System.exit(1);
+  }
+
+  public static int run(String[] args, RuntimeBindings bindings) throws Exception {
+    return new ResellerScenarios(args, bindings).run();
   }
 
   private int run() throws Exception {
@@ -88,6 +93,7 @@ public final class ResellerScenarios {
       long started = System.nanoTime();
       try (Runner runner = new Runner()) {
         evidence.put("captures", runner.captures);
+        evidence.put("transitions", runner.transitions);
         Map<String, Object> source = object(parse(sourcePath));
         for (var entry : object(scenario.getOrDefault("sourcePatch", map())).entrySet()) {
           updateExisting(source, entry.getKey(), entry.getValue(), false);
@@ -152,7 +158,7 @@ public final class ResellerScenarios {
         "failed", failed,
         "skipped", scenarios.size() - selected,
         "cases", results,
-        "scope", "Unmodified native Contracts with explicit fixture channels; not hosted authorization or package publication qualification");
+        "scope", "Explicit native Contracts selection with fixture channels; not hosted authorization or package publication qualification");
     Files.createDirectories(reportPath.getParent());
     Files.writeString(reportPath, WireData.write(report) + "\n");
     System.out.println("NATIVE CASES passed=" + (selected - failed) + " failed=" + failed);
@@ -168,6 +174,7 @@ public final class ResellerScenarios {
     private int restores;
     private final List<Object> quoteEvidence = new ArrayList<>();
     private final List<Object> captures = new ArrayList<>();
+    private final List<Object> transitions = new ArrayList<>();
     private final Map<String,Object> remembered = new LinkedHashMap<>();
 
     Runner() {
@@ -184,6 +191,8 @@ public final class ResellerScenarios {
 
     void initialize(Object source, String expectedStatus) {
       Contracts.Result result = processor.initialize(source);
+      transitions.add(map("operation", "initialize", "status", result.status(), "gas", result.gas(),
+          "documentBlueId", result.document().blueId(), "events", jsonEvidence(processor.emitted(result))));
       equal(expectedStatus, result.status(), "Native initialization: " + diagnostic(result));
       document = result.document();
       maxGas = Math.max(maxGas, result.gas());
@@ -284,6 +293,8 @@ public final class ResellerScenarios {
           "source", step.getOrDefault("source", step.get("channel")), "operation", call);
       long hostTimestamp = Long.parseLong(WireData.write(step.getOrDefault("timestampMicros", timestamp)));
       Contracts.Result result = processor.process(document, input, hostTimestamp);
+      transitions.add(map("operation", step.get("operation"), "status", result.status(), "gas", result.gas(),
+          "documentBlueId", result.document().blueId(), "events", jsonEvidence(processor.emitted(result))));
       String expectedStatus = text(step.getOrDefault("status", "APPLIED"));
       String label = "step " + timestamp + " " + step.get("operation");
       equal(expectedStatus, result.status(), label + ": " + diagnostic(result));
