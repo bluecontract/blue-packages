@@ -1,6 +1,71 @@
 name: Preparation Plan
 type: Connections/Connection Planning Functions
+constants:
+  admissionCanonicalDefinition:
+    type: Documents/Admission Functions
 functions:
+  admissionDefinition:
+    args:
+      definition: {}
+      definitionPath: {type: Text}
+      canonicalPath: {type: Text}
+      names: []
+    do:
+    # Project only the canonical library. Custom subtype implementations keep their
+    # complete definition, including any additional helper functions they introduce.
+    - $if:
+        cond: {$not: {$exists: {$document: {$var: canonicalPath}}}}
+        then:
+        - $return: {$var: definition}
+    - $if:
+        cond:
+          $ne:
+          - {$nodeBlueId: {$document: {$var: canonicalPath}}}
+          - $nodeBlueId:
+              $get:
+                object: {$literal: {type: Documents/Admission Functions}}
+                key: type
+        then:
+        - $return: {$var: definition}
+    - $let: {name: selected, expr: {}}
+    - $forEach:
+        item: functionName
+        in: {$var: names}
+        do:
+        - $let:
+            name: body
+            expr:
+              $document:
+                $concat: [{$var: definitionPath}, /functions/, {$var: functionName}]
+        - $if:
+            cond: {$not: {$exists: {$var: body}}}
+            then:
+            - $return: {$var: definition}
+        - $if:
+            cond:
+              $ne:
+              - {$nodeBlueId: {$var: body}}
+              - $nodeBlueId:
+                  $document:
+                    $concat: [{$var: canonicalPath}, /functions/, {$var: functionName}]
+            then:
+            - $return: {$var: definition}
+        - $set:
+            name: selected
+            expr:
+              $objectSet:
+                object: {$var: selected}
+                key: {$var: functionName}
+                val: {$var: body}
+    - $return:
+        $merge:
+        - type: Contracts/Compute Definition
+        - constants:
+            $choose:
+              cond: {$exists: {$document: {$concat: [{$var: definitionPath}, /constants]}}}
+              then: {$document: {$concat: [{$var: definitionPath}, /constants]}}
+              else: {}
+          functions: {$var: selected}
   validateConfiguration:
     args: {}
     do:
@@ -309,7 +374,15 @@ functions:
           - type: Contracts/Compute
           - name: nextAdmission
             definition:
-              $var: definition
+              $call:
+                function: admissionDefinition
+                args:
+                  definition: {$var: definition}
+                  definitionPath:
+                    $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/actionDefinition/type]
+                  canonicalPath:
+                    $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/hookDefinition/type/constants/admissionCanonicalDefinition/type]
+                  names: [nextAdmissionRequest, retireInvalidAdmission, retireAdmission]
             constants:
               $var: sharedConstants
             do:
@@ -352,7 +425,15 @@ functions:
           - type: Contracts/Compute
           - name: installAdmission
             definition:
-              $var: definition
+              $call:
+                function: admissionDefinition
+                args:
+                  definition: {$var: definition}
+                  definitionPath:
+                    $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/actionDefinition/type]
+                  canonicalPath:
+                    $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/hookDefinition/type/constants/admissionCanonicalDefinition/type]
+                  names: [admissionInstallRequest, installAdmissionConsentOperations, accessValid, accessRecordsValid, readerGroups, transports]
             constants:
               $var: sharedConstants
             do:
@@ -403,7 +484,15 @@ functions:
           - type: Contracts/Compute
           - name: finishAdmission
             definition:
-              $var: definition
+              $call:
+                function: admissionDefinition
+                args:
+                  definition: {$var: definition}
+                  definitionPath:
+                    $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/actionDefinition/type]
+                  canonicalPath:
+                    $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/hookDefinition/type/constants/admissionCanonicalDefinition/type]
+                  names: [finishAdmission, requireRosterCoverage, requireSameMainParty]
             constants:
               $var: sharedConstants
             do:
