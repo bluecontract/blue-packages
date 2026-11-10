@@ -543,6 +543,14 @@ functions:
         expr:
           $nodeBlueId:
             $var: original
+    - $if:
+        cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}, bootstrap]}
+        then:
+        - $call:
+            function: validateBootstrapReaders
+            args:
+              expected: {$pointerGet: {object: {$var: item}, path: /prepared}}
+              candidate: {$var: candidate}
     - $failIf:
         cond:
           $ne:
@@ -550,6 +558,7 @@ functions:
               $call:
                 function: normalizeProvisionSource
                 args:
+                  expected: {$pointerGet: {object: {$var: item}, path: /prepared}}
                   mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                   source:
                     $var: original
@@ -561,6 +570,7 @@ functions:
               $call:
                 function: normalizeProvisionSource
                 args:
+                  expected: {$pointerGet: {object: {$var: item}, path: /prepared}}
                   mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                   source:
                     $var:
@@ -582,6 +592,7 @@ functions:
                     $call:
                       function: provisionClausePolicy
                       args:
+                        expected: {$pointerGet: {object: {$var: item}, path: /prepared}}
                         mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                         candidate:
                           $var: candidate
@@ -597,6 +608,7 @@ functions:
                     $call:
                       function: provisionClausePolicy
                       args:
+                        expected: {$pointerGet: {object: {$var: item}, path: /prepared}}
                         mode: {$pointerGet: {object: {$var: item}, path: /prepareFor, default: inherited}}
                         candidate:
                           $var:
@@ -828,6 +840,60 @@ functions:
               path: /origin
     - $return:
         outcome: acceptedNew
+  # Authenticated Activation access observers may only retract stale usability.
+  # Eligibility is frozen, so removing current readers cannot hide the dependency.
+  # Do not read the selected child here: access loss may make it unavailable.
+  rootSourceAccessLost:
+    args: {}
+    do:
+    - $if:
+        cond: {$not: {$call: {function: rootSourceReaderScope, args: {}}}}
+        then:
+        - $return: {}
+    - $let:
+        name: initial
+        expr: {$document: /contracts/initialized/document}
+    - $let:
+        name: readers
+        expr: {$pointerGet: {object: {$var: initial}, path: /clauses/activation/parameters/readers, default: {}}}
+    - $forEach:
+        key: itemKey
+        item: item
+        in: {$pointerGet: {object: {$document: {$call: {function: processStatePath, args: {}}}}, path: /entries, default: {}}}
+        do:
+        - $if:
+            cond: {$eq: [{$pointerGet: {object: {$var: item}, path: /status}}, usable]}
+            then:
+            - $let: {name: lost, expr: false}
+            - $forEach:
+                key: role
+                item: party
+                in: {$pointerGet: {object: {$var: item}, path: /prepared/clauses/activation/parameters/parties, default: {}}}
+                do:
+                - $if:
+                    cond:
+                      $call:
+                        function: rootSourceReaderGroupsMatch
+                        args:
+                          party: {$var: party}
+                          declared: {$var: readers}
+                          readers: {$var: readers}
+                    then:
+                    - $if:
+                        cond: {$not: {$call: {function: rootSourceReaderPartyCovered, args: {party: {$var: party}}}}}
+                        then:
+                        - $set: {name: lost, expr: true}
+            - $if:
+                cond: {$var: lost}
+                then:
+                - $appendChange:
+                    op: add
+                    path: {$concat: [{$var: {name: item, path: /itemPath}}, /status]}
+                    val: selected
+                - $appendChange:
+                    op: add
+                    path: {$concat: [{$var: {name: item, path: /itemPath}}, /nextActions]}
+                    val: []
   sharedRefresh:
     args: {}
     do:
@@ -896,6 +962,11 @@ functions:
                           args:
                             document:
                               $var: selected
+                      - $call:
+                          function: rootSourceReadersReady
+                          args:
+                            item: {$var: item}
+                            candidate: {$var: selected}
                 - $let:
                     name: status
                     expr:
