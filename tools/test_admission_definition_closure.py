@@ -21,13 +21,14 @@ def calls(value):
 
 class AdmissionDefinitionClosureTest(unittest.TestCase):
     def test_every_admission_step_has_complete_exact_function_selection(self):
-        plan = yaml.safe_load((ROOT/'clause-documents/types/preparation-plan.blue').read_text())
+        plan = yaml.safe_load((ROOT/'clause-documents/types/admission-plan-function.blue').read_text())
         definitions = {}
         for folder in ['blue-parties/types', 'clause-documents/types']:
             for path in (ROOT/folder).glob('*.blue'):
                 node = yaml.safe_load(path.read_text())
                 if isinstance(node, dict):
-                    definitions.update(node.get('functions', {}))
+                    definitions.update({name: body for name, body in node.get('functions', {}).items()
+                                        if isinstance(body, dict) and set(body) != {'blueId'}})
         found = {}
         def visit(node):
             if isinstance(node, dict):

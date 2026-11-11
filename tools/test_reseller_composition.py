@@ -8,6 +8,15 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class ResellerCompositionTest(unittest.TestCase):
+    def test_provision_retains_native_validation_and_effects(self):
+        native = yaml.safe_load((ROOT / 'clause-documents/types/base.blue').read_text())
+        reseller = yaml.safe_load((ROOT / 'clause-reseller/types/customer-orders-clause.blue').read_text())
+        expected = native['actions']['provide']
+        actual = reseller['actions']['provideOrder']
+        self.assertEqual(expected['preflight'], actual['preflight'][:1])
+        self.assertEqual(expected['defaults'], actual['defaults'])
+        self.assertEqual(expected['do'], actual['do'])
+
     def test_preparation_retains_native_lifecycle(self):
         native = yaml.safe_load((ROOT / 'clause-documents/types/preparation-functions.blue').read_text())
         reseller = yaml.safe_load((ROOT / 'clause-reseller/types/customer-orders-clause.blue').read_text())
