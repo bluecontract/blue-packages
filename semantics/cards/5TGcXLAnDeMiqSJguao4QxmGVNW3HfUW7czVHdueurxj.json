@@ -1,0 +1,202 @@
+{
+  "blueId": "5TGcXLAnDeMiqSJguao4QxmGVNW3HfUW7czVHdueurxj",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "JAVfq3idjXE65QjTiGepqJFPb35tjpEQew6af6qPJZHj",
+      "Dsxv7hUoGTsTod8gPrHo3iC6VJ2sDhXTeZXThx9r6QPG",
+      "BWZxSpWmbP4QkHTnBXNHtVgmNNL8s5jy3DMkS6KbgBwb",
+      "G6chkZF9fXUbRbD6koCtwLfx9c8jJ2QZHTB67mRhWPbF",
+      "FYANJ2KaxMPpvR5ToeAbx3huXsygKsQpw9b8HRZSSmW8",
+      "6w4No9BtXZYzQwQ3iBZoqURAQ7dpS7giUectffGtJVcB",
+      "62YQUUEMjLBMjcE7X329jpLKMFLh7MfCPnKQEyA1kg4z",
+      "3g9NYgHucsKXt7fhmBKE5vJqCHoJGJJfhCngGhattktg",
+      "DvDZ2osJuDV2CbtoLUfUt1xNNXffYxKYtTzBdaaSP3Gb",
+      "EgBAsRJdHJKckJ3vsxgDjf3KMrxYM4PyBbuWPdRrUua5",
+      "BeocmvaZ64mC5qeEFbBuxnJx3PPoyqwtKmuAJCutskdL",
+      "7CYMqmVECevjyCcD9hQNnYG3Xb5Jd7aqd1RJCnhDkWZ4",
+      "AuCd4CneHodB6cXSmJBoxpLBAgH7EaqbXXjVYC64XV18",
+      "ERUpqV1ukEE2eZWaDJP6Dxne1Z12WTkrXgDiKDGRgDjV",
+      "CDV72TzMDZAzZyq4F4GmYx6G2dtzdya5Eo4BUHoAD6Ej",
+      "4FqAGskHttczv6E7ge1jqbKFuv8HNMu3h3qjasiLMjAw",
+      "4JxB65gr54JtFZG2ysnKSiwuwTTHEvkVJ2Mcb3KqaHos",
+      "EjZzo3PFrU1Bhea8Ekmuz9BJyzxtuZ251bmXQuetU886",
+      "3WukTexA1Nex951RDHoA6S6QfNgFmdiBpigfRUzi9YMh",
+      "GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy",
+      "HW7dw1gGvAMknFW6HXvHc432TZfzCut2mW4KCk4rj8o1"
+    ],
+    "displayLabel": "Admission Step Functions",
+    "limitations": [
+      "The supplied helpers do not define workflow triggers, state initialization, ledger approval actors or grant/history writes, installation-request execution, or completion of linking.",
+      "activationRevision and admittedRevision are compared or copied from /activation/revision, but its value type is not declared in the supplied definitions; no typed revision facts are assigned to those fields."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no initial status is defined here.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions: retireInvalidAdmission, admissionInstallRequest, finishAdmission.",
+        "id": "entryStatus",
+        "meaning": "admission_pending awaits approval, consents and access; installing awaits roster installation; linking follows coverage confirmation; admission_denied records refusal; reapproval_required records a stale revision. Retirement can also use a caller-supplied reason.",
+        "path": "/process_{clauseKey}/entries/*/status",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no reference is synthesized.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.nextAdmissionRequest; Admission Consent Functions.recordConsent.",
+        "id": "admissionReference",
+        "meaning": "Reference correlating the entry's grant, ledger history, consent scope and admission requests.",
+        "path": "/process_{clauseKey}/entries/*/admissionRef",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No recorded decision; neither approval nor decline.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Consent Functions.recordConsent; installAdmissionConsentOperations.",
+        "id": "partyConsent",
+        "meaning": "Final approve or decline decision for a party role, recorded through its installed lead-channel operation.",
+        "path": "/process_{clauseKey}/entries/*/consents/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unrecorded; comparison uses an empty string.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.admissionInstallRequest: accessRequested write and event.",
+        "id": "accessRequestReference",
+        "meaning": "Admission reference for which Party Addition Requested was emitted; not confirmation of access or installation.",
+        "path": "/process_{clauseKey}/entries/*/accessRequested",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no party count is established.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Party-role members of one entry's admissionToken.parties",
+          "unit": "party roles per admission token"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.admissionInstallRequest: loop over token.parties.",
+        "id": "requestedPartyCount",
+        "meaning": "Number of party roles in this entry's token; installation readiness requires approve for every role.",
+        "path": "/process_{clauseKey}/entries/*/admissionToken/parties",
+        "scope": "clause",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "No key is established at this member.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.finishAdmission, requireRosterCoverage, requireSameMainParty.",
+        "id": "primaryReaderKey",
+        "meaning": "Main-party reader key; roster coverage requires equal, nonempty sets of unique nonempty text keys.",
+        "path": "/process_{clauseKey}/entries/*/admissionToken/parties/*/readerKeys/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no initial revision is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.nextAdmissionRequest and retireAdmission.",
+        "id": "ledgerRevision",
+        "meaning": "Revision used as expectedRevision for grant proposals; incremented when retirement clears a matching proposal.",
+        "path": "/process_{clauseKey}/admission/ledger/revision",
+        "scope": "clause",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "This blocking ID is absent; approval is not implied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.nextAdmissionRequest: proposal/id existence guard.",
+        "id": "outstandingProposal",
+        "meaning": "Outstanding proposal identifier; its presence blocks nextAdmissionRequest pending ledger resolution.",
+        "path": "/process_{clauseKey}/admission/ledger/proposal/id",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No recorded approval is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.admissionInstallRequest: history and grant equality guards.",
+        "id": "ledgerApproval",
+        "meaning": "true is required as ledger approval for an admissionRef; the stored grant must also equal the current token.",
+        "path": "/process_{clauseKey}/admission/ledger/history/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; request construction reads missing as {}.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Members of the clause's admission.grants map",
+          "unit": "stored tokens; approval additionally requires ledger history"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.nextAdmissionRequest and admissionInstallRequest.",
+        "id": "storedGrantCount",
+        "meaning": "Number of stored admission tokens keyed by admissionRef; does not count confirmed installations.",
+        "path": "/process_{clauseKey}/admission/grants",
+        "scope": "clause",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "No archived reason; retirement is not established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.retireAdmission and retireInvalidAdmission.",
+        "id": "retirementReason",
+        "meaning": "Archived retirement reason; automatic retirement uses admission_denied or reapproval_required.",
+        "path": "/process_{clauseKey}/admission/retired/*/reason",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No archived decision is available.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Admission Step Functions.retireAdmission; Admission Consent Functions.recordConsent.",
+        "id": "retiredConsent",
+        "meaning": "Consent decision copied from the retired entry; recordConsent supports approve and decline.",
+        "path": "/process_{clauseKey}/admission/retired/*/consents/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Admission Step Functions\n\nA reusable Compute Definition containing helpers for admitting parties associated with a document entry. It coordinates ledger approval, explicit party consent, timeline-access checks and confirmation that the required main parties are present in the activation roster.\n\nThe definition has no automatic trigger or initialization. A calling Compute supplies `clauseKey` and invokes its functions. Clause state is read under `/process_{clauseKey}`; `/activation` and each entry's `itemPath` belong to that same executing document. Changes and events take effect only through a successful enclosing Contracts transition.\n\n## Roster and access checks\n\n- `requireSameMainParty(left, right)` requires identical `lead/channel` declarations and equal, nonempty sets of `readerKeys`. Both key lists must contain unique, nonempty text values; order does not matter. Representatives and other party fields are not compared.\n- `requireRosterCoverage(available, required)` finds each required main party among the available parties by its lead channel and applies `requireSameMainParty` to matching-channel candidates. Role names need not match. Missing coverage or conflicting primary keys rejects the call; this does not establish representative coverage.\n- `readerGroups(roster, readers)` starts with `readers`, then sets groups named by each party role and by `role__representativeId`, using their `readerKeys`. Roster-derived groups replace existing groups with those names. `transports(roster)` produces corresponding entries from each party's `lead/channel` and each representative's `channel`.\n- `accessRecordsValid(accessDocuments, roster, readers)` skips transports matching External Channel. Every other transport must match Timeline Channel. For each such transport, at least one individual Timeline Access document must contain its exact timeline in `allowedTimelines`, match its timeline provider through `contracts/provider/provider`, and include at least one `allowedKeys` value from **every** reader group. Different documents cannot collectively satisfy one transport's requirement. An empty reader group cannot be satisfied. Unsupported channels or non-Timeline Access records encountered during checking reject the call; insufficient coverage returns `false`.\n- `accessValid(accessPaths, roster, readers)` reads the documents at `accessPaths` and applies that same check. These helpers inspect access declarations; they do not grant private access.\n\n## Admission and consent\n\n`nextAdmissionRequest()` first calls `retireInvalidAdmission()`. That helper examines `admission_pending` entries and retires the first entry with any recorded `decline`, or otherwise a token whose `activationRevision` differs from `/activation/revision`. The corresponding reasons are `admission_denied` and `reapproval_required`.\n\n`retireAdmission(item, reason)` writes the reason as the entry's status and archives its `admissionToken`, `consents` and reason under `admission/retired`, keyed by `admissionRef`. If the ledger's outstanding proposal has that reference, it increments `admission/ledger/revision` and clears the proposal. It emits Document Admission Progress with `admissionRef`, `clauseId`, `itemKey` and the reason. It does not remove stored grants or installed consent operations, or revoke timeline access.\n\nIf retirement occurred, `nextAdmissionRequest()` returns `ready: false`. Otherwise, an existing `admission/ledger/proposal/id` blocks another request. For a current pending entry without a stored grant, it returns `ready: true` and a request containing:\n\n- `expectedRevision`: the admission ledger revision;\n- `path`: the clause's `admission/grants` location;\n- `proposalId`: the entry's `admissionRef`;\n- `replacement`: existing grants plus this reference's `admissionToken`;\n- `preservePending: true`.\n\nReturning this request neither writes the grant nor establishes ledger approval.\n\n`installAdmissionConsentOperations(item)` returns `false` if the token is absent or access validation fails for the combined activation and token rosters. Otherwise, for every token party it installs an `admissionConsent_<suffix>` channel copied from that party's `lead/channel` and a `consentAdmission_<suffix>` operation. The suffix is scoped to `clauseKey`, `admissionRef` and party role. Identical existing declarations are reusable; conflicting channel or operation declarations reject installation.\n\nEach operation accepts `admissionRef` and `decision`, which must be `approve` or `decline`, and delegates to `recordConsent` in Admission Consent Functions. The request reference must match the operation's reference and the entry's current reference. A new decision requires `admission_pending`, is stored under `consents` for that party role, and emits Document Admission Progress. A recorded decision is final: repeating it returns `duplicate`, including after the entry leaves pending; changing it rejects. Scope and stale-reference checks still apply to repeats. These operations are bound to the declared party channels; their existence alone establishes no viewer permission or personal obligation.\n\n## Installation and confirmation\n\n`admissionInstallRequest()` considers pending entries only when `admission/ledger/history` contains `true` for their `admissionRef` **and** the corresponding stored grant equals the whole current token. It attempts to install consent operations, then checks decisions for every party role in the token. A decline sets `admission_denied` and emits progress; this particular branch does not create a retirement archive.\n\nFor a current activation revision, if `accessRequested` differs from `admissionRef`, the function records that reference and emits Party Addition Requested with `parties`, `accessDocuments`, `admissionRef`, `clauseKey`, `expectedRevision` and `itemPath`, then returns `ready: false`. This can happen before all parties approve. The event requests incorporation of public access histories; it neither consents for participants nor confirms private access or completed party installation.\n\nOn a subsequent eligible call, every token party must have `approve`, the token revision must still equal `/activation/revision`, and current access validation must pass. The function then sets `status` to `installing` and returns `ready: true`, the `itemPath`, and an installation request containing `admissionRef`, `expectedRevision` and `parties`. This is preparation for installation, not confirmation of its outcome. A `ready: false` result can still accompany installed operations, a request event or a status change.\n\n`finishAdmission(input)` reads `input.itemPath`, requires `status: installing`, and checks that `/activation/parties` covers the token's main parties. It records the current activation revision as `admittedRevision`, sets the stored status to `linking`, emits Document Admission Progress with status `admitted`, and returns `outcome: acceptedNew`. The emitted `admitted` status and stored `linking` status have different meanings: roster coverage has passed, while linking remains a separate phase. This function does not repeat the earlier consent, access or token-revision checks.\n\nMissing `entries`, `grants`, `consents`, `representatives` and auxiliary `readers` have empty-map fallbacks where read; missing `readerKeys` and `accessPaths` have empty-list fallbacks. Missing channel declarations use an empty object, and missing `accessRequested` uses an empty string for comparison. These are local lookup fallbacks, not stored initialization or evidence of approval.\n\nThe supplied helpers do not define the surrounding workflow triggers, ledger approval authority and writes, execution of returned installation requests, or completion of linking."
+}
