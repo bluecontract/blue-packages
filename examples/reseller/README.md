@@ -2,6 +2,13 @@
 
 `adventures-in-paradise-preview.blue` is one configured agreement between Adventures in Paradise and Manatee Bay Inn. Its document contains the parties, business terms, catalog, order and payout templates, and clause bindings. Executable order, negotiation, commission and payout behavior lives in the exported `clause-reseller/types/` definitions.
 
+These examples qualify the maintained catalog-priced `Customer Orders Clause`
+from main. They are not alternate versions of MyOS hosted checkout. The current
+hosted reseller flow uses `Customer Orders Bootstrap Clause`; see
+[Hosted reseller checkout](../../clause-reseller/README.md#hosted-reseller-checkout)
+for that boundary and its native component tests. Neither this example nor a
+package build proves a completed Stripe payment.
+
 ## Clause configuration
 
 - `Customer Orders Clause` reads the template, order collection, catalog and optional fulfilment parameters through pointer bindings. Moving or renaming these fields requires updating a binding, not copying implementation. Removing the fulfilment clause removes the date and confirmation requirement from new orders.

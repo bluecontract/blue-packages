@@ -39,15 +39,23 @@ Customer Orders uses native Documents preparation/provision and independent boot
 
 The constructor is the only customization of the standard shared preparation lifecycle; `tools/test_reseller_composition.py` checks this seam against the selected Documents source. Shared function references use exact native node identities. See `examples/reseller/README.md` for the request contract and historical fixture boundary. Earlier execution results above apply to the previous embedded factory edition, not this transport contract.
 
-## Additional hosted bootstrap profile
+## Hosted reseller checkout
 
-`Customer Orders Bootstrap Clause` remains a distinct additive profile alongside
-preview.3 `Customer Orders Clause`. Its partner `startOrder` request retains
+`Customer Orders Bootstrap Clause` is the target clause for the current MyOS
+hosted reseller checkout. `Customer Orders Clause` remains the independent
+catalog-priced mechanism already supported on main; it is not a fallback or an
+older edition of this checkout. Its examples below retain their own qualification
+boundary. The hosted clause's partner `startOrder` request accepts
 `{key, requestId, customer, quoteKey, description?, groups?}`; the catalog-priced
 preview.3 request above is not silently substituted for it. It freezes the exact
 quote/customer/commercial snapshot and uses ordinary Documents independent
 bootstrap with native source, party, access, requirement and origin validation.
 The complete authored connection configuration is frozen during preparation.
+The current payment integration gives the guarantor Reader access to the Order
+through its frozen reader key and keeps it a party to the Payment Instruction.
+Card authorization does not replace the Order's commercial approval. The
+concrete MyOS instruction type selects Stripe or Test; there is no `provider`
+switch in the PI.
 Only this profile explicitly selects a valid initialized Order while it is still
 commercially inactive. Selection does not approve the Order or make it usable;
 missing-party admission still waits for its normal consent and access lifecycle.

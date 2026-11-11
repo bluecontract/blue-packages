@@ -41,7 +41,7 @@ class BootstrapCompositionTest(unittest.TestCase):
         evolved = {
             'types/catalog-functions.blue': '0f24eab9c459cd2f58baec2d383ddf3337517554be84417d308c64514126f1eb',
             'types/customer-orders-clause.blue': 'c77ddfc0332a33026c1b21dab7563136b6c0899d6051e0dd9d5a9c1449e7a091',
-            'types/commission-clause.blue': '326f5b14bd84fbe4d1284a85e3f56450a97acea3a25018856427941cb40861f9',
+            'types/commission-clause.blue': '3d5905f1c9d8d74f687738c9fc384dce6db1d5b497d301d156e5725bf17a80a0',
         }
         seen = set()
         for item in source['sourceFiles']:
@@ -68,7 +68,8 @@ class BootstrapCompositionTest(unittest.TestCase):
                      'normalizeProvisionSource', 'sharedPrepare', 'prepareMappedChild',
                      'mappedBootstrapPartyCovered']:
             self.assertIn(name, composition['functions'])
-        self.assertEqual(len(composition['functions']), 106)
+        # Reader admission extends the shared closure with seven helpers.
+        self.assertEqual(len(composition['functions']), 113)
 
     def test_domain_helpers_retain_exact_native_identities(self):
         composition = json.loads((PACKAGE / 'bootstrap-composition.json').read_text())
