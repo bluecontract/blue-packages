@@ -44,11 +44,32 @@ public final class BootstrapPreparationConformance {
   }
   public static void main(String[] args)throws Exception {
     Path root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    pinnedReaderNormalization(packages);
+    rootReaderAccessGuards(packages);
     bootstrapPartyGuards(packages);
     bootstrapAccessGuards(packages);
     for(String mode:List.of("bootstrap","inherited","unknown"))try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
       var p=runtime.processor(packages.language());
       var host=applied(p.initialize(source(mode.equals("inherited")?null:mode)));
+      if(mode.equals("bootstrap")) {
+        require("/activation".equals(p.read(host.document(),"/contracts/processActivation_orders/path")),"Local activation transition must trigger a fresh readiness evaluation");
+        require("processActivation_orders".equals(p.read(host.document(),"/contracts/refreshActivationProcesses_orders/channel")),"Activation readiness workflow must use its local update channel");
+        require(p.read(host.document(),"/contracts/refreshActivationProcesses_orders/steps/0/functions/configuredSources") instanceof Map<?,?> activationContext && activationContext.containsKey("expr"),"Activation refresh must compile exact source validators");
+        require(Objects.equals(p.read(host.document(),"/contracts/refreshProcesses_orders/steps"),p.read(host.document(),"/contracts/refreshActivationProcesses_orders/steps")),"Activation refresh must preserve the existing guarded refresh computation");
+        require(p.read(host.document(),"/contracts/refreshProcesses_orders/steps/0/functions/connectionConfiguration") instanceof Map<?,?> context0 && context0.containsKey("expr"),"Generated refresh must retain its exact clause configuration");
+        require(p.read(host.document(),"/contracts/refreshEmbeddedProcesses_orders/steps/0/functions/configuredSources") instanceof Map<?,?> context1 && context1.containsKey("expr"),"Generated embedded refresh must compile source validators");
+        var observedSource=source("bootstrap");
+        obj(obj(obj(observedSource.get("clauses")).get("activation")).get("parameters")).put("accessPaths",List.of("/observerAccess"));
+        observedSource.put("observerAccess",m());
+        var observerClause=obj(obj(observedSource.get("clauses")).get("orders"));
+        observedSource.put("readerTemplate",obj(observerClause.get("parameters")).remove("template"));
+        obj(observerClause.get("bindings")).put("template","/readerTemplate");
+        var observed=applied(p.initialize(observedSource));
+        require(p.read(observed.document(),"/contracts/rootSourceAccess_orders_0/steps/0/functions/connectionConfiguration") instanceof Map<?,?> context2 && context2.containsKey("expr"),"Generated access observer must retain its exact clause configuration");
+        require(p.read(observed.document(),"/contracts/rootSourceAccess_orders_0/steps/0/functions/configuredSources") instanceof Map<?,?> context3 && context3.containsKey("expr"),"Generated access observer must compile source validators");
+        require("bootstrap".equals(p.read(observed.document(),"/contracts/rootSourceAccess_orders_0/steps/0/functions/connectionConfiguration/expr/$literal/parameters/prepareFor")),"Observer must use this clause's exact configuration");
+        require("Customer order".equals(p.read(observed.document(),"/contracts/rootSourceAccess_orders_0/steps/0/functions/connectionSnapshots/expr/$literal/template/name")),"Observer must freeze the declared template binding");
+      }
       host=applied(p.process(host.document(),event(host.document(),"approve_merchant",m("revision",1)),1));
       var request=m("type","Documents/Preparation Input","key","one","values",m("size",42));
       var result=p.process(host.document(),event(host.document(),"prepareOrder",request),2);
@@ -79,6 +100,147 @@ public final class BootstrapPreparationConformance {
       }
       System.out.println("PASS native preparation "+mode);
     }
+  }
+  static void pinnedReaderNormalization(CompositionPackages packages)throws Exception {
+    try(var blue=packages.language()) {
+      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var definition=values.source(m("type","Documents/Factory Functions"),"definition");
+      var functions=new LinkedHashMap<>(obj(values.bexData(values.select(definition,"/functions"))));
+      var preparation=obj(WireData.parse(Files.readString(Path.of("clause-documents/types/preparation-functions.blue")),"yaml"));
+      functions.putAll(obj(preparation.get("functions")));
+      functions.putAll(obj(obj(WireData.parse(Files.readString(Path.of("clause-documents/types/bootstrap-functions.blue")),"yaml")).get("functions")));
+      functions.keySet().retainAll(Set.of("normalizeBootstrapSource","normalizeSlots","configuredConstraint","configuredTemplate","configurationParameters","connectionConfiguration","connectionSnapshots","preparedReaderGroups","validateBootstrapReaders"));
+      functions=new LinkedHashMap<>(obj(values.bexData(values.select(values.source(m("functions",functions),"definition"),"/functions"))));
+      var expected=m("clauses",m("activation",m("parameters",m("readers",m("guarantor",
+          m("myosAccountId","guarantor-account","readerKeys",List.of("pinned-key")))))));
+      var actual=m("clauses",m("activation",m("parameters",m("readers",m("guarantor",List.of("pinned-key"))))));
+      // Mixed maps and nested templates are not erased by root normalization.
+      obj(obj(obj(obj(expected.get("clauses")).get("activation")).get("parameters")).get("readers")).put("auditor",List.of("audit-key"));
+      obj(obj(obj(obj(actual.get("clauses")).get("activation")).get("parameters")).get("readers")).put("auditor",List.of("audit-key"));
+      var nested=m("clauses",m("activation",m("parameters",m("readers",m("nested",m("myosAccountId","nested-account","readerKeys",List.of("nested-key")))))));
+      expected.put("template",nested);actual.put("template",Values.copy(nested));
+      var programSource=m("do",List.of(m("$return",m("$eq",List.of(
+          m("$call",m("function","normalizeBootstrapSource","args",m("source",m("$binding","call/request/actual"),"slots",List.of(),"expected",expected))),
+          m("$call",m("function","normalizeBootstrapSource","args",m("source",expected,"slots",List.of(),"expected",expected))))))));
+      var bex=new Bex(BexProfile.current());var program=bex.compile(programSource,m("functions",functions),null);
+      var context=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m("call",m("request",m("actual",actual))),"/",null,
+          (a,p)->values.matches(a,values.source(p,"definition")),(a,g)->NativeRuntime.identity(values.source(Values.blueValue(a))));
+      require(Boolean.TRUE.equals(bex.execute(program,context,1000000).value()),"Pinned reader descriptor must normalize to its exact bootstrap list");
+      var changedNested=obj(Values.copy(actual));changedNested.put("template",m("changed",true));
+      var nestedCheck=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m("call",m("request",m("actual",changedNested))),"/",null,
+          (x,p)->values.matches(x,values.source(p,"definition")),(x,g)->NativeRuntime.identity(values.source(Values.blueValue(x))));
+      require(Boolean.FALSE.equals(bex.execute(program,nestedCheck,1000000).value()),"Nested template must remain exact");
+      var valid=m("contracts",m("initialized",m("document",actual)),"clauses",actual.get("clauses"),
+          "activation",m("readers",m("guarantor",List.of("pinned-key"),"auditor",List.of("audit-key"))));
+      var validation=bex.compile(m("do",List.of(m("$return",m("$call",m("function","validateBootstrapReaders","args",
+          m("expected",m("$binding","call/request/expected"),"candidate",m("$binding","call/request/actual"))))))),m("functions",functions),null);
+      for(String variant:List.of("valid","changed-key","extra-key","renamed","missing","missing-legacy-reader","runtime-descriptor","initial-changed","current-changed","unknown-field","empty-key")) {
+        var candidate=obj(Values.copy(valid));var frozen=obj(Values.copy(expected));
+        var readers=obj(obj(candidate.get("activation")).get("readers"));
+        switch(variant) {
+          case "changed-key" -> readers.put("guarantor",List.of("other-key"));
+          case "extra-key" -> readers.put("guarantor",List.of("pinned-key","other-key"));
+          case "renamed" -> {readers.remove("guarantor");readers.put("other",List.of("pinned-key"));}
+          case "missing" -> readers.clear();
+          case "missing-legacy-reader" -> readers.remove("auditor");
+          case "runtime-descriptor" -> readers.put("guarantor",m("myosAccountId","guarantor-account","readerKeys",List.of("pinned-key")));
+          case "initial-changed" -> obj(obj(obj(obj(obj(obj(candidate.get("contracts")).get("initialized")).get("document")).get("clauses")).get("activation")).get("parameters")).put("readers",m());
+          case "current-changed" -> obj(obj(obj(candidate.get("clauses")).get("activation")).get("parameters")).put("readers",m());
+          case "unknown-field" -> obj(obj(obj(obj(obj(frozen.get("clauses")).get("activation")).get("parameters")).get("readers")).get("guarantor")).put("email","unsupported@example.test");
+          case "empty-key" -> obj(obj(obj(obj(obj(frozen.get("clauses")).get("activation")).get("parameters")).get("readers")).get("guarantor")).put("readerKeys",List.of(""));
+        }
+        var check=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m("call",m("request",m("expected",frozen,"actual",candidate))),"/",null,
+            (x,p)->values.matches(x,values.source(p,"definition")),(x,g)->NativeRuntime.identity(values.source(Values.blueValue(x))));
+        boolean rejected=false;try {bex.execute(validation,check,1000000);}catch(BexError failure){
+          require(failure.getMessage().contains(variant.equals("unknown-field")||variant.equals("empty-key")?"PREPARATION_PINNED_READER_INVALID":"PREPARATION_PINNED_READER_MISMATCH"),"Unexpected pinned reader rejection: "+failure.getMessage());rejected=true;}
+        require(rejected!=variant.equals("valid"),"Pinned reader guard "+variant);
+      }
+      System.out.println("PASS exact pinned reader normalization and initial/current/runtime guards");
+    }
+  }
+  static void rootReaderAccessGuards(CompositionPackages packages)throws Exception {
+    try(var blue=packages.language()) {
+      var values=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution().values();
+      var definition=values.source(m("type","Documents/Factory Functions"),"definition");
+      var functions=new LinkedHashMap<>(obj(values.bexData(values.select(definition,"/functions"))));
+      var authored=obj(obj(WireData.parse(Files.readString(Path.of("clause-documents/types/admission-functions.blue")),"yaml")).get("functions"));
+      functions.putAll(authored);
+      functions.put("configurationParameters",m("args",m(),"do",List.of(m("$return",m("$binding","call/request/parameters")))));
+      functions.keySet().retainAll(Set.of("rootSourceReaderPartyCovered","rootSourceReaderScope","rootSourceReaderGroupsMatch","configurationParameters","readerGroups","transports","accessRecordsValid"));
+      functions=new LinkedHashMap<>(obj(values.bexData(values.select(values.source(m("functions",functions),"definition"),"/functions"))));
+      var bex=new Bex(BexProfile.current());
+      var source=m("do",List.of(m("$return",m("$call",m("function","rootSourceReaderPartyCovered","args",m("party",m("$binding","call/request/party")))))));
+      var document=accessCandidate(values);var activation=obj(document.get("activation"));
+      var key=obj(obj(obj(activation.get("parties")).get("seller"))).get("readerKeys");
+      var seller=obj(obj(activation.get("parties")).get("seller"));
+      var representative=obj(Values.copy(obj(seller.get("lead")).get("channel")));
+      obj(representative.get("timeline")).put("url","https://provider.example/order-agent");
+      seller.put("representatives",m("agent",m("readerKeys",key,"channel",representative)));
+      var representativeAccess=obj(Values.copy(obj(document.get("timelineAccess")).get("seller")));
+      representativeAccess.put("allowedTimelines",List.of(representative.get("timeline")));
+      obj(document.get("timelineAccess")).put("seller__agent",representativeAccess);
+      activation.put("accessPaths",List.of("/timelineAccess/seller","/timelineAccess/seller__agent"));
+      activation.put("readers",m("guarantor",key));
+      document.put("clauses",m("activation",m("parameters",m("readers",m("guarantor",key)))));
+      var needed=m("readerKeys",key,"representatives",m("agent",m("readerKeys",key)));
+      for(String variant:List.of("valid","revoked","restored","missing-access","missing-representative-grant","uninitialized","wrong-provider","different-representative","nonroot","bindings-self")) {
+        var actual=obj(Values.copy(document));var party=obj(Values.copy(needed));
+        var access=obj(obj(actual.get("timelineAccess")).get("seller"));
+        if(variant.equals("revoked"))access.put("allowedKeys",List.of());
+        if(variant.equals("missing-access"))obj(actual.get("timelineAccess")).clear();
+        if(variant.equals("missing-representative-grant"))obj(obj(actual.get("timelineAccess")).get("seller__agent")).put("allowedKeys",List.of());
+        if(variant.equals("uninitialized"))obj(access.get("contracts")).remove("initialized");
+        if(variant.equals("wrong-provider"))obj(obj(access.get("contracts")).get("provider")).put("provider",typed(values,"Coordination/Timeline Provider","publicKey",typed(values,"Coordination/Ed25519 Public Key","value","11".repeat(32)),"endpoint","https://foreign.example"));
+        if(variant.equals("different-representative"))obj(obj(party.get("representatives")).get("agent")).put("readerKeys",List.of("other-key"));
+        var parameters=m("sourcePaths",m("order",variant.equals("nonroot")?"/peer":""));
+        var bindings=variant.equals("bindings-self")?m("sources",m("order","self")):m();
+        var program=bex.compile(source,m("functions",functions,"constants",m("bindings",bindings)),null);
+        var context=new BexContext(actual,m(),m(),Values.UNDEFINED,m(),
+            m("call",m("request",m("parameters",parameters,"party",party))),"/",null,
+            (x,p)->values.matches(x,values.source(p,"definition")),(x,g)->NativeRuntime.identity(values.source(Values.blueValue(x))));
+        Object observed=bex.execute(program,context,1000000).value();
+        boolean result=Boolean.TRUE.equals(observed);
+        require(result==Set.of("valid","restored").contains(variant),"Root reader access guard "+variant+" result="+observed);
+      }
+      System.out.println("PASS root reader exact groups, grant and scope guards (predicate-level)");
+      rootReaderObserverGuards(values,document,needed);
+    }
+  }
+  static void rootReaderObserverGuards(ContractsExecution.Values values,Map<String,Object> base,Map<String,Object> needed)throws Exception {
+    var definition=values.source(m("type","Documents/Factory Functions"),"definition");
+    var functions=new LinkedHashMap<>(obj(values.bexData(values.select(definition,"/functions"))));
+    for(String file:List.of("admission-functions","preparation-functions"))functions.putAll(obj(obj(WireData.parse(Files.readString(Path.of("clause-documents/types/"+file+".blue")),"yaml")).get("functions")));
+    functions.put("configurationParameters",m("args",m(),"do",List.of(m("$return",m("sourcePaths",m("order",""))))));
+    functions.put("processStatePath",m("args",m(),"do",List.of(m("$return","/process_payment"))));
+    functions.keySet().retainAll(Set.of("rootSourceAccessLost","rootSourceReaderScope","rootSourceReaderGroupsMatch","rootSourceReaderPartyCovered","configurationParameters","processStatePath","readerGroups","transports","accessRecordsValid"));
+    functions=new LinkedHashMap<>(obj(values.bexData(values.select(values.source(m("functions",functions),"definition"),"/functions"))));
+    var bex=new Bex(BexProfile.current());
+    var program=bex.compile(m("do",List.of(m("$call",m("function","rootSourceAccessLost","args",m())))),m("functions",functions,"constants",m("bindings",m())),null);
+    for(String variant:List.of("valid","revoked","missing-reader","changed-reader","already-selected","unrelated")) {
+      var document=obj(Values.copy(base));
+      document.put("contracts",m("initialized",m("document",Values.copy(base))));
+      var party=obj(Values.copy(needed));party.remove("representatives");party.put("myosAccountId","guarantor");
+      var keys=party.get("readerKeys");
+      party.put("readerKeys",m("type","List","itemType","Text","schema",m("minItems",1,"maxItems",1,"uniqueItems",true),"items",keys));
+      if(variant.equals("unrelated"))party.put("readerKeys",List.of("foreign-reader"));
+      var item=m("status",variant.equals("already-selected")?"selected":"usable","itemPath","/process_payment/entries/one","nextActions",List.of(m("operation","secure")),"prepared",m("clauses",m("activation",m("parameters",m("parties",m("guarantor",party))))));
+      document.put("process_payment",m("entries",m("one",item)));
+      if(!variant.equals("valid"))obj(obj(document.get("timelineAccess")).get("seller")).put("allowedKeys",List.of());
+      if(variant.equals("missing-reader"))obj(document.get("activation")).put("readers",m());
+      if(variant.equals("changed-reader"))obj(document.get("activation")).put("readers",m("guarantor",List.of("different-key")));
+      var nativeDocument=values.view(values.source(document,"definition"));
+      var context=new BexContext(nativeDocument,m(),m(),Values.UNDEFINED,m(),m(),"/",null,
+          (x,p)->values.matches(x,values.source(p,"definition")),(x,g)->NativeRuntime.identity(values.source(Values.blueValue(x))));
+      var result=bex.execute(program,context,1000000);
+      boolean lost=Set.of("revoked","missing-reader","changed-reader").contains(variant);
+      require(result.events().isEmpty(),"Access observer must emit no domain events");
+      require(result.changeset().size()==(lost?2:0),"Reader observer "+variant+" changes="+result.changeset());
+      if(lost) {
+        require(obj(result.changeset().get(0)).get("val").equals("selected"),"Only downgrade selected status");
+        require(obj(result.changeset().get(1)).get("val").equals(List.of()),"Clear stale actions");
+      }
+    }
+    System.out.println("PASS frozen reader dependency observer, revoke/remove/change and no domain effects (native value/helper-level)");
   }
   static Map<String,Object> party(String timeline) {
     return m("lead",m("channel",m("actor","merchant","timeline",timeline)),

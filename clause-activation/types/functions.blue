@@ -1698,71 +1698,78 @@ functions:
                         path: /accessPaths
                         default: []
             then:
-            - $let:
-                name: request
-                expr:
-                  admissionRef:
-                    $var: ref
-                  expectedRevision:
-                    $pointerGet:
-                      object:
-                        $var: input
-                      path: /expectedRevision
-                  itemPath:
-                    $pointerGet:
-                      object:
-                        $var: input
-                      path: /itemPath
-                  clauseKey:
-                    $pointerGet:
-                      object:
-                        $var: input
-                      path: /clauseKey
-                  party:
-                    $var: role
-                  channel:
-                    $pointerGet:
-                      object:
-                        $var: party
-                      path: /lead/channel
-                  readerGroups:
-                    $var: groups
-                  ready: false
-                  accessPath:
-                    $concat:
-                    - /timelineAccess/
-                    - $var: role
-                  expectedAccessEntry:
-                    $choose:
-                      cond:
-                        $exists:
-                          $document:
-                            $concat:
-                            - /timelineAccess/
-                            - $var: role
-                            - /contracts/checkpoint/entries/provider/event
-                      then:
-                        $nodeBlueId:
-                          $document:
-                            $concat:
-                            - /timelineAccess/
-                            - $var: role
-                            - /contracts/checkpoint/entries/provider/event
-                      else: ''
-            - $set:
-                name: requests
-                expr:
-                  $objectSet:
-                    object:
-                      $var: requests
-                    key:
-                      $var: role
-                    val:
-                      $var: request
-            - $appendEvent:
-                $merge:
-                - type: Activation/Party Access Update Requested
-                - $var: request
+            - $forEach:
+                item: transport
+                key: transportKey
+                in:
+                  $call:
+                    function: transports
+                    args:
+                      roster:
+                        $var: one
+                do:
+                - $let:
+                    name: request
+                    expr:
+                      admissionRef:
+                        $var: ref
+                      expectedRevision:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /expectedRevision
+                      itemPath:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /itemPath
+                      clauseKey:
+                        $pointerGet:
+                          object:
+                            $var: input
+                          path: /clauseKey
+                      party:
+                        $var: role
+                      channel:
+                        $var: transport
+                      readerGroups:
+                        $var: groups
+                      ready: false
+                      accessPath:
+                        $concat:
+                        - /timelineAccess/
+                        - $var: transportKey
+                      expectedAccessEntry:
+                        $choose:
+                          cond:
+                            $exists:
+                              $document:
+                                $concat:
+                                - /timelineAccess/
+                                - $var: transportKey
+                                - /contracts/checkpoint/entries/provider/event
+                          then:
+                            $nodeBlueId:
+                              $document:
+                                $concat:
+                                - /timelineAccess/
+                                - $var: transportKey
+                                - /contracts/checkpoint/entries/provider/event
+                          else: ''
+                - $set:
+                    name: requests
+                    expr:
+                      $objectSet:
+                        object:
+                          $var: requests
+                        key:
+                          $var: transportKey
+                        val:
+                          $var: request
+                - $appendEvent:
+                    $merge:
+                    - type: Activation/Party Access Update Requested
+                    - $var: request
         key: role
     - $appendChange:
         op: add
@@ -1815,7 +1822,10 @@ functions:
                       $objectSet:
                         object: {}
                         key:
-                          $var: role
+                          $pointerGet:
+                            object:
+                              $var: request
+                            path: /party
                         val:
                           $pointerGet:
                             object:
@@ -1823,7 +1833,10 @@ functions:
                             path:
                               $concat:
                               - /
-                              - $var: role
+                              - $pointerGet:
+                                  object:
+                                    $var: request
+                                  path: /party
                 - $let:
                     name: ready
                     expr:

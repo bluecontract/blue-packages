@@ -108,6 +108,25 @@ agree. The containing clause supplies exactly those names through `bindings.sour
 `self` selects its own native instance; another pointer selects a particular existing
 document. An incoming observer never becomes an implicit parent.
 
+Alternatively, `parameters.sourcePaths` binds already initialized native documents
+directly into the prepared child's `sources`. Every declared dependency must have
+a matching path and satisfy its compiled type and field constraints. This mode
+does not require commercial activation of the source and does not grant access or
+approval. The exact selected reference is frozen during construction. Existing
+path aliases without declarations remain supported. Declared paths also install an
+ordinary embedded-source observer, so subsequent native versions of the same source
+can reach the child. The generated `documentSourceObservation_<native alias identity>` clause names
+are reserved. Undeclared path aliases do not acquire this observation behavior.
+
+A declared path selecting the current host root (`''`) participates in the existing
+missing-party admission lifecycle. The candidate source must retain the host's exact
+initialized origin and satisfy the compiled declaration. Required admission approval,
+participant consent, reader access and revision checks remain in force; admitting a
+participant does not commercially approve the host. A non-root path does not grant
+admission rights on the containing host. Do not combine this mode with
+`bindings.sources`; the latter retains its active-source, participant and subsequent
+source-binding checks.
+
 The plan freezes these declarations with the template snapshot and compiles native
 BEX `$is` checks. Preparation requires the declared type ancestry and field
 constraints; structural similarity alone does not make an Agreement an Order.
@@ -137,6 +156,15 @@ prepared requirement, added main identities, reader scope and Activation revisio
 The added party separately consents on its actual main channel. Existing commercial
 `required` and `approved` values are preserved when admission succeeds.
 
+For `prepareFor: bootstrap`, a mapped, explicitly nonsupplied Party slot does not
+create a new host participant when its frozen `bootstrapPrimary` exactly matches
+one current host Party and both the original and current child pass the existing
+bootstrap identity checks (actors, primary readers and representatives). Fresh
+child transports alone do not require admitting that mapped identity again. This
+recognition neither installs a host alias nor grants host authority. Missing,
+ambiguous or changed host witnesses do not qualify; supplied parties still require
+the ordinary admission and consent flow.
+
 `approveAdmission_<clause>_<party>` approves the exact pending proposal. Neither a
 provider response nor an event containing a party name is an approval. Admission
 also rechecks actual access at installation. A queued candidate cannot overwrite
@@ -162,3 +190,47 @@ Run Core's `scripts/import-independent-processes.py --source <blue-packages>` to
 copy a closed, integrity-checked package selection for the generic native tests.
 Its `--verify` mode checks the retained fixture bytes. The implementation ledger and
 ignored reports in the Core worktree distinguish passing evidence from pending work.
+
+The preparation planner emits only the canonical transitive function closure for
+`nextAdmissionRequest`, `admissionInstallRequest`, and `finishAdmission`. It checks
+the native identities of the canonical library and every included function once
+while constructing the plan, retaining the selected constants. Custom definitions
+(including overridden helpers or a missing canonical anchor) retain their complete
+selected definition. Function bodies, admission guards, effects, and the ordinary
+10,000,000 execution-gas limit are unchanged.
+
+### Pinned readers for independent bootstrap
+
+The reader-enabled candidate freezes an account descriptor with exactly
+`myosAccountId` and one nonempty `readerKeys` value. Provision checks the entire
+reader map against the initialized source, current activation configuration and
+runtime readers before normalizing that prepared root for source and policy
+comparison. Nested templates and native reader lists retain their exact content.
+This is representation validation, not account ownership or a grant: Core must
+validate the selected active account key, and initialized Timeline Access must
+cover the required transports separately.
+
+For explicitly declared root `sourcePaths`, an unmapped child party can remain a
+reader rather than enter the host roster when every nonempty principal and
+representative reader group exactly matches a declared/current host reader group
+and initialized provider-bound access covers every host transport. The same
+predicate participates in selected-child refresh. Neither `bindings.sources` nor
+non-root source paths gain this exception; ordinary admission remains available
+for other authored documents. This does not approve commercial terms or execute
+a payment. The new closure does not change identities of retained publications.
+
+A dedicated status observer shares Activation's existing ordered access channels.
+For a frozen root-reader dependency, loss of the current exact group or authentic
+access only downgrades `usable` to `selected` and clears `nextActions`. It neither
+reads an unavailable selected child nor emits attachment events or domain actions.
+Eligibility uses initialized reader declarations, so deleting a current reader
+cannot conceal that dependency. Restoration remains with normal `sharedRefresh`;
+no generic or financial handler bypasses Activation's dispatch policy.
+
+Readiness also observes local `/activation` updates through ordinary dispatch. This
+re-evaluates a selected document after an earlier destination update was denied
+while the host was inactive, or after access is restored. It uses the same compiled
+refresh and source guards. Refresh only writes process state, never `/activation`,
+and emits `Document Attached` only when status changes to `usable`; repeated
+activation updates do not replay financial operations. Historical package IDs
+retain their existing handlers.

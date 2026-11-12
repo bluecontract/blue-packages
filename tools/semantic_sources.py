@@ -178,6 +178,13 @@ def inventory(root):
     return dict(sorted(subjects.items())), definitions
 
 
+def context_wire(value):
+    """Deterministic UTF-8 presentation bytes; release wire identities stay unchanged."""
+    return json.dumps(value, ensure_ascii=False, sort_keys=True,
+                      separators=(',', ':')).encode('utf-8')
+
+
+
 def pointer(value):
     return isinstance(value, str) and value.startswith('/') and len(value) <= 256 and not re.search(r'\s|~(?![01])', value)
 
@@ -193,7 +200,7 @@ def executable_references(value):
 
 def evidence(blue_id, definitions):
     root = compact(definitions[blue_id])
-    require(len(wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
+    require(len(context_wire(root)) <= 200_000, 'Root definition exceeds semantic context budget: ' + blue_id)
     supplied, omitted, visited = {}, set(), {blue_id}
     # Keep the subject's executable specialization ahead of its large framework ancestry.
     queue = [(ref, 1) for ref in sorted(executable_references(root))]
@@ -208,8 +215,8 @@ def evidence(blue_id, definitions):
             continue
         visited.add(ref)
         value = compact(definitions[ref]) if ref in definitions else None
-        length = len(wire(value)) if value is not None else 0
-        if value is None or depth > 3 or len(supplied) >= 128 or size + length > 480_000:
+        length = len(context_wire(value)) if value is not None else 0
+        if value is None or depth > 3 or len(supplied) >= 128 or size + length > 240_000:
             omitted.add(ref)
             continue
         supplied[ref] = value

@@ -1,9 +1,95 @@
 name: Preparation Plan
 type: Connections/Connection Planning Functions
 constants:
-  admissionStepDefinition:
-    type: Documents/Admission Step Functions
+  admissionCanonicalDefinition:
+    type: Documents/Admission Functions
 functions:
+  assembleAdmissionDefinition:
+    args:
+      definition: {}
+      names: []
+      definitionPath:
+        type: Text
+      canonicalPath:
+        type: Text
+      clauses: {}
+      clauseKey:
+        type: Text
+    do:
+    - $return:
+        $call:
+          function: admissionDefinition
+          args:
+            definition:
+              $var: definition
+            names:
+              $var: names
+            definitionPath:
+              $var: definitionPath
+            canonicalPath:
+              $var: canonicalPath
+  admissionDefinition:
+    args:
+      definition: {}
+      definitionPath: {type: Text}
+      canonicalPath: {type: Text}
+      names: []
+    do:
+    # Project only the canonical library. Custom subtype implementations keep their
+    # complete definition, including any additional helper functions they introduce.
+    - $if:
+        cond: {$not: {$exists: {$document: {$var: canonicalPath}}}}
+        then:
+        - $return: {$var: definition}
+    - $if:
+        cond:
+          $ne:
+          - {$nodeBlueId: {$document: {$var: canonicalPath}}}
+          - $nodeBlueId:
+              $get:
+                object: {$literal: {type: Documents/Admission Functions}}
+                key: type
+        then:
+        - $return: {$var: definition}
+    - $let: {name: selected, expr: {}}
+    - $forEach:
+        item: functionName
+        in: {$var: names}
+        do:
+        - $let:
+            name: body
+            expr:
+              $document:
+                $concat: [{$var: definitionPath}, /functions/, {$var: functionName}]
+        - $if:
+            cond: {$not: {$exists: {$var: body}}}
+            then:
+            - $return: {$var: definition}
+        - $if:
+            cond:
+              $ne:
+              - {$nodeBlueId: {$var: body}}
+              - $nodeBlueId:
+                  $document:
+                    $concat: [{$var: canonicalPath}, /functions/, {$var: functionName}]
+            then:
+            - $return: {$var: definition}
+        - $set:
+            name: selected
+            expr:
+              $objectSet:
+                object: {$var: selected}
+                key: {$var: functionName}
+                val: {$var: body}
+    - $return:
+        $merge:
+        - type: Contracts/Compute Definition
+        - constants:
+            $choose:
+              cond: {$exists: {$document: {$concat: [{$var: definitionPath}, /constants]}}}
+              then: {$document: {$concat: [{$var: definitionPath}, /constants]}}
+              else: {}
+          functions: {$var: selected}
   validateConfiguration:
     args: {}
     do:
@@ -39,6 +125,46 @@ functions:
             $concat:
             - /clauseRuntime/work/candidate/
             - $const: clauseKey
+    # Refresh handlers need the same exact clause and frozen template context
+    # as action connections, without copying any action's execution bindings.
+    - $let: {name: refreshSnapshots, expr: {}}
+    - $forEach:
+        item: snapshotName
+        in: {$list: {$document: {$concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/snapshotBindings]}}}
+        do:
+        - $let:
+            name: snapshotPath
+            expr: {$get: {object: {$pointerGet: {object: {$var: clause}, path: /bindings, default: {}}}, key: {$var: snapshotName}}}
+        - $if:
+            cond: {$exists: {$var: snapshotPath}}
+            then:
+            - $failIf:
+                cond: {$not: {$isKind: {val: {$var: snapshotPath}, kind: text}}}
+                message: SNAPSHOT_BINDING_PATH_REQUIRED
+            - $let: {name: snapshot, expr: {$document: {$var: snapshotPath}}}
+            - $failIf:
+                cond: {$not: {$exists: {$var: snapshot}}}
+                message: SNAPSHOT_BINDING_MISSING
+            - $set:
+                name: refreshSnapshots
+                expr: {$objectSet: {object: {$var: refreshSnapshots}, key: {$var: snapshotName}, val: {$var: snapshot}}}
+    - $let:
+        name: refreshFunctions
+        expr:
+          connectionConfiguration:
+            args: {}
+            expr: {$objectFromEntries: [{key: $literal, val: {$var: clause}}]}
+          connectionSnapshots:
+            args: {}
+            expr: {$objectFromEntries: [{key: $literal, val: {$var: refreshSnapshots}}]}
+    - $let:
+        name: refreshBindings
+        expr:
+          $choose:
+            cond: {$exists: {$pointerGet: {object: {$var: clause}, path: /bindings/sources}}}
+            then:
+              sources: {$pointerGet: {object: {$var: clause}, path: /bindings/sources}}
+            else: {}
     - $let:
         name: destinationBinding
         expr:
@@ -124,10 +250,11 @@ functions:
                     - type: Contracts/Compute
                     - definition:
                         $var: definition
+                      functions: {$var: refreshFunctions}
                       constants:
                         clauseKey:
                           $const: clauseKey
-                        bindings: {}
+                        bindings: {$var: refreshBindings}
                       do:
                         $literal:
                         - $call:
@@ -172,6 +299,72 @@ functions:
                   $concat:
                   - processEmbedded_
                   - $const: clauseKey
+    # A destination update denied before activation is not replayed. Re-evaluate
+    # on the later local transition using ordinary dispatch and the same guards.
+    # Refresh writes process state only, so it cannot trigger this channel itself.
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object: {$var: plan}
+            path: {$concat: [/contracts/processActivation_, {$const: clauseKey}]}
+            val:
+              kind: channel
+              contract:
+                $merge:
+                - type: Contracts/Document Update Channel
+                - path: /activation
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object: {$var: plan}
+            path: {$concat: [/contracts/refreshActivationProcesses_, {$const: clauseKey}]}
+            val:
+              $pointerSet:
+                object:
+                  $pointerGet:
+                    object: {$var: plan}
+                    path: {$concat: [/contracts/refreshProcesses_, {$const: clauseKey}]}
+                path: /contract/channel
+                val: {$concat: [processActivation_, {$const: clauseKey}]}
+    # Reuse Activation's exact ordered access channels. No generic child or
+    # financial handler is admitted while access is unavailable.
+    - $let: {name: accessIndex, expr: 0}
+    - $forEach:
+        item: accessPath
+        in:
+          $pointerGet:
+            object: {$document: /clauseRuntime/work/candidate/activation/parameters}
+            path: /accessPaths
+            default: []
+        do:
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object: {$var: plan}
+                path: {$concat: [/contracts/rootSourceAccess_, {$const: clauseKey}, _, {$text: {$var: accessIndex}}]}
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel: {$concat: [activationAccess, {$text: {$var: accessIndex}}]}
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition: {$var: definition}
+                          functions: {$var: refreshFunctions}
+                          constants:
+                            clauseKey: {$const: clauseKey}
+                            bindings: {$var: refreshBindings}
+                          do:
+                            $literal:
+                            - $call:
+                                function: rootSourceAccessLost
+                                args: {}
+        - $set: {name: accessIndex, expr: {$add: [{$var: accessIndex}, 1]}}
     - $set:
         name: plan
         expr:
@@ -207,401 +400,21 @@ functions:
       base: {}
       definition: {}
     do:
-    - $let:
-        name: approvers
-        expr:
-          $pointerGet:
-            object:
-              $document: /clauseRuntime/work/candidate/activation/parameters
-            path: /admission/approvers
-            default: []
-    - $if:
-        cond:
-          $eq:
-          - $size:
-              $var: approvers
-          - 0
-        then:
-        - $return:
-            $var: base
-    - $let:
-        name: admissionDefinition
-        expr:
-          $var: definition
-    - $if:
-        cond:
-          $and:
-          - $isKind:
-              val:
-                $var: definition
-              kind: object
-          - $call:
-              function: matchesAdmissionStepFunctions
-              args:
-                definition:
-                  $var: definition
-        then:
-        - $set:
-            name: admissionDefinition
-            expr:
-              $objectFromEntries:
-              - key: blueId
-                val:
-                  $nodeBlueId:
-                    $const: admissionStepDefinition
-    - $let:
-        name: seen
-        expr: []
-    - $forEach:
-        item: role
-        in:
-          $var: approvers
-        do:
-        - $failIf:
-            cond:
-              $not:
-                $hasKey:
-                  object:
-                    $document: /clauseRuntime/work/candidate/activation/parameters/parties
-                  key:
-                    $var: role
-            message: ADMISSION_APPROVER_NOT_A_PARTY
-        - $failIf:
-            cond:
-              $includes:
-                list:
-                  $var: seen
-                val:
-                  $var: role
-            message: ADMISSION_DUPLICATE_APPROVER
-        - $set:
-            name: seen
-            expr:
-              $listConcat:
-              - $var: seen
-              - - $var: role
-    - $let:
-        name: statePath
-        expr:
-          $concat:
-          - /process_
-          - $const: clauseKey
-    - $let:
-        name: plan
-        expr:
-          $pointerSet:
-            object:
-              $var: base
-            path: /states/process/initial/admission
-            val:
-              ledger:
-                revision: 1
-                proposal: {}
-                history: {}
-              grants: {}
-              editable: true
-              retired: {}
-    - $let:
-        name: amendmentConstants
-        expr:
-          clauseKey:
-            $concat:
-            - admission_
-            - $const: clauseKey
-          bindings:
-            state:
-              $concat:
-              - $var: statePath
-              - /admission/ledger
-            editable:
-              $concat:
-              - $var: statePath
-              - /admission/editable
-          parameters:
-            approvers:
-              $var: approvers
-            paths:
-            - $concat:
-              - $var: statePath
-              - /admission/grants
-    - $let:
-        name: sharedConstants
-        expr:
-          clauseKey:
-            $const: clauseKey
-          bindings: {}
-    - $let:
-        name: steps
-        expr:
-        - $merge:
-          - type: Contracts/Compute
-          - name: nextAdmission
-            definition:
-              $var: admissionDefinition
-            constants:
-              $var: sharedConstants
-            do:
-              $literal:
-              - $return:
-                  $call:
-                    function: nextAdmissionRequest
-                    args: {}
-        - $merge:
-          - type: Contracts/Compute
-          - name: openAdmission
-            definition:
-              $objectFromEntries:
-              - key: blueId
-                val:
-                  $nodeBlueId:
-                    type: Amendments/Amendments Functions
-            constants:
-              $var: amendmentConstants
-            do:
-              $literal:
-              - $if:
-                  cond:
-                    $not:
-                      $steps:
-                        path: /ready
-                        step: nextAdmission
-                  then:
-                  - $return:
-                      outcome: skipped
-              - $return:
-                  $call:
-                    function: recordProposal
-                    args:
-                      input:
-                        $steps:
-                          path: /request
-                          step: nextAdmission
-        - $merge:
-          - type: Contracts/Compute
-          - name: installAdmission
-            definition:
-              $var: admissionDefinition
-            constants:
-              $var: sharedConstants
-            do:
-              $literal:
-              - $return:
-                  $call:
-                    function: admissionInstallRequest
-                    args: {}
-        - $merge:
-          - type: Contracts/Compute
-          - name: activateAdmission
-            definition:
-              $objectFromEntries:
-              - key: blueId
-                val:
-                  $nodeBlueId:
-                    type: Activation/Activation Functions
-            do:
-              $literal:
-              - $if:
-                  cond:
-                    $not:
-                      $steps:
-                        path: /ready
-                        step: installAdmission
-                  then:
-                  - $return:
-                      outcome: skipped
-              - $return:
-                  $call:
-                    function: admitApprovedParties
-                    args:
-                      input:
-                        $merge:
-                        - $steps:
-                            path: /request
-                            step: installAdmission
-                        - runtimeDefinition:
-                            $const: runtimeDefinition
-            constants:
-              runtimeDefinition:
-                $objectFromEntries:
-                - key: blueId
-                  val:
-                    $nodeBlueId:
-                      type: Activation/Activation Functions
-        - $merge:
-          - type: Contracts/Compute
-          - name: finishAdmission
-            definition:
-              $var: admissionDefinition
-            constants:
-              $var: sharedConstants
-            do:
-              $literal:
-              - $if:
-                  cond:
-                    $not:
-                      $steps:
-                        path: /ready
-                        step: installAdmission
-                  then:
-                  - $return:
-                      outcome: skipped
-              - $return:
-                  $call:
-                    function: finishAdmission
-                    args:
-                      input:
-                        $steps: installAdmission
-    - $forEach:
-        item: watchPath
-        in:
-          process:
-            $var: statePath
-          activation: /activation
-        do:
-        - $let:
-            name: channelName
-            expr:
-              $concat:
-              - admissionUpdate_
-              - $const: clauseKey
-              - _
-              - $text:
-                  $var: watchIndex
-        - $set:
-            name: plan
-            expr:
-              $pointerSet:
-                object:
-                  $var: plan
-                path:
-                  $concat:
-                  - /contracts/
-                  - $var: channelName
-                val:
-                  kind: channel
-                  contract:
-                    $merge:
-                    - type: Contracts/Document Update Channel
-                    - path:
-                        $var: watchPath
-        - $set:
-            name: plan
-            expr:
-              $pointerSet:
-                object:
-                  $var: plan
-                path:
-                  $concat:
-                  - /contracts/
-                  - $var: channelName
-                  - Handler
-                val:
-                  kind: handler
-                  contract:
-                    $merge:
-                    - type: Contracts/Sequential Workflow
-                    - channel:
-                        $var: channelName
-                      steps:
-                        $var: steps
-        key: watchIndex
-    - $forEach:
-        item: role
-        in:
-          $var: approvers
-        do:
-        - $set:
-            name: plan
-            expr:
-              $pointerSet:
-                object:
-                  $var: plan
-                path:
-                  $concat:
-                  - /contracts/approveAdmission_
-                  - $const: clauseKey
-                  - _
-                  - $var: role
-                val:
-                  kind: handler
-                  contract:
-                    $merge:
-                    - type: Contracts/Sequential Workflow Operation
-                    - channel:
-                        $var: role
-                      steps:
-                      - $merge:
-                        - type: Contracts/Compute
-                        - definition:
-                            $objectFromEntries:
-                            - key: blueId
-                              val:
-                                $nodeBlueId:
-                                  type: Amendments/Amendments Functions
-                          constants:
-                            $var: amendmentConstants
-                          do:
-                            $literal:
-                            - $failIf:
-                                cond:
-                                  $ne:
-                                  - $binding: call/requireExactDocumentVersion
-                                  - true
-                                message: EXACT_REVIEW_REQUIRED
-                            - $return:
-                                $call:
-                                  function: approve
-                                  args:
-                                    input:
-                                      $binding: call/request
-                    - $literal:
-                        $blue:requestFrom:
-                          definition:
-                            type: Amendments/Amendments Functions
-                          function: approve
-                          argument: input
-        - $set:
-            name: plan
-            expr:
-              $pointerSet:
-                object:
-                  $var: plan
-                path:
-                  $concat:
-                  - /contracts/rebaseAdmission_
-                  - $const: clauseKey
-                  - _
-                  - $var: role
-                val:
-                  kind: handler
-                  contract:
-                    $merge:
-                    - type: Contracts/Sequential Workflow Operation
-                    - channel:
-                        $var: role
-                      steps:
-                      - $merge:
-                        - type: Contracts/Compute
-                        - definition:
-                            $var: definition
-                          constants:
-                            $var: sharedConstants
-                          do:
-                            $literal:
-                            - $return:
-                                $call:
-                                  function: rebaseAdmissionPublic
-                                  args:
-                                    input:
-                                      $binding: call/request
-                    - $literal:
-                        $blue:requestFrom:
-                          definition:
-                            type: Documents/Admission Functions
-                          function: rebaseAdmissionPublic
-                          argument: input
     - $return:
-        $var: plan
+        $call:
+          function: assembleAdmissionPlan
+          args:
+            base:
+              $var: base
+            definition:
+              $var: definition
+            clauses:
+              $document: /clauseRuntime/work/candidate
+            clauseKey:
+              $const: clauseKey
+  assembleAdmissionPlan:
+    $blue:functionFrom:
+      type: Documents/Admission Plan Function
   planDocumentAccess:
     args:
       base: {}
@@ -915,295 +728,3 @@ functions:
                           $var: compute
     - $return:
         $var: base
-  isAdmissionDefinitionReference:
-    args:
-      candidateRef: {}
-    do:
-    - $if:
-        cond:
-          $not:
-            $isKind:
-              val:
-                $var: candidateRef
-              kind: object
-        then:
-        - $return: false
-    - $return:
-        $and:
-        - $eq:
-          - $size:
-              $keys:
-                $var: candidateRef
-          - 1
-        - $isKind:
-            val:
-              $pointerGet:
-                object:
-                  $var: candidateRef
-                path: /blueId
-                default: ''
-            kind: text
-        - $hasKey:
-            object:
-              $var: candidateRef
-            key: blueId
-  matchesAdmissionStepFunctions:
-    args:
-      definition: {}
-    do:
-    - $if:
-        cond:
-          $not:
-            $call:
-              function: isAdmissionDefinitionReference
-              args:
-                candidateRef:
-                  $var: definition
-        then:
-        - $return: false
-    - $let:
-        name: clauseTypePath
-        expr:
-          $concat:
-          - /clauseRuntime/work/candidate/
-          - $const: clauseKey
-          - /type
-    - $let:
-        name: actionDefinitionPath
-        expr:
-          $concat:
-          - $var: clauseTypePath
-          - /actionDefinition/type
-    - $let:
-        name: scopeDefinitionPath
-        expr:
-          $concat:
-          - $var: clauseTypePath
-          - /hookDefinition/constants/admissionStepDefinition/type
-    - $let:
-        name: effectiveDefinition
-        expr:
-          $document:
-            $var: actionDefinitionPath
-    - $if:
-        cond:
-          $not:
-            $isKind:
-              val:
-                $var: effectiveDefinition
-              kind: object
-        then:
-        - $return: false
-    - $if:
-        cond:
-          $not:
-            $eq:
-            - $pointerGet:
-                object:
-                  $var: definition
-                path: /blueId
-                default: ''
-            - $nodeBlueId:
-                $var: effectiveDefinition
-        then:
-        - $return: false
-    - $if:
-        cond:
-          $and:
-          - $eq:
-            - $var: definition
-            - $pointerGet:
-                object:
-                  type: Documents/Document Preparation Functions
-                path: /type
-          - $eq:
-            - $const: admissionStepDefinition
-            - type: Documents/Admission Step Functions
-        then:
-        - $return: true
-    - $forEach:
-        item: field
-        in:
-          $keys:
-            $var: effectiveDefinition
-        do:
-        - $if:
-            cond:
-              $not:
-                $includes:
-                  list:
-                  - type
-                  - name
-                  - description
-                  - constants
-                  - functions
-                  - specification
-                  - order
-                  val:
-                    $var: field
-            then:
-            - $return: false
-    - $let:
-        name: effectiveConstants
-        expr:
-          $document:
-            $concat:
-            - $var: actionDefinitionPath
-            - /constants
-    - $if:
-        cond:
-          $exists:
-            $var: effectiveConstants
-        then:
-        - $if:
-            cond:
-              $not:
-                $isKind:
-                  val:
-                    $var: effectiveConstants
-                  kind: object
-            then:
-            - $return: false
-        - $if:
-            cond:
-              $not:
-                $eq:
-                - $size:
-                    $keys:
-                      $var: effectiveConstants
-                - 0
-            then:
-            - $return: false
-    - $let:
-        name: scopeConstants
-        expr:
-          $document:
-            $concat:
-            - $var: scopeDefinitionPath
-            - /constants
-    - $if:
-        cond:
-          $exists:
-            $var: scopeConstants
-        then:
-        - $if:
-            cond:
-              $not:
-                $isKind:
-                  val:
-                    $var: scopeConstants
-                  kind: object
-            then:
-            - $return: false
-        - $if:
-            cond:
-              $not:
-                $eq:
-                - $size:
-                    $keys:
-                      $var: scopeConstants
-                - 0
-            then:
-            - $return: false
-    - $let:
-        name: scopeFunctionNames
-        expr:
-          $keys:
-            $document:
-              $concat:
-              - $var: scopeDefinitionPath
-              - /functions
-    - $if:
-        cond:
-          $not:
-            $eq:
-            - $size:
-                $var: scopeFunctionNames
-            - 12
-        then:
-        - $return: false
-    - $forEach:
-        item: functionName
-        in:
-        - accessRecordsValid
-        - accessValid
-        - admissionInstallRequest
-        - finishAdmission
-        - installAdmissionConsentOperations
-        - nextAdmissionRequest
-        - readerGroups
-        - requireRosterCoverage
-        - requireSameMainParty
-        - retireAdmission
-        - retireInvalidAdmission
-        - transports
-        do:
-        - $if:
-            cond:
-              $not:
-                $includes:
-                  list:
-                    $var: scopeFunctionNames
-                  val:
-                    $var: functionName
-            then:
-            - $return: false
-        - $let:
-            name: expectedFunction
-            expr:
-              $document:
-                path:
-                  $concat:
-                  - $var: scopeDefinitionPath
-                  - /functions/
-                  - $var: functionName
-                view: definition
-        - $let:
-            name: actualFunction
-            expr:
-              $document:
-                path:
-                  $concat:
-                  - $var: actionDefinitionPath
-                  - /functions/
-                  - $var: functionName
-                view: definition
-        - $if:
-            cond:
-              $not:
-                $and:
-                - $isKind:
-                    val:
-                      $var: expectedFunction
-                    kind: object
-                - $call:
-                    function: isAdmissionDefinitionReference
-                    args:
-                      candidateRef:
-                        $var: expectedFunction
-            then:
-            - $return: false
-        - $if:
-            cond:
-              $not:
-                $and:
-                - $isKind:
-                    val:
-                      $var: actualFunction
-                    kind: object
-                - $call:
-                    function: isAdmissionDefinitionReference
-                    args:
-                      candidateRef:
-                        $var: actualFunction
-            then:
-            - $return: false
-        - $if:
-            cond:
-              $not:
-                $eq:
-                - $var: actualFunction
-                - $var: expectedFunction
-            then:
-            - $return: false
-    - $return: true

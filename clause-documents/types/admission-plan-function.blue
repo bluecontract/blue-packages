@@ -1,0 +1,454 @@
+args:
+  base: {}
+  definition: {}
+  clauses: {}
+  clauseKey:
+    type: Text
+do:
+- $let:
+    name: approvers
+    expr:
+      $pointerGet:
+        object:
+          $pointerGet:
+            object:
+              $var: clauses
+            path: /activation/parameters
+        path: /admission/approvers
+        default: []
+- $if:
+    cond:
+      $eq:
+      - $size:
+          $var: approvers
+      - 0
+    then:
+    - $return:
+        $var: base
+- $let:
+    name: seen
+    expr: []
+- $forEach:
+    item: role
+    in:
+      $var: approvers
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $hasKey:
+              object:
+                $pointerGet:
+                  object:
+                    $var: clauses
+                  path: /activation/parameters/parties
+              key:
+                $var: role
+        message: ADMISSION_APPROVER_NOT_A_PARTY
+    - $failIf:
+        cond:
+          $includes:
+            list:
+              $var: seen
+            val:
+              $var: role
+        message: ADMISSION_DUPLICATE_APPROVER
+    - $set:
+        name: seen
+        expr:
+          $listConcat:
+          - $var: seen
+          - - $var: role
+- $let:
+    name: statePath
+    expr:
+      $concat:
+      - /process_
+      - $var: clauseKey
+- $let:
+    name: plan
+    expr:
+      $pointerSet:
+        object:
+          $var: base
+        path: /states/process/initial/admission
+        val:
+          ledger:
+            revision: 1
+            proposal: {}
+            history: {}
+          grants: {}
+          editable: true
+          retired: {}
+- $let:
+    name: amendmentConstants
+    expr:
+      clauseKey:
+        $concat:
+        - admission_
+        - $var: clauseKey
+      bindings:
+        state:
+          $concat:
+          - $var: statePath
+          - /admission/ledger
+        editable:
+          $concat:
+          - $var: statePath
+          - /admission/editable
+      parameters:
+        approvers:
+          $var: approvers
+        paths:
+        - $concat:
+          - $var: statePath
+          - /admission/grants
+- $let:
+    name: sharedConstants
+    expr:
+      clauseKey:
+        $var: clauseKey
+      bindings: {}
+- $let:
+    name: steps
+    expr:
+    - $merge:
+      - type: Contracts/Compute
+      - name: nextAdmission
+        definition:
+          $call:
+            function: assembleAdmissionDefinition
+            args:
+              definition:
+                $var: definition
+              definitionPath:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $var: clauseKey
+                - /type/actionDefinition/type
+              canonicalPath:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $var: clauseKey
+                - /type/hookDefinition/type/constants/admissionCanonicalDefinition/type
+              names:
+              - nextAdmissionRequest
+              - retireInvalidAdmission
+              - retireAdmission
+              clauses:
+                $var: clauses
+              clauseKey:
+                $var: clauseKey
+        constants:
+          $var: sharedConstants
+        do:
+          $literal:
+          - $return:
+              $call:
+                function: nextAdmissionRequest
+                args: {}
+    - $merge:
+      - type: Contracts/Compute
+      - name: openAdmission
+        definition:
+          $objectFromEntries:
+          - key: blueId
+            val:
+              $nodeBlueId:
+                type: Amendments/Amendments Functions
+        constants:
+          $var: amendmentConstants
+        do:
+          $literal:
+          - $if:
+              cond:
+                $not:
+                  $steps:
+                    path: /ready
+                    step: nextAdmission
+              then:
+              - $return:
+                  outcome: skipped
+          - $return:
+              $call:
+                function: recordProposal
+                args:
+                  input:
+                    $steps:
+                      path: /request
+                      step: nextAdmission
+    - $merge:
+      - type: Contracts/Compute
+      - name: installAdmission
+        definition:
+          $call:
+            function: assembleAdmissionDefinition
+            args:
+              definition:
+                $var: definition
+              definitionPath:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $var: clauseKey
+                - /type/actionDefinition/type
+              canonicalPath:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $var: clauseKey
+                - /type/hookDefinition/type/constants/admissionCanonicalDefinition/type
+              names:
+              - admissionInstallRequest
+              - installAdmissionConsentOperations
+              - accessValid
+              - accessRecordsValid
+              - readerGroups
+              - transports
+              clauses:
+                $var: clauses
+              clauseKey:
+                $var: clauseKey
+        constants:
+          $var: sharedConstants
+        do:
+          $literal:
+          - $return:
+              $call:
+                function: admissionInstallRequest
+                args: {}
+    - $merge:
+      - type: Contracts/Compute
+      - name: activateAdmission
+        definition:
+          $objectFromEntries:
+          - key: blueId
+            val:
+              $nodeBlueId:
+                type: Activation/Activation Functions
+        do:
+          $literal:
+          - $if:
+              cond:
+                $not:
+                  $steps:
+                    path: /ready
+                    step: installAdmission
+              then:
+              - $return:
+                  outcome: skipped
+          - $return:
+              $call:
+                function: admitApprovedParties
+                args:
+                  input:
+                    $merge:
+                    - $steps:
+                        path: /request
+                        step: installAdmission
+                    - runtimeDefinition:
+                        $const: runtimeDefinition
+        constants:
+          runtimeDefinition:
+            $objectFromEntries:
+            - key: blueId
+              val:
+                $nodeBlueId:
+                  type: Activation/Activation Functions
+    - $merge:
+      - type: Contracts/Compute
+      - name: finishAdmission
+        definition:
+          $call:
+            function: assembleAdmissionDefinition
+            args:
+              definition:
+                $var: definition
+              definitionPath:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $var: clauseKey
+                - /type/actionDefinition/type
+              canonicalPath:
+                $concat:
+                - /clauseRuntime/work/candidate/
+                - $var: clauseKey
+                - /type/hookDefinition/type/constants/admissionCanonicalDefinition/type
+              names:
+              - finishAdmission
+              - requireRosterCoverage
+              - requireSameMainParty
+              clauses:
+                $var: clauses
+              clauseKey:
+                $var: clauseKey
+        constants:
+          $var: sharedConstants
+        do:
+          $literal:
+          - $if:
+              cond:
+                $not:
+                  $steps:
+                    path: /ready
+                    step: installAdmission
+              then:
+              - $return:
+                  outcome: skipped
+          - $return:
+              $call:
+                function: finishAdmission
+                args:
+                  input:
+                    $steps: installAdmission
+- $forEach:
+    item: watchPath
+    in:
+      process:
+        $var: statePath
+      activation: /activation
+    do:
+    - $let:
+        name: channelName
+        expr:
+          $concat:
+          - admissionUpdate_
+          - $var: clauseKey
+          - _
+          - $text:
+              $var: watchIndex
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/
+              - $var: channelName
+            val:
+              kind: channel
+              contract:
+                $merge:
+                - type: Contracts/Document Update Channel
+                - path:
+                    $var: watchPath
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/
+              - $var: channelName
+              - Handler
+            val:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow
+                - channel:
+                    $var: channelName
+                  steps:
+                    $var: steps
+    key: watchIndex
+- $forEach:
+    item: role
+    in:
+      $var: approvers
+    do:
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/approveAdmission_
+              - $var: clauseKey
+              - _
+              - $var: role
+            val:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow Operation
+                - channel:
+                    $var: role
+                  steps:
+                  - $merge:
+                    - type: Contracts/Compute
+                    - definition:
+                        $objectFromEntries:
+                        - key: blueId
+                          val:
+                            $nodeBlueId:
+                              type: Amendments/Amendments Functions
+                      constants:
+                        $var: amendmentConstants
+                      do:
+                        $literal:
+                        - $failIf:
+                            cond:
+                              $ne:
+                              - $binding: call/requireExactDocumentVersion
+                              - true
+                            message: EXACT_REVIEW_REQUIRED
+                        - $return:
+                            $call:
+                              function: approve
+                              args:
+                                input:
+                                  $binding: call/request
+                - $literal:
+                    $blue:requestFrom:
+                      definition:
+                        type: Amendments/Amendments Functions
+                      function: approve
+                      argument: input
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object:
+              $var: plan
+            path:
+              $concat:
+              - /contracts/rebaseAdmission_
+              - $var: clauseKey
+              - _
+              - $var: role
+            val:
+              kind: handler
+              contract:
+                $merge:
+                - type: Contracts/Sequential Workflow Operation
+                - channel:
+                    $var: role
+                  steps:
+                  - $merge:
+                    - type: Contracts/Compute
+                    - definition:
+                        $var: definition
+                      constants:
+                        $var: sharedConstants
+                      do:
+                        $literal:
+                        - $return:
+                            $call:
+                              function: rebaseAdmissionPublic
+                              args:
+                                input:
+                                  $binding: call/request
+                - $literal:
+                    $blue:requestFrom:
+                      definition:
+                        type: Documents/Admission Functions
+                      function: rebaseAdmissionPublic
+                      argument: input
+- $return:
+    $var: plan
+name: Admission Plan Function
+description: Pure admission contract assembly shared by the planner and strict supplied-child validation.

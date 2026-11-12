@@ -13,9 +13,11 @@ Run `python3 tools/check_admission_scope.py` with Python 3.13 when preparing a
 Documents edition. The release job uses the checked-in Language reference and
 the compiler pinned by the BEX publication to read the selected archive,
 verify the whole-function references and empty effective constants, and
-compile the Plan and its three admission steps. The gate derives the exact
-scope from the compiled calls and models the selector with archive identities
-to check the stock read trap and custom fallback. Java runtime qualification
+compile the extracted Plan and each of its three admission steps against its own
+exact function closure. The exported combined scope remains available and must match
+the same-edition stock functions. The gate derives closures from compiled calls and
+executes the selector with archive identities to check bounded reads, preserved custom
+constants, and retention of customized functions or changed/missing anchors. Java runtime qualification
 covers native definition reads and the original admission and Reseller flows
 at the published gas limit.
 

@@ -56,3 +56,41 @@ retained entries, a retry after the former boundary and cold restoration.
 Customer Orders uses native Documents preparation/provision and independent bootstrap. In preview.2, `prepareOrder` takes `catalogRevision` and `lines` instead of a stored `quoteKey`. Shared Catalog Functions validate and price the selected items; the prepared Order retains the frozen calculation, currency and optional fulfilment terms. The `catalog` pointer replaces the `quotes` binding. New preparations require the current revision; identical retries retain the original prepared document even after a catalog change. The standalone Catalog Clause still supports explicit quotation workflows when configured, without requiring a quote store for catalog-only use.
 
 The constructor is the only customization of the standard shared preparation lifecycle; `tools/test_reseller_composition.py` checks this seam against the selected Documents source. Shared function references use exact native node identities. See `examples/reseller/README.md` for the request contract and historical fixture boundary. Earlier execution results above apply to the previous embedded factory edition, not this transport contract.
+
+## Hosted reseller checkout
+
+`Customer Orders Bootstrap Clause` is the target clause for the current MyOS
+hosted reseller checkout. `Customer Orders Clause` remains the independent
+catalog-priced mechanism already supported on main; it is not a fallback or an
+older edition of this checkout. Its examples below retain their own qualification
+boundary. The hosted clause's partner `startOrder` request accepts
+`{key, requestId, customer, quoteKey, description?, groups?}`; the catalog-priced
+preview.3 request above is not silently substituted for it. It freezes the exact
+quote/customer/commercial snapshot and uses ordinary Documents independent
+bootstrap with native source, party, access, requirement and origin validation.
+The complete authored connection configuration is frozen during preparation.
+The current payment integration gives the guarantor Reader access to the Order
+through its frozen reader key and keeps it a party to the Payment Instruction.
+Card authorization does not replace the Order's commercial approval. The
+concrete MyOS instruction type selects Stripe or Test; there is no `provider`
+switch in the PI.
+Only this profile explicitly selects a valid initialized Order while it is still
+commercially inactive. Selection does not approve the Order or make it usable;
+missing-party admission still waits for its normal consent and access lifecycle.
+
+`bootstrap-composition.json` records the reused exact native function identities.
+Additional fixed-account child roles remain checked against the prepared template;
+this does not grant those roles access to the Agreement. The shared admission
+proof remains needed by the maintained added-guarantor provision conformance case.
+Commission's guarded `attached` action remains for the supported continuation that
+provides a current publication after earlier financial outputs; historical receiving
+from INITIALIZE is qualified separately with that action disabled only in its test.
+An attached Order without a Payment Instruction leaves existing commission targets
+unchanged; malformed amounts and invalid identity/access still fail their guards.
+
+`source-import.json` is immutable provenance of the original owner-supplied handoff,
+not a claim that all current authored sources still equal that historical import.
+The task's native component tests and upstream reservation/catalog examples have
+separate qualification boundaries. Package selection and semantic cards alone do
+not establish hosted execution or financial acceptance. No semantic model call is
+required to build or verify the native archive.

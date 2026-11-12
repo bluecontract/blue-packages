@@ -40,12 +40,18 @@ def effective_map(bridge, node, field):
 
 
 def step_programs(plan):
-    body = plan['functions']['planAdmission']['do']
+    require(plan['functions']['planAdmission']['do'] == [{'$return': {'$call': {
+        'function': 'assembleAdmissionPlan', 'args': {
+            'base': {'$var': 'base'}, 'definition': {'$var': 'definition'},
+            'clauses': {'$document': '/clauseRuntime/work/candidate'},
+            'clauseKey': {'$const': 'clauseKey'}}}}}],
+        'Admission entry must delegate to the selected extracted planner')
+    body = plan['functions']['assembleAdmissionPlan']['do']
     bindings = {statement['$let']['name']: statement['$let']['expr']
                 for statement in body if '$let' in statement}
-    require(bindings['sharedConstants'] == {'clauseKey': {'$const': 'clauseKey'}, 'bindings': {}},
+    require(bindings['sharedConstants'] == {'clauseKey': {'$var': 'clauseKey'}, 'bindings': {}},
             'Admission step constants changed')
-    programs = {}
+    programs, selections = {}, {}
     for merge in bindings['steps']:
         require(isinstance(merge, dict) and merge.keys() == {'$merge'}
                 and isinstance(merge['$merge'], list), 'Expected a merged admission step')
@@ -53,129 +59,131 @@ def step_programs(plan):
         for part in merge['$merge']:
             require(isinstance(part, dict) and all(not key.startswith('$') for key in part),
                     'Admission step merge requires literal object operands')
-            # BEX merge is shallow and later operands replace earlier members.
             step.update(part)
         name = step.get('name')
         require(isinstance(name, str), 'Expected a literal admission step name')
         if name not in STEPS:
             continue
         require(name not in programs, 'Duplicate admission step: ' + name)
-        require(step.get('definition') == {'$var': 'admissionDefinition'},
+        selection = step.get('definition', {}).get('$call', {})
+        require(selection.get('function') == 'assembleAdmissionDefinition',
                 'Wrong scoped definition binding: ' + name)
-        require(step.get('constants') == {'$var': 'sharedConstants'},
-                'Wrong admission constants binding: ' + name)
+        args = selection.get('args', {})
+        require(args.get('definition') == {'$var': 'definition'}, 'Wrong source definition: ' + name)
+        for field, suffix in (('definitionPath', '/type/actionDefinition/type'),
+                              ('canonicalPath', '/type/hookDefinition/type/constants/admissionCanonicalDefinition/type')):
+            require(args.get(field) == {'$concat': ['/clauseRuntime/work/candidate/',
+                                                  {'$var': 'clauseKey'}, suffix]},
+                    'Wrong same-clause definition path: ' + name)
+        selected = args.get('names', [])
+        require(selected and len(selected) == len(set(selected)), 'Missing or duplicate closure: ' + name)
+        require(step.get('constants') == {'$var': 'sharedConstants'}, 'Wrong admission constants binding: ' + name)
         quoted = step.get('do')
         require(isinstance(quoted, dict) and quoted.keys() == {'$literal'},
                 'Expected a quoted admission program: ' + name)
-        programs[name] = {'constants': {'clauseKey': 'conformance', 'bindings': {}},
-                          'do': quoted['$literal']}
+        programs[name] = {'constants': {'clauseKey': 'conformance', 'bindings': {}}, 'do': quoted['$literal']}
+        selections[name] = selected
     require(programs.keys() == STEPS, 'Missing admission step')
-    return programs
+    return programs, selections
 
 
-def stock_guard(plan, stock_id, scope_id):
-    scope = {'type': {'blueId': scope_id}}
-    require(plan['constants']['admissionStepDefinition'] == scope,
-            'Plan scope differs from the selected Documents export')
-    expected = {'$and': [
-        {'$eq': [{'$var': 'definition'}, {'$pointerGet': {
-            'object': {'type': {'blueId': stock_id}}, 'path': '/type'}}]},
-        {'$eq': [{'$const': 'admissionStepDefinition'}, scope]},
-    ]}
-    body = plan['functions']['matchesAdmissionStepFunctions']['do']
-    guards = [step['$if']['cond'] for step in body
-              if step.get('$if', {}).get('then') == [{'$return': True}]]
-    require(guards == [expected], 'Stock guard must bind both same-edition exports')
-
-
-def check_selection(bridge, plan, stock_id, scope_id, function_ids):
+def check_selection(bridge, plan, stock_id, anchor_id, function_ids, selections):
     from blue_bex import Context, Engine, UNDEFINED
 
-    body = plan['functions']['planAdmission']['do']
-    decision = next(i for i, step in enumerate(body)
-                    if step.get('$let', {}).get('name') == 'admissionDefinition')
-    scope_carrier = plan['constants']['admissionStepDefinition']
-    scope_carrier_id = bridge.identity(bridge.node(scope_carrier, certify=False))
-    program = {
-        'constants': {'clauseKey': 'conformance', 'admissionStepDefinition': scope_carrier},
-        'functions': {name: plan['functions'][name] for name in
-                      ('isAdmissionDefinitionReference', 'matchesAdmissionStepFunctions')},
-        'do': [{'$let': {'name': 'definition', 'expr': {'$binding': 'input'}}},
-               *body[decision:decision + 2],
-               {'$return': {'$var': 'admissionDefinition'}}],
-    }
+    require(plan['constants']['admissionCanonicalDefinition'] == {'type': {'blueId': anchor_id}},
+            'Plan anchor differs from same-edition Admission Functions')
     root = '/clauseRuntime/work/candidate/conformance/type'
     actual_path = root + '/actionDefinition/type'
-    scope_path = root + '/hookDefinition/constants/admissionStepDefinition/type'
-
+    anchor_path = root + '/hookDefinition/type/constants/admissionCanonicalDefinition/type'
+    anchor = {'blueId': anchor_id}
     author = {'type': {'blueId': stock_id}, 'name': 'Conformance author'}
-    changed_name = next(iter(function_ids))
-    original = bridge.bex_data(bridge.node({'blueId': function_ids[changed_name]}, certify=False))
-    # Refine the existing body by preserving the inherited list prefix.
-    override = {'do': [*original['do'], {'$return': 'Changed admission function'}]}
-    variants = (
-        ('stock', {'blueId': stock_id}, True),
-        ('equivalent author', author, True),
-        ('author with constants', {**author, 'constants': {'conformance': 1}}, False),
-        ('author with changed function', {**author, 'functions': {changed_name: override}}, False),
-    )
-    for label, actual, selects_scope in variants:
-        # Model only the reads consumed by the selector. Native provider and
-        # gas behavior are checked separately with the Java runtime.
-        custom = 'type' in actual
-        constants = actual.get('constants', {})
-        actual_node = bridge.node(actual, certify=False)
-        actual_id = bridge.identity(actual_node)
-        actual_function_ids = function_ids
-        if 'functions' in actual:
-            selected = bridge.child(bridge.child(actual_node, 'functions'), changed_name)
-            identity = bridge.identity(bridge.exact(selected))
-            require(identity != function_ids[changed_name], 'Expected a distinct effective function')
-            actual_function_ids = {**function_ids, changed_name: identity}
-        canonical_reads = {
-            actual_path: actual,
-            actual_path + '/constants': constants,
-            scope_path + '/constants': {},
-            scope_path + '/functions': {name: {} for name in function_ids},
+    for step, names in selections.items():
+        program = {
+            'functions': {name: plan['functions'][name] for name in
+                          ('assembleAdmissionDefinition', 'admissionDefinition')},
+            'do': [{'$return': {'$call': {'function': 'assembleAdmissionDefinition', 'args': {
+                'definition': {'$binding': 'input'}, 'names': names,
+                'definitionPath': actual_path, 'canonicalPath': anchor_path,
+                'clauseKey': 'conformance', 'clauses': {}}}}}],
         }
+        variants = [('stock', {'blueId': stock_id}, {}, None, anchor, True),
+                    ('equivalent author', author, {}, None, anchor, True),
+                    ('author with constants', author, {'conformance': 1}, None, anchor, True),
+                    ('missing anchor', author, {}, None, UNDEFINED, False),
+                    ('changed anchor', author, {}, None, {'blueId': stock_id}, False)]
+        for selected_name in (names[0], names[-1]):
+            original = bridge.bex_data(bridge.node({'blueId': function_ids[selected_name]}, certify=False))
+            override = {**original, 'do': [*original['do'], {'$return': 'Changed admission function'}]}
+            variants.append(('changed ' + selected_name, author, {}, (selected_name, override), anchor, False))
+        for label, actual, constants, changed, canonical, selects_scope in variants:
+            actual = {**actual, **({'constants': constants} if constants else {}),
+                      **({'functions': {changed[0]: changed[1]}} if changed else {})}
+            actual_id = bridge.identity(bridge.node(actual, certify=False))
+            actual_ids = dict(function_ids)
+            if changed:
+                actual_node = bridge.node(actual, certify=False)
+                selected = bridge.child(bridge.child(actual_node, 'functions'), changed[0])
+                actual_ids[changed[0]] = bridge.identity(bridge.exact(selected))
+                require(actual_ids[changed[0]] != function_ids[changed[0]], 'Override must change identity')
+            reads = []
 
-        def read(path, view, _):
-            if view == 'definition':
-                require(custom and not constants, label + ' made a definition-role read')
-                parent, name = path.rsplit('/', 1)
-                if parent == actual_path + '/functions':
-                    return {'blueId': actual_function_ids[name]}
-                require(parent == scope_path + '/functions',
-                        'Selector requested a definition outside the two function maps')
-                return {'blueId': function_ids[name]}
-            require(view == 'canonical', 'Selector requested an unexpected read view')
-            return canonical_reads.get(path, UNDEFINED)
+            def read(path, view, _):
+                require(view == 'canonical', 'Unexpected admission read view')
+                reads.append(path)
+                if path == anchor_path:
+                    return canonical
+                if path == actual_path + '/constants':
+                    return constants
+                for parent, identities in ((actual_path, actual_ids), (anchor_path, function_ids)):
+                    prefix = parent + '/functions/'
+                    if path.startswith(prefix):
+                        name = path[len(prefix):]
+                        require(name in names, 'Selector read outside this step closure: ' + name)
+                        return {'blueId': identities[name]}
+                raise AssertionError('Selector attempted whole-library or unrelated read: ' + path)
 
-        def identify(value, _):
-            if value == actual:
-                return actual_id
-            require(value == scope_carrier, 'Selector requested an unexpected identity')
-            return scope_carrier_id
+            def identify(value, _):
+                return bridge.identity(bridge.node(value, certify=False))
 
-        context = Context(bindings={'input': {'blueId': actual_id}}, read_document=read,
-                          matcher=lambda _, pattern: pattern == {}, node_blue_id=identify)
-        expected = scope_carrier_id if selects_scope else actual_id
-        require(Engine().execute(program, context).value == {'blueId': expected},
-                'Unexpected admission definition selection: ' + label)
+            # BEX checks missing/invalid values before invoking the host matcher.
+            # Keep main's unconstrained {} argument behavior; use Language for
+            # the extracted planner's additional typed path/key arguments.
+            def matches(value, pattern):
+                return pattern == {} or bridge.matches(value, pattern)
+
+            print('Checking selector: ' + step + '/' + label, flush=True)
+            context = Context(bindings={'input': {'blueId': actual_id}}, read_document=read,
+                              matcher=matches, node_blue_id=identify)
+            result = Engine().execute(program, context).value
+            if selects_scope:
+                require(result.get('functions') == {name: {'blueId': function_ids[name]} for name in names},
+                        'Wrong exact closure: ' + step + '/' + label)
+                require(result.get('constants') == constants, 'Custom constants were lost')
+            else:
+                require(result == {'blueId': actual_id}, 'Custom definition was not retained: ' + step + '/' + label)
+            require(len(reads) <= 4 + 2 * len(names), 'Unbounded admission definition reads')
 
 
-def compile_closure(compiler_type, programs, stock, scope):
+def compile_closure(compiler_type, programs, stock, scope, selections):
     reached = set()
-    for program in programs.values():
+    for name, program in programs.items():
         compiler_type().compile(program, definition=stock)
         compiler = compiler_type()
         compiler.compile(program, definition=scope)
+        # Each actual emitted definition must compile without unrelated helpers.
+        selected_scope = {'constants': scope['constants'],
+                          'functions': {function: scope['functions'][function] for function in selections[name]}}
+        selected_compiler = compiler_type()
+        selected_compiler.compile(program, definition=selected_scope)
         pending = list(compiler.calls['<root>'])
+        step_reached = set()
         while pending:
             name = pending.pop()
-            if name not in reached:
-                reached.add(name)
+            if name not in step_reached:
+                step_reached.add(name)
                 pending.extend(compiler.calls[name])
+        require(step_reached == selected_scope['functions'].keys(), 'Step scope is not its exact call closure')
+        reached.update(step_reached)
     require(reached == scope['functions'].keys(),
             'Admission scope must contain exactly the compiled transitive call closure')
 
@@ -224,12 +232,13 @@ def check(root):
             require(bridge.identity(bridge.exact(selected)) == ids[export],
                     f'{name} does not select the same-edition {export}')
 
-    stock_guard(plan, ids[stock_name], ids[scope_name])
     Compiler().compile({'constants': {'clauseKey': 'conformance', 'mode': 'configuration',
                                      'typeId': 'conformance'}, 'do': [{'$return': {}}]},
                        definition=plan)
-    compile_closure(Compiler, step_programs(plan), stock, scope)
-    check_selection(bridge, plan, ids[stock_name], ids[scope_name], scope_functions)
+    print('Compiled selected Preparation Plan; checking step closures', flush=True)
+    programs, selected = step_programs(plan)
+    compile_closure(Compiler, programs, stock, scope, selected)
+    check_selection(bridge, plan, ids[stock_name], ids['Admission Functions'], scope_functions, selected)
     print(f"{row['packageBlueId']}: compiled the Plan and all three admission steps "
           f"against stock and scope. Exact call closure: {len(scope_functions)} functions. "
           "Stock read trap and custom selection checks passed.")
