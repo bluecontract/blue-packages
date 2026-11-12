@@ -145,6 +145,46 @@ functions:
             $concat:
             - /clauseRuntime/work/candidate/
             - $const: clauseKey
+    # Refresh handlers need the same exact clause and frozen template context
+    # as action connections, without copying any action's execution bindings.
+    - $let: {name: refreshSnapshots, expr: {}}
+    - $forEach:
+        item: snapshotName
+        in: {$list: {$document: {$concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/snapshotBindings]}}}
+        do:
+        - $let:
+            name: snapshotPath
+            expr: {$get: {object: {$pointerGet: {object: {$var: clause}, path: /bindings, default: {}}}, key: {$var: snapshotName}}}
+        - $if:
+            cond: {$exists: {$var: snapshotPath}}
+            then:
+            - $failIf:
+                cond: {$not: {$isKind: {val: {$var: snapshotPath}, kind: text}}}
+                message: SNAPSHOT_BINDING_PATH_REQUIRED
+            - $let: {name: snapshot, expr: {$document: {$var: snapshotPath}}}
+            - $failIf:
+                cond: {$not: {$exists: {$var: snapshot}}}
+                message: SNAPSHOT_BINDING_MISSING
+            - $set:
+                name: refreshSnapshots
+                expr: {$objectSet: {object: {$var: refreshSnapshots}, key: {$var: snapshotName}, val: {$var: snapshot}}}
+    - $let:
+        name: refreshFunctions
+        expr:
+          connectionConfiguration:
+            args: {}
+            expr: {$objectFromEntries: [{key: $literal, val: {$var: clause}}]}
+          connectionSnapshots:
+            args: {}
+            expr: {$objectFromEntries: [{key: $literal, val: {$var: refreshSnapshots}}]}
+    - $let:
+        name: refreshBindings
+        expr:
+          $choose:
+            cond: {$exists: {$pointerGet: {object: {$var: clause}, path: /bindings/sources}}}
+            then:
+              sources: {$pointerGet: {object: {$var: clause}, path: /bindings/sources}}
+            else: {}
     - $let:
         name: destinationBinding
         expr:
@@ -192,7 +232,7 @@ functions:
                   $get:
                     object: {$literal: {type: Documents/Refresh Functions}}
                     key: type
-              names: [sharedRefresh, processStatePath, checkedDomainNextActions, domainNextActions, namedSourcesReady, processOrigin, rosterCovers]
+              names: [accessRecordsValid, checkedDomainNextActions, configurationParameters, configuredSources, connectionConfiguration, domainNextActions, mappedBootstrapPartyCovered, namedSourcesReady, processOrigin, processStatePath, readerGroups, requireSameBootstrapParty, requireSameBootstrapPrimary, requireSameMainParty, rootSourceReaderGroupsMatch, rootSourceReaderPartyCovered, rootSourceReaderScope, rootSourceReadersReady, rosterCovers, sharedRefresh, sourceDeclarationMatches, transports]
     - $set:
         name: plan
         expr:
@@ -247,10 +287,11 @@ functions:
                     - type: Contracts/Compute
                     - definition:
                         $var: refreshDefinition
+                      functions: {$var: refreshFunctions}
                       constants:
                         clauseKey:
                           $const: clauseKey
-                        bindings: {}
+                        bindings: {$var: refreshBindings}
                       do:
                         $literal:
                         - $call:
@@ -295,6 +336,72 @@ functions:
                   $concat:
                   - processEmbedded_
                   - $const: clauseKey
+    # A destination update denied before activation is not replayed. Re-evaluate
+    # on the later local transition using ordinary dispatch and the same guards.
+    # Refresh writes process state only, so it cannot trigger this channel itself.
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object: {$var: plan}
+            path: {$concat: [/contracts/processActivation_, {$const: clauseKey}]}
+            val:
+              kind: channel
+              contract:
+                $merge:
+                - type: Contracts/Document Update Channel
+                - path: /activation
+    - $set:
+        name: plan
+        expr:
+          $pointerSet:
+            object: {$var: plan}
+            path: {$concat: [/contracts/refreshActivationProcesses_, {$const: clauseKey}]}
+            val:
+              $pointerSet:
+                object:
+                  $pointerGet:
+                    object: {$var: plan}
+                    path: {$concat: [/contracts/refreshProcesses_, {$const: clauseKey}]}
+                path: /contract/channel
+                val: {$concat: [processActivation_, {$const: clauseKey}]}
+    # Reuse Activation's exact ordered access channels. No generic child or
+    # financial handler is admitted while access is unavailable.
+    - $let: {name: accessIndex, expr: 0}
+    - $forEach:
+        item: accessPath
+        in:
+          $pointerGet:
+            object: {$document: /clauseRuntime/work/candidate/activation/parameters}
+            path: /accessPaths
+            default: []
+        do:
+        - $set:
+            name: plan
+            expr:
+              $pointerSet:
+                object: {$var: plan}
+                path: {$concat: [/contracts/rootSourceAccess_, {$const: clauseKey}, _, {$text: {$var: accessIndex}}]}
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - type: Contracts/Sequential Workflow
+                    - channel: {$concat: [activationAccess, {$text: {$var: accessIndex}}]}
+                      steps:
+                      - $merge:
+                        - type: Contracts/Compute
+                        - definition: {$var: definition}
+                          functions: {$var: refreshFunctions}
+                          constants:
+                            clauseKey: {$const: clauseKey}
+                            bindings: {$var: refreshBindings}
+                          do:
+                            $literal:
+                            - $call:
+                                function: rootSourceAccessLost
+                                args: {}
+        - $set: {name: accessIndex, expr: {$add: [{$var: accessIndex}, 1]}}
     - $set:
         name: plan
         expr:

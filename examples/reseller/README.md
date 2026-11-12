@@ -2,6 +2,13 @@
 
 `adventures-in-paradise-preview.blue` is one configured agreement between Adventures in Paradise and Manatee Bay Inn. Its document contains the parties, business terms, catalog, order and payout templates, and clause bindings. Executable order, negotiation, commission and payout behavior lives in the exported `clause-reseller/types/` definitions.
 
+These examples qualify the maintained catalog-priced `Customer Orders Clause`
+from main. They are not alternate versions of MyOS hosted checkout. The current
+hosted reseller flow uses `Customer Orders Bootstrap Clause`; see
+[Hosted reseller checkout](../../clause-reseller/README.md#hosted-reseller-checkout)
+for that boundary and its native component tests. Neither this example nor a
+package build proves a completed Stripe payment.
+
 ## Clause configuration
 
 - `Customer Orders Clause` reads the template, order collection, catalog and optional fulfilment parameters through pointer bindings. Moving or renaming these fields requires updating a binding, not copying implementation. Removing the fulfilment clause removes the date and confirmation requirement from new orders.
@@ -11,9 +18,11 @@
 
 ## Independent customer orders
 
-The exported Customer Orders Clause specializes `Documents/Documents Clause`. The partner calls `prepareOrder` once with a typed `Documents/Preparation Input`: `key`, `requestId` and `values` containing `catalogRevision`, `lines`, `customer`, `description` and optional fulfilment `groups`. Each line selects an `itemId`, `quantity` and any catalog-required date or duration. The clause checks the current catalog revision, item membership and quantity/duration constraints, calculates prices and discounts using the shared Catalog Functions, and freezes the result in the prepared Order. Currency also comes from that catalog. Caller-supplied amounts, prices, `quoteKey`, `orderAccess` and prepared fields are rejected.
+The exported Customer Orders Clause specializes `Documents/Documents Clause`. The partner calls `prepareOrder` once with a typed `Documents/Preparation Input`: `key`, `requestId` and `values` containing `catalogRevision`, `lines`, `description`, optional fulfilment `groups`, and exactly one of `customer` (account ID) or `customerEmail` (contact metadata). Each line selects an `itemId`, `quantity` and any catalog-required date or duration. The clause checks the current catalog revision, item membership and quantity/duration constraints, calculates prices and discounts using the shared Catalog Functions, and freezes the result in the prepared Order. Currency also comes from that catalog. Caller-supplied amounts, prices, `quoteKey`, `orderAccess` and prepared fields are rejected.
 
 There is no `createQuote` operation or `/quotes` collection in these three agreements. The Order retains its calculated line breakdown under `quote` and its exact identity under `quoteBlueId`, as required by the existing fulfilment snapshot contract; these fields are calculation evidence, not a separate quotation workflow. A new preparation uses current prices and rejects a stale revision. Repeating the same preparation returns the existing result without repricing it; conflicting reuse is rejected.
+
+In preview.4, `values.customerEmail` retains its exact 1–320 character text under `/customerEmail` in the prepared Order, without an account pin. The customer Party stays supplied at bootstrap. Business authorizes and retains the checkout-to-actual-account association, then uses the ordinary bootstrap participant mapping, such as `{channelName: customer, email: guest@example.test}`. The email is contact/correlation metadata, not verified identity. Provision checks the actual initialized/current customer and requires an account distinct from seller and partner. The existing `values.customer` branch still freezes `/customerAccountId` and requires that account at provision. Earlier exact package editions retain their original behavior.
 
 Handle `Documents/Document Provision Requested` for the orders clause, bootstrap the exact `requirementRef` using the seller, partner and customer account mappings, then call `provideOrder` as partner with `key`, `inResponseTo`, `requirementRef` and `document: {blueId: ...}`. Native Documents validates the mapped parties and their representatives against the fresh transports before linking the independently hosted Order. An identical preparation or provision is idempotent; conflicting reuse is rejected. The retained `newOrder` operation is a preparation alias, no longer an embedded factory.
 

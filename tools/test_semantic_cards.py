@@ -369,6 +369,27 @@ class SourceTests(unittest.TestCase):
                       json.dumps(context))
         self.assertLess(len(wire(context)), 1_000_000)
 
+    def test_cancellation_card_keeps_instants_distinct_from_numeric_amounts(self):
+        # Rebuilding the dependency closure changes the current export identity;
+        # the published card below remains an immutable regression fixture.
+        subjects, definitions = sources.inventory(ROOT)
+        cancellation, = [blue_id for blue_id, subject in subjects.items()
+                         if subject['alias'] == 'Reseller/Cancellation Clause'
+                         and 'current' in subject['collections']]
+        context = sources.evidence(cancellation, definitions)
+        self.assertIn('timestamp must be an integer Unix timestamp in microseconds',
+                      json.dumps(context))
+        identity = '4Jo5puA4Rb4yuMr2jAd6PUKVEXzJ72djA1KMeaDaom83'
+        card = json.loads((cards.ASSETS / 'cards' / (identity + '.json')).read_text())
+        cards.validate_card(card, identity)
+        facts = {fact['id']: fact for fact in card['metadata']['stateFacts']}
+        for name in ('confirmedStart', 'freeCancellationUntil', 'responseDeadline',
+                     'decisionTime', 'settlementObservedAt'):
+            with self.subTest(fact=name):
+                self.assertEqual('date-micros', facts[name]['type'])
+        for name in ('decisionBasis', 'decisionCharge', 'releasedPrice'):
+            self.assertEqual('money-minor', facts[name]['type'])
+
 
     def test_added_export_without_rebuild_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

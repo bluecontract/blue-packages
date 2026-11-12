@@ -27,7 +27,9 @@ class AdmissionDefinitionClosureTest(unittest.TestCase):
             for path in (ROOT/folder).glob('*.blue'):
                 node = yaml.safe_load(path.read_text())
                 if isinstance(node, dict):
-                    definitions.update(node.get('functions', {}))
+                    definitions.update({name: body for name, body in node.get('functions', {}).items()
+                                        if isinstance(body, dict) and set(body) != {'blueId'}
+                                        and '$blue:functionFrom' not in body})
         found = {}
         def visit(node):
             if isinstance(node, dict):
@@ -52,17 +54,25 @@ class AdmissionDefinitionClosureTest(unittest.TestCase):
 
     def test_refresh_selection_is_the_complete_shared_refresh_closure(self):
         libraries = {}
-        for path in (ROOT/'clause-documents/types').glob('*.blue'):
-            node = yaml.safe_load(path.read_text())
-            if isinstance(node, dict) and 'name' in node:
-                libraries['Documents/' + node['name']] = node
+        for folder, namespace in [('clause-documents/types', 'Documents'),
+                                  ('blue-parties/types', 'Parties'),
+                                  ('clause-activation/types', 'Activation'),
+                                  ('clause-amendments/types', 'Amendments')]:
+            for path in (ROOT/folder).glob('*.blue'):
+                node = yaml.safe_load(path.read_text())
+                if isinstance(node, dict) and 'name' in node:
+                    libraries[namespace + '/' + node['name']] = node
         refresh = libraries['Documents/Refresh Functions']['functions']
+        def function(library, name):
+            node = libraries[library]
+            if name in node.get('functions', {}):
+                return node['functions'][name]
+            return function(node['type'], name)
         def body(node):
             if '$blue:functionFrom' not in node:
                 return node
             link = node['$blue:functionFrom']
-            library = libraries[link['type']]
-            return body(library['functions'][link['function']])
+            return body(function(link['type'], link['function']))
         pending, reached = ['sharedRefresh'], set()
         while pending:
             name = pending.pop()

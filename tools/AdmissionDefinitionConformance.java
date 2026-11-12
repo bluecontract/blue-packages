@@ -18,13 +18,13 @@ public final class AdmissionDefinitionConformance {
     var bundle=PackageBundle.builder();
     for(String[] mount:List.of(new String[]{"Contracts","blue-contracts"},new String[]{"Clauses","blue-clauses"},new String[]{"Connections","clause-connections"},new String[]{"Activation","clause-activation"},new String[]{"Parties","blue-parties"},new String[]{"Documents","clause-documents"},new String[]{"Orders","blue-orders"},new String[]{"Agreements","blue-agreements"}))
       bundle.mount(mount[0],BluePackage.open(root.resolve(mount[1]+"/dist/package.bluepkg")));
-    for(String variant:List.of("canonical","override-entry","override-helper","override-anchor","missing-anchor")) {
+    for(String variant:List.of("canonical","override-entry","override-helper","override-anchor","missing-anchor","override-constants")) {
       if(args.length>1&&!args[1].equals(variant))continue;
       try(var blue=Blue.builder().packages(bundle.build()).build();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
         var processor=runtime.processor(blue);var values=processor.execution().values();
         var source=BootstrapPreparationConformance.source("bootstrap");var clauses=obj(source.get("clauses"));
         obj(obj(clauses.get("activation")).get("parameters")).put("admission",m("approvers",List.of("merchant")));
-        if(!variant.equals("canonical") && !variant.equals("missing-anchor")) {
+        if(!variant.equals("canonical") && !variant.equals("missing-anchor") && !variant.equals("override-constants")) {
           var overrides=new LinkedHashMap<String,Object>();
           for(var names:CLOSURES) {
             String name=variant.equals("override-entry")?names.getFirst():names.getLast();
@@ -37,6 +37,10 @@ public final class AdmissionDefinitionConformance {
           var clauseType=m("type","Documents/Documents Clause","actionDefinition",m("type",custom));
           if(variant.equals("override-anchor"))clauseType.put("hookDefinition",m("type",m("type","Documents/Preparation Plan","constants",m("admissionCanonicalDefinition",m("type",custom)))));
           obj(clauses.get("orders")).put("type",clauseType);
+        }
+        if(variant.equals("override-constants")) {
+          var custom=m("type","Documents/Document Preparation Functions","constants",m("conformance",42));
+          obj(clauses.get("orders")).put("type",m("type","Documents/Documents Clause","actionDefinition",m("type",custom)));
         }
         if(variant.equals("missing-anchor")) {
           var clauseType=obj(WireData.json(WireData.write(WireData.parse(Files.readString(root.resolve("clause-documents/types/base.blue")),"yaml"))));
@@ -59,7 +63,8 @@ public final class AdmissionDefinitionConformance {
         for(int i=0;i<CLOSURES.size();i++) {
           String path="/contracts/admissionUpdate_orders_processHandler/steps/"+List.of(0,2,4).get(i)+"/definition";
           var selected=values.select(document,path);check(selected!=null,"Missing generated definition "+path);
-          if(variant.equals("canonical")) {
+          if(variant.equals("canonical") || variant.equals("override-constants")) {
+            if(variant.equals("override-constants"))check(obj(values.bexData(values.select(document,path+"/constants"))).get("conformance").toString().equals("42"),"Custom constants not preserved");
             var functions=obj(values.bexData(values.select(document,path+"/functions")));
             check(functions.keySet().equals(new HashSet<>(CLOSURES.get(i))),"Unexpected closure "+functions.keySet());
             for(String name:CLOSURES.get(i))check(NativeRuntime.identity(values.exact(values.select(document,path+"/functions/"+name))).equals(NativeRuntime.identity(values.exact(values.select(document,originalPath+"/functions/"+name)))),"Function changed "+name);

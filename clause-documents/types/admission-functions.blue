@@ -74,6 +74,162 @@ functions:
           expected: {$var: expected}
           actual: {$var: party}
     - $return: true
+  rootSourceReaderScope:
+    args: {}
+    do:
+    - $let:
+        name: root
+        expr: false
+    - $forEach:
+        key: sourceAlias
+        item: path
+        in: {$pointerGet: {object: {$call: {function: configurationParameters, args: {}}}, path: /sourcePaths, default: {}}}
+        do:
+        - $if:
+            cond: {$eq: [{$var: path}, '']}
+            then:
+            - $set: {name: root, expr: true}
+    - $if:
+        cond: {$not: {$var: root}}
+        then:
+        - $return: false
+    # This exception applies only to explicitly declared root sourcePaths.
+    # bindings.sources keeps its existing admission semantics.
+    - $forEach:
+        key: bindingAlias
+        item: binding
+        in: {$pointerGet: {object: {$const: bindings}, path: /sources, default: {}}}
+        do:
+        - $if:
+            cond: {$eq: [{$var: binding}, self]}
+            then:
+            - $return: false
+    - $return: true
+  rootSourceReaderGroupsMatch:
+    args:
+      party: {}
+      declared: {}
+      readers: {}
+    do:
+    - $let:
+        name: groups
+        expr: {$call: {function: readerGroups, args: {roster: {required: {$var: party}}, readers: {}}}}
+    - $forEach:
+        key: groupName
+        item: keys
+        in: {$var: groups}
+        do:
+        - $if:
+            cond: {$eq: [{$size: {$var: keys}}, 0]}
+            then:
+            - $return: false
+        - $let: {name: matched, expr: false}
+        - $forEach:
+            key: readerName
+            item: allowed
+            in: {$var: readers}
+            do:
+            - $if:
+                cond:
+                  $and:
+                  - {$eq: [{$var: keys}, {$var: allowed}]}
+                  - {$eq: [{$var: keys}, {$get: {object: {$var: declared}, key: {$var: readerName}}}]}
+                then:
+                - $set: {name: matched, expr: true}
+        - $if:
+            cond: {$not: {$var: matched}}
+            then:
+            - $return: false
+    - $return: true
+  rootSourceReaderPartyCovered:
+    args:
+      party: {}
+    do:
+    - $if:
+        cond: {$not: {$call: {function: rootSourceReaderScope, args: {}}}}
+        then:
+        - $return: false
+    - $let:
+        name: readers
+        expr: {$pointerGet: {object: {$document: ''}, path: /activation/readers, default: {}}}
+    - $if:
+        cond:
+          $not:
+            $call:
+              function: rootSourceReaderGroupsMatch
+              args:
+                party: {$var: party}
+                declared: {$pointerGet: {object: {$document: ''}, path: /clauses/activation/parameters/readers, default: {}}}
+                readers: {$var: readers}
+        then:
+        - $return: false
+    - $let: {name: accessDocuments, expr: []}
+    - $forEach:
+        item: path
+        in: {$pointerGet: {object: {$document: ''}, path: /activation/accessPaths, default: []}}
+        do:
+        - $let: {name: access, expr: {$document: {$var: path}}}
+        - $if:
+            cond:
+              $or:
+              - {$not: {$is: {node: {$var: access}, pattern: {type: Coordination/Timeline Access}}}}
+              - {$not: {$exists: {$pointerGet: {object: {$var: access}, path: /contracts/initialized}}}}
+            then:
+            - $return: false
+        - $set:
+            name: accessDocuments
+            expr: {$listConcat: [{$var: accessDocuments}, [{$var: access}]]}
+    - $return:
+        $call:
+          function: accessRecordsValid
+          args:
+            roster: {$document: /activation/parties}
+            readers: {$var: readers}
+            accessDocuments: {$var: accessDocuments}
+  rootSourceReadersReady:
+    args:
+      item: {}
+      candidate: {}
+    do:
+    - $let:
+        name: paths
+        expr: {$pointerGet: {object: {$call: {function: configurationParameters, args: {}}}, path: /sourcePaths, default: {}}}
+    - $forEach:
+        key: alias
+        item: declaration
+        in: {$call: {function: configuredSources, args: {}}}
+        do:
+        - $if:
+            cond:
+              $and:
+              - {$hasKey: {object: {$var: paths}, key: {$var: alias}}}
+              - {$eq: [{$get: {object: {$var: paths}, key: {$var: alias}}}, '']}
+            then:
+            - $let:
+                name: source
+                expr: {$get: {object: {$pointerGet: {object: {$var: candidate}, path: /sources, default: {}}}, key: {$var: alias}}}
+            - $if:
+                cond:
+                  $or:
+                  - {$ne: [{$call: {function: processOrigin, args: {document: {$var: source}}}}, {$call: {function: processOrigin, args: {document: {$document: ''}}}}]}
+                  - {$not: {$call: {function: sourceDeclarationMatches, args: {alias: {$var: alias}, source: {$var: source}}}}}
+                then:
+                - $return: false
+            - $forEach:
+                key: role
+                item: party
+                in: {$pointerGet: {object: {$var: candidate}, path: /activation/parties, default: {}}}
+                do:
+                - $if:
+                    cond:
+                      $not:
+                        $or:
+                        - {$call: {function: rosterCovers, args: {required: {$objectSet: {object: {}, key: {$var: role}, val: {$var: party}}}, available: {$document: /activation/parties}}}}
+                        - {$call: {function: mappedBootstrapPartyCovered, args: {item: {$var: item}, candidate: {$var: candidate}, role: {$var: role}, party: {$var: party}}}}
+                        - {$call: {function: rootSourceReaderPartyCovered, args: {party: {$var: party}}}}
+                    then:
+                    - $return: false
+    - $return: true
   candidateStage:
     args:
       checked: {}
@@ -257,6 +413,10 @@ functions:
                           candidate: {$var: candidate}
                           role: {$var: role}
                           party: {$var: party}
+                  - $not:
+                      $call:
+                        function: rootSourceReaderPartyCovered
+                        args: {party: {$var: party}}
                 then:
                 - $let:
                     name: hostRole
