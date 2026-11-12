@@ -1,9 +1,73 @@
 name: Preparation Plan
 type: Connections/Connection Planning Functions
 constants:
+  refreshCanonicalFunctions:
+    accessRecordsValid: BWZxSpWmbP4QkHTnBXNHtVgmNNL8s5jy3DMkS6KbgBwb
+    checkedDomainNextActions: ARzZgck3qEStHv5377YNq39fLf18XWYHqg9Lfy94iBeR
+    configurationParameters: 7WbS9JNjpW2d58txqa8cXbwrcsV5oqYsdhkqZ3oLiR1X
+    configuredSources: 7dU4X5Ek1pQaz7wV44zTYYRRNwmy9dnPzWRE7NmG58iS
+    domainNextActions: ETnUA4vaa8YtPsG1Bjp2evZCSsA31gjMcyNgTygjmasR
+    mappedBootstrapPartyCovered: F4Rzri4cpxTEnByVF3KCNfhM6uWF8Pww7PqaWt28sFrc
+    namedSourcesReady: EXZMLDv4TxmYaH7L8yrVKDahRDzM3AeKJv44D8P9WxFC
+    processOrigin: 5UMRb3G6CPCKmkQKBLBhntAgaA5qjoJSLBbjS4kjS3VB
+    processStatePath: 6QXrUmZRXVy88TLUtc18x12cdMJDTntTnjhWTJkJc22j
+    readerGroups: DvDZ2osJuDV2CbtoLUfUt1xNNXffYxKYtTzBdaaSP3Gb
+    requireSameBootstrapParty: b3ueEPKpdb42HWsCzUYKgESSP16DpeYXemCUY545sZQ
+    requireSameBootstrapPrimary: GsmtbmyMpRwJZkSc7xLBELSTp3sdGDiEwFDmK1Yn8Bba
+    requireSameMainParty: BeocmvaZ64mC5qeEFbBuxnJx3PPoyqwtKmuAJCutskdL
+    rootSourceAccessLost: 5s74N3hwsX6nFSj9K4k23Gg52LpQRzK1T2hdshSCRqdK
+    rootSourceReaderGroupsMatch: Eb5SaH46VJA3qZbLfQuzqDarhuhKkuE4smShvQoiCWPb
+    rootSourceReaderPartyCovered: C13BnXMtSEzPFE8q9AyxewaeQ9orCYXwV3LEiFdT8knt
+    rootSourceReaderScope: 9UBgJm6Nrw3iMKAu9CpfS9mkZwqN6jLAwdDGusdaGdGa
+    rootSourceReadersReady: 3r1imQW6LZVbsV3cbe9FMzc379ad7KtWX2ja7RSP5xrR
+    rosterCovers: 2VRjCVXah8NQpo69uGhaMJZobwh36J77t6rz4edzv1ii
+    sharedRefresh: AynC5EBRaeU35R5bVn12setevqkqGx8pZAe3K1bzwmye
+    sourceDeclarationMatches: 6UieaF5Xk9n84qdN95v8XE2ZsRoQhwcDA1KVxAPJz5Zf
+    transports: ERUpqV1ukEE2eZWaDJP6Dxne1Z12WTkrXgDiKDGRgDjV
   admissionCanonicalDefinition:
     type: Documents/Admission Functions
 functions:
+  refreshDefinition:
+    args:
+      definition: {}
+      definitionPath: {type: Text}
+    do:
+    - $let: {name: selected, expr: {}}
+    - $forEach:
+        item: canonical
+        key: functionName
+        in: {$const: refreshCanonicalFunctions}
+        do:
+        - $let:
+            name: body
+            expr:
+              $document:
+                $concat: [{$var: definitionPath}, /functions/, {$var: functionName}]
+        # Preserve complete custom definitions when a reachable override introduces
+        # other helpers. This is the permanent custom-library compatibility path.
+        - $if:
+            cond:
+              $or:
+              - {$not: {$exists: {$var: body}}}
+              - {$ne: [{$nodeBlueId: {$var: body}}, {$var: canonical}]}
+            then:
+            - $return: {$var: definition}
+        - $set:
+            name: selected
+            expr:
+              $objectSet:
+                object: {$var: selected}
+                key: {$var: functionName}
+                val: {$var: body}
+    - $return:
+        $merge:
+        - type: Contracts/Compute Definition
+        - functions: {$var: selected}
+          constants:
+            $choose:
+              cond: {$exists: {$document: {$concat: [{$var: definitionPath}, /constants]}}}
+              then: {$document: {$concat: [{$var: definitionPath}, /constants]}}
+              else: {}
   assembleAdmissionDefinition:
     args:
       definition: {}
@@ -196,6 +260,15 @@ functions:
                   - /clauseRuntime/work/candidate/
                   - $const: clauseKey
                   - /type/actionDefinition/type
+    - $let:
+        name: refreshDefinition
+        expr:
+          $call:
+            function: refreshDefinition
+            args:
+              definition: {$var: definition}
+              definitionPath:
+                $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/actionDefinition/type]
     - $set:
         name: plan
         expr:
@@ -249,7 +322,7 @@ functions:
                   - $merge:
                     - type: Contracts/Compute
                     - definition:
-                        $var: definition
+                        $var: refreshDefinition
                       functions: {$var: refreshFunctions}
                       constants:
                         clauseKey:
@@ -354,7 +427,7 @@ functions:
                       steps:
                       - $merge:
                         - type: Contracts/Compute
-                        - definition: {$var: definition}
+                        - definition: {$var: refreshDefinition}
                           functions: {$var: refreshFunctions}
                           constants:
                             clauseKey: {$const: clauseKey}
