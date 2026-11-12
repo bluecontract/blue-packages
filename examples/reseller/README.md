@@ -94,8 +94,8 @@ native time, not a caller-supplied or automatically inferred service-end date.
 Dated groups also retain their own `fulfilledAtMicros`. An identical retry has no
 effects and preserves the original timestamp; a different execution request is
 rejected. Fulfilled groups cannot subsequently be cancelled through the existing
-Cancellation Clause. The action emits `Order Fulfilled` through the existing
-clause-event type. Bindings can relocate the state and reservation paths.
+Cancellation Clause. The action emits `Commerce/Domain Event` with
+`kind: Order Fulfilled`. Bindings can relocate the state and reservation paths.
 Acceptance, payment capture, and commission accrual remain separate from this
 seller declaration of actual execution.
 
