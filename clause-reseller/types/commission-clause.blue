@@ -16,6 +16,42 @@ actionDefinition:
           input: {}
         do:
         - $let:
+            name: payout
+            expr:
+              $document:
+                $concat:
+                - $const: {name: bindings, path: /payouts}
+                - /
+                - $var: {name: input, path: /key}
+        - $if:
+            cond:
+              $and:
+              - $eq:
+                - $var: {name: payout, path: /paymentDetails/method}
+                - myos-account-to-account
+              - $includes:
+                  list:
+                  - $nodeBlueId:
+                      $get: {object: {type: MyOS/MyOS Test Account to Account Payment Instruction}, key: type}
+                  - $nodeBlueId:
+                      $get: {object: {type: MyOS/MyOS Stripe Account to Account Payment Instruction}, key: type}
+                  val:
+                    $nodeBlueId:
+                      $var: {name: payout, path: /type}
+            then:
+            - $return:
+                $call:
+                  function: reconcileAccountPayout
+                  args: {input: {$var: input}}
+        - $return:
+            $call:
+              function: reconcileManualPayout
+              args: {input: {$var: input}}
+      reconcileManualPayout:
+        args:
+          input: {}
+        do:
+        - $let:
             name: key
             expr:
               $var:
@@ -249,6 +285,379 @@ actionDefinition:
             $merge:
             - type: Events/Event
             - kind: Payout Reconciled
+        - $return:
+            outcome: acceptedNew
+      reconcileAccountPayout:
+        args:
+          input: {}
+        do:
+        - $let:
+            name: key
+            expr:
+              $var:
+                name: input
+                path: /key
+        - $let:
+            name: payout
+            expr:
+              $document:
+                $concat:
+                - $concat:
+                  - $const:
+                      name: bindings
+                      path: /payouts
+                  - /
+                - $var: key
+        # The provided payout Payment Instruction is the collection item itself; before provision nothing settles.
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $var: payout
+            then:
+            - $return:
+                outcome: duplicate
+        - $let:
+            name: pi
+            expr:
+              $var: payout
+        - $let:
+            name: s
+            expr:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state
+        - $let:
+            name: old
+            expr:
+              $pointerGet:
+                object:
+                  $var: s
+                path:
+                  $concat:
+                  - /settlements/
+                  - $var: key
+        - $failIf:
+            cond:
+              $not:
+                $exists:
+                  $var: old
+            message: UNKNOWN_SETTLEMENT
+        - $if:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: old
+                  path: /status
+              - reserved
+            then:
+            - $return:
+                outcome: duplicate
+        - $let:
+            name: terms
+            expr:
+              $pointerGet:
+                object:
+                  $var: pi
+                path: /paymentDetails/payoutTerms
+        - $let:
+            name: gross
+            expr:
+              $pointerGet:
+                object:
+                  $var: old
+                path: /amountMinor
+        # The frozen split must settle exactly the reserved commission.
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /grossMinor
+                  - $var: gross
+                - $eq:
+                  - $add:
+                    - $pointerGet:
+                        object:
+                          $var: terms
+                        path: /feeMinor
+                    - $pointerGet:
+                        object:
+                          $var: terms
+                        path: /netMinor
+                  - $var: gross
+            message: INVALID_PAYOUT_TERMS
+        - $let:
+            name: state
+            expr:
+              $pointerGet:
+                object:
+                  $var: pi
+                path: /payment
+                default: {}
+        - $let:
+            name: unresolved
+            expr: false
+        - $forEach:
+            item: financialRequest
+            key: requestKey
+            in:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /requests
+                default: {}
+            do:
+            - $if:
+                cond:
+                  $includes:
+                    list:
+                    - pending
+                    - unknown
+                    val:
+                      $var:
+                        name: financialRequest
+                        path: /status
+                then:
+                - $set:
+                    name: unresolved
+                    expr: true
+        - $if:
+            cond:
+              $var: unresolved
+            then:
+            - $return:
+                outcome: duplicate
+        - $if:
+            cond:
+              $ne:
+              - $add:
+                - $var: {name: state, path: /reserved/secure}
+                - $var: {name: state, path: /reserved/capture}
+                - $var: {name: state, path: /reserved/void}
+                - $var: {name: state, path: /reserved/refund}
+              - 0
+            then:
+            - $return: {outcome: duplicate}
+        - $let:
+            name: completed
+            expr:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /completed
+                default: 0
+        - $let:
+            name: settlement
+            expr:
+              $pointerGet:
+                object:
+                  $var: pi
+                path: /accountSettlement
+                default: {}
+        # Settlement needs both the operator split report and the ordinary completion of N, in either order.
+        - $let:
+            name: settled
+            expr:
+              $and:
+              - $isKind:
+                  val:
+                    $var: settlement
+                  kind: object
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: settlement
+                    path: /grossMinor
+                    default: null
+                - $var: gross
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: settlement
+                    path: /netMinor
+                    default: null
+                - $pointerGet:
+                    object:
+                      $var: terms
+                    path: /netMinor
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: settlement
+                    path: /feeMinor
+                    default: null
+                - $pointerGet:
+                    object:
+                      $var: terms
+                    path: /feeMinor
+              - $eq:
+                - $var: completed
+                - $pointerGet:
+                    object:
+                      $var: terms
+                    path: /netMinor
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /reversed
+                    default: 0
+                - 0
+        - $set:
+            name: settled
+            expr:
+              $and:
+              - $var: settled
+              - $eq:
+                - $var: {name: settlement, path: /payoutTerms}
+                - $var: terms
+              - $eq:
+                - $var: {name: settlement, path: /payoutKey}
+                - $var: key
+              - $eq:
+                - $var: {name: settlement, path: /transactionId}
+                - $var: {name: state, path: /transactionId}
+              - $eq:
+                - $var: {name: settlement, path: /instructionOrigin}
+                - $nodeBlueId:
+                    $var: {name: pi, path: /contracts/initialized/document}
+        # The operator rejected the instruction, or its fixed securing request (payout-secure) was declined or
+        # failed, before any effect: no debit, no transfer, no fee. Or the operator confirmed the void
+        # (payout-void) that returned the whole secured debit G to the seller before any partner transfer.
+        - $let:
+            name: returned
+            expr:
+              $and:
+              - $or:
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /rejected
+                      default: false
+                  - true
+                - $includes:
+                    list:
+                    - declined
+                    - failed
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: state
+                        path: /requests/payout-secure/status
+                        default: null
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /requests/payout-void/status
+                      default: null
+                  - succeeded
+              - $eq:
+                - $var: completed
+                - 0
+              - $eq:
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /secured
+                    default: 0
+                - 0
+        - $if:
+            cond:
+              $not:
+                $or:
+                - $var: settled
+                - $var: returned
+            then:
+            - $return:
+                outcome: duplicate
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $const:
+                  name: bindings
+                  path: /state
+              - /reserved
+            val:
+              $subtract:
+              - $pointerGet:
+                  object:
+                    $var: s
+                  path: /reserved
+              - $var: gross
+        - $if:
+            cond:
+              $var: settled
+            then:
+            - $appendChange:
+                op: replace
+                path:
+                  $concat:
+                  - $const:
+                      name: bindings
+                      path: /state
+                  - /paid
+                val:
+                  $add:
+                  - $pointerGet:
+                      object:
+                        $var: s
+                      path: /paid
+                  - $var: gross
+        - $appendChange:
+            op: replace
+            path:
+              $concat:
+              - $concat:
+                - $const:
+                    name: bindings
+                    path: /state
+                - /settlements/
+              - $var: key
+            val:
+              amountMinor:
+                $var: gross
+              paidMinor:
+                $choose:
+                  cond:
+                    $var: settled
+                  then:
+                    $var: gross
+                  else: 0
+              transferredMinor:
+                $choose:
+                  cond:
+                    $var: settled
+                  then:
+                    $var: completed
+                  else: 0
+              feeMinor:
+                $choose:
+                  cond:
+                    $var: settled
+                  then:
+                    $pointerGet:
+                      object:
+                        $var: terms
+                      path: /feeMinor
+                  else: 0
+              status: closed
+        - $appendEvent:
+            $merge:
+            - type: Events/Event
+            - kind: Payout Reconciled
+              key:
+                $var: key
+              settled:
+                $var: settled
         - $return:
             outcome: acceptedNew
 actions:
@@ -492,6 +901,144 @@ actions:
                         - {$var: {name: order, path: /payment/payment/completed}}
                         - {$var: {name: order, path: /payment/payment/reversed}}
                       bps: {$document: {$const: {name: bindings, path: /rate}}}
+  payoutAttached:
+    resultContract: outcome-v1
+    automatic:
+      'on': event
+      event:
+        type: Documents/Document Attached
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node: {$event: ''}
+              pattern: {type: Documents/Document Attached}
+        then:
+        - $return: {}
+    - $let: {name: key, expr: {$event: /itemKey}}
+    - $let: {name: producer, expr: {$event: /clauseId}}
+    - $forEach:
+        item: part
+        in: [{$var: key}, {$var: producer}]
+        do:
+        - $if:
+            cond: {$not: {$isKind: {val: {$var: part}, kind: text}}}
+            then:
+            - $return: {}
+        - $if:
+            cond:
+              $or:
+              - {$eq: [{$var: part}, '']}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: /}}}, 1]}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: '~'}}}, 1]}
+            then:
+            - $return: {}
+    - $if:
+        cond:
+          $ne:
+          - {$document: {$concat: [/clauses/, {$var: producer}, /bindings/collection]}}
+          - {$const: {name: bindings, path: /payouts}}
+        then:
+        - $return: {}
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document: {$concat: [{$const: {name: bindings, path: /state}}, /settlements/, {$var: key}]}
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reconcile
+            args:
+              input:
+                key: {$var: key}
+  # The seller cancelled a payout preparation that no Agreement-linked instruction executes: the operator
+  # executes only a payout linked under /payouts/<key>, and native cancellation refuses a linked preparation.
+  payoutCancelled:
+    resultContract: outcome-v1
+    automatic:
+      'on': event
+      event:
+        type: Documents/Preparation Cancellation Requested
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node: {$event: ''}
+              pattern: {type: Documents/Preparation Cancellation Requested}
+        then:
+        - $return: {}
+    - $let: {name: key, expr: {$event: /itemKey}}
+    - $let: {name: producer, expr: {$event: /clauseId}}
+    - $forEach:
+        item: part
+        in: [{$var: key}, {$var: producer}]
+        do:
+        - $if:
+            cond: {$not: {$isKind: {val: {$var: part}, kind: text}}}
+            then:
+            - $return: {}
+        - $if:
+            cond:
+              $or:
+              - {$eq: [{$var: part}, '']}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: /}}}, 1]}
+              - {$ne: [{$size: {$split: {text: {$var: part}, separator: '~'}}}, 1]}
+            then:
+            - $return: {}
+    - $if:
+        cond:
+          $ne:
+          - {$document: {$concat: [/clauses/, {$var: producer}, /bindings/collection]}}
+          - {$const: {name: bindings, path: /payouts}}
+        then:
+        - $return: {}
+    - $let:
+        name: item
+        expr: {$document: {$concat: [/process_, {$var: producer}, /entries/, {$nodeBlueId: {$var: key}}]}}
+    - $let: {name: s, expr: {$document: {$const: {name: bindings, path: /state}}}}
+    - $let: {name: old, expr: {$pointerGet: {object: {$var: s}, path: {$concat: [/settlements/, {$var: key}]}}}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: item, path: /key}}, {$var: key}]}
+            - {$eq: [{$var: {name: item, path: /status}}, cancellation_requested]}
+            - {$not: {$exists: {$var: {name: item, path: /documentOrigin}}}}
+            - {$not: {$exists: {$document: {$concat: [{$const: {name: bindings, path: /payouts}}, /, {$var: key}]}}}}
+            - {$exists: {$var: old}}
+            - {$eq: [{$var: {name: old, path: /status}}, reserved]}
+        then:
+        - $return: {}
+    - $let: {name: gross, expr: {$var: {name: old, path: /amountMinor}}}
+    - $appendChange:
+        op: replace
+        path: {$concat: [{$const: {name: bindings, path: /state}}, /reserved]}
+        val: {$subtract: [{$var: {name: s, path: /reserved}}, {$var: gross}]}
+    - $appendChange:
+        op: replace
+        path: {$concat: [{$const: {name: bindings, path: /state}}, /settlements/, {$var: key}]}
+        val:
+          amountMinor: {$var: gross}
+          paidMinor: 0
+          transferredMinor: 0
+          feeMinor: 0
+          status: closed
+    - $appendEvent:
+        $merge:
+        - type: Events/Event
+        - kind: Payout Reconciled
+          key: {$var: key}
+          settled: false
+    - $set:
+        name: actionResult
+        expr:
+          outcome: acceptedNew
   opened:
     resultContract: outcome-v1
     automatic:
@@ -535,6 +1082,62 @@ actions:
                 $event: /event
               pattern:
                 type: Payment/Payment Event Received
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reconcile
+            args:
+              input:
+                key:
+                  $sliceAfter:
+                  - $event: /sourcePath
+                  - $concat:
+                    - $const:
+                        name: bindings
+                        path: /payouts
+                    - /
+  observedAccountPayout:
+    resultContract: outcome-v1
+    automatic:
+      'on': collection
+      pathBinding: payouts
+      event:
+        type: Events/Event
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Events/Event
+        then:
+        - $return: {}
+    - $let:
+        name: payout
+        expr:
+          $document:
+            $event: /sourcePath
+    - $if:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $var: {name: payout, path: /paymentDetails/method}
+              - myos-account-to-account
+            - $includes:
+                list:
+                - $nodeBlueId:
+                    $get: {object: {type: MyOS/MyOS Test Account to Account Payment Instruction}, key: type}
+                - $nodeBlueId:
+                    $get: {object: {type: MyOS/MyOS Stripe Account to Account Payment Instruction}, key: type}
+                val:
+                  $nodeBlueId:
+                    $var: {name: payout, path: /type}
         then:
         - $return: {}
     - $set:

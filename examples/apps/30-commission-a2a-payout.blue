@@ -1,0 +1,158 @@
+name: Reseller commission settled by a MyOS account-to-account payout
+type: Agreements/Agreement with Clauses
+terms:
+  commissionBps: 1000
+  currency: USD
+  payoutOperator: test
+  payoutFeePolicy: myos-commission-fee-v1
+  payoutOperatorAccountId: test-guarantor
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: MyOS/MyOS Party
+          displayName: Seller
+          myosAccountId: test-seller
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: seller
+        partner:
+          type: MyOS/MyOS Party
+          displayName: Partner
+          myosAccountId: test-partner
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: partner
+      required:
+      - seller
+      - partner
+  commission:
+    type: Reseller/Commission Clause
+    bindings:
+      state: /commission
+      orders: /orders
+      payouts: /payouts
+      rate: /terms/commissionBps
+  payouts:
+    type: Reseller/Commission Account Payouts Clause
+    bindings:
+      template: /payoutTemplate
+      collection: /payouts
+      commission: /commission
+      parties:
+        seller: seller
+        partner: partner
+      preparePayout:
+        startPayout:
+          'on': workflow
+          party: seller
+      provide:
+        providePayout:
+          'on': workflow
+          party: seller
+      cancel:
+        cancelPayout:
+          'on': workflow
+          party: seller
+orders: {}
+commission:
+  targets:
+    o1: 1000
+    o2: 1000
+  accrued: 2000
+  paid: 0
+  reserved: 0
+  settlements: {}
+payouts: {}
+payoutTemplate:
+  name: Partner commission payout
+  type: MyOS/MyOS Test Account to Account Payment Instruction
+  paymentTerms:
+    amountMinor:
+      type: Integer
+    limitMinor:
+      type: Integer
+    currency: USD
+    payerChannel: seller
+    payeeChannel: partner
+    guarantorChannel: guarantor
+    allowedPayees:
+    - partner
+    captureGate: ''
+    recipientApprovalRequired: false
+  paymentDetails:
+    method: myos-account-to-account
+    payoutTerms: {}
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: MyOS/MyOS Party
+          partner:
+            type: MyOS/MyOS Party
+          guarantor:
+            type: MyOS/MyOS Party
+        required:
+        - seller
+    payment:
+      type: PaymentInstruction/Payment Request Actions
+      bindings:
+        requestAuthorize:
+          securePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-secure
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Secures the complete frozen partner transfer; no input fields.
+        requestCapture:
+          capturePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-capture
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Transfers the complete frozen partner amount; no input fields.
+        requestVoid:
+          voidPayout:
+            'on': workflow
+            party: seller
+            params:
+              requestId: payout-void
+              amountMinor:
+                $document: /payment/secured
+            request:
+              description: Returns the complete secured debit to the seller before the partner transfer; no input
+                fields.
+    method:
+      type: MyOS/Payment Method Events
+    accountSettlement:
+      type: Reseller/Commission Payout Settlement Clause
+      bindings:
+        confirm:
+          confirmAccountSettlement:
+            'on': workflow
+            party: guarantor
+            params:
+              debitReference:
+                $var:
+                  name: trigger
+                  path: /debitReference
+              transferReference:
+                $var:
+                  name: trigger
+                  path: /transferReference
+    payoutProfile:
+      type: Reseller/Commission Payout Profile Clause
