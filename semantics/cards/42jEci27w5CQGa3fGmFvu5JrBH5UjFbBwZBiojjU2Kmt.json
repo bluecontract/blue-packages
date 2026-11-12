@@ -1,0 +1,131 @@
+{
+  "blueId": "42jEci27w5CQGa3fGmFvu5JrBH5UjFbBwZBiojjU2Kmt",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "A6fqEe3ag4xU6CK2pFQDTDuE4E3jTKsgA3WPeXNSEaSF",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "Ed8xrgARSGxfHJgXUCe6ZRFeQbZqamSnyPRFkqPuQdUG",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR"
+    ],
+    "displayLabel": "Document Scope Clause",
+    "limitations": [
+      "The clause reads budget.used but does not define its initialization, what consumes a usage unit, or how usage is maintained.",
+      "Only Active is interpreted here; the Mandate's other lifecycle values and transitions are not defined by this clause."
+    ],
+    "parameterRefs": [
+      "bindings.budget",
+      "bindings.documents",
+      "bindings.pattern"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; the Active condition is not established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: status guard and budgetPredicate.",
+        "id": "mandateStatus",
+        "meaning": "Only Active permits registration and installed grants. Other lifecycle values are not defined by this clause.",
+        "path": "/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence is not a recorded zero.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All entries in the documents binding.",
+          "unit": "document registry entries"
+        },
+        "binding": "documents",
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: identity, duplicate check, documents add.",
+        "id": "registeredDocumentCount",
+        "meaning": "Registry entry count; register keys each new candidate by its initialized document's Blue identity.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no empty scope is initialized here.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All current entries in /scope, including entries from other clauses.",
+          "unit": "scope entries"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: grants loop and /scope replacement.",
+        "id": "scopeEntryCount",
+        "meaning": "Stored scope-entry count across clauses; conditional grants need not currently be usable.",
+        "path": "/scope",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; required integer when budget is bound.",
+        "aggregate": null,
+        "binding": "budget",
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: budget limit check and budgetPredicate.",
+        "id": "budgetLimit",
+        "meaning": "Shared usage ceiling in the same unspecified units as used; installed grants require used below this limit.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/limit",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; this clause supplies no initial value.",
+        "aggregate": null,
+        "binding": "budget",
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: budgetPredicate reads budget/used.",
+        "id": "budgetUsed",
+        "meaning": "Shared usage read by grant guards; its units and accounting are external to this clause.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/used",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; planned initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial state and once guard/write.",
+        "id": "connectionOnceCompleted",
+        "meaning": "For once:true, reaching the connection's end sets true and suppresses later runs; not an external outcome.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; planned initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: timer arm and cancel task bodies.",
+        "id": "connectionTimerArmed",
+        "meaning": "For timers, records arming and suppresses further first-policy arms; does not prove a timer remains pending.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Document Scope Clause\n\nQualifies initialized documents against an approved Blue pattern and installs operation grants tied to each document's initial identity. Registration establishes qualification and scope; it neither executes a target operation nor consumes usage.\n\n## Configuration\n\n- `bindings.documents` is a required, non-root JSON Pointer to the document registry. There is no default path. Registration stores the candidate under the Blue identity of its `contracts.initialized.document`.\n- `bindings.pattern` is an optional, non-root JSON Pointer to the approved pattern. When supplied, its value must exist and be an object at installation; it is snapshotted. Otherwise, `parameters.documentPattern` must supply an object. Installation freezes the native Blue matcher, so later changes to the bound pattern do not change that matcher, and a candidate cannot supply its own matcher.\n- `bindings.budget` optionally points to shared usage state. Its `limit` must be an integer when registration runs. Each installed grant requires `used` to be less than `limit`. Registration does not initialize or increment either field and does not require available capacity: a document can be registered while the budget is exhausted. Omitting this binding adds no usage cap through this clause.\n- `parameters.grants` supplies keyed grant templates. Each processed grant must contain text values at `target.channel` and `target.operation`.\n- `parameters.requireAttributed` enables attribution checking only when exactly `true`. The processing actor must equal `/contracts/authorizedActorChannel/actor`; `processingEventSource/onBehalfOf/mandate` must exist and have the same Blue identity as the executing Mandate's `/contracts/initialized/document`.\n- `parameters.embedDocuments` must be Boolean if present. Unless it is `false`, the registry is included in embedded-document processing. Setting it to `false` omits that contribution, for example when an already embedded producer supplies the documents' live events.\n\n## Registration and installed grants\n\nThe `register` action defaults its `document` argument to `trigger.document`; a connection's `params.document` can override it. The registration body returns without registering anything unless the executing document's `/status` is `Active`. Failed required attribution also returns without registration.\n\nThe candidate must match the frozen pattern and contain `contracts.initialized.document`. Invalid patterns, failed matching, missing initialized documents, and a non-integer bound budget `limit` fail the action. These checks precede duplicate detection. If the registry already contains that initial identity, registration returns without replacing its entry, reinstalling grants, or emitting another qualification event.\n\nFor a new identity, registration stores the candidate and adds each grant to `/scope` under a key formed from the clause key, initial identity, and grant key. It replaces `target.initialDocument` with the candidate's initialized document and replaces the grant's document-validation pattern with the approved pattern. The validation expression combines:\n\n- the executing Mandate remaining `Active`;\n- `budget.used` being below `budget.limit`, when a budget is bound;\n- the template's existing `target.documentValidation.function.expr`, or `true` when absent.\n\nThus each installed grant rechecks the approved pattern at execution and retains the template's additional validation expression. A stored grant is conditional authority, not proof of a viewer's permission or of a completed operation.\n\nRegistration emits `Document Qualified`, whose `clause` identifies this clause and whose `document` is the initialized document, rather than the whole candidate. A committed qualification records admission to this scope; it does not confirm any later operation's outcome. Registry and scope counts describe stored entries, not the number of currently usable permissions.\n\n## Connections and execution controls\n\nInherited `bindings.register` connections determine when registration runs; this type declares no automatic registration source. Supported sources include emitted events, embedded documents or collections, document changes, existing channels, clause initialization, document activation, workflows, and timers. Workflow triggers use the request, embedded sources use the inner event, and timers use their captured triggering event.\n\nConnection `params` override action defaults. A false `when` skips execution; a failing `parameters.conditions.register` rejects it. Optional `before` steps run before the registration body's own checks, while `after` steps run only when that body reaches its end. Therefore an early return from registration does not imply that configured `before` steps did nothing. `once` defaults to `false`; when enabled, reaching the connection's end records `fired=true` and suppresses later invocations. This flag is not confirmation of an external operation.\n\nTimer connections select exactly one of an absolute `timestamp` or an `afterEvent` source with `delayMs`. Absolute timestamps are integer Unix-microsecond instants from 0 through 9007199254740991. Relative delays are positive integer milliseconds, at most 9007199254740, based on a timestamped source rather than initialization; the resulting deadline must remain within the timestamp range. Absolute timers do not accept `delayMs` or `policy`. Relative `policy` defaults to `first`, which ignores further arm events once armed; `latest` replaces the keyed pending timer. `cancelOn` emits a cancellation request. Neither cancellation nor firing clears the inherited `armed` flag, so cancellation alone does not make `first` rearmable. A timer request or an armed flag is not a confirmed firing; firing requires Time runtime admission, and registration guards still apply when it runs.\n\nThe inherited transition check requires a new clause key for a changed clause configuration. Budget accounting and the Mandate's broader lifecycle are defined outside this clause."
+}

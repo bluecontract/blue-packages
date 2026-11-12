@@ -1,0 +1,53 @@
+{
+  "blueId": "HCLNwqVZfWNtjeP6MQrJiRzBFcUEtizFyfihPfoLsMqJ",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Task Launch Policy",
+    "limitations": [
+      "The supplied definitions do not establish the Work request implementation, its use of parameters.workClause, or task business outcomes and lifecycle state."
+    ],
+    "parameterRefs": [
+      "parameters.workClause"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; false is planned only at initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: slot initialization and timer arm taskBody.",
+        "id": "connectionArmed",
+        "meaning": "Records timer arming for a connection; does not establish a pending timer or started work.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false is planned only at initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: slot initialization, once guard and final fired write.",
+        "id": "connectionFired",
+        "meaning": "Records reaching the final wrapper step for once=true; suppresses repeats, without confirming Work completion.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Task Launch Policy\n\nAn abstract connected-policy marker for clauses that invoke the package-owned Work request function. This exact definition supplies no concrete launch action, request payload or task lifecycle. The marker itself does not establish that work has been requested, started or completed.\n\n`parameters.workClause` has the source-defined default `\"work\"`. Its validation, resolution and effect on Work requests are not established by the supplied functions. `bindingTypes` is empty, so this marker declares no data bindings. Executable actions and hooks come from the admitted exact clause type.\n\n## Inherited connections\n\nWhere actions are declared, `bindings` can associate each action with named connections. Supported `on` values are `event`, `channel`, `change`, `embedded`, `collection`, `initialized`, `activated`, `workflow` and `timer`. `initialized` observes `Clauses Initialized`; `activated` observes `Document Activated`. Embedded and collection sources require a non-root `path` and request embedding unless `embed` is false. Workflow connections require an authenticated channel name, selected by `party` when present, otherwise `channel`; availability does not establish the current viewer's permission.\n\nConnection `params` override action `defaults`. A false `when` skips execution. Declared `args` are validated, while false `require.when` or `parameters.conditions` for the action rejects execution. Conditions naming unknown actions are invalid. Optional `preflight` runs before connection `before`, action `do` and connection `after`. A preflight must set `actionResult.outcome` to `acceptedNew`, `duplicate`, `rejected` or `skipped`; only `acceptedNew` proceeds. Actions with `resultContract: \"outcome-v1\"` must also provide one of these outcomes after `do`, and only `acceptedNew` proceeds to `after`. These outcomes describe action processing, not external Work completion.\n\n`once` defaults to false. When true, a connection is marked `fired` only after reaching the final wrapper step, and subsequent invocations skip it. Skipped or non-accepted outcomes do not consume this one-time execution.\n\nTimer connections require exactly one of `timestamp` and `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991; it permits neither `delayMs` nor `policy`. An `afterEvent` timer requires a timestamped source and positive integer `delayMs`, at most 9007199254740 milliseconds. Its `policy` defaults to `first`, which suppresses later arm attempts once `armed` is true; `latest` permits replacement of the pending keyed timer. Optional `cancelOn` emits a keyed cancellation request. Timer effects require the Time runtime and a successful commit; a request is not a firing or confirmation of launched work.\n\n## Connection state\n\nThe planner initializes each connection slot under `/connectionState_{clauseKey}` with `armed: false` and `fired: false`. Slot names join the action and connection names with a dot. `armed` records timer arming, not current pending status: cancellation and firing do not clear it. `fired` records completion of the wrapper for a `once: true` connection, not completion of Work; repeatable connections do not set it. Missing flags are unknown, not false.\n\nThe inherited transition validator rejects changed clause contents under an existing clause key; changing the clause requires a new key."
+}

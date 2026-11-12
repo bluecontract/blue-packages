@@ -1,0 +1,58 @@
+{
+  "blueId": "73mm9Sv5iHZpoyX7zde5WN85aTJxvhGALBnYkpUAtSZ8",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "BJAryTTpFhjTvvvii1hKiHMf3VHqMarwE3fCDzg9w3Ad",
+      "4FqAGskHttczv6E7ge1jqbKFuv8HNMu3h3qjasiLMjAw",
+      "HghdkbesKKN5Mh64CUived1Ygebn4TT3aiFpcCubhk4t",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "AUbUbE9rcdUxW2gj8p4EnbNDMuGQaC1SKADvLMqEBQ9Z",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "rzWvzsV3nUXBThaM8f896BBmiBr3zzojz4dBynmBVgm",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Registration Scope Plan",
+    "limitations": [
+      "The shared handler body does not invoke qualifiesRegistration; the evidence does not establish where its result controls registration.",
+      "The registrationPattern object check does not establish owner approval or enforce scalar-only contents."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initializer and timer arm taskBody.",
+        "id": "connectionArmed",
+        "meaning": "Timer arm marker set with request emission; remains true after cancellation or firing, not a pending-timer status.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initializer and body final once branch.",
+        "id": "connectionFired",
+        "meaning": "For once=true, records reaching the final handler marker after after; does not confirm an external result.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Registration Scope Plan\n\nCompiles an owner-approved registration pattern into a reusable matching function in generated connection handlers. The intended boundary is that actors supply candidate values, while the registration rule comes from approved configuration.\n\n`plan` calls `planRegistrationScopes`, which reads the candidate clause’s `parameters.registrationPattern` in definition view. It must be an object; otherwise planning fails with `MANDATE_REGISTRATION_PATTERN_REQUIRED`. No default is supplied. The check does not itself establish owner approval or enforce scalar-only contents.\n\nAfter inherited connection planning, every contribution with `kind: handler` receives `qualifiesRegistration(candidate)` in its first Compute step, including timer arming and cancellation handlers. This function applies native `$is` matching against the preserved pattern. Adding it does not replace event or request filters. The supplied shared handler body does not invoke it, so the evidence does not establish where its result is enforced. Planning returns contract contributions and proposed state initializers; it does not itself confirm registration acceptance.\n\n## Configuration\n\nThe planner reads the candidate clause at `/clauseRuntime/work/candidate/{clauseKey}`.\n\n- `type.defaultBindings` is merged with clause `bindings`, with clause values taking precedence. Names belonging to `actions` or `childActions` are distinguished from property bindings. Other names must appear in `type.bindingTypes`. Required bindings must have the declared kind; `pointer` requires non-root text beginning with `/`. `type.optionalBindings` permits omission.\n- Actions come from `type.actions`, or from `parameters.actions` when `type.configurableActions` is true. Actions must be an object, although absent actions become an empty object when `type.initialState` is an object. Each `initialState` entry requires a named pointer binding and an object initial value.\n- `type.embeds` and `type.embedsCollections` identify pointer bindings to process as embedded documents or collections. Embedded and collection source selectors also add processing paths unless `embed` is false.\n- An action’s `automatic` declaration adds the reserved connection name `_automatic`; user bindings cannot reuse it for that action. `automatic.pathBinding` resolves through property bindings.\n- `type.snapshotBindings` captures existing document values at configured binding paths during planning; supplied paths must be text and their values must exist. Clause parameters are captured without `actions` and `conditions`, unless `type.readParametersFromDocument` is true, in which case the captured `parameters` constant is empty. `type.actionDefinition`, when present, selects the generated Compute definition.\n\nExecutable action and connection configuration is retained for later execution rather than run during planning.\n\n## Generated handlers\n\nConnections select sources through `on`: `event`, `channel`, `change`, `embedded`, `collection`, `initialized`, `activated`, `workflow`, or `timer`. Source-specific fields are checked, and unsupported fields are rejected. `change`, `embedded`, and `collection` require non-root paths; collection handlers accept only events whose `sourcePath` descends from the configured path. `initialized` selects `Clauses Initialized`, while `activated` selects `Document Activated`.\n\nWorkflow connections use `party` when supplied, otherwise `channel`, and require a valid channel name. They can carry `request` and `event` patterns. This configuration does not itself establish an actor’s authority to invoke the operation. Clause keys and names used for actions, connections, and channels must be nonempty and contain no `.`, `/`, or `~`.\n\nA handler first skips a connection already marked `fired` when `once` is true; `once` defaults to false. Its `trigger` is the workflow request, the inner event for embedded or collection sources, the saved originating trigger for timers, or the ordinary event otherwise. Runtime `params` merges action `defaults` with connection `params`, with connection values taking precedence.\n\nA false connection `when` skips execution; its default is true. Declared action `args` are checked, with failure reported as `ACTION_ARGUMENT_INVALID`. Action `require.when` and `parameters.conditions[actionName]` must pass; both default to true. Requirement failure uses `require.message` or `ACTION_REQUIREMENT_FAILED`; clause-condition failure uses `ACTION_CONDITION_FAILED`. Conditions naming unknown actions are rejected during planning.\n\nOptional `preflight` runs before connection `before` and action `do`. It must set `actionResult.outcome` to `acceptedNew`, `duplicate`, `rejected`, or `skipped`; only `acceptedNew` continues. After `do`, `resultContract: outcome-v1` requires the same explicit outcome and only `acceptedNew` proceeds to `after` and the final `once` marker. The default `resultContract` is `legacy`, which does not require that post-action outcome check. These labels govern continuation; they do not establish an external business result.\n\n## Timers and connection state\n\nA timer requires exactly one of `timestamp` or `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond instant from 0 through 9007199254740991. It arms on `Clauses Initialized` and cannot specify `delayMs` or `policy`.\n\nA relative timer uses a timestamped `afterEvent` source and a positive integer `delayMs`, measured in milliseconds, no greater than 9007199254740. Its deadline follows the source input’s logical timestamp by that duration and must remain within the timestamp range. Supported relative sources are `event`, `channel`, `change`, `embedded`, and `collection`; initialization cannot provide the time base. `policy` defaults to `first`; `latest` permits replacement on later arming inputs. Optional `cancelOn` accepts those source kinds plus `initialized` and must name a nonempty source.\n\nArming emits a `Timer Request` with key `connection`, preserving the originating trigger in its context. Cancellation emits a `Cancel Timer Request` for that key. Only committed effects affect registrations. Emission is not firing: processing requires a pending registration and Time runtime admission, including closed input-history evidence. Deadlines must follow an established invocation’s logical position; a new standalone document without a prior position can initialize with an elapsed absolute deadline. Processing may occur late while retaining the requested deadline as its logical timestamp. Cancellation cannot undo a firing already earlier in logical order.\n\nThe proposed state at `/connectionState_{clauseKey}` contains one entry per `actionName.connectionName`, initially with `armed: false` and `fired: false`:\n\n- `armed` becomes true when the timer arm path emits its request. The supplied code never resets it on cancellation or firing. Consequently, `first` prevents further arming after the first committed arm, and `armed` is not a live pending-timer status.\n- `fired` becomes true only for `once: true` after execution reaches the final marker following `after`. It suppresses later handler execution and timer arming for that connection. It does not confirm an external outcome; with `once: false`, it remains false even when actions execute.\n\nMissing flags are unknown; the initial false values apply only after initialization is installed. Additional structural state depends on the planned clause’s declared bindings and `initialState`.\n\nThe inherited configuration-validation hook returns approval, but planning still performs the checks above. Transition validation compares the current clause with the candidate; a changed configuration under the same clause key returns `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`."
+}

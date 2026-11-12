@@ -1,0 +1,66 @@
+{
+  "blueId": "8m58DYW4HwQYXQ6JRWyJq9WjvH5FMji2CWPx2U4MWBVB",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "G41toeMqM3MsLyNmjEqQCrTPEmq6Ri51ZEpsY7ECGPAs",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Hello Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.text"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; Hello World is an action default only.",
+        "aggregate": null,
+        "binding": "text",
+        "defaultPath": null,
+        "evidence": "Hello Clause.actions.say.do: $appendChange replaces bindings.text with params.text.",
+        "id": "text",
+        "meaning": "Current text at the configured destination; say replaces it with its selected text.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired; body once guard and final change.",
+        "id": "connectionFired",
+        "meaning": "For once=true, records reaching the end of execution and suppresses later runs; other runs do not set it.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial armed and timer arm/cancel taskBody.",
+        "id": "timerArmed",
+        "meaning": "Records timer arming; first policy blocks later arms. Firing and cancellation do not clear it.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Hello Clause\n\nProvides one reusable action, `say`, that replaces text at a configured document location and emits `Hello Said`. Connections determine when it runs; this type supplies no automatic connection.\n\n## Text and action\n\n`bindings.text` is required and identifies the destination in the executing document. It must be a Text pointer beginning with `/`, other than `/` itself. There is no default destination or initial text.\n\nThe action's `text` parameter defaults to `\"Hello World\"`. Connection `params` are merged over that default during execution. A workflow request is available as `trigger`; its fields do not automatically become action parameters. The selected `text` must be Text, including an empty string if supplied. Otherwise, `say` fails with `Hello text must be Text`.\n\nThe action stages a replacement at `bindings.text` and emits `Hello Said` with `clause` identifying the clause instance, `connection` identifying the invoking connection, and `text` containing the selected text. These effects depend on the invocation committing. The event describes the document action; it does not establish delivery of a message to a person. An absent destination value is unknown, not the action's default greeting.\n\n## Connections and guards\n\n`bindings.say` is a dictionary of named connections. Clause and connection names must be nonempty and cannot contain `.`, `/` or `~`. Each connection's `on` selects its source:\n\n- `workflow`: an operation using an authenticated `channel`, or `party` override, with an optional `request` pattern.\n- `channel` or `event`: an existing named channel or emitted events, respectively.\n- `change`, `embedded` or `collection`: updates at `path`, events from an embedded document at `path`, or events below a collection `path`. These paths must be non-root pointers. Embedded sources are included for processing unless `embed` is `false`.\n- `initialized` or `activated`: `Clauses Initialized` or `Document Activated` events.\n- `timer`: an admitted timer firing configured as described below.\n\nWhere supported, `event` restricts matching events. A workflow connection does not itself establish a particular person's permission to invoke it.\n\nAfter preparing `params`, a false `when` skips execution; its default is `true`. A false `parameters.conditions.say` instead fails with `ACTION_CONDITION_FAILED`; an omitted condition permits execution. Configured `before` steps run before `say`, and `after` steps follow it. `once` defaults to `false`; when `true`, reaching the end records `fired` and suppresses subsequent executions of that connection.\n\n## Timer connections and recorded state\n\nA timer requires exactly one of `timestamp` or `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991, armed on initialization; it cannot have `delayMs` or `policy`. A relative timer uses a timestamped `afterEvent` selector and positive integer `delayMs`, in milliseconds, no greater than 9007199254740. Its `policy` defaults to `first`, which ignores subsequent arming inputs once `armed` is true; `latest` replaces the pending keyed timer. `cancelOn` optionally selects inputs that request cancellation. Arming and cancellation selectors support `event`, `channel`, `change`, `embedded`, `collection` and `initialized`, but relative arming cannot use `initialized`. Timer execution exposes the captured arming event as `trigger`.\n\nTimer requests require support for the supplied Time protocol. Scheduling is not firing, and cancellation cannot undo an earlier firing. New deadlines must follow the invocation's logical timestamp; standalone initialization without a committed external position may request an already elapsed absolute deadline.\n\nPer-connection state under `/connectionState_{clauseKey}` is keyed by the action and connection names. Initialization supplies `fired: false` and `armed: false`. Successful runs with `once: false` do not set `fired`. Timer arming sets `armed`, but firing and cancellation do not clear it, so it is not a pending-timer indicator. Missing state is unknown. Changing an installed clause configuration requires a new clause key."
+}

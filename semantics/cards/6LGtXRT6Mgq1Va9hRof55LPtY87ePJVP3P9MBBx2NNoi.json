@@ -1,0 +1,198 @@
+{
+  "blueId": "6LGtXRT6Mgq1Va9hRof55LPtY87ePJVP3P9MBBx2NNoi",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "8trocmFZrFY9423BPspudxLhJxtboHjyR1Km9xJmTkiD",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "HRac84i2MqGQmcHdysnrmKjw3pQpLw7Fd82m4MJv8CZP",
+      "A7wEjRJqWS1f6osMkG1wcBig6MHx9gGTejQE4zNSBnDr",
+      "7hZBxZQ4pz6fjMddyrVMEDakNuy4Y3ivoWNb5dSjdQQP",
+      "E8vAZTWAieCb3nPsm4D4PLC5GC1YiYp3prK3PTiXShTY",
+      "DKnFCL5jgaz72HAaJyZuEt8mR1dUWMmGyAh18mnou8zG",
+      "C78Fs4i4yG2vzpJWuAgRRvjj8kzmGj7PMTmgkXmaTd9H",
+      "2xwFsmk4U1W84e7rZkKWXPyq3GcMfGdEB4UHazxurJZu",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "23Cjn3PdR7LaYe1JH3ZmxsWpC7UbjhMwk71Fz7BeDKAP",
+      "39S8zEAGjCMzpvfmLepgA5wry8iHuTbgx86YxxBn7Hem",
+      "8Qa2KBSeQAn2ep8ofkBqmrtYgLWrMzM3Ngj5uFPfsF1p",
+      "34FDPdm7MbNFzs4D195p4q6QYHPCjh7BMud2bMvR8Fw4",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR"
+    ],
+    "displayLabel": "Shipping Clause",
+    "limitations": [
+      "Request-side operation names and authorized callers depend on the instruction template; Shipping Clause itself declares only start and observe."
+    ],
+    "parameterRefs": [
+      "bindings.instruction",
+      "bindings.template"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no shipment correlation key established.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Clause.actions.start; Shipping Functions.request/respond",
+        "id": "shipmentIdentity",
+        "meaning": "Shipment correlation key formed from the original parent document's identity and this clause key.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/instanceKey",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization must run to establish new.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Instruction.contracts.__shippingInitialize; Shipping Functions.request/respond",
+        "id": "shipmentStatus",
+        "meaning": "new: unrequested; requested: awaiting carrier decision; accepted: awaiting dispatch; dispatched: awaiting delivery; delivered/cancelled/rejected/failed: terminal carrier reports.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/status",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization writes empty text.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Instruction.contracts.__shippingInitialize; Shipping Functions.respond",
+        "id": "trackingId",
+        "meaning": "Stored carrier tracking identifier. New responses replace it only when trackingId is supplied.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/trackingId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; shipment initialization supplies no address.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Functions.respond: addressChanged branch",
+        "id": "destination",
+        "meaning": "Current delivery address; addressChanged applies the correlated request's input.address.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/destination",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; an initialized empty map has count zero.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All entries in the instruction's shipment.requests map",
+          "unit": "Locally accepted request IDs, not completed carrier outcomes"
+        },
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Instruction.contracts.__shippingInitialize; Shipping Functions.request",
+        "id": "recordedRequestCount",
+        "meaning": "Count of distinct recorded book, cancel and address requests; duplicates add no record.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/requests",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown request action.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Functions.request: request record action",
+        "id": "requestAction",
+        "meaning": "Recorded intention: book, cancel or address. Recording it does not confirm a carrier outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/requests/*/action",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown request correlation.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Functions.request: requestId validation and stored input",
+        "id": "requestId",
+        "meaning": "Caller-selected nonempty requestId, also used as the request-map key and by correlated carrier reports.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/requests/*/input/requestId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown or inapplicable to this request action.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Functions.requestAddressChange, request and respond",
+        "id": "requestedAddress",
+        "meaning": "Address proposed by an address request; the request alone does not change the destination.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/requests/*/input/address",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence alone is not a carrier decision.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Functions.respondPublic/respond; Shipping Instruction carrier operations",
+        "id": "responseRequestId",
+        "meaning": "Carrier report correlation. Response-map keys are accepted, rejected, dispatched, delivered, failed, cancelled, cancellationRejected, addressChanged or addressRejected.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/requests/*/responses/*/requestId",
+        "type": "string"
+      },
+      {
+        "absent": "No tracking identifier recorded in this response.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Response Input.trackingId; Shipping Functions.respond",
+        "id": "responseTrackingId",
+        "meaning": "Tracking identifier supplied for this report; omission does not clear the shipment's stored trackingId.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/requests/*/responses/*/trackingId",
+        "type": "string"
+      },
+      {
+        "absent": "No explanation recorded in this response.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Shipping Response Input.reason; Shipping Functions.respond",
+        "id": "responseReason",
+        "meaning": "Carrier explanation for the outcome named by the response-map key.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/shipment/requests/*/responses/*/reason",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; the child may have no activation state.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": null,
+        "evidence": "Child Activation Functions.activateChild; Activation Functions.computeState",
+        "id": "childActivationStatus",
+        "meaning": "WAITING_FOR_ACCESS: initial access pending; SUSPENDED_ACCESS: access lost after activation; AWAITING_ACCEPTANCE: required party acceptance or current terms missing; ACTIVE: activation ready; CLOSED: closed.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/activation/status",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Shipping Clause\n\nStarts and embeds one Shipping Instruction and relays its emitted events. Starting the instruction creates a document for a shipment; it does not itself request shipment or confirm a carrier outcome.\n\n## Bindings and startup\n\n- `bindings.instruction` is the destination for the embedded instruction.\n- `bindings.template` points to the Shipping Instruction template used to create it.\n\nBoth are required non-root JSON pointers with no default paths. Shipment state belongs inside the document at `instruction`.\n\n`start` has no automatic trigger; a configured connection invokes it. It constructs `instanceKey` from the original parent document at `/contracts/initialized/document` and the clause key, separated by a colon. If the destination already exists with that key, `start` reports `duplicate` without reinstalling it or revalidating its type or template. A different key fails with `SHIPPING_DESTINATION_CONFLICT`.\n\nFor a new destination, the template must match Shipping Instruction and have no `/contracts/initialized`; otherwise startup fails with `SHIPPING_TEMPLATE_REQUIRED` or `SHIPPING_TEMPLATE_ALREADY_STARTED`. Successful creation reports `acceptedNew`.\n\nWhen the parent has `/activation`, `parameters.parties` selects parent party roles; omission or an empty list selects all parent parties. `parameters.readers` selects named parent reader groups and defaults to an empty list. Unknown selections reject startup. `activateChild` copies the selected parties, reader groups and parent access-document references, installs their transports, and prepares child activation with `frozen: true`. The child's existing `required` list is preserved, defaulting to `[]`; parent approvals are not copied. Child activation remains subject to its own access, acceptance and closure state. Without parent `/activation`, this preparation leaves the template unchanged before `instanceKey` is added.\n\n## Connections and event relay\n\nNamed action connections can use `workflow`, `event`, `embedded`, `collection`, `change`, `channel`, `initialized`, `activated` or `timer` sources. A workflow selects an authenticated channel; declaring a connection does not establish the current reader's permission. `when` can skip an invocation, while a false `parameters.conditions` entry for the action rejects it. Connections support `before` and `after` steps. For `start`, `after` steps run only for `acceptedNew`; `duplicate` does not consume an optional `once` connection. `once` defaults to false. Changing an installed clause configuration requires a new clause key.\n\nTimer connections select either an absolute integer `timestamp` in Unix microseconds or `afterEvent` with positive integer `delayMs` in milliseconds. Relative `policy` defaults to `first`, suppressing later arming once armed; `latest` emits another timer request for each arming. Absolute timers do not accept `delayMs` or `policy`. `cancelOn` emits a timer cancellation request.\n\n`observe` automatically listens to the embedded `instruction`. It accepts any Event descendant, including non-shipping events, and ignores other emissions. Each matching observation emits Shipping Event Received with `clause` identifying this clause and `event` referencing the exact child event. This relay preserves the underlying distinction between a request and a carrier report; it does not create a separate parent shipment outcome.\n\n## Instruction state and carrier reports\n\nThe child's initialization sets `/shipment/status` to `new`, `/shipment/requests` to `{}`, and `/shipment/trackingId` to empty text. Missing state before initialization is unknown, not an implied default. Its activation status, when present, is separate from shipment progress.\n\nRequest-side entry points and authorized callers depend on the template's wiring. Shipping Functions provide `requestShipment`, `requestCancellation` and `requestAddressChange`, recording actions `book`, `cancel` and `address`. Each requires a nonempty `requestId`; address changes also require a nonempty `address`. Reusing an ID with the exact same action and input is a duplicate; changed content is rejected. New booking requests require `new` and change status to `requested`. Cancellation and address requests require `requested` or `accepted` and leave shipment status unchanged. Their emitted requests do not establish external completion.\n\nOnly the instruction's `carrier` channel records responses, correlated to an existing request:\n\n- `confirmShipment` and `rejectShipment` decide a booking while status is `requested`, producing `accepted` or `rejected`.\n- `recordDispatched` requires `accepted`; `confirmDelivery` requires `dispatched`. They record `dispatched` and `delivered`. `failShipment` records `failed` against a booking before a terminal outcome.\n- `confirmCancellation` records `cancelled`. `confirmAddressChange` applies the correlated request's address to `/destination` without changing shipment status. Both confirmations require `requested` or `accepted`.\n- `rejectCancellation` and `rejectAddressChange` record `cancellationRejected` and `addressRejected` without changing shipment status. These rejections can still be recorded after dispatch, provided the shipment is not terminal.\n\nResponses must match the request action. Each cancellation or address request receives at most one distinct decision. `delivered`, `cancelled`, `rejected` and `failed` are terminal shipment states and reject different later outcomes. An exact replay of an already recorded response remains a no-op after later progress; changed content for that recorded outcome is rejected.\n\nRequest records retain their original `input` and carrier `responses` keyed by outcome. Optional response `trackingId` replaces the instruction's stored tracking identifier when supplied; omission retains the previous value. Optional `reason` explains that particular report. Emitted response events use empty text for omitted `trackingId` and `reason`, even when the instruction retains an earlier tracking identifier. Requests and responses identify the shipment through `instanceKey` as `shipmentId`."
+}

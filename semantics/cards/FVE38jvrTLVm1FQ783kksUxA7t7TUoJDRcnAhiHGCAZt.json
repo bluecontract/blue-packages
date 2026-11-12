@@ -1,0 +1,117 @@
+{
+  "blueId": "FVE38jvrTLVm1FQ783kksUxA7t7TUoJDRcnAhiHGCAZt",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "DQz6Uhzp8U9T5Pnb9aaJjYgMP9uqwArwPzRFwroofVZ1",
+      "7hZBxZQ4pz6fjMddyrVMEDakNuy4Y3ivoWNb5dSjdQQP",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "6nvB6mRrFAZmyv2vP3h8tAWLeDTq4b9BtfqSJdbdNJzS",
+      "2sSugnwiV9M2YxKDg42MuRpcG48RJgxteq76tHbYFmdi",
+      "BPMByZokSM9z9aVJWWzmEdPwa45uRvvAWjMWuRnkWWnV",
+      "3WukTexA1Nex951RDHoA6S6QfNgFmdiBpigfRUzi9YMh",
+      "26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG",
+      "HW7dw1gGvAMknFW6HXvHc432TZfzCut2mW4KCk4rj8o1",
+      "GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy",
+      "BvtgU3qxEP7vTPD7vTwC1qTdvWSBwwxsaA4j6xkyqbJt",
+      "HN5JMeurkfSWYamyNumcBHu23ExHmDTMZB8SQYFFwWZu",
+      "7dL9TXBk1TmaAuzEeui7rGX2D9X2apTDMenQmFP1z5Xu",
+      "EpAGfKidGeyW6nEe3QKyYyvzBKXfT9c3PHj6GSz9vc7e"
+    ],
+    "displayLabel": "Preparation Admission Functions",
+    "limitations": [
+      "No enclosing caller configuration is supplied for admit: the values of key, authority, requestPath and admissionKey, and invocation authority, are unspecified.",
+      "The supplied documentPaths do not include concrete preparation/admission records or individual Activation status, approval and access-readiness fields, so those states lack individual structured locators here."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no stored revision is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Admission Functions.admit; Attachment Access Functions.installAuthority",
+        "id": "activationRevision",
+        "meaning": "Activation review revision matched by admission and advanced when authority installation succeeds.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; absence does not establish an empty roster.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Current role-keyed entries in /activation/parties",
+          "unit": "party roles, not distinct people or approvals"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Attachment Access Functions.installAuthority: roster and /activation replacement",
+        "id": "partyRoleCount",
+        "meaning": "Current party-role count, including an installed authority; membership does not establish acceptance.",
+        "path": "/activation/parties",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; accessValid reads an empty-list fallback.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in /activation/accessPaths, including any repeated paths",
+          "unit": "registered path entries"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Attachment Access Functions.registerAccess; Party Access Functions.accessValid",
+        "id": "accessPathCount",
+        "meaning": "Registered access-document path entries consulted for access checks; their presence does not prove readiness.",
+        "path": "/activation/accessPaths",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no terms reference is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, commitState and approve",
+        "id": "termsReference",
+        "meaning": "Recorded terms identity checked against termsRef when a party accepts the reviewed terms.",
+        "path": "/activation/terms/ref",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization must run to set its default.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms and approve",
+        "id": "negotiationEditable",
+        "meaning": "Negotiation editability flag: initialized true and set false when approval makes the document active.",
+        "path": "/activation/negotiation/editable",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown unless initialized or explicitly cleared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, approve and commitState",
+        "id": "pendingNegotiationProposalId",
+        "meaning": "Pending negotiation proposal identifier; activation or a qualifying authority change can clear it.",
+        "path": "/activation/negotiation/proposal/id",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Preparation Admission Functions\n\nA reusable function definition for admitting a prepared authority party into a document’s Activation roster after the corresponding amendment has been approved and applied. It inherits attachment-access and Activation functions. The definition itself does not specify an automatic trigger or an invoking actor for `admit`.\n\n## Admission decision\n\n`admit(input)` reads existing document state; it does not use `input`. Execution constants identify the relevant records:\n\n- `key` selects `/preparation_{key}` and `/admission_{key}`.\n- `authority` identifies the party role to install.\n- `requestPath` identifies the request whose `documentBlueId` must match the admission requirement.\n- `admissionKey` selects the clause whose `bindings.state` locates amendment state. That lookup defaults to `/amendments`.\n\nNo values or defaults for these constants are supplied by this definition.\n\nThe checks run in this order:\n\n1. Return `outcome: duplicate` if preparation does not require admission (`requiresAdmission` is read with default `false`), or its `admission` record is absent. The stored admission record becomes the proposal.\n2. Return `duplicate` unless `/admission_{key}` exactly equals the proposal’s `replacement`.\n3. Require amendment `history[proposalId]` to equal `true`, otherwise fail with `PREPARATION_UNAPPROVED_ADMISSION`. Require the request’s `documentBlueId` to equal `replacement.requirementRef`, and preparation’s `candidateOrigin` to equal `replacement.candidateOrigin`; mismatches fail with `PREPARATION_WRONG_REQUIREMENT` or `PREPARATION_WRONG_CANDIDATE`.\n4. Return `duplicate` if the authority role already exists, `replacement.activationRevision` differs from `/activation/revision`, or the roster including `replacement.profile` fails the access check. Malformed access documents or unsupported channels can instead cause that check to fail with an error.\n\nIf all checks pass, `admit` calls `installAuthority` with `replacement.profile`, then returns `outcome: acceptedNew`. Here, `duplicate` means no new admission was performed; it can indicate stale information, missing access or an inapplicable proposal, rather than previous success.\n\nThe inherited amendment helpers distinguish proposal recording from application. `recordAmendmentProposal` checks `expectedRevision`, permitted `parameters.paths`, and an editable binding equal to `true`. It validates proposal identity and rejects conflicting or previously used IDs. `preservePending`, defaulting to `false`, prevents replacement of a different pending proposal when enabled. `approveAmendmentProposal` accepts approvals only from channels in `parameters.approvers`; only after every configured approver has approved does it apply the replacement, record `history[proposalId] = true`, advance the amendment revision and clear the proposal. A pending proposal alone therefore does not satisfy admission.\n\n## Installation and inherited entry points\n\n`installAuthority` fixes the target role to `authority`. It rejects a frozen roster, a new role when `allowNewParties` is false or absent, invalid role or representative names, a missing `replacement.lead.channel`, inadequate participant access, or conflicting generated contract names. Valid names are nonempty text without `.`, `/`, `~` or `__`.\n\nOn successful installation it installs the roster’s channels and approval/party-management handlers, replaces the authority profile, adds a newly introduced authority to `required`, clears `approved`, advances the Activation revision, recalculates Activation state, and emits `Party Changed` with the role and revision. For this increment, a missing prior revision is read as `1`. This path calls `computeState` directly; it does not itself emit `Document Activated`.\n\nCompleted admission establishes installation of the authority profile. It does not mark preparation complete, supply the parties’ acceptance, or guarantee an active document.\n\nOther inherited entry points retain their own checks:\n\n- `addAuthority` requires exact-document review and an existing party-lead channel. An existing authority role can be managed through this entry point only by that role’s lead. It then uses the same installer.\n- `updatePartyPublic` also requires exact-document review and a party lead. Its optional `party` defaults to the invoking role; another existing party cannot be managed. Adding a role requires `allowNewParties`. Its replacement must include `lead.channel`; no revision argument is required. Successful changes clear approvals and advance the Activation revision.\n- `registerAccessPublic` requires exact-document review, an existing party lead, an unfrozen roster and permission to add parties. Its `documents` contains one to sixteen initialized Timeline Access publications with a public provider channel and recorded provider history. It stores them under `/attachmentAccess_{key}`, registers access paths and provider-channel refresh handlers, and returns `acceptedNew`. Re-registration returns `duplicate` only for the same ordered documents; a different registration fails with `ATTACHMENT_ACCESS_ALREADY_REGISTERED`. Registration does not change provider permissions.\n- `approve` requires exact-document review, a party-lead channel, the current `revision` and valid participant access. When negotiation has `allowedPaths`, a text `termsRef` is required; any supplied reference must match `/activation/terms/ref`. `approveWithTerms` delegates to this check. A new acceptance records that party’s approval, recalculates state and emits `Terms Accepted`; repeated approval returns without another acceptance event. If acceptance makes the document active, negotiation becomes noneditable and any pending negotiation proposal is cleared as `SUPERSEDED`.\n\nThe inherited `requestPartyAddition` helper can record access needs and emit `Party Access Update Requested`. Such a request neither grants access nor admits the requested parties. Its separate `admitApprovedParties` helper checks revision, an established admission policy, party identities, access and contract-name conflicts; its name alone does not establish that an enclosing caller has obtained approval.\n\n## Access and Activation meaning\n\n`accessValid` reads the documents identified by `activation.accessPaths`, defaulting to an empty list, and combines `activation.readers`, defaulting to an empty object, with party and additional-representative `readerKeys`. Party and representative keys form alternative-key groups.\n\n`External Channel` transports bypass this access-document test. Each other transport must be a `Timeline Channel`. For each such transport, one matching Timeline Access document must contain its exact timeline, have the same provider, and include at least one key from every reader group. An empty group cannot satisfy this check. Coverage split across separate access documents does not satisfy this helper’s single-document requirement. Confirmed Timeline Access governs reading; it does not grant business-operation authority or acceptance.\n\nThe inherited `installTimelineAccess` helper additionally checks the original and current executable access policy, deduplicates registrations by initial document identity, and registers embedded access-update notifications. Provider-owned permission changes remain separate from local registration.\n\n`computeState` evaluates access for current parties together with pending additions whose `expectedRevision` matches the current Activation revision. `functional` and `accessReady` express access readiness. `termsAccepted` requires approval of every `required` role and agreement between recorded negotiated fields and their current document values. `active` additionally requires access readiness and a document that is not `closed`.\n\nThe maintained `status` distinguishes `CLOSED`; `WAITING_FOR_ACCESS` before any recorded activation; `SUSPENDED_ACCESS` after prior activation when access is missing; `AWAITING_ACCEPTANCE` when access is ready but acceptance or current terms are insufficient; and `ACTIVE` when those conditions are satisfied. Missing stored values remain unknown; helper lookup defaults do not establish a stored lifecycle outcome."
+}

@@ -1,0 +1,86 @@
+{
+  "blueId": "9bezjmJXmd839gDLNVip3DQNvAaZPj1HvtG7ryoZJV7J",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "6g3ssxCr86e1pHoFLhrdXo972SiQ6YKn9mB9U5no3MDi",
+      "BPMByZokSM9z9aVJWWzmEdPwa45uRvvAWjMWuRnkWWnV",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "2YkEGWyCQ2Q44SDYgXY5PMJdw6Wh9VETkkK52gJU7Q49",
+      "3C4sYTigN2y3iykXFzdQPzVQCgyzACpU9vtzBN1GtDVX",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Source Binding Clause",
+    "limitations": [
+      "No default bind connection or participant role is supplied; caller authorization depends on configured connections and document dispatch policy."
+    ],
+    "parameterRefs": [
+      "bindings.refresh",
+      "bindings.sources"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown until a refresh records it.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Source Functions.namedSourcesReady and refreshSourceReadiness",
+        "id": "sourceReadiness",
+        "meaning": "Whether all declared sources meet origin, activation, roster coverage and required return-link checks.",
+        "path": "/sourceLinks/ready",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; readiness treats a missing map as empty.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in the declared requirements dictionary.",
+          "unit": "declared source aliases"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Source Functions.namedSourcesReady: requirements lookup and alias iteration",
+        "id": "requiredSourceCount",
+        "meaning": "Number of declared source aliases; distinct from the number bound or ready.",
+        "path": "/clauses/documentSources/parameters/requirements",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no initial collection is declared.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Present members of the sources binding, not attempted bind requests.",
+          "unit": "source entries"
+        },
+        "binding": "sources",
+        "defaultPath": "/sources",
+        "evidence": "Source Binding Clause.embedsCollections; Source Functions.bindSource",
+        "id": "sourceEntryCount",
+        "meaning": "Number of entries in the embedded sources collection, regardless of readiness.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; readiness requires explicit true.",
+        "aggregate": null,
+        "binding": "sources",
+        "defaultPath": "/sources",
+        "evidence": "Source Functions.validateSource and namedSourcesReady: /activation/active",
+        "id": "sourceActive",
+        "meaning": "Embedded source's activation flag; every required source at /sources must be active for readiness.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/activation/active",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Source Binding Clause\n\nLinks a document to exact, predeclared independent source processes and maintains their collective readiness. Binding an existing source does not create it, change commercial approval requirements, or establish overall document activation.\n\n## Configuration\n\n- `bindings.sources` is a non-root document pointer, defaulting to `/sources`. Its members are embedded documents. The executable source functions nevertheless read and write the fixed `/sources` location: changing this binding redirects embedding, not source validation or storage.\n- Requirements are read from `/clauses/documentSources/parameters/requirements`, keyed by source alias. Each requirement uses `origin`, the exact identity of the source's original `/contracts/initialized/document`, and `selectionPath`. An empty-string `selectionPath` disables the return-link check; otherwise readiness requires that path inside the source to select an initialized document with the receiving document's process origin. No default for `selectionPath` is declared.\n- `bindings.refresh` defaults to `ownActivationChanged` on changes to `/activation`, `sourceChanged` on changes to `/sources`, and `sourceAdvanced` on embedded events from members of `/sources`. `sourceAdvanced` has `embed: false`; embedding is separately established by `bindings.sources`. An explicit refresh binding replaces this default connection dictionary. The automatic `_automatic` connection still runs once on `Clauses Initialized`.\n\nThe inherited connection rules allow connection `params` to override action defaults, `when` to skip execution, and `parameters.conditions.<action>` to reject execution. `before` runs before the action; `after` and successful `once` consumption occur only for an `acceptedNew` outcome. Installed clause configuration cannot be changed in place under the inherited transition check.\n\n## Binding a source\n\n`bind` takes `alias`, `document`, and `sourcePath` from the trigger, defaulting respectively to `\"\"`, `{}`, and `\"\"`. A nonempty `sourcePath` selects a document at that path in the executing document and takes precedence over `document`. The supplied document represents an existing initialized publication, identified by its exact Blue reference.\n\nThe alias must already be declared. The candidate must have an initialization origin equal to the requirement's `origin`, and `/activation/active` must be explicitly true. Every receiving main party must be represented in the source by the same exact `lead/channel` and the same nonempty, duplicate-free set of nonempty-text `readerKeys`. Role names need not match, and additional source parties are allowed. Additional representatives are not used for this identity comparison.\n\nUnknown aliases, missing initialization, wrong origins, inactive sources, and missing or mismatched main parties reject the attempt. These checks run even for a duplicate binding. On successful committed execution, a new binding stores an exact publication reference at `/sources/<alias>` and reports `acceptedNew`. An existing entry with the configured origin reports `duplicate` without replacing its publication; an existing entry with a different origin rejects rebinding. The `selectionPath` check belongs to readiness, not bind validation.\n\nThis type declares no default `bind` connection or participant role. Participant invocation depends on an installed authenticated workflow connection and applicable document dispatch policy; declaring the action alone grants no caller permission.\n\n## Readiness\n\n`refresh` rechecks every declared source for initialization, matching origin, explicit active state, coverage of the receiving document's current main-party roster, and any required `selectionPath` return link. Readiness can become false after source or roster changes. With no requirements, the readiness check returns true, including when the requirements map is absent.\n\nWhen the calculated value differs from `/sourceLinks/ready`, including its first recording, refresh writes `/sourceLinks` as `{ready: ...}` and emits `Source Readiness Changed` carrying that Boolean. Missing stored readiness means unknown until recorded. A false value means at least one required check is unsatisfied; it does not identify which one.\n\n`refresh` reports `acceptedNew` even when readiness is false or unchanged. Thus an accepted bind, a successful refresh, and confirmed collective readiness are distinct outcomes."
+}

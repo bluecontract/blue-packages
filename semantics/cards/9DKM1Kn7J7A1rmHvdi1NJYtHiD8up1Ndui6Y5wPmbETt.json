@@ -1,0 +1,50 @@
+{
+  "blueId": "9DKM1Kn7J7A1rmHvdi1NJYtHiD8up1Ndui6Y5wPmbETt",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "EDMAoBztjCBtY1S7yPRVkxCJen5dgg9fYotDKwtBQxgi",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Termination Clause",
+    "limitations": [
+      "The supplied definitions do not establish how readiness is produced or which actors are connected to request and finish."
+    ],
+    "parameterRefs": [
+      "bindings.ready",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; request returns duplicate; finish rejects.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/lifecycle",
+        "evidence": "Termination Clause.defaultBindings.state; Termination Functions.request/finish",
+        "id": "lifecycle",
+        "meaning": "Active permits request; WindingDown awaits ready=true and a finish invocation; Terminated records the completed transition.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; cannot pass finish's readiness guard.",
+        "aggregate": null,
+        "binding": "ready",
+        "defaultPath": "/canTerminate",
+        "evidence": "Termination Clause.defaultBindings.ready; Termination Functions.finish",
+        "id": "readiness",
+        "meaning": "Only true permits finish from WindingDown; this clause reads but does not compute or write the readiness signal.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Termination Clause\n\nCoordinates a two-step lifecycle transition in its executing document: `request` moves `Active` to `WindingDown`; `finish` moves `WindingDown` to `Terminated` when a supplied readiness signal is exactly `true`. Requesting termination is distinct from completing this transition.\n\n## Bindings\n\n- `bindings.state` defaults to `/lifecycle`. It identifies the lifecycle value read and updated by both actions.\n- `bindings.ready` defaults to `/canTerminate`. It identifies the readiness value checked by `finish`. This clause neither calculates nor updates readiness.\n\nBoth resolved bindings must be non-root JSON pointers. Overrides redirect the reads and writes within the executing document. These are default paths, not default values: the type initializes neither lifecycle nor readiness. Missing values remain unknown.\n\n## Actions and outcomes\n\n`request` changes the lifecycle only when its value is exactly `Active`. It writes `WindingDown`, emits a `Domain Event` with `clause` set to the clause key and `kind` set to `Termination Requested`, and returns `acceptedNew`. For every other lifecycle value, including an absent or unrecognized value, it returns `duplicate` without its own state change or event. Consequently, this duplicate outcome alone does not prove an earlier termination request succeeded.\n\n`finish` first returns `duplicate` if the lifecycle is already `Terminated`, without checking readiness. Otherwise, it rejects with `WIND_DOWN_REQUIRED` unless the lifecycle is exactly `WindingDown`. It then rejects with `OUTSTANDING_WORK` unless readiness is exactly Boolean `true`. Passing both guards writes `Terminated`, emits a `Domain Event` carrying the clause key and `kind: Terminated`, and returns `acceptedNew`.\n\nThe functions accept `input` but do not read any of its fields. Their committed changes record lifecycle transitions; neither function performs the underlying work represented by readiness or independently verifies that work.\n\n## Configured invocation\n\nNamed connection dictionaries in `bindings.request` and `bindings.finish` determine when actions run. Neither action declares a default or automatic connection. Supported connection sources are `workflow`, `event`, `channel`, `embedded`, `collection`, `change`, `initialized`, `activated`, and `timer`. A `workflow` connection selects its channel through `channel` or `party`; this type fixes no actor and grants no viewer permission merely by declaring an action.\n\nA connection's `when` defaults to `true`; a false condition skips execution. Optional `parameters.conditions.request` and `parameters.conditions.finish` add guards that reject with `ACTION_CONDITION_FAILED` when false. Connection `params` supplies the otherwise unused function input.\n\nConnection `before` steps run before the action and can therefore run even when the action returns `duplicate`. `after` steps run only after `acceptedNew`. `once` defaults to `false`; when enabled, the connection is marked fired only after a newly accepted action and its `after` steps. Later invocations of that connection are then skipped. Scheduling a timer is not an action outcome or completed termination.\n\nClause and connection names must be nonempty and contain no `.`, `/`, or `~`. Changing an installed clause's configuration requires a new clause key under the inherited transition rule."
+}

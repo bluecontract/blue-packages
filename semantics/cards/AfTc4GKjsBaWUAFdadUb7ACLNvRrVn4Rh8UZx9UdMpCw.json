@@ -1,0 +1,79 @@
+{
+  "blueId": "AfTc4GKjsBaWUAFdadUb7ACLNvRrVn4Rh8UZx9UdMpCw",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "DnBvCf7Q7graMZtAGMkN8W9VWkxdpEumZaJDvoJM8A65"
+    ],
+    "displayLabel": "Usage Limit Clause",
+    "limitations": [
+      "The supplied evidence establishes the Active recording gate, but not the surrounding Mandate's other lifecycle states or transitions."
+    ],
+    "parameterRefs": [
+      "bindings.usage"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no configuration default is defined.",
+        "aggregate": null,
+        "binding": "usage",
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.initialize and actions.record: usage.limit writes.",
+        "id": "usageLimit",
+        "meaning": "Positive use-count limit copied at initialization and preserved by record; these actions do not enforce it.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/limit",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; initialize sets zero only when it runs.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Previously unseen keys passing the Active, authorized-actor and exact-Mandate checks; success depends on the selected effect source.",
+          "unit": "recorded uses"
+        },
+        "binding": "usage",
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.initialize; actions.record: deduplication and used increment.",
+        "id": "recordedUses",
+        "meaning": "Cumulative count of distinct qualifying keys recorded through the configured effect connections.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/used",
+        "type": "count"
+      },
+      {
+        "absent": "Missing key permits recording; absent state is unknown.",
+        "aggregate": null,
+        "binding": "usage",
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.record: $hasKey and $objectSet on usage.seen.",
+        "id": "recordedKey",
+        "meaning": "Presence marks a counted key. record writes true, but deduplication tests presence rather than value.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/seen/*",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; absence does not establish Active.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.record: opening /status equality guard.",
+        "id": "mandateStatus",
+        "meaning": "Only Active permits recording, subject to the authorized Agent and matching-Mandate effect checks.",
+        "path": "/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Usage Limit Clause\n\nMaintains a shared, deduplicated usage counter for a Mandate's authorized Agent. Its successful-use meaning depends on `record` being connected to a committed successful effect from an observed document. The action checks provenance and deduplication; it does not independently verify external completion. Registration itself does not consume usage.\n\n## Configuration and initialization\n\n- `bindings.usage` is a required pointer to the counter state in the executing document. It must start with `/` and cannot be `/`. There is no default path.\n- `parameters.limit` must be a positive integer. `initialize` rejects missing or non-integer values with `MANDATE_USAGE_LIMIT_REQUIRED`, and nonpositive values with `MANDATE_USAGE_LIMIT_MUST_BE_POSITIVE`.\n- The automatic `initialize` connection runs on `Clauses Initialized`, the successful initial clause-installation event. It writes `limit` from configuration, `used: 0`, and an empty `seen` dictionary at the `usage` binding. These are initialization effects, not meanings to assign to absent state.\n\nInherited named action connections select triggers. Their `params` override action defaults, including `record`'s `key`. A false connection `when` skips execution; a false `parameters.conditions.<action>` rejects it with `ACTION_CONDITION_FAILED`. Connection `before` and `after` effects surround the action body. `once` defaults to false; when true, subsequent execution is suppressed after the connection reaches its final fired marker. Early returns from `record` bypass `after` and that marker. The inherited transition validator rejects in-place clause configuration changes with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`.\n\n## Recording a use\n\n`record` proceeds only when all these conditions hold:\n\n- `/status` equals `Active`.\n- `processingEvent/actor` equals `/contracts/authorizedActorChannel/actor`.\n- `processingEventSource/onBehalfOf/mandate` exists and has the same Blue identity as `/contracts/initialized/document`.\n\nOtherwise it returns without recording. These checks exclude direct owner actions and actions under other Mandates; having a callable connection alone does not establish authority.\n\nThe `key` defaults to the Blue identity of `processingEventSource`. A configured key determines which deliveries represent the same business effect. After the provenance checks, a non-text key fails with `MANDATE_USAGE_KEY_REQUIRED`. If `seen` already contains that key, the action returns without incrementing or emitting another usage event; it tests key presence, not the stored Boolean value.\n\nFor a new qualifying key, `record` stores `true` in `seen`, increases `used` by one, preserves `limit`, and emits `Usage Recorded`. Its fields are `clause` (the clause key), `key` (the deduplication key), and `used` (the updated cumulative count). This event reports usage recording, not independent confirmation of an external request's completion.\n\nThe stored `limit` is not enforced by these actions: `record` does not compare it with `used`, reject excess usage, or deactivate the Mandate. No decrement or reversal action is defined."
+}

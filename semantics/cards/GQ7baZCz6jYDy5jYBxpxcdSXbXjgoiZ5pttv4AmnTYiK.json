@@ -1,0 +1,244 @@
+{
+  "blueId": "GQ7baZCz6jYDy5jYBxpxcdSXbXjgoiZ5pttv4AmnTYiK",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "Hh3FDuHUdfAETMEjKtUR6268f3BTGWcE7829mKidcoXw",
+      "8RZsD9TREaVADn3r7GSR6WgCZBb8ZMDH27RJ32GkvWvz",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE",
+      "9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "EBuskkMM84G1os5d9eEvLJesCVi6vt2TeQUAoa2Q44At",
+      "4t1qR43VeKt6zTyrsnUCivgSTfiEM6hgNiryiED43iz9",
+      "EXZMLDv4TxmYaH7L8yrVKDahRDzM3AeKJv44D8P9WxFC",
+      "5UMRb3G6CPCKmkQKBLBhntAgaA5qjoJSLBbjS4kjS3VB",
+      "2VRjCVXah8NQpo69uGhaMJZobwh36J77t6rz4edzv1ii",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Commission Clause",
+    "limitations": [
+      "The supplied definitions identify instruction minor units but no currency paths, ledger currency binding, conversion or common-currency validation.",
+      "The payout flags and four operation-reservation fields are supplied as reconciliation inputs; their producers' full lifecycle rules and reservation units are not established here."
+    ],
+    "parameterRefs": [
+      "bindings.orders",
+      "bindings.payouts",
+      "bindings.rate",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no rate value is defaulted.",
+        "aggregate": null,
+        "binding": "rate",
+        "defaultPath": "/terms/commissionBps",
+        "evidence": "Commission Clause.actions.confirmed/reversed/attached; Rounding.roundBps",
+        "id": "commissionRate",
+        "meaning": "Commission rate in integer basis points, 0–10,000; read when an automatic target is calculated.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; declared initial value is zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Current per-key targets, including directly set targets",
+          "unit": "Minor units; currency unspecified"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Ledger Clause.initialState; Balance Functions.setTarget",
+        "id": "accrued",
+        "meaning": "Current total of ledger targets in minor units; no ledger currency source is declared.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/accrued",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No stored target; setTarget uses zero internally.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Commission Clause.actions.confirmed/reversed/attached; Balance Functions.setTarget",
+        "id": "targetAmount",
+        "meaning": "Per-key commission target; automatic targets use the order instruction's minor units. Currency path unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; declared initial value is zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Reservation additions less releases by settle or reconcile",
+          "unit": "Minor units; currency unspecified"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve/settle; HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.reconcile",
+        "id": "reserved",
+        "meaning": "Ledger reservation balance, distinct from secured or completed payments; currency unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; declared initial value is zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Full settle postings and changes in reconciled net payouts",
+          "unit": "Minor units; currency unspecified"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.settle; HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.reconcile",
+        "id": "paid",
+        "meaning": "Booked payout balance; includes direct settle postings and reconciled net adjustments. Currency unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paid",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no reservation amount is established.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve; HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.reconcile",
+        "id": "settlementAmount",
+        "meaning": "Original positive reservation amount, retained after reconciliation; ledger currency unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no lifecycle stage is established.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve/settle; HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.reconcile",
+        "id": "settlementStatus",
+        "meaning": "reserved awaits reconciliation or settle; paid is set by settle; closed records reconciliation, including zero or partial payment.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Unrecorded; reconcile uses zero as its baseline.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.functions.reconcile",
+        "id": "settlementPaid",
+        "meaning": "Last reconciled completed payout less reversals, in payout instruction minor units; currency path unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/paidMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; not treated as zero.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orders",
+        "evidence": "Commission Clause.actions.confirmed/reversed/attached; Payment Completed.amountCompleted",
+        "id": "orderCompleted",
+        "meaning": "Completed receipts before reversals, used for commission; order payment instruction currency, path unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/payment/payment/completed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; not treated as zero.",
+        "aggregate": null,
+        "binding": "orders",
+        "defaultPath": "/orders",
+        "evidence": "Commission Clause.actions.reversed; Payment Reversed After Completion.amountReversed",
+        "id": "orderReversed",
+        "meaning": "Reversed receipts deducted from the commission basis; order payment instruction currency, path unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/payment/payment/reversed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; not treated as zero.",
+        "aggregate": null,
+        "binding": "payouts",
+        "defaultPath": "/payouts",
+        "evidence": "HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.functions.reconcile",
+        "id": "payoutCompleted",
+        "meaning": "Completed payout before reversals; equality with the reservation is a terminal signal. Instruction currency, path unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/payment/payment/completed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; not treated as zero.",
+        "aggregate": null,
+        "binding": "payouts",
+        "defaultPath": "/payouts",
+        "evidence": "HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.functions.reconcile",
+        "id": "payoutReversed",
+        "meaning": "Payout reversals deducted when reconciling paidMinor; payout instruction currency, path unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/payment/payment/reversed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; absence does not establish false.",
+        "aggregate": null,
+        "binding": "payouts",
+        "defaultPath": "/payouts",
+        "evidence": "HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.functions.reconcile",
+        "id": "payoutSettlementOpen",
+        "meaning": "False is one terminal signal for reconciliation; it does not establish a fully paid payout.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/payment/settlementOpen",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; absence does not establish false.",
+        "aggregate": null,
+        "binding": "payouts",
+        "defaultPath": "/payouts",
+        "evidence": "HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.functions.reconcile",
+        "id": "payoutRejected",
+        "meaning": "True is a terminal rejection signal; reconciliation still reads completed and reversed amounts.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/payment/payment/rejected",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; absence does not establish false.",
+        "aggregate": null,
+        "binding": "payouts",
+        "defaultPath": "/payouts",
+        "evidence": "HGkvBbhKD9SrKmroG1nftW1VQ1ohrLVb7PN6MwucvjQE.functions.reconcile",
+        "id": "payoutClosed",
+        "meaning": "True is a terminal payment signal; operation reservations must also pass the zero-total guard.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/payment/payment/closed",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Commission Clause\n\nMaintains commission targets from confirmed net order receipts, reserves commission payouts, and reconciles their confirmed net results. Accrued commission, reserved allocations and ledger-booked payments are distinct amounts.\n\n## Bindings and initialization\n\nAll four data bindings are non-root JSON pointers in the executing document:\n\n- `orders` defaults to `/orders`: the order collection supplying receipt amounts and payment events.\n- `payouts` defaults to `/payouts`: the payout collection supplying payment results for reconciliation.\n- `rate` defaults to `/terms/commissionBps`: the commission rate, an integer from 0 through 10,000 basis points. No rate value is defaulted.\n- `state` defaults to `/balance`: the ledger containing `accrued`, `paid`, `reserved`, `targets` and `settlements`.\n\nThe inherited declared initial state has zero totals and empty `targets` and `settlements`. Missing state does not establish that initialization occurred. These definitions provide no ledger currency binding, currency conversion or check that order and payout amounts share a currency. Automatic commission targets use the order payment instruction's minor units.\n\n## Commission accrual\n\n`confirmed` observes `Payment Event Received` containing `Payment Completed` from `orders`; `reversed` observes the corresponding `Payment Reversed After Completion`. Both read the order's `payment.payment.completed` and `payment.payment.reversed`, then set its commission target from the confirmed net receipts. They use the stored amounts, rather than treating the event amount as a new increment.\n\n`roundBps` requires an integer net receipt basis between zero and 1,000,000,000,000 minor units and an integer rate between zero and 10,000. It rounds commission to the nearest minor unit, with half units rounded upward. Invalid input rejects the action. The rate is read on each calculation; changing it alone does not trigger the built-in accrual actions.\n\n`attached` can establish a target when an order is attached. It requires valid `itemKey` and `clauseId`, a matching producer collection binding, and a `usable` process entry whose key, paths, request correlation and document origin match the attachment. The order must be initialized, active and have payment state. `namedSourcesReady` also requires declared sources to be initialized and active, match their required origins, cover the order's parties through matching channels and nonempty matching reader-key sets, and satisfy any `selectionPath` origin linkage. Failed attachment guards leave the target unchanged; malformed completed or reversed amounts reject the calculation.\n\nA target replaces the previous amount for its key and adjusts `accrued` by the change. An unchanged target is a duplicate. Reducing a target does not cancel reservations or recover paid funds.\n\n## Reservation and reconciliation\n\n`opened` handles an Event with `kind: \"Commission Payout Opened\"`, passing its `key` and `amountMinor` to `reserve`. A new reservation must be a positive integer amount that fits the accrued obligation remaining after booked payments and existing reservations. It creates a settlement with `status: \"reserved\"`, increases `reserved`, and emits `Settlement Reserved`. Reusing a settlement key with the same amount is a duplicate, even after closure; a different amount conflicts. Reservation does not confirm an external transfer.\n\n`observed` reconciles a payout when its collection emits `Payment Event Received`. The named `reconcile` action also accepts a settlement `key`. Reconciliation requires an existing settlement and reads the matching payout's `payment` instruction. Its completed amount less reversals must be an integer between zero and the original reservation amount.\n\nReconciliation proceeds only when `settlementOpen` is false, `payment.rejected` or `payment.closed` is true, or gross `payment.completed` equals the reserved amount. It also requires the combined `payment.reserved.secure`, `payment.reserved.capture`, `payment.reserved.void` and `payment.reserved.refund` value to be zero. Otherwise it returns `duplicate` without closing the ledger entry; this outcome does not prove payout completion.\n\nOn a new reconciliation, an entry still marked `reserved` releases its entire reservation. The ledger adjusts `paid` against the previously recorded `paidMinor`, records the confirmed net result as `paidMinor`, sets `status: \"closed\"`, and emits `Payout Reconciled`. A closed settlement can have zero or partial payment. Later reconciliation can reduce its booked payment after reversals; an unchanged closed result is a duplicate.\n\n## Inherited actions and outcome distinctions\n\nConfigured connections can also invoke `setTarget`, `reserve` and `settle`. Their ledger keys must be nonempty text containing neither `/` nor `~`. `setTarget` accepts a nonnegative integer `amountMinor`; an absent target is treated as zero for that update.\n\n`settle` requires an existing settlement, transfers its full recorded amount from `reserved` to `paid`, marks it `paid`, and emits `Settlement Confirmed` without checking payout evidence. Only an already `paid` entry is treated as duplicate; `closed` entries are not specially protected. It does not write `paidMinor`, which reconciliation treats as zero when absent. Consequently, the ledger's `paid` total can contain direct settlement postings and is not universally proof of confirmed net transfers.\n\nNamed connections determine invocation and may apply conditions; workflow connections require an authenticated channel. A declared action alone grants no viewer permission. Only `acceptedNew` runs connection `after` hooks and marks a `once` connection fired. Existing clause configuration must remain identical under its key; changing that configuration requires a new clause key."
+}

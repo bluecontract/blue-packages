@@ -1,0 +1,81 @@
+{
+  "blueId": "6ym9As6SQzNGZQS4xGm9gyMRFMXjjNGLQ8LesQdaMmUv",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HCLNwqVZfWNtjeP6MQrJiRzBFcUEtizFyfihPfoLsMqJ",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "GTHDfj3hfUCUxrnYwuB5s7jWLkqq5v7D8WRgytKULGhc",
+      "3oGtXdt5rKJwsJbBGC1NWphpRdeB4RQKRgzo27uf1rTY",
+      "G4iHwpy5H6pac4XzMMqGGQ6QojE2ZZme2u4GBuJk91eY",
+      "8Qa2KBSeQAn2ep8ofkBqmrtYgLWrMzM3Ngj5uFPfsF1p",
+      "32G1ERaDgaiJr8Zntq7qEpJMWB7EwmRXTLHGZ7x6uciY",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Run On Manual Request Clause",
+    "limitations": [
+      "Individual request dispositions and latestReport fields are defined, but their paths are not supplied for structured state facts.",
+      "The task-specific meanings of input, instructions and successful result are not established here; the work clause's reportRequest defines the success-report pattern."
+    ],
+    "parameterRefs": [
+      "parameters.workClause"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown if unresolved; inherited default is \"work\".",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Launch Policy.parameters.workClause; Task Work Functions.request owner checks.",
+        "id": "workClause",
+        "meaning": "Key of the exact Task Work Clause selected to own requests; must match /taskWork/ownerClause.",
+        "path": "/clauses/{clauseKey}/parameters/workClause",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; the launch ownership check must pass.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.plan states.taskWork.initial; Task Work Functions.request.",
+        "id": "ownerClause",
+        "meaning": "Work-clause key owning this document's task ledger, established by work-clause initialization.",
+        "path": "/taskWork/ownerClause",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization supplies 1.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.plan initial.nextRequestNumber; Task Work Functions.request.",
+        "id": "nextRequestNumber",
+        "meaning": "Sequence number for the next request identifier; advances on launch, not on task completion.",
+        "path": "/taskWork/nextRequestNumber",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; installation initializes false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: slot initialization and final once branch.",
+        "id": "connectionFired",
+        "meaning": "For a once connection, marks an accepted launch after its after steps; it is not a task outcome.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Run On Manual Request Clause\n\nLaunches task work through its connected `request` action. An accepted launch records and emits a work request; it does not establish that the work succeeded or finished.\n\n## Configuration and invocation\n\n`parameters.workClause` selects the owning `Task Work Clause` and inherits the default `\"work\"`. At execution it must be nonempty Text, identify a clause of that exact type, and match `/taskWork/ownerClause` in the executing document. An invalid launch-policy type, work-clause reference or ownership match rejects the invocation.\n\nNamed connections are configured under `bindings.request`. There is no built-in connection or actor channel. A `workflow` connection uses its configured authenticated `channel`, with `party` taking precedence when supplied; it may also supply a `request` definition and `event` filter. Invocation authority comes from that channel, not from the action's availability. Despite the type's name, an `initialized` connection is also supported and responds to `Clauses Initialized`. Every other source mode is rejected by the request function.\n\nConnection `params` supplies action arguments. For workflow connections, the incoming request is available as `trigger`; its fields are not automatically copied into `params`. The launch function uses `params.input` and copies `/instructions` from the executing document into the emitted request. This action declares no input schema or interpretation for those values.\n\nA false connection `when` skips execution; a false `parameters.conditions.request` rejects it. Both checks default to true when omitted. Connection `before` steps run before the request function, and `after` steps run following its `acceptedNew` result. `once` defaults to false. When true, successful completion of this sequence marks the connection's `fired` flag and subsequent invocations skip it. That flag records acceptance of a launch, not completion of work.\n\nChanging an existing connected-clause configuration requires a new clause key.\n\n## Requests and outcomes\n\nOn a committed launch, the function allocates `requestId` as `request-` followed by `/taskWork/nextRequestNumber`, advances that counter, stores a request reference with disposition `pending` under `/taskWork/requests`, and emits `Task Work Requested` containing `requestId`, `input` and `instructions`. Its `outcome-v1` result is `acceptedNew` with the allocated identifier. Each execution that reaches this function creates a fresh request; repeated inputs are not deduplicated here.\n\nThe separate work clause supplies initial state: its key as `ownerClause`, `nextRequestNumber` of 1, an empty request ledger and an empty `latestReport`. Launching another request does not clear an earlier report.\n\nReports arrive through the work clause's `performer` channel and correlate by `requestId`. A `succeeded` report must match its configured `reportRequest` definition and include `result`. A `failed` report requires nonempty `error` and forbids `result`. An unknown request is rejected. The first accepted final report replaces `pending` with the reported status, stores its reference, updates `/taskWork/latestReport`, and emits `Task Report Accepted`. An identical repeat returns `alreadyFinal` without updating state or emitting another acceptance event; a conflicting final report is rejected.\n\n`latestReport` therefore represents the most recently newly accepted final report, which may concern an older request. Pending work awaits the performer's report; neither a launch nor a connection's `fired` flag supplies that outcome."
+}

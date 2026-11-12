@@ -1,0 +1,112 @@
+{
+  "blueId": "Bm66PeCzBymurAqHKAPT7A34xRnksxsTXQrQef8aAp4Q",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "DrWgoLeVxQYSxAhWk1YrvCL5L8mCx27uguNJmSnnzXEq",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Product Clause",
+    "limitations": [
+      "The quote function copies parameters.currency without a declared default or validation rule; supported currency codes and behavior for missing currency are not established."
+    ],
+    "parameterRefs": [
+      "bindings.product"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no currency default is defined.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: $appendChange val.currency.",
+        "id": "currency",
+        "meaning": "Currency of the stored quote, copied from parameters.currency when the quote action runs.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; absence does not mean a zero price.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: price checks and $appendChange val.unitPriceMinor.",
+        "id": "unitPriceMinor",
+        "meaning": "Quoted unit price, 0–1,000,000,000 minor units of currency at the same product binding.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/unitPriceMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no quantity default is defined.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: quantity checks and $appendChange val.quantity.",
+        "id": "quantity",
+        "meaning": "Number of product units in the current quote, an integer from 1 through 1,000.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/quantity",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; absence does not mean a zero total.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Product units represented by the current quote's quantity",
+          "unit": "Quoted minor units of currency at the product binding"
+        },
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: $appendChange val.totalMinor uses price and quantity.",
+        "id": "totalMinor",
+        "meaning": "Current quoted total in minor units of currency at the same product binding; not a paid amount.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/totalMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; false is established only by initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial state and timer arm task.",
+        "id": "connectionArmed",
+        "meaning": "True records timer scheduling-request emission; it does not establish that a timer is still pending.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false is established only by initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: once guard and final fired change.",
+        "id": "connectionFired",
+        "meaning": "True records completion of a once connection and suppresses repeats; false is not proof no quote occurred.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Product Clause\n\nMaintains a document-owned product quote with a bounded integer unit price and quantity. The stored value represents the current quote, not an order, stock reservation or payment.\n\n## Quote inputs and effects\n\n`bindings.product` is required: a non-root JSON Pointer into the document where the clause executes. There is no default binding path or initial product quote.\n\nThe `quote` action accepts:\n\n- `unitPriceMinor`: an integer from 0 through 1,000,000,000, in minor units of the configured currency.\n- `quantity`: an integer from 1 through 1,000, representing product units.\n\nBoth values must satisfy the executable checks; missing, non-integer or out-of-range values fail with `Invalid product quote`. Neither has a default.\n\n`parameters.currency` supplies the currency, rather than an action input. It is captured from clause configuration when connections are planned. The quote function defines no currency default or validation rule.\n\nThe action replaces the entire value at `bindings.product` with `currency`, `quantity`, `unitPriceMinor` and `totalMinor`. It calculates `totalMinor` from the supplied unit price and quantity. This is a replacement quote total, not an accumulated amount; other fields previously at that location are not preserved by this replacement.\n\nThe action also emits a `Domain Event` with `kind` equal to `Product Quoted`, `clause` identifying the clause key, and `totalMinor` carrying the quoted total. An attempted invocation does not establish a committed update. A committed quote update records no external purchase or payment outcome. Missing stored fields remain unknown, not zero or evidence that quoting has never occurred.\n\n## Connections and execution\n\nThe type fixes no caller or automatic trigger. `bindings.quote` can declare named connections whose `params` supplies the quote inputs. Omitting `params` supplies no price or quantity; incoming request fields are not automatically forwarded. Request or event data is available to connection expressions as `trigger`.\n\nConnections select an `on` source: `workflow`, `channel`, `event`, `change`, `embedded`, `collection`, `initialized` or `activated`, or use `timer`. Workflow connections require a configured authenticated `channel`, with `party` taking precedence when supplied; declaring the action does not itself grant permission. Other connections use their source's channel, path and event selector as applicable. `initialized` observes `Clauses Initialized`; `activated` observes `Document Activated`. Embedded and collection sources contribute embedding paths unless `embed` is false.\n\nA connection's `when` defaults to true; a false result skips execution. `parameters.conditions.quote` also defaults to true, but a false result rejects with `ACTION_CONDITION_FAILED`. Optional `before` and `after` statements run around the quote action. `once` defaults to false. When true, the connection records `fired` only after the action and `after` statements complete, then skips subsequent executions. Thus `fired` is a once-only execution marker, not a universal quote status.\n\nTimer connections require exactly one of an absolute `timestamp` or an `afterEvent` source. `timestamp` is a nonnegative Unix-microsecond instant, at most 9,007,199,254,740,991, and arms on `Clauses Initialized`; absolute timers cannot specify `delayMs` or `policy`. Relative timers require a timestamped source other than `initialized` and integer `delayMs` from 1 through 9,007,199,254,740 milliseconds, added to the source timestamp. Their `policy` defaults to `first`; `latest` replaces the keyed pending timer on later arming triggers. `first` ignores later arming triggers once `armed` is set, including after cancellation or firing. Optional `cancelOn` emits a keyed cancellation request without clearing `armed` or `fired`. Scheduling and cancellation requests require the Time runtime and do not themselves confirm firing. New deadlines must also satisfy its causal-position admission rules.\n\nConnection state starts with `armed` and `fired` false when installed. `armed` records emission of a scheduling request, not whether a timer remains pending. Missing flags are unknown. Clause and connection names must be nonempty and contain no dot, slash or tilde. Configuration changes to an existing clause require a new clause key."
+}

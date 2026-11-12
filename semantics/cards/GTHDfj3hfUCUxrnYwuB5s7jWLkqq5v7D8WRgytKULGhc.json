@@ -1,0 +1,63 @@
+{
+  "blueId": "GTHDfj3hfUCUxrnYwuB5s7jWLkqq5v7D8WRgytKULGhc",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "JAVfq3idjXE65QjTiGepqJFPb35tjpEQew6af6qPJZHj",
+      "HCLNwqVZfWNtjeP6MQrJiRzBFcUEtizFyfihPfoLsMqJ",
+      "3oGtXdt5rKJwsJbBGC1NWphpRdeB4RQKRgzo27uf1rTY",
+      "G4iHwpy5H6pac4XzMMqGGQ6QojE2ZZme2u4GBuJk91eY",
+      "8Qa2KBSeQAn2ep8ofkBqmrtYgLWrMzM3Ngj5uFPfsF1p",
+      "32G1ERaDgaiJr8Zntq7qEpJMWB7EwmRXTLHGZ7x6uciY",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Task Work Functions",
+    "limitations": [
+      "The supplied documentPaths omit per-request ledger paths and scalar fields within latestReport. Their established pending, succeeded and failed outcomes cannot be addressed as structured state facts."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; launch requires a nonempty value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Launch Policy.parameters.workClause; Task Work Functions.functions.request",
+        "id": "workClause",
+        "meaning": "Owning Task Work Clause selected by the launch policy; its declared default is \"work\".",
+        "path": "/clauses/{clauseKey}/parameters/workClause",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization must not be assumed.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.hookDefinition.functions.plan states.taskWork; Task Work Functions.request",
+        "id": "ownerClause",
+        "meaning": "Clause key owning this document's task ledger; must equal the launch policy's workClause.",
+        "path": "/taskWork/ownerClause",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; do not infer the initial value of 1.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Functions.functions.request; Task Work Clause.plan states.taskWork.initial",
+        "id": "nextRequestNumber",
+        "meaning": "Unitless sequence used for the next requestId; initialized to 1 and incremented on each accepted launch.",
+        "path": "/taskWork/nextRequestNumber",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Task Work Functions\n\nA shared compute definition exposing `request(params)` to create a tracked task invocation in the executing document. Acceptance records and emits a request; it does not confirm that a performer has started or completed the work.\n\n## Inputs and launch requirements\n\n- `params.input` supplies the emitted request's `input`. This function declares no input payload schema or default. It copies `/instructions` into the request's `instructions` at launch.\n- The runtime constant `clauseKey` identifies the launching clause. Its `type/type` must identify the exact Task Launch Policy type, otherwise the call fails with `TASK_LAUNCH_POLICY_REQUIRED`.\n- The policy's `parameters.workClause` selects the owning clause. Task Launch Policy declares the default `\"work\"`. The effective value must be nonempty text (`TASK_WORK_BINDING_REQUIRED`), select the exact Task Work Clause type (`TASK_WORK_OWNER_REQUIRED`), and equal `/taskWork/ownerClause` (`TASK_WORK_OWNER_MISMATCH`).\n- The runtime constant `sourceMode` must be `initialized` or `workflow`; other modes fail with `TASK_LAUNCH_MODE_NOT_SUPPORTED`. The supplied connection planner associates these modes with successful clause initialization and a workflow on its configured authenticated channel, respectively. The calling policy's connections determine the actual trigger and workflow actor.\n\n## Creating a request\n\nAfter these checks, `request` uses `/taskWork/nextRequestNumber` to form `requestId` as `request-<number>`. It constructs a Task Work Requested event containing `requestId`, `input`, and `instructions`, increments the counter, and adds an entry under `/taskWork/requests` keyed by `requestId`. That entry has `disposition: pending` and a `request` reference to the event's content identity. It emits the event and returns `outcome: acceptedNew` with `requestId`.\n\nEach accepted call creates a new request; matching input is not deduplicated. The owning Task Work Clause initializes the counter to `1`, `ownerClause` to its own clause key, `requests` to an empty object, and `latestReport` to an empty object. These initialization values do not establish the meaning of absent state.\n\n## Reported outcomes\n\nA pending request awaits a correlated report through the owner's `performer` channel. A `succeeded` report must include `result` and match the owner's configured `reportRequest` schema. A `failed` report requires a nonempty `error` and forbids `result`. Unknown request identifiers are rejected.\n\nThe first accepted report replaces the request entry's `disposition` with `succeeded` or `failed`, preserves its request reference, and stores a report reference. It also writes the full report to `/taskWork/latestReport` and emits Task Report Accepted. Thus `latestReport` concerns the most recently accepted new report, which need not concern the most recently launched request.\n\nAn identical final report returns `alreadyFinal` without another state update or acceptance event. A different report for an already-final request is rejected with `TASK_FINAL_REPORT_CONFLICT`. These report outcomes are separate from the launch function's `acceptedNew` outcome."
+}
