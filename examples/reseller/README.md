@@ -27,7 +27,7 @@ The order uses the existing `Payment/Payment Clause`, with `obtain: provide`, `s
 
 The example follows MyOS Core's `examples/independent-processes/corpus/payments/12-agreement-orders-payments.blue` for party bindings and `14-existing-authorized-card-pi.blue` for the card process. `payments@example.test` is the example MyOS account constrained in the PI template’s guarantor declaration. The guarantor is a supplied party at bootstrap, so no channel from another document is copied. It is not a production payment service. Replace it with the admitted guarantor account for an actual integration; the guarantor does not become a party to the reseller agreement.
 
-Orders do not require a second customer approval. The cancellation-enabled Agreement requires seller acceptance (`required: [seller]`); the earlier preview agreements retain `required: []`. Seller date confirmation remains a separate operation when the Agreement includes fulfilment terms. The Payment Clause uses `prepareFor: bootstrap`; its prepared PI must receive fresh participant transports through Core bootstrap. Access and exact party matching remain required.
+Orders do not require a second customer approval. The cancellation-enabled Agreement requires seller acceptance (`required: [seller]`), which also confirms the proposed dates through its Confirmation Clause. The earlier preview agreements retain `required: []` and separate date confirmation. The Payment Clause uses `prepareFor: bootstrap`; its prepared PI must receive fresh participant transports through Core bootstrap. Access and exact party matching remain required.
 
 The integration must handle `Documents/Document Provision Requested`, retrieve the prepared document identified by `requirementRef`, bootstrap it, and call `providePayment` as seller with the original `inResponseTo`, `requirementRef`, and the bootstrapped document reference. Deduplicate bootstrap by the originating document and preparation correlation; reuse the same PI when retrying. The native scenario exercises provision validation and a repeated response. It does not implement or qualify a hosted provisioning handler.
 
@@ -56,10 +56,20 @@ The cancellation-enabled example requires seller acceptance through
 `approve_seller`, with the current Activation revision and exact reviewed document.
 Its PI requests full capture when the Order is active and authorization is available.
 An embedded Order event or a payment state change can wake this request, so either
-acceptance or authorization may arrive first. `confirmReservation` and an optional
-customer approval do not replace seller acceptance. Repeating acceptance does not
-create a second capture request. The manual capture action applies the same
-Activation and cancellation conditions.
+acceptance or authorization may arrive first. Its Confirmation Clause binds
+`confirmAcceptance` to `Activation/Terms Accepted` for the seller. In the same
+atomic transition, pending groups receive their exact proposed start as the
+confirmed start. Different groups may have different dates. A passed start,
+expired response deadline, or outstanding customer consent rejects the entire
+approval, including Activation, all group changes and payment effects.
+An alternative date or an immediate cancellation charge still needs the existing
+customer `acceptProposal` step; `confirmReservation` remains available to request
+that consent before approval. Confirmed, fulfilled and cancelled/closed groups
+are not changed or revived. Orders without the Confirmation Clause require no
+date confirmation. `confirmReservation` and an optional customer approval do not
+replace seller acceptance. Repeating acceptance does not create new confirmations
+or a second capture request. The manual capture action applies the same Activation
+and cancellation conditions.
 
 Cancellation reconciliation retains its separate request path: a full-price
 capture condition must not prevent collection of a valid cancellation fee.
@@ -79,9 +89,11 @@ would reject that Agreement before preparation can supply them.
 The payment process and top-level `sources/order` use the same Order type
 declaration. Different declarations for that alias are rejected by Documents.
 `tools/test_reseller_automatic_capture.py` uses the example's actual payment
-configuration with the native component fixture. Seven cases cover both orderings,
-multiple reservation groups, customer approval, stale seller approval, cold
-restoration, cancellation before capture, fee capture after a failed full-price
+and confirmation configuration with the native component fixture. Twelve cases
+cover both orderings, multiple reservation groups and dates, atomic rollback,
+alternative-date and immediate-charge consent, an Order without a date clause,
+customer approval, stale or unauthorized seller approval, exact-review enforcement,
+cold restoration, cancellation before capture, fee capture after a failed full-price
 request, later recipient approval and rejection of conflicting source declarations.
 The fixture calculates a basket using the retained legacy factory, then processes
 the Order as its own native root. It uses the current `sourcePaths` configuration

@@ -1052,9 +1052,98 @@ functions:
               path: /key
     - $return:
         outcome: acceptedNew
+  confirmAcceptedProposals:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $gt:
+          - $add:
+            - $size:
+                $document:
+                  $const:
+                    name: bindings
+                    path: /requests
+            - $size:
+                $filter:
+                  in:
+                    $document:
+                      $const:
+                        name: bindings
+                        path: /state
+                  item: group
+                  where:
+                    $eq:
+                    - $var:
+                        name: group
+                        path: /status
+                    - pending_supplier
+          - 500
+        message: REQUEST_LIMIT
+    - $forEach:
+        in:
+          $document:
+            $const:
+              name: bindings
+              path: /state
+        item: group
+        key: groupId
+        do:
+        - $failIf:
+            cond:
+              $eq:
+              - $var:
+                  name: group
+                  path: /status
+              - pending_customer
+            message: CUSTOMER_PROPOSAL_ACCEPTANCE_REQUIRED
+        - $if:
+            cond:
+              $eq:
+              - $var:
+                  name: group
+                  path: /status
+              - pending_supplier
+            then:
+            - $call:
+                function: confirmProposalWithConsent
+                args:
+                  requireConfirmed: true
+                  input:
+                    key:
+                      $concat:
+                      - acceptance-
+                      - $nodeBlueId:
+                          groupId:
+                            $var: groupId
+                          proposal:
+                            $var:
+                              name: group
+                              path: /proposalBlueId
+                    groupId:
+                      $var: groupId
+                    expectedProposalBlueId:
+                      $var:
+                        name: group
+                        path: /proposalBlueId
+    - $return:
+        outcome: acceptedNew
   confirmProposal:
     args:
       input: {}
+    do:
+    - $return:
+        $call:
+          function: confirmProposalWithConsent
+          args:
+            input:
+              $var: input
+            requireConfirmed: false
+  confirmProposalWithConsent:
+    args:
+      input: {}
+      requireConfirmed:
+        type: Boolean
     do:
     - $let:
         name: context
@@ -1205,6 +1294,16 @@ functions:
                     - 3600000000
                 confirmedAtMicros:
                   $binding: timestamp
+    - $failIf:
+        cond:
+          $and:
+          - $var: requireConfirmed
+          - $ne:
+            - $var:
+                name: group
+                path: /status
+            - confirmed
+        message: IMMEDIATE_CHARGE_CONSENT_REQUIRED
     - $return:
         $call:
           function: saveReservation

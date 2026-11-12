@@ -78,18 +78,116 @@ def main():
     after['steps'][authorized + 1:authorized + 1] = [attempted, customer, stale, approved, repeated]
 
     groups = copy.deepcopy(before)
-    groups['name'] = 'One seller approval covers the multi-product order without confirmReservation'
+    groups['name'] = 'One seller approval confirms every proposed date and captures the multi-product order'
     complete = next(i for i, s in enumerate(groups['steps']) if s.get('operation') == 'completePayment')
     groups['steps'] = [s for s in groups['steps'][:complete + 1] if s.get('operation') != 'confirmReservation']
     order = groups['steps'][1]
     first = order['request']['groups'][0]
     first['lineIndices'] = [0]
-    order['request']['groups'].append({**first, 'id': 'rental', 'lineIndices': [1]})
+    order['request']['groups'].append({**first, 'id': 'rental', 'lineIndices': [1],
+                                      'proposedStartMicros': first['proposedStartMicros'] + 3600000000})
     order['expect']['/orders/o1/reservations/trip/proposal/amountMinor'] = 6000
     for step in groups['steps']:
-        if step.get('operation') == 'secureFunds':
-            step['expect'].update({'/orders/o1/reservations/trip/status': 'pending_supplier',
-                                   '/orders/o1/reservations/rental/status': 'pending_supplier'})
+        if step.get('operation') in ('approve_seller', 'secureFunds'):
+            step.setdefault('expect', {}).update({
+                '/orders/o1/reservations/trip/status': 'confirmed',
+                '/orders/o1/reservations/trip/confirmedStartMicros': first['proposedStartMicros'],
+                '/orders/o1/reservations/rental/status': 'confirmed',
+                '/orders/o1/reservations/rental/confirmedStartMicros': first['proposedStartMicros'] + 3600000000,
+            })
+
+    combined_after = copy.deepcopy(after)
+    combined_after['name'] = 'Authorized payment waits for exact seller acceptance and date confirmation together'
+    combined_after['steps'] = [s for s in combined_after['steps'] if s.get('operation') != 'confirmReservation']
+    for step in combined_after['steps']:
+        if step.get('operation') == 'approve_seller':
+            if step.get('status') == 'FAILED':
+                step['unchangedPaths'] = ['/orders/o1/activation', '/orders/o1/reservations', PAYMENT]
+                step['expectNoEffects'] = True
+                step['diagnosticContains'] = 'BEX_EXECUTION_REJECTED'
+            else:
+                step['expect'].update({'/orders/o1/activation/active': True,
+                                      '/orders/o1/reservations/trip/status': 'confirmed'})
+                if step.get('restore'):
+                    step['unchangedPaths'] = ['/orders/o1/reservations', '/orders/o1/reservationRequests']
+    successful = next(s for s in combined_after['steps']
+                      if s.get('operation') == 'approve_seller' and s.get('status') != 'FAILED')
+    rejected = copy.deepcopy(approval)
+    rejected.update(status='FAILED', expectNoPublicEffects=True, absent=[CAPTURE],
+                    diagnosticContains='BEX_EXECUTION_REJECTED',
+                    unchangedPaths=['/orders/o1/activation', '/orders/o1/reservations',
+                                    '/orders/o1/reservationRequests', PAYMENT])
+    unchecked = copy.deepcopy(rejected)
+    unchecked['requireExactDocumentVersion'] = False
+    impostor = copy.deepcopy(rejected)
+    impostor['channel'] = 'customer'
+    impostor.pop('diagnosticContains')
+    at_approval = combined_after['steps'].index(successful)
+    combined_after['steps'][at_approval:at_approval] = [unchecked, impostor]
+
+    # Start the boundary cases with an authorized PI and no seller/date approval.
+    secured_index = next(i for i, s in enumerate(combined_after['steps']) if s.get('operation') == 'secureFunds')
+    pending = copy.deepcopy(combined_after)
+    pending['steps'] = pending['steps'][:secured_index + 1]
+    past_date = copy.deepcopy(pending)
+    past_date['name'] = 'One expired date rolls back seller approval, all group confirmations and capture'
+    past_order = past_date['steps'][1]
+    past_order['request']['groups'] = copy.deepcopy(groups['steps'][1]['request']['groups'])
+    past_order['request']['groups'][1]['proposedStartMicros'] += 172800000000
+    past_order['expect']['/orders/o1/reservations/trip/proposal/amountMinor'] = 6000
+    expired_approval = copy.deepcopy(rejected)
+    expired_approval['timestampMicros'] = first['proposedStartMicros'] + 1
+    past_date['steps'].append(expired_approval)
+
+    alternative = copy.deepcopy(pending)
+    alternative['name'] = 'Seller approval cannot bypass customer acceptance of an alternative date'
+    alternative_date = first['proposedStartMicros'] + 86400000000
+    proposed = {
+        'operation': 'proposeAlternative', 'channel': 'seller', 'target': '/orders/o1',
+        'request': {'key': 'alternative', 'groupId': 'trip', 'catalog': fixture['catalog'],
+                    'lines': copy.deepcopy(pending['steps'][0]['request']['lines']),
+                    'proposedStartMicros': alternative_date},
+        'requestFromState': {'expectedProposalBlueId': '/orders/o1/reservations/trip/proposalBlueId'},
+        'timestampMicros': approval['timestampMicros'], 'absent': [CAPTURE],
+        'expect': {'/orders/o1/reservations/trip/status': 'pending_customer'},
+    }
+    consent = {
+        'operation': 'acceptProposal', 'channel': 'customer', 'target': '/orders/o1',
+        'request': {'key': 'consent', 'groupId': 'trip'},
+        'requestFromState': {'expectedProposalBlueId': '/orders/o1/reservations/trip/proposalBlueId'},
+        'timestampMicros': approval['timestampMicros'], 'absent': [CAPTURE],
+        'expect': {'/orders/o1/activation/active': False, '/orders/o1/reservations/trip/status': 'confirmed',
+                   '/orders/o1/reservations/trip/confirmedStartMicros': alternative_date},
+    }
+    alternative['steps'].extend([proposed, copy.deepcopy(rejected), consent, copy.deepcopy(successful)])
+
+    immediate = copy.deepcopy(pending)
+    immediate['name'] = 'Seller approval cannot impose an immediate cancellation fee without customer consent'
+    immediate_rejected = copy.deepcopy(rejected)
+    immediate_rejected['timestampMicros'] = approval['timestampMicros'] + 2
+    confirmation = copy.deepcopy(next(s for s in before['steps'] if s.get('operation') == 'confirmReservation'))
+    confirmation.update(timestampMicros=immediate_rejected['timestampMicros'], absent=[CAPTURE],
+                        expect={'/orders/o1/activation/active': False,
+                                '/orders/o1/reservations/trip/status': 'pending_customer'})
+    immediate_consent = copy.deepcopy(consent)
+    immediate_consent['timestampMicros'] = immediate_rejected['timestampMicros']
+    immediate_consent['request']['acceptImmediateCharge'] = True
+    immediate_consent['expect']['/orders/o1/reservations/trip/confirmedStartMicros'] = first['proposedStartMicros']
+    immediate_approved = copy.deepcopy(successful)
+    immediate_approved['timestampMicros'] = immediate_rejected['timestampMicros']
+    immediate['steps'].extend([immediate_rejected, confirmation, copy.deepcopy(immediate_rejected),
+                               immediate_consent, immediate_approved])
+
+    undated = copy.deepcopy(pending)
+    undated['name'] = 'Order without a confirmation clause needs no date for seller acceptance'
+    undated['steps'] = undated['steps'][:2]
+    undated['sourceRemove'] = ['/clauses/orders/parameters/template/clauses/confirmation',
+                               '/clauses/orders/parameters/template/clauses/cancellation']
+    undated['steps'][1]['request']['groups'][0].pop('proposedStartMicros')
+    undated['steps'][1]['expect'] = {'/orders/o1/reservations': {}}
+    undated_approved = copy.deepcopy(approval)
+    undated_approved['expect'] = {'/orders/o1/activation/active': True, '/orders/o1/reservations': {}}
+    undated['steps'].append(undated_approved)
 
     cancelled = copy.deepcopy(after)
     cancelled['name'] = 'Cancellation before seller approval voids authorization; late approval cannot capture'
@@ -145,7 +243,7 @@ def main():
         TEMPLATE.rsplit('/clauses/payment', 1)[0] + '/paymentTerms/recipientApprovalRequired': True,
     }
 
-    scenarios = [cancelled, before, after, groups, fee, recipient]
+    scenarios = [cancelled, before, after, groups, combined_after, past_date, alternative, immediate, undated, fee, recipient]
     for scenario in scenarios:
         # Use the authored example, including an absent binding in the red run.
         scenario.setdefault('sourcePatch', {}).update({
@@ -170,6 +268,11 @@ def main():
         # This component fixture explicitly requests the same preparation instead of a host timer.
         activation_parameters['preActivationOperations'].append('startPayment')
         scenario['sourcePatch']['/clauses/orders/parameters/template/clauses/activation/parameters'] = activation_parameters
+        confirmation = example['clauses']['fulfilment']['parameters']['template']['clauses']['confirmation']
+        scenario['sourcePatch']['/clauses/orders/parameters/template/clauses/confirmation/bindings'] = {
+            **fixture['clauses']['orders']['parameters']['template']['clauses']['confirmation']['bindings'],
+            **confirmation['bindings'],
+        }
         clause_path = '/clauses/orders/parameters/template/clauses/payment'
         scenario['sourcePatch'] = {
             clause_path + '/parameters': {

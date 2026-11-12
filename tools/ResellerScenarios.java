@@ -314,9 +314,13 @@ public final class ResellerScenarios {
         check(WireData.write(result.observations()).contains(text(step.get("diagnosticContains"))),
             label + " missing diagnostic: " + step.get("diagnosticContains") + " actual=" + diagnostic(result));
       }
-      if (Boolean.TRUE.equals(step.get("expectNoEffects"))) {
+      if (Boolean.TRUE.equals(step.get("expectNoEffects"))
+          || Boolean.TRUE.equals(step.get("expectNoPublicEffects"))) {
         Map<String, Object> observations = object(result.observations());
-        for (String key : List.of("changes", "events", "publicEvents")) {
+        // Failed reactions may retain tentative events as diagnostics, never as published output.
+        List<String> empty = Boolean.TRUE.equals(step.get("expectNoEffects"))
+            ? List.of("changes", "events", "publicEvents") : List.of("publicEvents");
+        for (String key : empty) {
           equal(List.of(), observations.get(key), label + " unexpected " + key);
         }
         equal(List.of(), processor.emitted(result), label + " emitted effects");
