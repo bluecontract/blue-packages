@@ -1,0 +1,167 @@
+{
+  "blueId": "GjGE8YwmH76UdnaMxUPC6do5UiftZh3eJK7yRULjjKnd",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "GqUCrevmNkQt2p4mAM9G5oBynDXiZE7fiqDDgZhezZKb",
+      "CW1zK2W5xefyRBRkMGHBW9dQ4psFTLZkYmy1QR8ZFYia",
+      "B3V1gsfk5qRzDbkDtAibTzUV7J6nUCga5qgTTDi61NJC",
+      "26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG",
+      "2H3KYc6Mg4ogmc4Jaqb38e1SyN8TopGtmCchmFugrsmZ",
+      "6qC11v617mevJhkE7v2VGnYdwDKZRufNgQTNe3coSt9z",
+      "AX3A1cujdbRkx3aTwvJk53oeMx3EbJqirL5S1dX2hZzv",
+      "GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy",
+      "5qc8VUqQD3esGZEtECxvpbuJDcuXNpFqS6iee673bP55",
+      "78H2M36JKQBjGpEtufBvF3FTx3CNhzbSLLntJ9MEE8eB",
+      "2U4eqK4mfUoqxLP9jiVz5JZgNcGUuVhUxCVpjchLiMzD",
+      "BcWLepFrq82yNFCsTE5aFVMwhrRFgCdqU6cmtqQHyJna",
+      "4wFZ4kJwzbgv5YnVRo17PqLqDuG7Lp9y1SfLPQTJpLs1"
+    ],
+    "displayLabel": "Representation Clause",
+    "limitations": [
+      "No parameter-specific schemas or defaults are supplied for owner, delegate, target or operations; their uses are established by grant."
+    ],
+    "parameterRefs": [
+      "bindings.mandate"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; Pending applies only after initialization.",
+        "aggregate": null,
+        "binding": "mandate",
+        "defaultPath": "/mandate",
+        "evidence": "Mandate.initializeMandate, approveMandate and applyMandateTermination; Status.schema.",
+        "id": "mandateStatus",
+        "meaning": "Pending awaits direct holder approval; Active records approval; Terminated permanently ends the mandate.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/status",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absent after initialization until approval.",
+        "aggregate": null,
+        "binding": "mandate",
+        "defaultPath": "/mandate",
+        "evidence": "Mandate.approveMandate writes timestamp; Mandates §5 and Coordination §2.4 define time.",
+        "id": "approvedAt",
+        "meaning": "Causal Unix-microsecond instant of successful holder approval; termination does not clear it.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/approvedAt",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown; absent after initialization until termination.",
+        "aggregate": null,
+        "binding": "mandate",
+        "defaultPath": "/mandate",
+        "evidence": "Mandate.applyMandateTermination writes timestamp; Mandates §5 and Coordination §2.4.",
+        "id": "terminatedAt",
+        "meaning": "Causal Unix-microsecond instant when the internal termination signal ends the mandate.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/terminatedAt",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown; initialization supplies empty scope if missing.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Current grant entries in the embedded mandate's scope dictionary, regardless of lifecycle status.",
+          "unit": "Operation grants, not executed calls."
+        },
+        "binding": "mandate",
+        "defaultPath": "/mandate",
+        "evidence": "Representation Clause.actions.grant; Operation Mandate.initializeOperationScope and clearOperationScope.",
+        "id": "scopeGrantCount",
+        "meaning": "Count of current operation-grant entries; their presence alone does not establish usable authority.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/scope",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; an empty confirmed scope contains no grants.",
+        "aggregate": null,
+        "binding": "mandate",
+        "defaultPath": "/mandate",
+        "evidence": "Representation Clause.actions.grant builds scope entries from parameters.operations.",
+        "id": "grantedOperation",
+        "meaning": "Operation named by this complete grant, copied from the configured operations.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/scope/*/target/operation",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; an empty confirmed scope contains no grants.",
+        "aggregate": null,
+        "binding": "mandate",
+        "defaultPath": "/mandate",
+        "evidence": "Representation Clause.actions.grant sets target.channel; Mandates §2 defines holder targeting.",
+        "id": "targetChannel",
+        "meaning": "Holder-owned channel name selected on the target; set to the configured owner name.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/scope/*/target/channel",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; an empty confirmed scope contains no grants.",
+        "aggregate": null,
+        "binding": "mandate",
+        "defaultPath": "/mandate",
+        "evidence": "Representation Clause.actions.grant uses nodeBlueId of target/contracts/initialized/document.",
+        "id": "targetInitialIdentity",
+        "meaning": "Exact initial target identity fixing this grant's target lineage, not its latest document state.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/scope/*/target/initialDocument/blueId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no parameter default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Representation Clause.actions.grant reads parameters.owner and checks call/channel.",
+        "id": "configuredOwner",
+        "meaning": "Local channel name required by grant and copied as the mandate's authority holder.",
+        "path": "/clauses/{clauseKey}/parameters/owner",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no parameter default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Representation Clause.actions.grant checks and copies contracts/<delegate>.",
+        "id": "configuredDelegate",
+        "meaning": "Declared local channel copied as the mandate's authorized actor channel.",
+        "path": "/clauses/{clauseKey}/parameters/delegate",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no parameter default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Representation Clause.actions.grant reads target + /contracts/initialized/document.",
+        "id": "configuredTarget",
+        "meaning": "Document path prefix used to locate the initialized target document when creating the mandate.",
+        "path": "/clauses/{clauseKey}/parameters/target",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Representation Clause\n\nPrepares an embedded **Operation Mandate**, named `Operation delegation`, for one owner, one delegate and configured operations on a fixed target. Creating the mandate does not activate delegation: genuine initialization makes it `Pending`, awaiting separate owner approval.\n\n## Configuration\n\nThe `grant` action reads these clause parameters:\n\n- `owner`: the local contract channel name used to authorize creation, copied into the mandate as `contracts.authorityHolderChannel`. It also becomes each grant's target channel name.\n- `delegate`: the local contract channel name copied into `contracts.authorizedActorChannel`.\n- `target`: the document path prefix used to read `<target>/contracts/initialized/document`. The exact identity of that initialized document fixes the grants' target lineage.\n- `operations`: operation names used both as scope keys and as each grant's `target.operation`. Empty operations produce no target grants; repeated names occupy the same scope entry.\n\nNo parameter-specific schemas or defaults are supplied for these four values. They are captured during connection planning; connection `params` do not replace them.\n\n`bindings.mandate` is a required non-root JSON pointer, defaulting to `/mandate`. It selects both the creation destination and the embedded document processed by the enclosing document. The mandate's lifecycle fields belong inside this binding, not at the enclosing document's root.\n\n`grant` runs through configured named connections; this type supplies no automatic grant connection. Inherited connection `when` conditions can skip execution, while `parameters.conditions.grant` can reject it. `once` defaults to `false`; when enabled, only an `acceptedNew` result completes the connection. Changing an installed clause's configuration under the same clause key is rejected with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`.\n\n## Creation\n\nThe action requires `call/channel` to equal `owner`, otherwise it fails with `MANDATE_OWNER_REQUIRED`. It then requires `/contracts/<delegate>` to exist, otherwise it fails with `DECLARED_REPRESENTATIVE_REQUIRED`.\n\nIf any value already exists at the mandate destination, the action returns `duplicate` without replacing or checking that value against the requested delegation. Otherwise it copies the two participant channels, constructs one complete scope grant per operation, and adds the mandate at the destination. Each grant contains `target.channel`, `target.operation` and an exact `target.initialDocument` reference. The result is `acceptedNew` with `path` identifying the destination. This confirms preparation within a successful committed invocation, not owner approval or execution of a delegated operation.\n\nConfigured connection `before` steps run before the action's guards and duplicate check because this action has no preflight. A duplicate skips `after` steps and the `once` completion mark, but does not itself undo preceding `before` effects. A failed invocation publishes none of its candidate changes.\n\n## Embedded mandate lifecycle\n\nThe copied participants must satisfy the native Mandates rules: concrete authenticated Timeline Channels for distinct holder and delegate actors. Genuine initialization sets `status` to `Pending` and clears supplied `approvedAt` and `terminatedAt` values. Initialization cannot import approval.\n\nThe holder separately invokes `approveMandate` with `{}`, the exact reviewed pending document and `requireExactDocumentVersion: true`. Native verification requires a direct holder action; delegated self-approval is unsupported. Successful approval changes `Pending` to `Active`, records `approvedAt` and emits `Mandate Approved`. No delegate countersignature is required. The approved program and participant bindings are protected against later replacement.\n\nAn `Active` status alone does not establish permission for a particular call. Delegated eligibility requires supported native protocol execution, verified approval and complete historical mandate state before the candidate input, a matching complete scope grant, and the required target participant bindings. Missing required history leaves authorization waiting. Ordinary target validation and business guards still apply. These grants are not single-use tokens and do not guarantee successful target execution.\n\nThe holder may invoke `terminateMandate` while `Pending` or `Active`, supplying only a nonempty `reason`. Its internal `Mandate Termination Requested` signal clears `scope`, reports the cleared scope, sets `status` to `Terminated`, records `terminatedAt`, emits `Mandate Terminated` and ends mandate processing. Termination is permanent; it does not reverse previously committed business actions or external effects.\n\n`approvedAt` and `terminatedAt` are causal Unix-microsecond timestamps supplied through execution, not wall-clock observations. A missing field is generally unknown; genuine initialization specifically leaves both timestamps absent until their respective transitions occur."
+}

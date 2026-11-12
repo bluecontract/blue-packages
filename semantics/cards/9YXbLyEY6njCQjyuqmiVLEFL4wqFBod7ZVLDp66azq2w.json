@@ -1,0 +1,50 @@
+{
+  "blueId": "9YXbLyEY6njCQjyuqmiVLEFL4wqFBod7ZVLDp66azq2w",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Observation Clause",
+    "limitations": [
+      "The supplied definitions do not specify payment-event kind values or the selected instruction's payment state and confirmation rules."
+    ],
+    "parameterRefs": [
+      "bindings.instruction"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; initialization supplies false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and timer arm task.",
+        "id": "automaticObservationArmed",
+        "meaning": "Timer-arming bookkeeping; unused by the built-in embedded observation and does not indicate payment status.",
+        "path": "/connectionState_{clauseKey}/observe._automatic/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialization supplies false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization, once default and fired update.",
+        "id": "automaticObservationFired",
+        "meaning": "One-shot completion latch; built-in observe has once=false, so this does not record whether an event was relayed.",
+        "path": "/connectionState_{clauseKey}/observe._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Observation Clause\n\nRelays events from a selected payment instruction to the containing order, allowing downstream reseller accounting to interpret them. It neither prepares payments nor confirms money: an `Event` can express a fact or an intention, and its authority depends on its authenticated input or document origin.\n\n`bindings.instruction` is required and has no default. It must be a text JSON Pointer beginning with `/`, other than `/` itself. It selects the instruction within the containing document. The inherited planner includes this path in embedded processing; its binding check does not establish that the selected value has a particular payment-instruction type.\n\nThe automatic `observe` action listens to embedded events at that path. It ignores inputs whose nested `event` does not match `Event`. Otherwise, it appends a `Payment Event Received` event containing:\n\n- `clause`: the observing clause's key.\n- `event`: an exact BlueId reference to the original event.\n- `instructionPath`: the configured `instruction` pointer.\n- `kind`: the original event's `kind`, with no default supplied.\n\nThe relay does not filter specifically for confirmed receipts or update payment amounts. The original event's meaning determines whether it establishes a request, confirmation or another outcome.\n\nInherited configuration can add named connections under `bindings.observe`; `_automatic` is reserved. An added connection's `when` condition can skip execution, and its `before` and `after` hooks surround the action body. `once` defaults to `false`; when enabled, it suppresses later runs after the body and hooks complete. `parameters.conditions.observe` defaults to `true`; a false condition rejects execution with `ACTION_CONDITION_FAILED`. Changing an installed clause's configuration requires a new clause key.\n\nThe inherited plan initializes `armed` and `fired` to `false` for `observe._automatic`. This connection uses embedded events and has `once=false`, so these bookkeeping flags do not track payments or whether an event has ever been relayed. No payment balance or settlement status is maintained by the observation action."
+}

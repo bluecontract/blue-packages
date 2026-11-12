@@ -1,0 +1,143 @@
+{
+  "blueId": "Ns1HJJ2MKMerZKtDhJdX1eZgxJWnQ1J1NgsosS1nH5r",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "3vCzsK9M1W3rvLKS9KTYJGcrWoRBf1SHJ9qBx6Py4b2q",
+      "6nvB6mRrFAZmyv2vP3h8tAWLeDTq4b9BtfqSJdbdNJzS",
+      "Cv8jfAGRxhbAozbmimq1pMiZpypNFToCj6TdRvoZasrW",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Amendments Clause",
+    "limitations": [
+      "proposal.replacement accepts an arbitrary Blue value. Its business type, units and field-specific constraints depend on the selected target and are not established by this clause."
+    ],
+    "parameterRefs": [
+      "bindings.editable",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; new changes require explicit true.",
+        "aggregate": null,
+        "binding": "editable",
+        "defaultPath": "/termsEditable",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal and approveAmendmentProposal: TERMS_FROZEN guards.",
+        "id": "editable",
+        "meaning": "True permits new proposals and pending-proposal approvals; it does not grant channel authority.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialization must establish revision 1.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendments Clause.initialState.state.revision; Amendment Proposal Functions.approveAmendmentProposal.",
+        "id": "revision",
+        "meaning": "Amendment revision checked by proposals; advances by one only when an amendment is applied.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/revision",
+        "type": "number"
+      },
+      {
+        "absent": "No pending proposal when proposal is {}; otherwise unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: p.id; approveAmendmentProposal clears proposal.",
+        "id": "pendingProposalId",
+        "meaning": "Identifier of the single pending proposal awaiting approvals from all configured approver channels.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/id",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown or no pending proposal.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: p.path; approveAmendmentProposal target replacement.",
+        "id": "pendingTargetPath",
+        "meaning": "Document path selected for exact replacement once all required approvals are recorded.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/path",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown or no pending proposal.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: p.revision and PROPOSAL_ID_CONFLICT check.",
+        "id": "pendingBaseRevision",
+        "meaning": "Amendment revision captured when this proposal was recorded, also used to check duplicate submissions.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/revision",
+        "type": "number"
+      },
+      {
+        "absent": "Unrecorded in an established map; otherwise unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.approveAmendmentProposal: approvals actor entry and ready loop.",
+        "id": "approverConsent",
+        "meaning": "True records the keyed channel's approval of the pending proposal; all configured approvers are awaited.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/approvals/*",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unrecorded in established history; otherwise unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.approveAmendmentProposal: ready branch adds /history/<proposal id> as true.",
+        "id": "appliedProposal",
+        "meaning": "True records successful application of the proposal identified by the map key, rather than mere submission.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/history/*",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no default is declared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Amendments Functions.propose; Amendment Proposal Functions.approveAmendmentProposal: parameters.approvers.",
+        "id": "approverChannel",
+        "meaning": "Channel allowed to propose and approve; its approval is required for application.",
+        "path": "/clauses/{clauseKey}/parameters/approvers/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no default is declared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: parameters.paths inclusion check.",
+        "id": "amendablePath",
+        "meaning": "Exact document path permitted as a proposal target.",
+        "path": "/clauses/{clauseKey}/parameters/paths/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Amendments Clause\n\nCoordinates unanimous approval of a replacement at a permitted document path. It maintains one pending proposal, recorded approvals, an amendment revision and identifiers of applied proposals. Proposing a change does not apply it or count as the proposer's approval.\n\n## Configuration\n\n- `parameters.approvers` identifies the channel names allowed to propose and approve. Every listed channel must approve before application. Authorization uses `call/channel`; an action's availability does not establish the caller's authority.\n- `parameters.paths` is the exact allowlist of document paths that proposals may replace. Neither parameter has a declared default.\n- `bindings.editable` is a non-root document pointer, defaulting to `/termsEditable`. Its value must be exactly `true` for new proposals and pending-proposal approvals. This clause does not initialize or change that flag.\n- `bindings.state` is a non-root document pointer, defaulting to `/amendments`. Initialization establishes `revision: 1`, `proposal: {}` and `history: {}` there. These are initialization values, not substitutes for absent state.\n\nNamed connections under `bindings.propose` and `bindings.approve` determine triggers and supply action arguments through `params`; no default action connections are declared. A connection's `when` can skip execution, and `parameters.conditions` can reject the corresponding action. Optional `before` hooks run before the action; `after` hooks and `once` success marking run only for `acceptedNew`. `once` defaults to `false`. Changed connected-clause configuration requires a new clause key.\n\n## Proposing a replacement\n\n`propose` takes `proposalId`, `expectedRevision`, `path` and `replacement`. `proposalId` must be nonempty text containing neither `/` nor `~`. `expectedRevision` must equal the current amendment revision, and `path` must occur in `parameters.paths`. `replacement` is the exact Blue value to install at that path, rather than a partial merge. Its business meaning and units depend on the target field.\n\nAn unauthorized channel, stale revision, disallowed path, frozen terms or invalid identifier rejects the attempt. After those checks, repeating the pending identifier with the same path, replacement and revision returns `duplicate`; changing any of those values produces `PROPOSAL_ID_CONFLICT`. An identifier already present in `history` is rejected as `PROPOSAL_ID_USED`.\n\nOptional `preservePending` defaults to `false`. A different valid proposal therefore replaces the pending proposal and discards its approvals. With `preservePending: true`, that replacement is rejected as `PROPOSAL_PENDING`. A newly recorded proposal stores `id`, `path`, `replacement`, the current `revision` and empty `approvals`, then emits `Amendment Proposed` with `clause` and `proposalId`. It returns `acceptedNew` without changing the target field.\n\n## Approving and applying\n\n`approve` takes `proposalId`. After checking channel authorization, it returns `duplicate` if `history` already records that identifier as `true`, even when terms are now frozen or another proposal is pending. Otherwise the identifier must match the pending proposal (`PROPOSAL_CHANGED` on mismatch), and the editable flag must be `true`. An already recorded approval from that channel then returns `duplicate`.\n\nA new approval records `true` under that channel in `proposal.approvals`. Until every configured approver has approved, the proposal remains pending and the action returns `acceptedNew`. The final required approval replaces the stored `proposal.path` with `proposal.replacement`, records `history[proposalId]: true`, increments `revision`, clears `proposal` to `{}`, and emits `Amendment Applied` with `clause` and `proposalId`.\n\nThus `acceptedNew` can mean a proposal was recorded, a non-final approval was recorded, or an amendment was applied. Only successful committed application establishes the changed field and applied-history entry. Duplicate amendment actions add no amendment changes or amendment events, although a configured `before` hook may already have run.\n\nAn established empty `proposal` means no pending proposal. `history` records applied identifiers only; it does not retain their replacement values, approval details or application times. Missing state remains unknown rather than implying initialization or completion."
+}

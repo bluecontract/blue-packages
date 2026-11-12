@@ -1,0 +1,59 @@
+{
+  "blueId": "64GwBujuaaRb4ZK2yHEwEAAQzNg81KHxZyyr1smCeErC",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Commercial Terms Validation",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.terms"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; missing value fails validation.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do: commissionBps integer and range checks.",
+        "id": "commissionBps",
+        "meaning": "Commission rate in basis points; validation requires an integer from 0 through 10000 inclusive.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/commissionBps",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; missing value fails validation.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do: currency comparison with USD.",
+        "id": "settlementCurrency",
+        "meaning": "Settlement currency; validation requires USD and does not supply it as a default.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; absence does not imply false or completion.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired=false; sets /fired after action completion.",
+        "id": "automaticValidationCompleted",
+        "meaning": "Automatic validate connection completed; initially false, true suppresses later runs of this connection.",
+        "path": "/connectionState_{clauseKey}/validate._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Commercial Terms Validation Clause\n\nChecks the percentage commission and USD settlement currency when clauses are initialized.\n\n`bindings.terms` selects the terms location in the executing document. It defaults to `/terms` and must be a non-root JSON pointer. Overriding it redirects both field reads:\n\n- `commissionBps` must be an integer from 0 through 10000 inclusive, representing basis points (0% through 100%). Otherwise, `validate` fails with `INVALID_COMMISSION_TERMS`.\n- After that check passes, `currency` must equal `USD`; otherwise, validation fails with `UNSUPPORTED_CURRENCY`.\n\nNeither field has a value default. Missing values fail their respective checks.\n\nThe `validate` action has an automatic connection with `on: initialized` and `once: true`. This source matches `Clauses Initialized`, the event for successful initial clause installation. The connection's `fired` flag starts as false and is set to true after validation completes. Later matching triggers skip that completed automatic connection. False does not establish a validation failure, and absence does not establish completion. Completion concerns the values read during that execution; later changes to the terms are not automatically revalidated.\n\nInherited configuration can supply `parameters.conditions.validate`, which defaults to true. A false condition rejects execution with `ACTION_CONDITION_FAILED` before the terms checks. Additional named connections can invoke `validate`; the once-only rule is specific to each connection. The name `_automatic` is reserved and cannot be overridden. Changing an existing clause configuration is rejected with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`; a changed configuration requires a new clause key.\n\nThis clause checks the terms without calculating a commission amount or confirming settlement."
+}

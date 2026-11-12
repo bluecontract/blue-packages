@@ -1,0 +1,71 @@
+{
+  "blueId": "8fGPcMAWVsq4ZerwVbmPbwqd8A8GBh6SJqBEA8kXvHRU",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "88TiDu72JqKzkFX6wqEynFG7nvPFoiN5bLDvy3Tk44eU",
+      "EbCfAgGdGzqdNGkDAXfeZCzmbghuB1oJNACdKRrtWnQD",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "AUbUbE9rcdUxW2gj8p4EnbNDMuGQaC1SKADvLMqEBQ9Z",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "rzWvzsV3nUXBThaM8f896BBmiBr3zzojz4dBynmBVgm",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Status Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no initial status is defined.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/status",
+        "evidence": "Status Clause.defaultBindings.state; State Machine Functions.transition reads and replaces it.",
+        "id": "currentState",
+        "meaning": "Current status; parameters.transitions defines allowed targets, and configured connections supply transition triggers.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; false only after initialization runs.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial state and generated timer arm task.",
+        "id": "connectionArmed",
+        "meaning": "True records a timer scheduling request by this connection's arm handler; it does not establish a pending timer.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false only after initialization runs.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: generated once guard and post-action fired update.",
+        "id": "connectionFired",
+        "meaning": "With once=true, records acceptedNew after after-hooks finish and suppresses later calls; false does not prove no transition.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Status Clause\n\nControls a document's configured status through the `transition` action. Status names, permitted transitions and their business significance come from configuration; the type defines no fixed lifecycle or terminal state.\n\n## State and transitions\n\n`bindings.state` is a non-root document JSON Pointer, defaulting to `/status`. It selects the value the action reads and replaces. The clause does not initialize that value or declare an initial status; absence means unknown.\n\n`parameters.transitions` maps each current state to a list of allowed targets. `parameters.subject` supplies the subject prefix for transition events. Neither parameter has a declared default.\n\nThe transition input requires a Text `to` target and permits an optional Text `reason`. Omitting `reason` gives the emitted event an empty explanation.\n\nAfter connection guards pass, the transition function:\n\n- Reads the current state as `from`. If `to` equals `from`, it returns `duplicate` before checking allowed targets, without producing its own state change or transition event.\n- Rejects any other target absent from the current state's configured list with `DISALLOWED_TRANSITION`.\n- For an allowed target, stages replacement of the bound state and emits a `Domain Event` containing `clause`, `from`, `to`, `reason` and `kind`. Here `clause` is the clause key, and `kind` is `parameters.subject`, a space and the target. It returns `acceptedNew`.\n\nAn attempted invocation is not a confirmed change: the staged effects must commit. The transition event describes the document's status change and does not establish completion of an external activity.\n\n## Connections and conditions\n\n`bindings.transition` supplies a dictionary of named connections. No trigger or actor is selected by default. The inherited `on` modes are:\n\n- `workflow`: an operation through the configured `party` or `channel`, with optional `request` and `event` patterns. It requires an authenticated channel binding; availability does not establish a reader's permission or obligation.\n- `event`, `channel`, `change`, `embedded` and `collection`: sources selected using the applicable `event`, `channel` or `path`. Embedded and collection sources enroll their paths for embedded processing unless `embed` is false. Collection handling restricts events to members beneath its path.\n- `initialized` and `activated`: the `Clauses Initialized` and `Document Activated` events, respectively.\n- `timer`: a processor-admitted firing configured as described below.\n\nConnection `params` supplies the transition arguments and can use the trigger. A workflow request is available as the trigger; it is not automatically copied into `params`. Connection `when` defaults to true and skips execution when false. `parameters.conditions.transition` also defaults to true; failure rejects with `ACTION_CONDITION_FAILED`.\n\n`before` runs before the transition function. `after` runs only for `acceptedNew`. `once` defaults to false; when true, an accepted transition that finishes `after` sets the connection's `fired` flag and suppresses later executions. A duplicate neither runs `after` nor consumes `once`, although `before` may already have produced effects. Thus `fired` records consumption of `once`, not every transition or timer firing.\n\nClause and connection names must be nonempty and exclude `.`, `/` and `~`. Changing an installed clause's configuration requires a new clause key.\n\n## Optional timers\n\nA timer connection requires exactly one of `timestamp` and `afterEvent`. An absolute `timestamp` is an integer Unix instant in microseconds, from 0 through 9,007,199,254,740,991; it arms on clause initialization and disallows `delayMs` and `policy`.\n\nA relative timer uses a timestamped `afterEvent` source and a positive integer `delayMs`, at most 9,007,199,254,740 milliseconds. Initialization cannot be its source. Its deadline follows the source's logical timestamp by that duration and must fit the timestamp range. `policy` defaults to `first`, which ignores further arm triggers after `armed` becomes true. `latest` replaces the pending keyed timer on subsequent arm triggers. Optional `cancelOn` selects a source that emits cancellation of that timer.\n\nThe connection's `armed` flag records that its arm handler requested scheduling. Firing and cancellation do not clear it, so it does not prove a timer remains pending, and `first` does not automatically rearm after either event. Both connection flags start false only after connection-state initialization runs.\n\nTimers require the supported Time runtime. Scheduling and cancellation requests become effective only on commit; neither is a firing confirmation. New deadlines must follow an existing logical invocation position; standalone initialization without such a position may request an elapsed deadline. Processing can occur late, and cancellation cannot undo an earlier firing."
+}

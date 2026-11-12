@@ -1,0 +1,50 @@
+{
+  "blueId": "3WTV7iipp1s7Ewk1SxJf9n4Giajy6ezbzT5QHyNMYEeW",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "CJgGWmocYCpqmt9isfL6aJab4Qs4i62qhUt7T7QubHoo",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Method Events",
+    "limitations": [
+      "The supplied definitions do not establish paymentDetails' schema, required fields or a complete set of method values.",
+      "The evidence does not define how MyOS processes execution requests or reports external payment or session outcomes."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no method default is declared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Method Events.actions.announce.do and actions.request.do",
+        "id": "paymentMethod",
+        "meaning": "Method discriminator: myos-customer selects the session request announcement; request copies it into the execution event.",
+        "path": "/paymentDetails/method",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial state, once guard, fired write",
+        "id": "automaticAnnouncementCompleted",
+        "meaning": "False initially; true after automatic announce finishes locally, preventing repeats on that connection.",
+        "path": "/connectionState_{clauseKey}/announce._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Method Events\n\nA Connected Clause that announces payment instructions and emits MyOS execution requests. It reads `/paymentDetails` and `/paymentDetails/method` from the document where it executes, including an instruction's own document.\n\n- **`announce`** automatically responds to `Clauses Initialized`, which represents successful initial clause installation. It emits a `Payment Event` with `details` copied from `/paymentDetails`. If `method` equals `myos-customer`, its `kind` is `Customer Payment Session Requested`; otherwise, its `kind` is `Account Payment Instruction Created`. This automatic connection has `once: true`.\n- **`request`** automatically responds to an `Event` matching `kind: Payment Requested`. It emits a `Payment Event` with `kind: MyOS Execution Requested`, `details` copied from `/paymentDetails`, `method` copied from `/paymentDetails/method`, and `request` containing the triggering event. This automatic connection is not one-shot and has no request-deduplication guard.\n\nThe actions read payment details when they run. Neither action declares a schema, required fields or defaults for those details, nor a complete set of allowed methods. The announcement's otherwise branch is not validation of a payment method.\n\nInherited `bindings.announce` and `bindings.request` can add named connections; `_automatic` is reserved. A connection's `when` can skip execution, `before` and `after` surround the action body, and `once` defaults to `false` for additional connections. Configured `parameters.conditions.announce` and `parameters.conditions.request` must hold or execution fails with `ACTION_CONDITION_FAILED`; unknown condition-action names are rejected. Changing an installed clause's configuration requires a new clause key.\n\nThe automatic announcement's `fired` flag starts as `false` when connection state initializes and becomes `true` after its action and hooks finish, suppressing further execution through that connection. Other connections can announce independently. Missing state is unknown.\n\nThese effects are emitted messages. A customer-session request does not confirm session creation, and `MyOS Execution Requested` does not confirm payment execution. The `fired` flag records local action completion, not an external payment outcome."
+}
