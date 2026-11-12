@@ -107,6 +107,7 @@ public final class ResellerScenarios {
             if (row.containsKey("bootstrapPrepared")) runner.bootstrapPrepared(row);
             else runner.operation(row, step);
             runner.expect(row, name + " step " + step + " " + row.get("operation"));
+            if (row.containsKey("focus")) runner.focus(text(row.get("focus")));
           }
           evidence.put("operations", step);
         } else {
@@ -169,6 +170,7 @@ public final class ResellerScenarios {
     private final List<Object> quoteEvidence = new ArrayList<>();
     private final List<Object> captures = new ArrayList<>();
     private final Map<String,Object> remembered = new LinkedHashMap<>();
+    private Contracts.Result lastOperation;
 
     Runner() {
       open();
@@ -213,6 +215,16 @@ public final class ResellerScenarios {
       retainMemberHistories(document);
       var result = processor.initialize(map("blueId", entry.get("requirementRef")));
       equal("APPLIED", result.status(), "Prepared instruction bootstrap: " + diagnostic(result));
+      if (step.containsKey("receivePreparedSource")) {
+        check(lastOperation != null, "Prepared source must have a committed operation");
+        String sourcePath = text(step.get("receivePreparedSource"));
+        var snapshot = processor.execution().snapshot(lastOperation.document());
+        String member = sourcePath.isEmpty() ? snapshot.root : snapshot.edges.values().stream()
+            .filter(edge -> edge.source().equals(snapshot.root) && edge.path().equals(sourcePath))
+            .findFirst().orElseThrow().target();
+        result = processor.receive(result.document(), List.of(processor.capture(lastOperation, List.of(member))));
+        equal("APPLIED", result.status(), "Prepared source completion: " + diagnostic(result));
+      }
       for (var binding : object(step.getOrDefault("bindPreparedSources", map())).entrySet()) {
         var values = processor.execution().values();
         String sourceVersion = NativeRuntime.identity(values.exact(
@@ -249,6 +261,16 @@ public final class ResellerScenarios {
       for (var member : snapshot.documents.values())
         execution.chooseHistory(member.blueId,
             ContractsExecution.rooted(snapshot, member.key, outgoing));
+    }
+
+    void focus(String path) {
+      retainMemberHistories(document);
+      var snapshot = processor.execution().snapshot(document);
+      var edge = snapshot.edges.values().stream()
+          .filter(item -> item.source().equals(snapshot.root) && item.path().equals(path))
+          .findFirst().orElseThrow();
+      document = ContractsExecution.rooted(snapshot, edge.target(),
+          ContractsExecution.outgoing(snapshot)).document();
     }
 
     void operation(Map<String, Object> step, int timestamp) {
@@ -300,6 +322,7 @@ public final class ResellerScenarios {
         equal(List.of(), processor.emitted(result), label + " emitted effects");
       }
       document = result.document();
+      lastOperation = result;
       if (step.containsKey("expectProvisionRequested")) {
         var entries = object(processor.read(document, text(step.get("expectProvisionRequested")) + "/entries"));
         equal(1, entries.size(), label + " prepared instruction count");

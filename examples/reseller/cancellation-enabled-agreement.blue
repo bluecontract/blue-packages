@@ -209,14 +209,23 @@ orderTemplate:
             type: Parties/Party
           customer:
             type: Parties/Party
-        required: []
+        required:
+        - seller
         preActivationChannels:
         - cx.payment.prepare.onOrderCreated_source
         - cx.payment.prepare.onOrderCreated_arm_source
+        - cx.paymentEvents.observe._automatic_source
+        - cx.cancellationSettlement.observe._automatic_source
+        - cx.cancellationSettlement.observe.instructionLinked_source
         preActivationTimerChannels:
         - cx.payment.prepare.onOrderCreated_source
         preActivationOperations:
         - providePayment
+        - confirmReservation
+        - proposeAlternative
+        - acceptProposal
+        - cancelReservation
+        - cancelBySupplier
         admission:
           approvers:
           - seller
@@ -256,7 +265,7 @@ orderTemplate:
                   requestCapture:
                     $and:
                     - $eq:
-                      - $document: /cancellationSettlement/allGroupsResolved
+                      - $document: /sources/order/activation/active
                       - true
                     - $eq:
                       - $document: /cancellationSettlement/status
@@ -270,12 +279,9 @@ orderTemplate:
                       $object:
                         $var: trigger
                 requestCapture:
-                  afterConfirmation:
-                    'on': event
-                    event:
-                      type: Events/Event
-                      kind: Cancellation Settlement Changed
-                      clause: cancellation
+                  afterOrderChange:
+                    'on': embedded
+                    path: /sources/order
                     when:
                       $and:
                       - $eq:
@@ -285,7 +291,7 @@ orderTemplate:
                         - $document: /sourceLinks/ready
                         - false
                       - $eq:
-                        - $document: /cancellationSettlement/allGroupsResolved
+                        - $document: /sources/order/activation/active
                         - true
                       - $eq:
                         - $document: /cancellationSettlement/status
@@ -337,7 +343,7 @@ orderTemplate:
                         - $document: /sourceLinks/ready
                         - false
                       - $eq:
-                        - $document: /cancellationSettlement/allGroupsResolved
+                        - $document: /sources/order/activation/active
                         - true
                       - $eq:
                         - $document: /cancellationSettlement/status
@@ -414,7 +420,7 @@ orderTemplate:
             allowedPayees:
             - payee
             recipientApprovalRequired: false
-            captureGate: /cancellationSettlement/allGroupsResolved
+            captureGate: /sources/order/activation/active
           businessContext:
             description: Płatność kartą za zamówiony rejs.
             orderOrigin: {}
