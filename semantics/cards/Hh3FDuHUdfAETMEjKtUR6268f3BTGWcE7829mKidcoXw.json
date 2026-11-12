@@ -1,0 +1,118 @@
+{
+  "blueId": "Hh3FDuHUdfAETMEjKtUR6268f3BTGWcE7829mKidcoXw",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "8RZsD9TREaVADn3r7GSR6WgCZBb8ZMDH27RJ32GkvWvz",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Ledger Clause",
+    "limitations": [
+      "No currency field or currency source is established for the ledger's minor-unit amounts.",
+      "Ledger Clause does not establish which external event, if any, justifies invoking settle; its actor and trigger depend on configured connections."
+    ],
+    "parameterRefs": [
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; declared initialization sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Current keyed targets maintained by setTarget",
+          "unit": "minor currency units; currency unspecified"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Ledger Clause.initialState.state.accrued; Balance Functions.setTarget.",
+        "id": "accrued",
+        "meaning": "Current total obligation targets, including decreases, in minor units; currency is unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/accrued",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; declared initialization sets zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Accepted reservation amounts, reduced by amounts moved to paid by settle",
+          "unit": "minor currency units; currency unspecified"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve and settle: state.reserved updates.",
+        "id": "reserved",
+        "meaning": "Outstanding ledger reservations awaiting settle, not secured funds; minor units with unspecified currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; declared initialization sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Settlement amounts recorded paid by settle; no refund deductions",
+          "unit": "minor currency units; currency unspecified"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Ledger Clause.initialState.state.paid; Balance Functions.settle.",
+        "id": "paid",
+        "meaning": "Cumulative amounts recorded paid by settle, without external payment verification; minor units, currency unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paid",
+        "type": "money-minor"
+      },
+      {
+        "absent": "A missing key is read as zero by setTarget; absent state is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.setTarget: targets[key], old default 0.",
+        "id": "targetAmount",
+        "meaning": "Current nonnegative obligation target for a ledger key, in minor units; currency is unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; settle rejects a missing settlement entry.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve and settle: settlements[key].amountMinor.",
+        "id": "settlementAmount",
+        "meaning": "Positive amount fixed when reserve creates the entry and later used by settle; minor units, currency unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; absence does not mean reserved or paid.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve writes reserved; settle writes paid.",
+        "id": "settlementStatus",
+        "meaning": "reserved awaits settle; paid records settle's ledger confirmation, without external payment verification.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/status",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Ledger Clause\n\nMaintains keyed obligation targets and settlement records, distinguishing accrued obligation, outstanding reservations and amounts recorded as paid. A reservation earmarks obligation; it does not secure funds. Marking a settlement `paid` records ledger confirmation without transferring money or verifying an external payment.\n\n`bindings.state` is a required non-root JSON pointer, defaulting to `/balance` in the executing document. Overriding it relocates all ledger reads and writes. The declared initial state contains `accrued`, `reserved` and `paid` set to zero, with empty `targets` and `settlements` maps. These initialization values do not establish the meaning of absent runtime state.\n\nAll amounts use exact integer minor currency units. The type defines no currency field or currency source. Every action requires a nonempty text `key` containing neither `/` nor `~`; invalid keys fail with `INVALID_LEDGER_KEY`. Keys should be reused only for the same obligation or reservation. Reservation keys need not match individual target keys: reservations draw against the aggregate obligation.\n\n## Actions\n\n- **`setTarget`** requires `key` and a nonnegative integer `amountMinor`; otherwise it fails with `NONNEGATIVE_INTEGRAL_TARGET_REQUIRED`. It creates or replaces `targets[key]` and adjusts `accrued` by the change from that key's previous target. A missing target is treated as zero for this comparison. An unchanged amount is a duplicate; setting a missing target to zero therefore creates no entry. Decreasing a target can leave `accrued` below amounts already paid or reserved: this action neither releases reservations nor reverses payments. A new change emits `Balance Target Changed`, carrying the new `amountMinor` and signed `deltaMinor`.\n- **`reserve`** requires `key` and a positive integer `amountMinor` that fits within accrued obligation remaining after paid and reserved amounts. Failure produces `INSUFFICIENT_UNRESERVED_OBLIGATION`. It creates `settlements[key]` with that amount and `status: reserved`, increases `reserved`, and emits `Settlement Reserved` with `amountMinor`. An existing settlement with the same amount is a duplicate, even if already `paid`; a different amount fails with `SETTLEMENT_ID_CONFLICT`. This existing-entry check precedes the available-obligation check.\n- **`settle`** requires `key` and takes the amount from the existing settlement. A missing entry fails with `UNKNOWN_SETTLEMENT`; an entry already marked `paid` is a duplicate. Otherwise it marks the entry `paid`, reduces `reserved`, increases `paid`, and emits `Settlement Confirmed`. There is no additional external-payment check. No release, refund or reversal action is declared.\n\nThese emitted Domain Events include `clause` and `key`. The functions report `acceptedNew` for a new ledger change and `duplicate` for an unchanged repeat; duplicate branches make no ledger changes or ledger event emissions. An attempted invocation alone establishes neither result.\n\n## Connections\n\nThe three actions are fixed by the type. Named connection dictionaries under their action bindings supply triggers and `params`; no automatic connection or particular actor is declared. Supported `on` sources are `workflow`, `event`, `channel`, `embedded`, `collection`, `change`, `initialized`, `activated` and `timer`. Workflow connections use the configured `channel` or `party`; the action's existence does not establish a viewer's permission.\n\nA connection's `when` defaults to true; false skips the action. `parameters.conditions.<actionName>` also defaults to true, but a failing configured condition rejects execution. `once` defaults to false; when true, later attempts are skipped after an `acceptedNew` execution. Optional `before` runs before the ledger function, including its duplicate detection. With these actions' `outcome-v1` contract, `after` and recording the connection as fired occur only for `acceptedNew`. Thus a duplicate ledger result does not imply that configured `before` effects were absent. Changing an existing connected clause's configuration requires a new clause key.\n\nTimer connections use either an absolute `timestamp` in Unix microseconds or a timestamped `afterEvent` with positive integer `delayMs`; initialization cannot supply the relative time base. Relative `policy` defaults to `first`, while `latest` replaces the pending keyed timer. Absolute timers accept neither `delayMs` nor `policy`. `cancelOn` requests cancellation. The `first` policy's armed flag is not cleared by firing or cancellation. Timer requests require the Time runtime and are not firings; cancellation cannot undo an earlier firing."
+}

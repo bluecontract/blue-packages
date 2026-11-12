@@ -1,0 +1,59 @@
+{
+  "blueId": "64GwBujuaaRb4ZK2yHEwEAAQzNg81KHxZyyr1smCeErC",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Commercial Terms Validation",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.terms"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; missing value fails validation when checked.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do[0]: commissionBps checks.",
+        "id": "commissionBps",
+        "meaning": "Commission rate in basis points; validation requires an integer from 0 through 10000, inclusive.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/commissionBps",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; missing value fails its validation check.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do[1]: currency comparison.",
+        "id": "settlementCurrency",
+        "meaning": "Settlement currency read from the terms; validation requires exactly USD.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired=false and once completion update.",
+        "id": "automaticValidationCompleted",
+        "meaning": "True records completed automatic validation on Clauses Initialized; false does not distinguish waiting from failure.",
+        "path": "/connectionState_{clauseKey}/validate._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Commercial Terms Validation Clause\n\nValidates a percentage commission and the USD settlement currency when clauses are initialized. It checks commercial terms; it does not calculate or settle a commission.\n\n`bindings.terms` identifies the terms within the executing document and defaults to `/terms`. It must be a non-root pointer beginning with `/`. An override changes where both fields are read:\n\n- `commissionBps` must be an integer from `0` through `10000`, inclusive, representing 0% through 100% in basis points. A missing, non-integer or out-of-range value fails with `INVALID_COMMISSION_TERMS`.\n- `currency` must equal the text `USD`. This check follows the commission check and fails with `UNSUPPORTED_CURRENCY` for any other or missing value.\n\nNeither field has a default, and validation does not populate or correct them.\n\nThe runtime invokes `validate` through its built-in `_automatic` connection: `on: initialized` selects the `Clauses Initialized` event, and `once: true` applies to this connection. Its `fired` flag starts as false when connection state is initialized and becomes true after successful completion. Later invocations through that connection are skipped. An attempted validation alone does not establish completion; an absent flag is unknown.\n\nInherited configuration permits additional named connections under `bindings.validate`; `_automatic` is reserved. A connection's `when` condition can skip its execution. If supplied, `parameters.conditions.validate` must hold before the terms checks, otherwise the action fails with `ACTION_CONDITION_FAILED`. The inherited transition check requires a new clause key to change an existing clause's configuration (`CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`).\n\nThe default connection does not recheck later edits to the bound terms. Its completion flag records a past successful validation, not a guarantee that the current terms still satisfy the checks."
+}

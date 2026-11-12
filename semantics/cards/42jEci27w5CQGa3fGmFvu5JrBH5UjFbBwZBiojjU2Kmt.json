@@ -1,0 +1,190 @@
+{
+  "blueId": "42jEci27w5CQGa3fGmFvu5JrBH5UjFbBwZBiojjU2Kmt",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "A6fqEe3ag4xU6CK2pFQDTDuE4E3jTKsgA3WPeXNSEaSF",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "Ed8xrgARSGxfHJgXUCe6ZRFeQbZqamSnyPRFkqPuQdUG",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Document Scope Clause",
+    "limitations": [
+      "The supplied definitions do not establish the usage unit, accounting population, initialization or update rules for budget.used and budget.limit."
+    ],
+    "parameterRefs": [
+      "bindings.budget",
+      "bindings.documents",
+      "bindings.pattern"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; registration returns without registering.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: initial status guard and budgetPredicate.",
+        "id": "mandateStatus",
+        "meaning": "Active permits registration and satisfies the installed grants’ status guard; other values do not.",
+        "path": "/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; a new registration can create the registry.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in the bound documents registry, keyed by initialized-document BlueId.",
+          "unit": "Registered documents, not executed operations."
+        },
+        "binding": "documents",
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: identity lookup and documents $objectSet.",
+        "id": "registeredDocumentCount",
+        "meaning": "Registered document entries keyed by initial identity; shared registries also share duplicate suppression.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "No binding: no cap. Bound but missing: registration fails.",
+        "aggregate": null,
+        "binding": "budget",
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: MANDATE_USAGE_BUDGET_REQUIRED and budgetPredicate.",
+        "id": "budgetLimit",
+        "meaning": "Shared usage ceiling; registration requires an integer. The usage unit is unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/limit",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; no zero default is established.",
+        "aggregate": null,
+        "binding": "budget",
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: budgetPredicate reads budget/used.",
+        "id": "budgetUsed",
+        "meaning": "Shared usage value required to be below limit by installed grants; its accounting basis and unit are unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/used",
+        "type": "number"
+      },
+      {
+        "absent": "A grant without a Text channel rejects new registration.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: grants loop checks target/channel.",
+        "id": "grantChannel",
+        "meaning": "Target channel named by each configured grant; the grant is installed for each newly registered identity.",
+        "path": "/clauses/{clauseKey}/parameters/grants/*/target/channel",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "A grant without a Text operation rejects new registration.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: grants loop checks target/operation.",
+        "id": "grantOperation",
+        "meaning": "Exact target operation named by each configured grant; registration does not execute it.",
+        "path": "/clauses/{clauseKey}/parameters/grants/*/target/operation",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "The additional attribution check is not enabled.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Document Scope Clause.actions.register: requireAttributed guard.",
+        "id": "attributionRequired",
+        "meaning": "Exactly true requires the processing actor and source mandate identity to match this Mandate.",
+        "path": "/clauses/{clauseKey}/parameters/requireAttributed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Omission enables registry embedding.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Document Scope Plan.planDocumentScopes: embedDocuments check and collectionPaths.",
+        "id": "embedDocuments",
+        "meaning": "False omits this clause’s added embedding of registered documents; supplied values must be Boolean.",
+        "path": "/clauses/{clauseKey}/parameters/embedDocuments",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; installation initializes it to false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired and final once guard.",
+        "id": "connectionCompletedOnce",
+        "meaning": "For once=true, true records completion through after steps and suppresses later invocations; no external outcome implied.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; installation initializes it to false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: timer arm and cancel task bodies.",
+        "id": "timerArmRecorded",
+        "meaning": "True records timer request emission; first policy blocks rearming. Cancellation and firing do not clear it.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No absolute deadline is specified for this connection.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: absolute timestamp validation and arm task.",
+        "id": "absoluteTimerDeadline",
+        "meaning": "Configured absolute timer deadline in Unix microseconds, not an observed firing or registration time.",
+        "path": "/clauses/{clauseKey}/bindings/register/*/timestamp",
+        "scope": "clause",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Required for relative timers; forbidden for absolute timers.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: delayMs validation and deadline expression.",
+        "id": "relativeTimerDelay",
+        "meaning": "Positive integer delay in milliseconds from the afterEvent source’s logical timestamp.",
+        "path": "/clauses/{clauseKey}/bindings/register/*/delayMs",
+        "scope": "clause",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Document Scope Clause\n\nQualifies initialized documents against an approved Blue pattern and installs configured operation grants for each document’s initial identity within a Mandate. Registration does not execute those operations or consume usage.\n\n## Configuration\n\n- `bindings.documents` is required: a non-root JSON Pointer to the registry of registered documents, keyed by the BlueId of each document’s `/contracts/initialized/document`.\n- `bindings.pattern` optionally points to the approved pattern. Otherwise, `parameters.documentPattern` supplies it. The pattern must be an object. Installation freezes it into the native `qualifiesMandateDocument` matcher and snapshots the bound pattern for registration. Later changes at the bound path do not replace the installed matcher; a candidate cannot supply its own matcher.\n- `bindings.budget` optionally points to a shared usage budget containing `limit` and `used`. Omitting this binding adds no usage cap. This clause neither initializes nor updates these values; the supplied definitions do not establish their usage unit or accounting basis.\n\nAll three data bindings are document-relative pointers with no default paths. Supplied pointers must begin with `/` and cannot be `/` itself.\n\n`parameters.grants` supplies the grant entries to install. For a new registration, each entry must have Text values for `target.channel` and `target.operation`.\n\nWhen `parameters.requireAttributed` is exactly `true`, registration requires the processing event’s actor to equal `/contracts/authorizedActorChannel/actor`. Its source must also contain `onBehalfOf.mandate` whose BlueId equals that of this Mandate’s `/contracts/initialized/document`. A failed attribution check returns without registering. Omission does not enable this additional check.\n\nRegistered documents are embedded for processing by default. `parameters.embedDocuments: false` omits this clause’s added embedding of the registry, allowing an already embedded producer to supply live events. If supplied, `embedDocuments` must be Boolean. The inherited transition validator requires a new clause key for changed clause configuration.\n\n## Registration and installed grants\n\nThe `register` action accepts `document`, defaulting to the trigger’s `/document`; connection `params` can override this default. The action first returns without registration unless the executing Mandate’s `/status` is `Active`.\n\nAfter any attribution check, the candidate must match the frozen pattern and contain `/contracts/initialized/document`. If a budget is bound, its `limit` must be an integer. These checks precede duplicate suppression. An initial identity already present in the bound registry returns without refreshing its stored document, installing grants or emitting another qualification event. Clauses sharing that registry therefore share duplicate suppression.\n\nFor a new identity, successful registration stores the candidate and installs each configured grant in `/scope`, using a key composed of the clause key, initial-document identity and grant key, separated by colons. Invalid grant channel or operation values reject the attempt.\n\nEach installed grant replaces `target.initialDocument` with the candidate’s initialized document and replaces `target.documentValidation` with the approved pattern and a combined predicate. At execution, the grant rechecks the pattern and requires the Mandate to be `Active`. With a budget binding, `used` must be below `limit`. Any original `target.documentValidation.function.expr` remains an additional condition; its absence contributes `true`.\n\nRegistration emits `Document Qualified`: `clause` identifies the clause key, and `document` contains the initialized document, not the full registered candidate. This records qualification and installation of the configured grants, not an attempted or completed external operation.\n\n## Connections\n\n`bindings.register` configures named connections; this type supplies no automatic registration connection. Supported sources are `event`, `embedded`, `collection`, `change`, `channel`, `initialized`, `activated`, `workflow` and `timer`. Workflow connections require an authenticated channel and use the call’s request as the trigger. Embedded and collection connections use the child event; timers use the captured trigger; other connections use the source event. Embedded and collection sources add processing of their source by default unless `embed` is `false`.\n\nA connection’s `when` can skip invocation. A false `parameters.conditions.register` rejects it. `before` runs before the action body; `after` runs only if that body reaches its end. `once` defaults to `false`; when enabled, completion through `after` marks the connection `fired` and suppresses later invocations. An early return from registration does not consume this once-only completion, although `before` has already run.\n\nA timer connection requires exactly one of an absolute `timestamp` or an `afterEvent` source with positive integer `delayMs`. `timestamp` is a Unix-microsecond instant from 0 through 9007199254740991; `delayMs` is a millisecond duration no greater than 9007199254740. Relative timers require a timestamped source rather than initialization. Their `policy` defaults to `first`, which suppresses rearming once `armed`; `latest` replaces the keyed pending request. Absolute timers arm from initialization and cannot specify `delayMs` or `policy`. `cancelOn` can emit a keyed cancellation.\n\nA timer request is not a firing. The Time runtime requires a committed registration and time/history admission evidence. New deadlines must follow the invocation’s logical timestamp; a new standalone initialization without a prior external position may use an elapsed absolute deadline. The connection’s `armed` flag records request emission and is not cleared by cancellation or firing, so it does not establish that a timer remains pending."
+}

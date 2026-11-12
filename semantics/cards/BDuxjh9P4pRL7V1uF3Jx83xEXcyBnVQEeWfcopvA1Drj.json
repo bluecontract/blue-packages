@@ -1,0 +1,81 @@
+{
+  "blueId": "BDuxjh9P4pRL7V1uF3Jx83xEXcyBnVQEeWfcopvA1Drj",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HCLNwqVZfWNtjeP6MQrJiRzBFcUEtizFyfihPfoLsMqJ",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "GTHDfj3hfUCUxrnYwuB5s7jWLkqq5v7D8WRgytKULGhc",
+      "3oGtXdt5rKJwsJbBGC1NWphpRdeB4RQKRgzo27uf1rTY",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "G4iHwpy5H6pac4XzMMqGGQ6QojE2ZZme2u4GBuJk91eY",
+      "8Qa2KBSeQAn2ep8ofkBqmrtYgLWrMzM3Ngj5uFPfsF1p",
+      "32G1ERaDgaiJr8Zntq7qEpJMWB7EwmRXTLHGZ7x6uciY"
+    ],
+    "displayLabel": "Run On Initialization Clause",
+    "limitations": [
+      "No per-request document paths or typed scalar paths within latestReport are supplied.",
+      "The schemas of input and instructions are unspecified; successful report content depends on the selected work clause's parameters.reportRequest."
+    ],
+    "parameterRefs": [
+      "parameters.workClause"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Run On Initialization Clause.actions.request; Connection Planning Functions.planConnections",
+        "id": "automaticRequestAccepted",
+        "meaning": "True after acceptedNew and after steps finish; blocks another automatic launch, without confirming task completion.",
+        "path": "/connectionState_{clauseKey}/request._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; do not infer an installed work clause.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Launch Policy.parameters.workClause; Task Work Functions.request",
+        "id": "selectedWorkClause",
+        "meaning": "Key selecting the exact Task Work Clause that owns the ledger; inherited configuration default is work.",
+        "path": "/clauses/{clauseKey}/parameters/workClause",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; ledger ownership is not established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.hookDefinition.functions.plan; Task Work Functions.request",
+        "id": "ledgerOwner",
+        "meaning": "Task Work Clause key owning this document's request ledger; must match parameters.workClause for launch.",
+        "path": "/taskWork/ownerClause",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; do not substitute the initial value 1.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.hookDefinition.functions.plan; Task Work Functions.request",
+        "id": "nextRequestNumber",
+        "meaning": "Sequence number for the next request ID; initialized to 1 and advanced per accepted launch, not a completion count.",
+        "path": "/taskWork/nextRequestNumber",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Run On Initialization Clause\n\nLaunches a task request after successful initial clause installation. Its `request` action has a built-in `_automatic` connection with `on: initialized` and `once: true`. The trigger is `Clauses Initialized`; issuing the request does not establish that the task has started or completed.\n\n## Configuration\n\n`parameters.workClause` defaults to `work`. It must be a nonempty clause key identifying an exact `Task Work Clause` in the same executing document. The request function checks the installed policy's `Task Launch Policy` parent and requires `/taskWork/ownerClause` to match the selected work clause. Invalid policy, work-clause or ownership configuration rejects the launch.\n\nThe emitted request copies `instructions` from `/instructions` and `input` from the action's `params.input`. The built-in connection supplies no input value. This type declares no input or instructions schema and no data bindings.\n\nAdditional named action connections can be configured under `bindings.request`; `_automatic` is reserved. Request execution accepts only `initialized` and `workflow` sources. A workflow connection requires an authenticated channel binding, with `party` taking precedence over `channel`; its existence does not establish a reader's permission. Additional connections can supply `params`, `when`, `before`, `after` and `once`. Their defaults are empty `params`, true `when`, empty hook lists and false `once`. A false `when` skips execution. Optional `parameters.conditions.request` defaults to true; a false condition rejects execution with `ACTION_CONDITION_FAILED`. Changing an installed clause's configuration under the same clause key is rejected.\n\n## Launch and reported outcome\n\nAn accepted launch allocates `request-<nextRequestNumber>`, advances `/taskWork/nextRequestNumber`, records a `pending` entry in `/taskWork/requests`, and emits `Task Work Requested` containing `requestId`, `input` and `instructions`. The function returns `acceptedNew` with the request ID. These effects establish a new request, not successful performance.\n\nThe connection's `fired` flag is set only after an `acceptedNew` outcome and completion of any `after` steps. Once true, the automatic connection skips subsequent invocations. Failed or skipped attempts do not set that flag, and no separate retry schedule is defined. This once rule applies to the connection: separately configured workflow connections can issue further requests.\n\nThe selected `Task Work Clause` initializes the ledger with `nextRequestNumber: 1`, empty `requests`, empty `latestReport`, and its own clause key as `ownerClause`. Missing state is unknown, not an initialization default.\n\nA pending request awaits a correlated report through the work clause's `performer` channel. A `succeeded` report must match that clause's `parameters.reportRequest` and include `result`. A `failed` report requires a nonempty `error` and forbids `result`. Unknown request IDs are rejected. A newly accepted final report changes the request's disposition, updates `/taskWork/latestReport`, and emits `Task Report Accepted`. Repeating the identical final report returns `alreadyFinal` without another update; a conflicting final report is rejected. `latestReport` describes the most recently accepted final report across the ledger, not the status of every request."
+}

@@ -1,0 +1,98 @@
+{
+  "blueId": "3pusTLgyAp56h1q35Rqrkyxq8eSA3Dnzea955RUi93qJ",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "8ZpP5rnJ8H3DDHL2yYvJGrSZyJ6BhDZehB2oaziBJyVF",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "ExVewu847anQ4tcxsQspqvPvEBkgAWcyf98W6hFeJ3DH",
+      "HRac84i2MqGQmcHdysnrmKjw3pQpLw7Fd82m4MJv8CZP",
+      "A7wEjRJqWS1f6osMkG1wcBig6MHx9gGTejQE4zNSBnDr",
+      "7hZBxZQ4pz6fjMddyrVMEDakNuy4Y3ivoWNb5dSjdQQP",
+      "He9HYTeB5WJwvQGQJYDm6qyBz3P3ARU3r8E9N8C81JQn",
+      "FVqPfSx5t8A2rLUtu5qKizaKuagPDonZg8rsp6E5EPyK"
+    ],
+    "displayLabel": "Attachment Functions",
+    "limitations": [
+      "Concrete requestPath, instructionPath and statePath constants and corresponding data bindings are not supplied. Prepared requests and attached outcomes are established by the functions, but cannot be assigned safe structured state paths here.",
+      "The surrounding operation wiring and selected template, allowed actions and requestType implementation are not supplied; this library alone does not establish a specific invoking actor or downstream business outcome."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; automatic invocation requires true.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Attachment Functions.requireInvocation; Party Access Functions.requireActive",
+        "id": "activationActive",
+        "meaning": "Activation gate of the executing document, checked before preparation, creation or attachment.",
+        "path": "/activation/active",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; absence does not establish an empty roster.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Current party-role entries in activation.parties.",
+          "unit": "party roles"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Attachment Functions.checkCandidate, create; Attachment Rules.checkRoster",
+        "id": "parentPartyCount",
+        "meaning": "Number of current parent party roles whose primary identities must be preserved in the attachment.",
+        "path": "/activation/parties",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; copying uses an empty list if absent.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in activation.accessPaths copied during preparation.",
+          "unit": "access-history references"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Attachment Functions.prepare: accessPaths loop and attachmentAccess construction",
+        "id": "accessHistoryCount",
+        "meaning": "Access-history references selected for copying into the prepared child; this is not a count of permissions.",
+        "path": "/activation/accessPaths",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unspecified; prepare alone applies guarantor.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Attachment Functions.prepare, create, checkCandidate; Attachment Rules.checkRoster",
+        "id": "authorityRole",
+        "meaning": "Authority role required in the child and, for cross-embedded attachment, in the current parent roster.",
+        "path": "/clauses/{clauseKey}/parameters/authority",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no gate when attachWhen itself is absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Attachment Functions.requireReady, create, attach",
+        "id": "readinessPath",
+        "meaning": "Executing-document path compared with attachWhen.equals before create or attach; prepare does not check it.",
+        "path": "/clauses/{clauseKey}/parameters/attachWhen/path",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Attachment Functions\n\nA reusable function library for preparing an attachment, then either inserting its configured document with `create` or selecting an existing initialized publication with `attach`. The surrounding workflow supplies invocation wiring and execution constants; these functions do not themselves register public operations.\n\n## Configuration and preparation\n\nExecution uses `key`, `kind`, `actor`, `automatic`, `allowCreate`, `allowed`, `requestType`, `instructionType`, `instructionPath`, `requestPath`, `statePath` and `termsPath`. The paths identify locations in the executing document; no concrete values are fixed by this definition.\n\n`preparePublic` accepts Attachment Preparation Input and delegates to `prepare`. Its optional `values` map defaults to `{}`. Each supplied name must appear in the clause's `fieldPaths`, and its mapped path must begin with `/paymentTerms/`, `/destination/` or `/terms/`. Unknown names and other destination paths are rejected. Values are inserted into the configured `template`.\n\nPreparation merges clause parameters over defaults `authority: \"guarantor\"`, `hooks: {}`, `payer: \"customer\"` and `payee: \"seller\"`. The shown functions do not otherwise use `payer` or `payee`. These are preparation defaults: `create` and `attach` read `authority` directly from clause parameters.\n\nThe authority must be present in the prepared roster. Input `authorityParty` is needed when it is absent; when supplied for an existing authority, its primary identity must match. This changes the prepared roster, without admitting anyone to the parent.\n\nPreparation assigns `instanceKey` from the parent identity and attachment `key`. An initialized parent's identity is its original initialized document's Blue identity; otherwise preparation uses the current document's identity. Parent-dependent hooks require an initialized parent.\n\nThe prepared child receives an Activation Clause with the selected parties, `frozen: true` and `required: []`, plus their lead and representative channels. Parent `activation.accessPaths` documents are copied as exact references under the child's `attachmentAccess`, with corresponding local access paths. An empty required-approval list does not grant timeline access or record participant consent. Preparation also installs an Attachment Endpoint policy and, unless `kind` is `\"document\"`, a hooks clause using `requestType` and the compiled bindings.\n\nAt `requestPath`, preparation stores `document`, `documentBlueId`, `policy`, `requirements` and `signals`. Requirements record `attachBy`, authority membership requirements, `instructionType`, primary party channels and reader keys, parent dependencies, relationship and the terms selected by `termsPath`. `actor` supplies `linkBy` and `attachBy`; these recorded fields alone do not establish invocation permission. An identical repeated preparation returns `duplicate`; a different request at the same location is rejected with `ATTACHMENT_REQUEST_ALREADY_PREPARED`.\n\n## Invocation and attachment\n\nEvery preparation, creation and attachment checks `requireInvocation`. With `automatic` enabled, `/activation/active` must be exactly `true`. Otherwise invocation requires exact document-version review and, when activation state exists, an active document, valid participant access and a channel belonging to a current party or declared representative.\n\nOnly `create` and `attach` additionally check `attachWhen`: when configured, the document value at `attachWhen.path` must equal `attachWhen.equals`. Preparation does not apply this readiness gate.\n\nRoster checks require a nonempty parent roster, preserve every parent role and permit no additional child role except the configured authority. Matching primary identities means identical lead-channel Blue identities and equal, nonempty, duplicate-free `readerKeys` sets; key order does not matter. The child must contain the authority. For `\"cross-embedded\"` relationships, the authority must also belong to the current parent roster, even if preparation supplied it separately.\n\n- `create` needs no request fields. It rejects when `allowCreate` is false. After invocation and readiness checks, an existing value at `instructionPath` returns `duplicate`; otherwise a prepared request is required. It checks the prepared roster against the current parent and inserts the prepared document at `instructionPath`. For cross-embedded attachments it also inserts a reference to the invoking parent publication at the child's `sources.parent` and records `attachmentLink.parentOrigin`. This branch does not perform `attach`'s initialized, active-candidate checks.\n- `attach` accepts `input.document` as an exact reference to an initialized publication. Its original initialized source must match the prepared source after removing activation parties and their transport contracts from both comparison inputs. Its current attachment policy, hooks, selected terms and `instanceKey` must match the prepared request, and its `activation.active` must be `true`. Its roster is checked against both preparation and the current parent. Cross-embedded attachment additionally requires a matching `attachmentLink.parentOrigin` and checks the roster inside `sources.parent`. Candidate validation occurs before duplicate handling: the same original identity returns `duplicate` without replacing the stored publication; a different original identity is rejected as `ATTACHMENT_REPLACEMENT_FORBIDDEN`.\n\nA newly accepted creation or attachment writes `status: \"attached\"` at `statePath`. Creation also records `request`, containing the prepared child's `instanceKey`; attachment records `documentOrigin`, containing the candidate's original initialized identity. Both return `acceptedNew`. Preparation's `acceptedNew` means only that preparation was stored. None of these outcomes confirms completion of the attachment's downstream business actions.\n\n## Hook behavior\n\n`hooks` maps allowed action names to named connections. Actions must belong to `allowed`; hook names must be nonempty and exclude `.`, `/`, `~` and `__`. `in` defaults to `\"instruction\"`, where `on` must be `\"workflow\"` and defaults to that value. A parent connection uses `in: \"parent\"` with `on: \"event\"` or `\"state\"`. Event connections require `event`; state connections require an absolute `path` and an `equals` value. Any parent connection makes the relationship `\"cross-embedded\"`; otherwise it is `\"one-way\"`.\n\nParent connections are compiled against the child's `/sources/parent`. They require that the parent has selected this child's initialized identity. Before an action, they also require an active parent, authority membership in its roster, and matching primary channels and reader keys for its current parties. State connections additionally test the selected parent value against `equals` and preserve any configured `when` condition.\n\n`recheckOn` is allowed only for parent-state connections. It adds change-triggered checks at distinct, non-root absolute paths in the child, outside the `/sources` prefix. Such connections cannot specify `before` or `after`; their `params` and `when` must pass the document-expression checker, which rejects event, binding, variable, function-call and other execution-context expressions and excessive nesting. Generated hook-name collisions are rejected.\n\nAfter a new creation or attachment, `signal` emits a Source Changed event for each prepared state-hook signal, carrying `attachment: key` and its `hook` identifier. Emission prompts evaluation; it does not assert that the hook condition holds or that an external action succeeded."
+}

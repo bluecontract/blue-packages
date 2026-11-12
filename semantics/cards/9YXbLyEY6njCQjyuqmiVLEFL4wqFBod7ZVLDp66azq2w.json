@@ -1,0 +1,51 @@
+{
+  "blueId": "9YXbLyEY6njCQjyuqmiVLEFL4wqFBod7ZVLDp66azq2w",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW"
+    ],
+    "displayLabel": "Payment Observation Clause",
+    "limitations": [
+      "The supplied definitions do not establish payment-specific kind values or the payment outcome represented by an arbitrary referenced Event."
+    ],
+    "parameterRefs": [
+      "bindings.instruction"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and timer arm task.",
+        "id": "automaticObserverArmed",
+        "meaning": "Timer arming bookkeeping; the automatic embedded observer does not arm a timer.",
+        "path": "/connectionState_{clauseKey}/observe._automatic/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: once default, initial state and fired finalizer.",
+        "id": "automaticObserverFired",
+        "meaning": "Once-only completion marker; automatic observe uses once=false, so relaying an event does not set it.",
+        "path": "/connectionState_{clauseKey}/observe._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Observation Clause\n\nRelays typed events from a selected payment instruction to the containing order, allowing its reseller agreement to interpret receipts.\n\n`bindings.instruction` is required and has no default. It selects the instruction through a non-root document pointer: text beginning with `/`, excluding `/` itself. Planning includes that path for embedded processing. The binding check does not establish a particular payment-instruction type.\n\nThe automatic `observe` action listens to embedded events at that path. It checks the inner event against `Event`; a nonmatching event returns without emitting a receipt wrapper. A matching event produces `Payment Event Received` with:\n\n- `clause`: the observing clause's key.\n- `event`: an exact BlueId reference to the original inner event.\n- `instructionPath`: the configured `instruction` pointer.\n- `kind`: copied from the original event's `kind`, with no declared value set or fallback.\n\nAn `Event` may express a fact or an intention. This clause neither prepares payments nor confirms money, and the wrapper does not turn a request into a successful payment. Payment meaning depends on the referenced event and its authenticated origin.\n\nInherited connection rules allow additional named connections under `bindings.observe`; `_automatic` is reserved and cannot be supplied there. A connection's false `when` skips execution, while a false `parameters.conditions.observe` rejects execution with `ACTION_CONDITION_FAILED`. Connections default to `once=false`; a connection configured with `once=true` suppresses later runs after its action and `after` hooks complete. Changing an installed clause's configuration requires a new clause key.\n\nThe clause maintains no payment amount or payment lifecycle status. Inherited bookkeeping declares `armed` and `fired` initially false for `observe._automatic`. This embedded, repeatable connection does not advance those flags when relaying events, so they do not indicate whether an observation or payment occurred."
+}

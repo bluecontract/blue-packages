@@ -1,0 +1,74 @@
+{
+  "blueId": "8m58DYW4HwQYXQ6JRWyJq9WjvH5FMji2CWPx2U4MWBVB",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "G41toeMqM3MsLyNmjEqQCrTPEmq6Ri51ZEpsY7ECGPAs",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "4FqAGskHttczv6E7ge1jqbKFuv8HNMu3h3qjasiLMjAw",
+      "AUbUbE9rcdUxW2gj8p4EnbNDMuGQaC1SKADvLMqEBQ9Z",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "rzWvzsV3nUXBThaM8f896BBmiBr3zzojz4dBynmBVgm",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Hello Clause",
+    "limitations": [
+      "The supplied Contracts definitions do not establish detailed channel admission or event-matching rules."
+    ],
+    "parameterRefs": [
+      "bindings.text"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; Hello World is an action default only.",
+        "aggregate": null,
+        "binding": "text",
+        "defaultPath": null,
+        "evidence": "Hello Clause.actions.say.do: Text guard and $appendChange at bindings.text.",
+        "id": "text",
+        "meaning": "Document destination that say replaces with its effective params.text on successful commit.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; installation initializes false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial state, once guard and final fired write.",
+        "id": "connectionFired",
+        "meaning": "For once=true, records completed execution and suppresses repeats; false does not prove say never ran.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; installation initializes false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial state and timer arm/cancel taskBody.",
+        "id": "connectionArmed",
+        "meaning": "Timer arming latch used by policy=first; firing and cancellation do not clear it or establish pending status.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Hello Clause\n\nHello Clause provides one reusable `say` action that writes text into its document and emits `Hello Said`. Named connections determine when it runs; this type supplies no automatic connection.\n\n## Text and execution\n\n`bindings.text` is required. It must be a Text pointer beginning with `/`, other than `/` itself, identifying the destination in the document where the clause executes. There is no default destination or initial text value.\n\nThe action's `defaults.text` is `\"Hello World\"`. Each connection's `params` overrides action defaults to produce the effective `params.text`; this is an invocation default, not a default for missing document state. A workflow request is available as `trigger` and is not automatically merged into `params`.\n\n`say` rejects a non-Text value with `Hello text must be Text`. Otherwise it stages a `replace` at the bound destination and emits `Hello Said` with three Text fields: `clause` identifies the clause key, `connection` identifies the connection key, and `text` contains the effective text. These effects become effective upon successful commit. An attempted invocation does not establish that the write occurred, and the event does not establish external speech or delivery.\n\n## Connections and guards\n\n`bindings.say` holds a dictionary of named connections. Clause and connection names must be nonempty Text without `.`, `/` or `~`. The inherited transition check rejects changes to an installed clause under the same key with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`; changed configurations require a new clause key.\n\nA connection's `on` selects its source:\n\n- `workflow` exposes an operation through `party`, when supplied, or `channel`, with optional `request` and `event` declarations. The connection does not itself grant caller permission.\n- `channel` selects an existing named channel; `event` creates a triggered-event source. Both support an optional `event` selector.\n- `embedded` and `collection` select embedded-document events at `path`; `change` selects document updates at `path`. These paths must be non-root pointers. Collection execution additionally requires the incoming `sourcePath` to descend from the configured path. Embedded and collection sources contribute embedding unless `embed` is `false`.\n- `initialized` selects `Clauses Initialized`, representing successful initial clause installation; `activated` selects `Document Activated`.\n- `timer` uses the scheduling rules below.\n\nDetailed channel admission and event-matching rules are not established by the supplied Contracts definitions. For parameter expressions, `trigger` is the workflow request, the inner event for embedded or collection sources, the captured original trigger for timers, or the incoming event for other sources.\n\n`when` defaults to `true`; a failing guard skips execution. `parameters.conditions.say` also defaults to `true`, but a failing condition rejects with `ACTION_CONDITION_FAILED`. Optional `before` and `after` programs run around `say` and may contribute additional effects.\n\n`once` defaults to `false` and must be Boolean. With `once: true`, a recorded `fired` value suppresses later execution. The flag is set only after the action and `after` program finish successfully. Per-connection state resides under `/connectionState_{clauseKey}`, keyed as `say.<connectionName>`; installation initializes `fired` and `armed` to `false`. `fired` tracks completion only for `once` connections, so `false` does not generally mean that `say` has never run. Missing state is unknown.\n\n## Optional timers\n\nA timer connection requires exactly one of `timestamp` and `afterEvent`:\n\n- `timestamp` is an integer Unix-microsecond deadline from `0` through `9007199254740991`, armed by initialization. An absolute timer cannot specify `delayMs` or `policy`.\n- `afterEvent` selects a timestamped source and requires integer `delayMs` from `1` through `9007199254740`, measured in milliseconds relative to that input's logical timestamp. The resulting deadline must fit the timestamp range. Relative timers cannot use initialization as their source. `policy` is `first` by default or `latest`.\n\nTimer source selectors support `event`, `channel`, `embedded`, `collection`, `change` and, where allowed, `initialized`. Optional `cancelOn` must contain a nonempty source selector.\n\nArming stages a keyed `Timer Request` and sets `armed` to `true`. Under `first`, that latch prevents subsequent arming; `latest` permits replacement of a pending registration. Neither firing nor cancellation clears `armed`, so it is not a pending-timer indicator. A completed `once` connection also prevents later arming.\n\nScheduling requests require the Time runtime and successful commit; emission is not a firing. Firing awaits the deadline and required input-history completeness, and may be processed late while retaining the deadline's logical timestamp. New requests must be later than the invocation's logical timestamp; standalone initialization without a prior committed position may request an elapsed deadline. `cancelOn` emits a keyed cancellation request, which is a no-op when no matching timer is pending and cannot undo a firing that precedes it in logical input order."
+}
