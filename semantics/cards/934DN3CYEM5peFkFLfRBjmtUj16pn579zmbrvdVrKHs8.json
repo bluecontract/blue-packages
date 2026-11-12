@@ -1,0 +1,67 @@
+{
+  "blueId": "934DN3CYEM5peFkFLfRBjmtUj16pn579zmbrvdVrKHs8",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "2U4eqK4mfUoqxLP9jiVz5JZgNcGUuVhUxCVpjchLiMzD",
+      "B3V1gsfk5qRzDbkDtAibTzUV7J6nUCga5qgTTDi61NJC",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Mandate Termination Clause",
+    "limitations": [
+      "The supplied structural paths do not expose scope or terminatedAt for structured state facts; their lifecycle meanings are established by the Mandates protocol."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; absence does not establish Pending.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Mandate Termination Clause.actions.terminate; Mandates — owner-approved operation authority §5",
+        "id": "mandateStatus",
+        "meaning": "Pending awaits holder approval; Active permits this action's signal; Terminated records permanent lifecycle closure.",
+        "path": "/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; installation initializes it to false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and final once branch",
+        "id": "connectionFired",
+        "meaning": "A once-enabled connection finished its wrapper; true suppresses reuse but does not prove termination.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; installation initializes it to false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: timer arm task and first-policy guard",
+        "id": "timerArmed",
+        "meaning": "Timer arming ran; true blocks further first-policy arming and remains true after cancellation or firing.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Mandate Termination Clause\n\nConnects an owner-approved Mandate program to immediate termination through its `terminate` action. Connections can react to events, state changes, timers or authenticated workflows. The type supplies no automatic connection: its triggers come from named entries in `bindings.terminate`.\n\n## Termination behavior\n\nThe action emits `Mandate Termination Requested` only when the executing document's `/status` is exactly `Active`. In any other state, the action itself emits nothing. This differs from the holder's separate `terminateMandate` operation, which can also terminate a Pending Mandate.\n\nThe emitted `reason` defaults to `Approved termination condition reached`. A connection's `params.reason` can override it; the resulting event requires nonempty Text. A workflow request becomes the action's `trigger`; its fields do not automatically replace action parameters.\n\n`Mandate Termination Requested` is an internal lifecycle event, not a request addressed to another participant. The Mandate lifecycle consumes it, clears operation scope, sets `status` to `Terminated`, records `terminatedAt`, emits `Mandate Terminated` with the reason and causal timestamp, and ends processing. There is no reservation or drain phase. Termination is permanent and does not undo committed business actions or automatically cancel external work.\n\nThe request signal and the completed termination are distinct. The authoritative outcome is the committed lifecycle state; a failed invocation publishes none of its candidate changes or events. `/status` means `Pending` after genuine initialization while awaiting holder approval, `Active` after approval, or `Terminated` after permanent closure. Status alone does not establish a particular delegated permission.\n\n## Connection configuration\n\nEach named connection selects an `on` source:\n\n- `event` observes local triggered events, optionally filtered by `event`.\n- `change` observes document changes at `path`, with an optional `event` filter.\n- `embedded` observes a child at `path`; `collection` observes child events beneath `path`. Both accept an `event` filter and add embedded processing unless `embed` is `false`.\n- `channel` uses an existing named `channel`, optionally filtering by `event`.\n- `workflow` creates an operation named after the connection, on its authenticated `channel` or overriding `party`. Optional `request` and `event` patterns constrain its input. This does not inherently make the operation holder-only or grant the reader permission to call it.\n- `initialized` observes `Clauses Initialized`; `activated` observes `Document Activated`. Neither source is itself Mandate holder approval.\n- `timer` invokes the action through the timer runtime described below.\n\nSource `path` values must be non-root JSON pointers. Clause, action and connection names must be nonempty and contain no dot, slash or tilde. The Mandate's installed clause configuration is frozen after genuine initialization and forms part of the program reviewed by the holder.\n\nConnection `params` override action defaults. `when` defaults to `true`; a false result skips the connection. An optional `parameters.conditions.terminate` condition must pass or execution fails with `ACTION_CONDITION_FAILED`. Optional `before` steps run before the action body, and `after` steps run afterward, including when the action's Active guard emits nothing.\n\n`once` defaults to `false`. With `once: true`, finishing the wrapper marks that connection's `fired` flag and suppresses later executions. This can happen even when the Active guard emitted nothing, so `fired` does not confirm termination. Connection flags initialize to `false` only when installation runs.\n\n### Timer connections\n\nA timer requires exactly one of `timestamp` or `afterEvent`. An absolute `timestamp` is an integer Unix instant in microseconds, from 0 through 9007199254740991, armed on initialization; it cannot include `delayMs` or `policy`. A relative timer uses a timestamped `afterEvent` source and a positive integer `delayMs` no greater than 9007199254740. Its resulting deadline must fit the timestamp range; initialization cannot supply its relative time base.\n\nRelative `policy` defaults to `first`, which ignores further arming after `armed` becomes true. `latest` replaces the pending keyed timer on subsequent arming. Optional `cancelOn` selects a source that requests cancellation; cancellation and firing do not reset `armed`. Consequently, cancellation does not make a `first` timer eligible to arm again.\n\nTimer requests require the supported Time runtime and committed registration. Arming is not firing, and firing is not termination. Deadlines follow logical input ordering, may be processed late, and must respect the runtime's causal deadline rules."
+}
