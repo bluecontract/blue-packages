@@ -25,7 +25,20 @@ actionDefinition:
             message: PAYOUT_FEE_POLICY_UNSUPPORTED
         - $let:
             name: feeBps
-            expr: 2000
+            expr: {$document: /terms/payoutFeeBps}
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val: {$var: feeBps}
+                  kind: integer
+            message: PAYOUT_FEE_BPS_INVALID
+        - $failIf:
+            cond:
+              $or:
+              - {$lt: [{$var: feeBps}, 0]}
+              - {$gt: [{$var: feeBps}, 9999]}
+            message: PAYOUT_FEE_BPS_INVALID
         - $let:
             name: feeMinor
             expr:

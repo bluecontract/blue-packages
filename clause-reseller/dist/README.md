@@ -100,15 +100,18 @@ required to build or verify the native archive.
 `Commission Account Payouts Clause` prepares an independent MyOS Test or Stripe
 Payment Instruction. Existing `Commission Payouts Clause` and its manual payment
 profile remain available. The Agreement explicitly accepts `payoutOperator`,
-`payoutOperatorAccountId` and `payoutFeePolicy: myos-commission-fee-v1`.
+`payoutOperatorAccountId`, `payoutFeePolicy: myos-commission-fee-v1` and required
+`payoutFeeBps` (an integer from 0 through 9999). Missing or invalid rates reject
+preparation; the policy identifies the rounding algorithm, not a fixed rate.
 
 `preparePayout.startPayout` accepts `{key, amountMinor, accountContext}` where
 `amountMinor` is gross commission G. `accountContext` contains concrete
 `payerBinding`, `payeeBinding`, `platformAccountId` and `environment` returned by
 Core for the Agreement parties. Preparation freezes those bindings, the party
 account IDs and channels, Agreement origin, payout key, currency and G/F/N.
-The only fee resolver uses Money rounding at 2000 basis points: F = round(G*20%),
-N = G-F. The Payment Instruction authorizes N; the operator reserves/debits G.
+The only fee resolver reads the agreed `terms.payoutFeeBps` and uses Money
+rounding: F = roundBps(G, payoutFeeBps), N = G-F, requiring N > 0. The prepared
+instruction freezes that rate and split; later execution uses the frozen values. The Payment Instruction authorizes N; the operator reserves/debits G.
 Operator costs are not added to G.
 
 The seller bootstraps the prepared instruction, provides the inactive candidate,

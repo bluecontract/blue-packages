@@ -97,6 +97,12 @@ public final class CommissionPayoutConformance {
     apply("guarantor","confirmAccountSettlement",embedded("/payouts/"+key),m("debitReference",debit,"transferReference","test-transfer-"+key));
   }
 
+  static CommissionPayoutConformance activeAgreement(Contracts processor,Map<String,Object> source) {
+    var template=WireData.json(WireData.write(source.get("payoutTemplate")));ClauseAppsExamples.wire(source);source.put("payoutTemplate",template);
+    channels(source,List.of("seller","partner"));var test=new CommissionPayoutConformance(processor);test.host=test.init(source);
+    test.root("seller","approve_seller",m("revision",1));test.root("partner","approve_partner",m("revision",1));return test;
+  }
+
   public static void main(String[] args) throws Exception {
     var root=Path.of(args[0]).toAbsolutePath();var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
@@ -152,6 +158,43 @@ public final class CommissionPayoutConformance {
         t.root("seller","probeFinal",m("requestId","same-amount","finalAmount",800));
         check(t.number("/payment/targetMinor")==800&&o(t.read("/payment/requests")).size()==1,"Only full-N request survived");
         System.out.println("PASS standalone inherited request profile guards and positive controls");return;
+      }
+      if(args.length>1 && args[1].equals("--fee-only")) {
+        // Each accepted Agreement has its own fee terms; no caller-supplied fee and no shared mutable payout state.
+        for(var scenario:List.of(m("rate",2000,"gross",10000,"fee",2000,"net",8000),
+            m("rate",1500,"gross",10000,"fee",1500,"net",8500),m("rate",0,"gross",10000,"fee",0,"net",10000),
+            m("rate",9999,"gross",10000,"fee",9999,"net",1),m("rate",2000,"gross",3,"fee",1,"net",2))) {
+          var agreement=o(WireData.json(WireData.write(source)));o(agreement.get("terms")).put("payoutFeeBps",scenario.get("rate"));
+          agreement.put("commission",m("targets",m("earned",10000),"accrued",10000,"paid",0,"reserved",0,"settlements",m()));
+          // Fixture-only mutation models later parent terms; this is not a production Agreement operation.
+          o(agreement.get("clauses")).put("testFeeChange",m("type",m("type","Connections/Connected Clause","actions",m("change",m("do",List.of(
+              m("$appendChange",m("op","replace","path","/terms/payoutFeeBps","val",m("$var",m("name","trigger","path","/feeBps")))))))),
+              "bindings",m("change",m("changeFeeForTest",m("on","workflow","party","seller")))));
+          var fee=activeAgreement(t.p,agreement);fee.root("seller","startPayout",m("key","fee","amountMinor",scenario.get("gross")));
+          var prepared=fee.literal(fee.entry("fee").get("itemPath")+"/prepared");var split=o(o(prepared.get("paymentDetails")).get("payoutTerms"));
+          for(var field:Map.of("feeBps","rate","grossMinor","gross","feeMinor","fee","netMinor","net").entrySet())
+            check(((Number)split.get(field.getKey())).longValue()==((Number)scenario.get(field.getValue())).longValue(),"Frozen agreed fee field "+field+": "+split);
+          check(((Number)o(prepared.get("paymentTerms")).get("amountMinor")).longValue()==((Number)scenario.get("net")).longValue()
+              &&((Number)o(prepared.get("paymentTerms")).get("limitMinor")).longValue()==((Number)scenario.get("net")).longValue(),"PI amount and limit freeze N");
+          fee.root("seller","startPayout",m("key","fee","amountMinor",scenario.get("gross")));
+          check(prepared.equals(fee.literal(fee.entry("fee").get("itemPath")+"/prepared")),"Retry preserves the exact prepared rate and split");
+          if(((Number)scenario.get("rate")).intValue()==1500) {
+            fee.root("seller","changeFeeForTest",m("feeBps",2000));
+            check(fee.number("/terms/payoutFeeBps")==2000,"Parent fixture changed its rate");
+            check(prepared.equals(fee.literal(fee.entry("fee").get("itemPath")+"/prepared")),"Later parent terms cannot reprice the prepared PI");
+            fee.deny("seller","startPayout",fee.host.blueId(),m("key","fee","amountMinor",10000));
+            check(fee.number("/commission/reserved")==10000&&prepared.equals(fee.literal(fee.entry("fee").get("itemPath")+"/prepared")),"Changed-parent retry conflicts without rewriting the frozen payout");
+          }
+        }
+        for(Object rate:Arrays.asList(null,"2000",1500.5,-1,10000)) {
+          var agreement=o(WireData.json(WireData.write(source)));if(rate==null)o(agreement.get("terms")).remove("payoutFeeBps");else o(agreement.get("terms")).put("payoutFeeBps",rate);
+          var fee=activeAgreement(t.p,agreement);fee.deny("seller","startPayout",fee.host.blueId(),m("key","invalid","amountMinor",1000));
+          check(fee.number("/commission/reserved")==0&&o(fee.read("/payouts")).isEmpty(),"Invalid/missing rate must not reserve or prepare a payout");
+        }
+        var roundedAway=o(WireData.json(WireData.write(source)));o(roundedAway.get("terms")).put("payoutFeeBps",9999);
+        var fee=activeAgreement(t.p,roundedAway);fee.deny("seller","startPayout",fee.host.blueId(),m("key","zero-net","amountMinor",1));
+        check(fee.number("/commission/reserved")==0,"Rounding to zero net must not reserve gross");
+        System.out.println("PASS agreed fee rates, frozen G/F/N and PI amounts, bounds/missing/type rejection, rounding and positive net");return;
       }
       // Wire the Agreement's own parties only; the payout template stays as authored (bootstrap supplies channels).
       var template=WireData.json(WireData.write(source.get("payoutTemplate")));
