@@ -1,0 +1,337 @@
+{
+  "blueId": "GSBkiEdeSFWVXYwajzxwyhX3SppdgC2eVWkENqYZCCR2",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "9uaNLT6DfnQ8EXeozaJQZgCy84P3m8E1fkb3YekMUieb",
+      "2aE614qR9AoVX6NgkwBfSGRdbboy7w7irK5WYLWkuJTc",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh",
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Cancellation Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.payments",
+      "bindings.requests",
+      "bindings.snapshot",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.initialGroups; saveReservation",
+        "id": "groupStatus",
+        "meaning": "pending_supplier/pending_customer await supplier/customer; other states: confirmed, cancelled, declined, expired, no_show, fulfilled.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.confirmProposal",
+        "id": "confirmedStart",
+        "meaning": "Confirmed service start in Unix microseconds.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/confirmedStartMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown; omitted without cancellation policy.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.confirmProposal; saveReservation",
+        "id": "freeCutoff",
+        "meaning": "Inclusive free-cancellation cutoff in Unix microseconds.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/freeCancellationUntilMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No recorded deadline; expire cannot proceed.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.setResponseDeadline; expireGroup",
+        "id": "responseDeadline",
+        "meaning": "Unix-microsecond deadline; pending groups may expire at or after it.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/responseDeadlineMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.cancelGroup, declineGroup, expireGroup, supplierCancelGroup, noShowGroup",
+        "id": "decisionKind",
+        "meaning": "Decision route: cancel, decline, expire, supplierCancel or noShow.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/kind",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Current proposal lines selected by lineIndices",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.makeProposal; cancelGroup",
+        "id": "decisionBasis",
+        "meaning": "Group price basis in decision.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/basisMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.cancelGroup; noShowGroup",
+        "id": "decisionCharge",
+        "meaning": "Policy charge, not captured money; decision.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/chargeMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.cancelGroup",
+        "id": "releasedPrice",
+        "meaning": "Released price, not cash refunded; decision.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/releasedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.cancelGroup: binding timestamp",
+        "id": "decisionAt",
+        "meaning": "Decision input's logical time in Unix microseconds.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/timestampMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.reconcileSettlement",
+        "id": "refundStatus",
+        "meaning": "not_requested: due; not_required: none due; requested: awaits guarantor; unknown: unresolved; failed: declined/failed; completed: succeeded.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/refundStatus",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Group instruction's successful captures",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.reconcileSettlement; Payment Functions.confirm",
+        "id": "captured",
+        "meaning": "Observed cumulative captures before refunds; settlement.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/capturedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Group instruction's successful refunds",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.reconcileSettlement; Payment Functions.confirm",
+        "id": "refunded",
+        "meaning": "Observed cumulative confirmed refunds; settlement.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/refundedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Confirmed net payment above decision charge",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.reconcileSettlement",
+        "id": "cashRefundDue",
+        "meaning": "Cash still refundable at observation; settlement.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/cashRefundDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Decision charge above confirmed net payment",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.reconcileSettlement",
+        "id": "additionalCharge",
+        "meaning": "Charge still uncovered at observation; settlement.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/additionalChargeDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Observed secured funds above charge still due",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.reconcileSettlement",
+        "id": "authorizationRelease",
+        "meaning": "Authorization available for release, not a refund; settlement.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/authorizationReleaseDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Order Functions.reconcileSettlement",
+        "id": "observedAt",
+        "meaning": "Settlement observation's logical time in Unix microseconds.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/settlement/observedAtMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Catalog Functions.priceLine",
+        "id": "itemLabel",
+        "meaning": "Quoted item's business name.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/quote/lines/*/itemLabel",
+        "type": "string"
+      },
+      {
+        "absent": "No description supplied.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Catalog Functions.priceLine",
+        "id": "itemDescription",
+        "meaning": "Optional quoted item description.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/quote/lines/*/itemDescription",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Catalog Functions.priceLine",
+        "id": "itemQuantity",
+        "meaning": "Selected item quantity, before hourly duration.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/quote/lines/*/quantity",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Catalog Functions.priceLine",
+        "id": "itemUnitPrice",
+        "meaning": "Price per pricingUnit; proposal.quote.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/quote/lines/*/unitAmountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Catalog Functions.priceLine",
+        "id": "itemDiscount",
+        "meaning": "Rounded line discount; proposal.quote.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/quote/lines/*/discountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Catalog Functions.priceSelections; Order Functions.proposeAlternative",
+        "id": "quoteCurrency",
+        "meaning": "Quoted-line currency; alternatives match snapshot.quote.currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/quote/currency",
+        "type": "currency"
+      }
+    ]
+  },
+  "semanticText": "# Cancellation Clause\n\nRecords whole-group cancellation, decline, expiry and no-show decisions, and reconciles those decisions with payment evidence. A decision separates the policy charge from the released price; neither amount proves that money has moved.\n\n## Configuration and inputs\n\nFour configurable, non-root JSON-pointer bindings locate data in the executing document:\n\n- `bindings.state`, default `/reservations`: reservation groups and their decisions and settlement observations.\n- `bindings.requests`, default `/reservationRequests`: accepted action intents, resulting group statuses and timestamps.\n- `bindings.snapshot`, default `/orderSnapshot`: the order quote, currency and cancellation terms.\n- `bindings.payments`, default `/payments`: native Payment Instructions keyed by reservation group ID.\n\nThese actions operate on existing groups; they do not initialize reservations. Named action connections determine triggers, mapped `params`, workflow channels and additional conditions or hooks. The type supplies no default action connections, caller roles or expiry timer. `supplierCancel` and `noShow` express supplier-related decisions, but their functions do not independently require a supplier channel. They record `call/channel` as the actor; action names alone establish no permission.\n\nEvery action requires `key`, `groupId` and `expectedProposalBlueId`. The five decision actions also require a text `reason` of 1–1,000 characters. Extra input fields are rejected. `key` and `groupId` are validated identifiers of 1–64 characters, excluding `/`, `~`, a leading `$` and reserved metadata names. New requests require an existing group and its exact current proposal identity, and the request ledger permits at most 500 entries.\n\nAn existing `key` with the same action, actor and input returns `duplicate`; changed intent is rejected. Duplicate business calls do not reconsider the decision or refresh settlement evidence. Successful new calls return `acceptedNew`, save the group and request record, and emit `Reservation Changed`. Under `outcome-v1`, connection `after` hooks and consumption of `once` occur only for `acceptedNew`; configured `before` hooks precede the business call.\n\n## Decision rules\n\nThe policy comes from `snapshot.terms.cancellationPolicy`. Its validated fields are `freeCancellationHoursBeforeStart`, an integer from 0–8,760 hours, and `lateCancellationChargePercent`, an integer from 0–100. Cancellation actions supply no fallback policy. A confirmed group's `freeCancellationUntilMicros` is its confirmed start offset by the configured hours. The cutoff is inclusive. Recorded instants and deadlines use Unix microseconds.\n\n- `cancel`: pending supplier or customer proposals can be withdrawn without charge. A confirmed group can be cancelled before its start; cancellation exactly at the start is allowed only when `freeCancellationHoursBeforeStart` is zero. Cancellation through the free cutoff has no charge. Later permitted cancellation charges the configured percentage of the current proposal amount, rounded half up to minor units. The resulting status is `cancelled`.\n- `decline`: requires `pending_supplier` or `pending_customer`, charges zero and records `declined`.\n- `expire`: requires either pending status and a recorded `responseDeadlineMicros` that has been reached or passed. It charges zero and records `expired`. Reaching the deadline alone does not invoke this action.\n- `supplierCancel`: permits either pending status or `confirmed`, without a start-time restriction. It charges zero and records `cancelled`.\n- `noShow`: requires `confirmed` and a time at or after `confirmedStartMicros`. It applies the same rounded percentage charge and records `no_show`. This records a report, not independent verification of attendance.\n\nOther group states, including `fulfilled`, do not satisfy these decision guards. `pending_supplier` awaits supplier response; `pending_customer` awaits customer response.\n\nEach decision records its `kind`, actor, reason, proposal identity, policy, timestamp, `basisMinor`, `chargeMinor`, `releasedMinor` and currency. The basis is the current proposal's selected quote-line total. The released amount is the portion of that price released by the decision, not necessarily a cash refund. `decision.settlementStatus` is written as `payment_evidence_required`; reconciliation stores separate evidence rather than updating this marker.\n\nProposal quotes retain business labels, optional descriptions, quantities, `pricingUnit`, prices and discounts. `per_selected_hour` pricing also uses `durationHours`; otherwise pricing is `per_unit`. Pricing defaults an omitted `guestDiscountPercent` to zero and rounds discounts half up per line. `lineTotalMinor` is the discounted line price. A proposal may retain a larger shared quote: only its `lineIndices` identify the lines belonging to that group. Alternative quotes must retain the order's supplier and currency.\n\n## Payment evidence\n\n`reconcileSettlement` requires a recorded decision and a native Payment Instruction at the group's entry under `payments`. Its `paymentTerms.currency` and `amountMinor` must match the decision's currency and basis, and its immutable payer/payee terms must name `customer` and `seller`.\n\nReconciliation observes cumulative confirmed captures and refunds separately. It compares payment remaining after confirmed refunds with the decision charge, recording excess payment as `cashRefundDueMinor` or a shortfall as `additionalChargeDueMinor`. `authorizationReleaseDueMinor` records remaining secured authorization beyond that shortfall. Secured authorization is not historical authorization or captured money. These observations do not deduct pending payment reservations.\n\nThe correlated refund request uses `decisionBlueId` as its payment request ID. If present, it must request `refund`, stay within `releasedMinor`, and match the observed refund due; a succeeded request requires no remaining cash refund due. `refundStatus` means:\n\n- `not_requested`: cash refund is due, with no correlated request.\n- `not_required`: no cash refund is due and no correlated request exists.\n- `requested`: the correlated request is pending guarantor response.\n- `unknown`: its outcome remains unresolved.\n- `failed`: the guarantor reported declined or failed.\n- `completed`: the guarantor reported success.\n\n`cashRefundCompleted` is true only for `completed`; it is not an overall settlement-complete flag. `capturedMinor` remains cumulative captures before refunds, while `refundedMinor` is cumulative confirmed refunds for the instruction, not just this decision's request. `observedAtMicros` dates the observation. A fresh observation requires a new action key.\n\nReconciliation records evidence without requesting or performing a capture, refund or authorization release. A pending request is not confirmation; a void releases authorization and is distinct from a cash refund. Missing business state remains unknown."
+}

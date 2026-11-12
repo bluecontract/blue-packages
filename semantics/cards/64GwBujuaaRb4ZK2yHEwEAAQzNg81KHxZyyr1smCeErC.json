@@ -1,0 +1,59 @@
+{
+  "blueId": "64GwBujuaaRb4ZK2yHEwEAAQzNg81KHxZyyr1smCeErC",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Commercial Terms Validation",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.terms"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; missing value fails validation.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do: commissionBps checks.",
+        "id": "commissionBps",
+        "meaning": "Commission rate in basis points; validation requires an integer from 0 through 10000 inclusive.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/commissionBps",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; missing value fails validation.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do: currency comparison.",
+        "id": "settlementCurrency",
+        "meaning": "Settlement currency; validation accepts only the exact value USD.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; the planned initial value is false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired=false, once guard and final fired=true write.",
+        "id": "automaticValidationCompleted",
+        "meaning": "True records completed automatic validation; false means no completion recorded. Clauses Initialized triggers the check.",
+        "path": "/connectionState_{clauseKey}/validate._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Commercial Terms Validation Clause\n\nChecks a document’s percentage commission and USD settlement currency on clause initialization.\n\n`bindings.terms` is a required non-root document pointer, defaulting to `/terms`. Changing it selects a different terms object. The `validate` action checks these fields in order:\n\n- `commissionBps` must be an integer from 0 through 10000 inclusive, representing 0% through 100% in basis points. Otherwise it fails with `INVALID_COMMISSION_TERMS`.\n- `currency` must equal `\"USD\"` exactly. Otherwise it fails with `UNSUPPORTED_CURRENCY`.\n\nNeither field has a default. Missing values fail their respective checks. Validation reads the bound values without changing them, calculating a commission amount or performing settlement.\n\nThe automatic connection uses `on: initialized`, mapped by the inherited planner to `Clauses Initialized`, the event for successful initial clause installation. It has `once: true`: completing the connection records `fired: true`, and subsequent invocations of that connection are skipped. A failed attempt does not establish successful validation. The completion flag records a past check; it does not establish that subsequently edited terms remain valid.\n\nAn optional inherited `parameters.conditions.validate` condition must pass before the checks run; otherwise the action fails with `ACTION_CONDITION_FAILED`. Additional named connections in `bindings.validate` can invoke the same action, but cannot replace the reserved `_automatic` connection. The automatic connection’s once-only rule does not apply globally to those other connections.\n\nInherited transition validation requires a new clause key to change an installed clause configuration, reporting `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY` for a change under the existing key."
+}

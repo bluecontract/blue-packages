@@ -1,0 +1,171 @@
+{
+  "blueId": "28p2i5SgAUDSRYe6oxT7hmnRWDjS47F1sjEBgDwJZ1qp",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "7pow1ECPJzZL1sukGFyjdHD2pJkKZvuAAMPTJNJvRgqN",
+      "DKnFCL5jgaz72HAaJyZuEt8mR1dUWMmGyAh18mnou8zG",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "8Qa2KBSeQAn2ep8ofkBqmrtYgLWrMzM3Ngj5uFPfsF1p",
+      "23Cjn3PdR7LaYe1JH3ZmxsWpC7UbjhMwk71Fz7BeDKAP",
+      "39S8zEAGjCMzpvfmLepgA5wry8iHuTbgx86YxxBn7Hem",
+      "C78Fs4i4yG2vzpJWuAgRRvjj8kzmGj7PMTmgkXmaTd9H",
+      "J8zrxN3a76bkeBJxJBfhy8LQwi8YCDLqhaTx5g6cBmB",
+      "CRBkVhLRTLtBFmor7piF79TPSnKxzAmWAgn5tmQv1czC",
+      "74kXv3xqedh2dfSzHvVyr7D8AAuuRKdPJ3wLJm527ZGC",
+      "HeaSQeZLLhyyU4RVnX5dGKW3HhEpQytE3zY1GYnLvvn1",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Shipment Process Clause",
+    "limitations": [
+      "The supplied definitions do not establish shipment initialization, how sourceLinks.ready is produced, or which external operations invoke carrier responses.",
+      "Shipping Functions.respond accepts text without an outcome-enum check. The described lifecycle covers its explicitly handled outcomes; additional entry-point restrictions are not established."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; missing state does not imply new.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Shipping Functions.request and respond: status guards and /shipment writes.",
+        "id": "shipmentStatus",
+        "meaning": "Handled lifecycle values: new permits booking; requested awaits carrier decision; accepted confirms booking; dispatched awaits delivery; delivered, cancelled, rejected and failed are terminal for different outcomes. Pending edits preserve status.",
+        "path": "/shipment/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no identifier fallback is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Shipping Functions.request and respond: emitted shipmentId.",
+        "id": "shipmentId",
+        "meaning": "Shipment identifier copied into shipmentId on emitted shipping requests and carrier outcome events.",
+        "path": "/instanceKey",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no destination default is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Shipping Functions.respond: addressChanged writes /destination.",
+        "id": "destination",
+        "meaning": "Delivery address; replaced with the requested address when the carrier confirms addressChanged.",
+        "path": "/destination",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence is not shipment failure.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Shipping Functions.respond: trackingId merge and fallback.",
+        "id": "trackingId",
+        "meaning": "Carrier tracking identifier. An omitted response trackingId preserves the previous value or stores an empty fallback.",
+        "path": "/shipment/trackingId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; do not infer zero requests.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All requestId entries recorded by acceptedNew shipping requests, regardless of response outcome.",
+          "unit": "Recorded requests, not completed shipments."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Shipping Functions.request: requests[requestId] stores action, input and responses.",
+        "id": "recordedRequestCount",
+        "meaning": "Count of recorded book, cancel and address requests, including requests that already have carrier responses.",
+        "path": "/shipment/requests",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; fails the gate when documentSources exists.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Shipment Process Clause.actions.requestShipment.require.when.",
+        "id": "shipmentSourcesReady",
+        "meaning": "Must be exactly true for requestShipment when /clauses/documentSources exists; otherwise this gate is bypassed.",
+        "path": "/sourceLinks/ready",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; planned initial value is false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: once guard and final fired write.",
+        "id": "connectionFired",
+        "meaning": "For once:true, marks acceptedNew execution and suppresses later invocations; it does not confirm shipment.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; planned initial value is false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: timer arm and cancel task bodies.",
+        "id": "connectionArmed",
+        "meaning": "Records timer arming and blocks further first-policy arms. Cancellation and firing do not clear it; pending status is unproven.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No absolute deadline recorded; a relative timer may apply.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: absolute timestamp validation and arm.",
+        "id": "absoluteTimerDeadline",
+        "meaning": "Configured absolute connection timer deadline in Unix microseconds; not an observed shipping event time.",
+        "path": "/clauses/{clauseKey}/bindings/*/*/timestamp",
+        "scope": "clause",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No relative delay recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: delayMs validation and deadline.",
+        "id": "relativeTimerDelay",
+        "meaning": "Positive integer delay in milliseconds applied to the timestamped afterEvent source for a relative timer.",
+        "path": "/clauses/{clauseKey}/bindings/*/*/delayMs",
+        "scope": "clause",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Shipment Process Clause\n\nConnects shipment, cancellation and address-change requests to configured sources, with shared action conditions and an explicit source-readiness gate. Requests record intentions; carrier responses establish shipment outcomes. Shipping state uses fixed paths in the document where the clause executes, including a nested instruction's own document.\n\n## Request actions\n\n- `requestShipment` records a `book` request. A new request requires `/shipment/status` to be `new`; it changes the status to `requested` and emits `Shipment Requested`.\n- `requestCancellation` records a `cancel` request and emits `Shipment Cancellation Requested`. The shipment must be `requested` or `accepted`; requesting cancellation leaves its status unchanged.\n- `requestAddressChange` records an `address` request and emits `Shipping Address Change Requested`. It requires status `requested` or `accepted` and a nonempty text `address`. The destination changes only after carrier confirmation.\n\nEvery request requires a nonempty text `requestId`. Requests are stored in `/shipment/requests`, keyed by that identifier, with `action`, the complete `input`, and a `responses` dictionary. Emitted requests contain `requestId`, `shipmentId` from `/instanceKey`, and the input as `details`.\n\n`requestShipment` additionally requires either that `/clauses/documentSources` is absent or that `/sourceLinks/ready` is exactly `true`. Otherwise it fails with `SHIPMENT_SOURCES_NOT_READY`. When `documentSources` exists, missing readiness does not satisfy the gate. This requirement does not apply to the other two actions.\n\nReusing a stored `requestId` with exactly the same action and input returns `duplicate`, without recording or emitting another shipping request. Different input or action fails with `SHIPPING_REQUEST_ID_CONFLICT`. Duplicate detection precedes shipment-status checks inside the shipping function, but applicable connection and action guards still run first. A new request returns `acceptedNew`: this means local request acceptance, not carrier acceptance, dispatch, delivery or cancellation.\n\n## Carrier outcomes\n\nThe inherited `respond` function requires the call channel to be `carrier` and an existing request identified by `requestId`. Booking outcomes correlate with a `book` request; cancellation outcomes with `cancel`; address outcomes with `address`. Unknown requests and mismatched request kinds are rejected. This clause declares the three request actions; the supplied definitions do not establish which external operations invoke carrier responses.\n\nThe explicitly handled outcomes have these rules:\n\n- `accepted` and `rejected` require status `requested`. `accepted` confirms the booking and emits `Shipment Confirmed`.\n- `dispatched` requires `accepted`; `delivered` requires `dispatched`.\n- `failed` has no additional nonterminal status prerequisite.\n- `cancelled` and `addressChanged` require the shipment still to be `requested` or `accepted`. `cancelled` changes shipment status. `addressChanged` copies the original request's `input.address` to `/destination` and preserves shipment status.\n- `cancellationRejected` and `addressRejected` preserve shipment status. They can still be recorded after dispatch, subject to the other response guards.\n\n`delivered`, `cancelled`, `rejected` and `failed` prevent different subsequent outcomes. An identical response already recorded for the same request and outcome is a no-op, checked before transition guards; changed input for that outcome conflicts. Cancellation and address requests admit only one distinct response outcome. Consequently, a pending cancellation or address request does not prevent dispatch, and its later confirmation can fail because the shipment is no longer editable.\n\nSuccessful responses store their input under the request's `responses[outcome]` and emit the corresponding typed outcome event. Optional `trackingId` updates `/shipment/trackingId`; omission preserves the previous identifier, falling back to an empty string when none exists. Optional `reason` is retained in the response record. Emitted outcome events use empty strings for omitted `trackingId` and `reason`, even when shipment state retains an earlier tracking identifier.\n\nThe supplied functions do not establish an initializer for `/shipment`; `new` is a booking prerequisite, not an inferred default for missing state.\n\n## Connections and conditions\n\nConfigure each action through a dictionary of named connections in the clause's `bindings`. No data bindings or default connections are declared by this type. Clause and connection names must be nonempty and contain no dot, slash or tilde. Changing an installed connection configuration requires a new clause key.\n\nA connection's `on` selects `workflow`, `channel`, `event`, `embedded`, `collection`, `change`, `initialized`, `activated` or `timer`. Workflow connections require an authenticated `channel`, with `party` selecting the channel when supplied; the clause assigns no fixed requester role. Optional `request` and `event` patterns constrain the applicable source. `embedded`, `collection` and `change` use a non-root JSON Pointer `path`; embedded and collection sources contribute embedding unless `embed` is `false`. `initialized` observes `Clauses Initialized`; `activated` observes `Document Activated`.\n\nConnection `params` supplies action input and defaults to an empty object. For workflow sources, `trigger` contains the operation request. Connection `when` defaults to `true`; a false result skips the action. Clause `parameters.conditions` may contain conditions keyed by the three action names; unknown action keys are rejected, and a false action condition fails with `ACTION_CONDITION_FAILED`. An omitted action condition imposes no additional condition.\n\nOptional `before` hooks run before the shipping function. `after` hooks run only for `acceptedNew`. Boolean `once` defaults to `false`; when enabled, a new accepted action marks that connection `fired` and later invocations skip it. A duplicate does not mark it fired or run `after`, although `before` has already run. These connection markers describe local execution, not carrier confirmation.\n\n## Optional timers\n\nA timer connection requires exactly one of absolute `timestamp` or `afterEvent`. Absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991 and arms on `Clauses Initialized`; it excludes `delayMs` and `policy`. A relative timer requires a timestamped `afterEvent` source, excluding `initialized`, and integer `delayMs` from 1 through 9007199254740 milliseconds. Its resulting deadline must fit the same timestamp range.\n\nRelative `policy` defaults to `first`, which prevents another arm after the connection's `armed` marker is set. `latest` permits replacement of the pending keyed timer. Optional `cancelOn` must identify a nonempty source and emits a timer cancellation request. Cancellation and firing do not clear `armed`, so that marker does not establish that a timer remains pending. Connection state is planned with `armed: false` and `fired: false`; missing state does not establish those values.\n\nTimers require the selected Time runtime. Only committed effects register or cancel timers; firing requires processor admission and complete input-history evidence. A deadline is a logical input time, and processing may occur later. Newly emitted deadlines must be later than the invocation's logical position, with the Time protocol's exception for genuinely new standalone initialization without a prior external position. Timer cancellation cannot undo a prior firing. Neither scheduling nor firing establishes a carrier outcome."
+}

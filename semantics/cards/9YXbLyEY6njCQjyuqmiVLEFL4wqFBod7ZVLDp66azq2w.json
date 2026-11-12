@@ -1,0 +1,24 @@
+{
+  "blueId": "9YXbLyEY6njCQjyuqmiVLEFL4wqFBod7ZVLDp66azq2w",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Observation Clause",
+    "limitations": [
+      "The supplied evidence does not define the selected instruction's payment-state fields or the event-specific rules establishing confirmed receipts."
+    ],
+    "parameterRefs": [
+      "bindings.instruction"
+    ],
+    "stateFacts": []
+  },
+  "semanticText": "# Payment Observation Clause\n\nRelays native events from a selected payment instruction to the containing order, supporting receipt accounting by its reseller agreement. The clause does not prepare payments or confirm money.\n\n`bindings.instruction` is required and has no default. It must be a text JSON Pointer beginning with `/`, other than `/` itself. It selects the instruction within the containing document. The inherited plan includes that path for embedded processing; missing or invalid bindings reject planning.\n\nThe automatic `observe` action listens for embedded events at that path. It ignores payloads that do not match `Event`. For each matching payload, it emits `Payment Event Received` with:\n\n- `clause`: the observing clause's key.\n- `instructionPath`: the configured `bindings.instruction` pointer.\n- `event`: an exact Blue reference to the observed native event.\n- `kind`: copied from the native event's `kind`, without additional classification.\n\nThe automatic connection is not once-only. The action does not filter for confirmed receipts or maintain payment balances, payment status, or receipt totals. A relayed event can represent a fact or an intention: whether it establishes a confirmed receipt depends on that native event's semantics and authority. Its name or relaying alone does not establish a payment outcome.\n\nThe inherited `parameters.conditions.observe` condition defaults to true; a false result rejects execution with `ACTION_CONDITION_FAILED`. Clause keys must be nonempty and contain no `.`, `/`, or `~`. The automatic connection name `_automatic` is reserved. The inherited transition check rejects configuration changes under an existing clause key with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`."
+}

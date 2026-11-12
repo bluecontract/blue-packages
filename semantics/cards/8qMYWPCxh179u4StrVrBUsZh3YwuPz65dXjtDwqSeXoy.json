@@ -1,0 +1,106 @@
+{
+  "blueId": "8qMYWPCxh179u4StrVrBUsZh3YwuPz65dXjtDwqSeXoy",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Commercial Terms Negotiation",
+    "limitations": [
+      "The supplied definitions do not establish initial terms or activation values, required approvers, approval-entry structure, or the transition from approvals to activation.",
+      "The commission calculation base and the scope of exclusivity are not specified."
+    ],
+    "parameterRefs": [
+      "bindings.terms"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no initial rate is supplied.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Negotiation Clause.actions.propose: commissionBps guard and replacement.",
+        "id": "commissionBps",
+        "meaning": "Stored commission rate in basis points; propose accepts integers 0–10000. 100 basis points equals 1%.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/commissionBps",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; no initial exclusivity flag is supplied.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Negotiation Clause.actions.propose: exclusive guard and replacement.",
+        "id": "exclusive",
+        "meaning": "Stored exclusivity flag, replaced by the proposal's Boolean exclusive value.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/exclusive",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; absence does not establish inactivity.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commercial Terms Negotiation Clause.actions.propose: NEGOTIATION_CLOSED guard.",
+        "id": "active",
+        "meaning": "Activation flag; true closes negotiation. This action does not change it.",
+        "path": "/activation/active",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; absence does not establish unfrozen terms.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commercial Terms Negotiation Clause.actions.propose: NEGOTIATION_CLOSED guard.",
+        "id": "frozen",
+        "meaning": "Freeze flag; true closes negotiation independently of active. This action does not change it.",
+        "path": "/activation/frozen",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no initial revision is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commercial Terms Negotiation Clause.actions.propose: revision comparison and increment.",
+        "id": "revision",
+        "meaning": "Terms revision required in the request; each successful proposal advances it by one.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; an absent approval map is not zero.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in the /activation/approved object",
+          "unit": "recorded approval entries"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commercial Terms Negotiation Clause.actions.propose: replaces /activation/approved with {}.",
+        "id": "approvalEntries",
+        "meaning": "Number of recorded approval entries; each successful proposal clears all entries for renewed approval.",
+        "path": "/activation/approved",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      }
+    ]
+  },
+  "semanticText": "# Commercial Terms Negotiation Clause\n\nAllows configured parties to propose commission and exclusivity before activation or freezing. Each successful proposal changes the terms, clears existing approvals and advances the terms revision, requiring renewed approval.\n\n## Configuration and invocation\n\n`bindings.terms` is a non-root document pointer, defaulting to `/terms`. It locates `commissionBps` and `exclusive`; changing it does not relocate the `/activation` fields. `commissionBps` is a commission rate in basis points, where 100 basis points equals 1%. `exclusive` is the exclusivity flag. The commission calculation base and the scope of exclusivity are not specified here.\n\nNamed connections in `bindings.propose` determine how `propose` is invoked; this type supplies no default connection or party. A workflow connection uses `on: workflow` and selects its authenticated channel through `party`, or otherwise `channel`. Authorization depends on that channel. The action reads `call/request` directly; connection `params` do not replace those request fields.\n\nInherited connection `when` can skip execution, while `parameters.conditions.propose` can reject it with `ACTION_CONDITION_FAILED`. `once` defaults to false; when true, later invocations are skipped after successful completion. Configured `before` and `after` programs surround the action body. Changing an installed clause’s configuration requires a new clause key under the inherited transition rule.\n\n## Proposal rules and effects\n\nThe action checks these conditions in order:\n\n- `call/requireExactDocumentVersion` must equal true, otherwise it rejects with `EXACT_TERMS_REQUIRED`.\n- Neither `/activation/active` nor `/activation/frozen` may equal true, otherwise it rejects with `NEGOTIATION_CLOSED`.\n- `call/request/revision` must equal `/activation/revision`, otherwise it rejects with `TERMS_REVISION_CHANGED`.\n- `call/request/commissionBps` must be an integer from 0 through 10000 inclusive, and `call/request/exclusive` must be Boolean, otherwise it rejects with `INVALID_PARTNERSHIP_TERMS`.\n\nA committed successful proposal replaces both bound terms, replaces `/activation/approved` with an empty object and increases `/activation/revision` by one. Even resubmitting unchanged terms clears approvals and advances the revision.\n\nIt emits an `Event` with `kind: Partnership Terms Proposed`, containing the new `commissionBps`, `exclusive` and `revision`, plus `previousCommissionBps` from before the proposal. This records a proposal, not approval or activation; submitting a call alone does not establish that these effects occurred.\n\nThe clause supplies no initial business values. Missing terms or activation data remain unknown. The supplied definitions do not establish who must approve or how renewed approvals lead to activation."
+}

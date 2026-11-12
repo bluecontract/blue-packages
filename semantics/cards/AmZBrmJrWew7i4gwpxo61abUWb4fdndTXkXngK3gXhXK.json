@@ -1,0 +1,134 @@
+{
+  "blueId": "AmZBrmJrWew7i4gwpxo61abUWb4fdndTXkXngK3gXhXK",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "4dY12vKJbpBnirVZypoB5AySfJ4K7453tm61bRfgAT3S",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k"
+    ],
+    "displayLabel": "Schedule Clause",
+    "limitations": [
+      "parameters.key has no declared type, requiredness or default; its value is copied to the emitted scheduleKey.",
+      "No document path for authoritative timer registration status, cancellation disposition or observed execution time is established.",
+      "Detailed channel authentication and request/event matching rules are not established by the supplied definitions."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; planning supplies an initial false value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and timer arm taskBody.",
+        "id": "timerArmed",
+        "meaning": "A timer arm handler recorded a request. True persists after cancellation or firing; it does not mean pending.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; planning supplies an initial false value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: body once guard and final fired change.",
+        "id": "onceConsumed",
+        "meaning": "True means a once connection completed fire and after steps. False does not exclude success when once is false.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no source mode default is declared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: mode and sourceFields validation.",
+        "id": "connectionSource",
+        "meaning": "Source mode: event, initialized, activated, change, channel, embedded, collection, workflow or timer.",
+        "path": "/clauses/{clauseKey}/bindings/fire/*/on",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Omitted configuration; planner uses false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: once default, body and arm guards.",
+        "id": "onceConfigured",
+        "meaning": "Limits this connection to one accepted action followed by completed after steps; also gates later timer arming.",
+        "path": "/clauses/{clauseKey}/bindings/fire/*/once",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown or inapplicable to a relative timer.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: absolute timestamp validation and deadline.",
+        "id": "absoluteDeadline",
+        "meaning": "Configured absolute firing deadline in Unix microseconds; not observed execution time.",
+        "path": "/clauses/{clauseKey}/bindings/fire/*/timestamp",
+        "scope": "clause",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown or inapplicable to an absolute timer.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: delayMs validation and deadline calculation.",
+        "id": "relativeDelay",
+        "meaning": "Positive integer delay in milliseconds from the afterEvent invocation timestamp; maximum 9007199254740.",
+        "path": "/clauses/{clauseKey}/bindings/fire/*/delayMs",
+        "scope": "clause",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Relative timers use first; forbidden for absolute timers.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: policy validation and timer arm guard.",
+        "id": "armingPolicy",
+        "meaning": "first arms only before armed becomes true; latest requests replacement on later qualifying source events.",
+        "path": "/clauses/{clauseKey}/bindings/fire/*/policy",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No cancellation source is established by this field.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: cancelSource, selectorFields and cancel taskBody.",
+        "id": "cancellationSource",
+        "meaning": "Cancellation trigger mode: event, channel, change, embedded, collection or initialized; not cancellation confirmation.",
+        "path": "/clauses/{clauseKey}/bindings/fire/*/cancelOn/on",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Schedule Clause\n\nConnects the `fire` action to configured triggers, including timers. Its action body emits a `Domain Event` with `kind: \"Schedule Fired\"`, `clause` set to the clause key, `scheduleKey` copied from `parameters.key`, and `at` copied from the invocation timestamp. It returns `outcome: \"acceptedNew\"`. The event records the document action; it does not confirm an external task's completion. Because other connection sources can invoke `fire`, the event name alone does not prove a timer fired.\n\n`parameters.key` has no declared type, requiredness or default. The action accepts the connection's `params` as input but does not use them in its body. There are no declared data bindings or automatic connections.\n\n## Connections\n\n`bindings.fire` maps connection names to configurations. Clause and connection names must be nonempty and contain no dot, slash or tilde. Supported `on` values are `event`, `initialized`, `activated`, `change`, `channel`, `embedded`, `collection`, `workflow` and `timer`.\n\n- `initialized` selects `Clauses Initialized`; `activated` selects `Document Activated`. Other sources can supply an `event` pattern.\n- `change`, `embedded` and `collection` require a non-root JSON Pointer in `path`. Collection handling restricts events to descendants of that path. Embedded and collection sources request embedded processing unless `embed: false`.\n- `channel` names an existing channel. `workflow` declares an operation using `party` when supplied, otherwise `channel`, and can supply `request` and `event` declarations. This configuration does not itself grant caller permission.\n\nCommon fields are `params`, `when`, `before`, `after` and `once`. `params` defaults to an empty object. `when` defaults to true; a false result skips the action. `parameters.conditions.fire` defaults to true; a false result rejects execution with `ACTION_CONDITION_FAILED`. Conditions for unknown actions are rejected. `before` runs before the action body and `after` runs after its accepted result.\n\n`once` defaults to false. When true, the connection records `fired: true` only after `fire` returns `acceptedNew` and its `after` steps finish. Later invocations are suppressed. A skipped or rolled-back attempt does not consume this allowance. These action guards do not gate the separate timer arming and cancellation handlers.\n\n## Timers\n\nAn `on: \"timer\"` connection requires exactly one of `timestamp` and `afterEvent`:\n\n- **Absolute:** `timestamp` is an integer Unix timestamp in microseconds, from 0 through 9007199254740991. Arming uses the `initialized` source. `delayMs` and `policy` are forbidden.\n- **Relative:** `afterEvent` selects a timestamped `event`, `channel`, `change`, `embedded` or `collection` source. `delayMs` must be a positive integer no greater than 9007199254740, measured in milliseconds. The deadline is that source invocation's timestamp plus the delay, converted to microseconds; a deadline beyond the supported range is rejected. Initialization cannot be the relative source.\n\nRelative `policy` is `first` by default, or `latest`. `first` ignores later arming events after `armed` becomes true. `latest` emits a new request for each qualifying source event, replacing any pending request under the same key. A consumed `once` connection suppresses further arming under either policy.\n\nEach arm handler records `armed: true` and emits a `Timer Request` on its generated local timer channel with `key: \"connection\"`. Optional `cancelOn` selects an `event`, `channel`, `change`, `embedded`, `collection` or `initialized` source and emits a `Cancel Timer Request` for that key. Cancellation of a missing pending key is a no-op. Replacement and cancellation affect pending registrations only when they precede the firing in logical input order; they cannot undo an earlier firing.\n\nRequests become effective only when their originating invocation commits. Emission is not a firing, and storing request data alone does not activate a timer. Timer mode requires explicitly enabled compatible Time runtime support. New deadlines must be later than the invocation's logical position or inherited causal floor; genuinely new standalone initialization without a committed external position may use an elapsed deadline.\n\nThe processor admits a firing only after authoritative time and input-history prerequisites are satisfied. Processing may occur late. For timer delivery, the emitted event's `at` is the requested deadline in Unix microseconds, not a wall-clock observation. Initialization supplies no timestamp. Each timer registration is one-shot; a later qualifying source event can request another registration where the connection's guards allow it.\n\n## Recorded state\n\nConnection state is stored at `/connectionState_{clauseKey}`, in entries named `fire.<connectionName>`. Planning supplies initial `armed: false` and `fired: false`; absence does not establish either value.\n\n`armed` records that the arm handler issued a request. Neither cancellation nor firing clears it, so it does not indicate that a timer remains pending. In particular, `first` does not rearm after cancellation or firing. `fired` records consumption of `once`, including through non-timer sources; with `once: false`, successful actions leave it false. These flags are not a complete timer lifecycle record.\n\nChanging an existing clause configuration requires a new clause key; transition validation otherwise returns `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`."
+}

@@ -1,0 +1,48 @@
+{
+  "blueId": "3WTV7iipp1s7Ewk1SxJf9n4Giajy6ezbzT5QHyNMYEeW",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "CJgGWmocYCpqmt9isfL6aJab4Qs4i62qhUt7T7QubHoo",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Method Events",
+    "limitations": [
+      "The schema and validity rules for /paymentDetails, and downstream handling of MyOS execution requests, are not supplied."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no method default is declared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Method Events.actions.announce.do and actions.request.do",
+        "id": "paymentMethod",
+        "meaning": "Method discriminator: myos-customer selects the customer-session announcement; also copied into execution requests.",
+        "path": "/paymentDetails/method",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization establishes false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and once/fired guard/update",
+        "id": "automaticAnnouncementFired",
+        "meaning": "Whether announce's automatic connection completed; true suppresses repeats without confirming payment.",
+        "path": "/connectionState_{clauseKey}/announce._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Method Events\n\nA Connected Clause that announces payment instructions and forwards payment requests through `Payment Event` messages. It reads `/paymentDetails` from the document where it executes, including a nested instruction's own document.\n\n- **`announce`** automatically responds to `Clauses Initialized`, which represents successful initial clause installation. It emits `details` copied from the current `/paymentDetails`. When `/paymentDetails/method` equals `myos-customer`, its `kind` is `Customer Payment Session Requested`; otherwise, it is `Account Payment Instruction Created`. Its `_automatic` connection has `once: true`.\n- **`request`** automatically responds to an `Event` matching `kind: \"Payment Requested\"`. It emits `kind: \"MyOS Execution Requested\"`, with `details` copied from the current `/paymentDetails`, `method` copied from `/paymentDetails/method`, and `request` containing the complete triggering event. Its automatic connection has no once-only guard.\n\nThe built-in action bodies do not validate payment details or supply a default method. These emitted messages do not confirm that a customer session exists, that MyOS executed the request, or that payment completed. An event's authority comes from its authenticated input or document origin, not its `kind` label.\n\nInherited connection configuration can add named connections under `bindings.announce` and `bindings.request`; `_automatic` is reserved. Each connection has its own `once` setting, defaulting to false when unspecified. A false `when` skips that connection; `before` and `after` hooks surround the action body. False `parameters.conditions.announce` or `parameters.conditions.request` conditions reject execution with `ACTION_CONDITION_FAILED`; unknown condition action names are rejected. Changing an installed clause configuration requires a new clause key.\n\nThe planner initializes `/connectionState_{clauseKey}/announce._automatic/fired` to false. Completing that connection sets it to true, suppressing subsequent executions of that automatic connection. This records announcement handling, not payment success. An absent flag means unknown."
+}

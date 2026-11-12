@@ -1,0 +1,96 @@
+{
+  "blueId": "8m58DYW4HwQYXQ6JRWyJq9WjvH5FMji2CWPx2U4MWBVB",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "G41toeMqM3MsLyNmjEqQCrTPEmq6Ri51ZEpsY7ECGPAs",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Hello Clause",
+    "limitations": [
+      "Detailed admission and event-matching rules for configured Contracts channels are not included in the supplied evidence."
+    ],
+    "parameterRefs": [
+      "bindings.text"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no destination initialization is declared.",
+        "aggregate": null,
+        "binding": "text",
+        "defaultPath": null,
+        "evidence": "Hello Clause.actions.say.do: text guard and $appendChange to bindings.text.",
+        "id": "text",
+        "meaning": "Text at the configured destination; say replaces it with its effective params.text.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; the planned initial value is false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired and final once branch.",
+        "id": "connectionFired",
+        "meaning": "For once=true, records reaching the connection's final marker and suppresses later attempts.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; the planned initial value is false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: timer arm taskBody and first guard.",
+        "id": "timerArmed",
+        "meaning": "Records timer arming and gates policy=first; does not establish pending status or firing.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No absolute deadline recorded; no default applies.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: absolute timestamp validation and deadline.",
+        "id": "absoluteTimerDeadline",
+        "meaning": "Configured absolute timer deadline in Unix microseconds; not an observed execution time.",
+        "path": "/clauses/{clauseKey}/bindings/say/*/timestamp",
+        "scope": "clause",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No relative delay recorded; no default applies.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: delayMs validation and deadline calculation.",
+        "id": "relativeTimerDelay",
+        "meaning": "Relative timer duration in milliseconds, measured from the selected source's logical timestamp.",
+        "path": "/clauses/{clauseKey}/bindings/say/*/delayMs",
+        "scope": "clause",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Hello Clause\n\nHello Clause provides one reusable action, `say`, that writes text into its document and emits a `Hello Said` event. Named connections determine when and how the action runs; the type declares no automatic connection.\n\n`bindings.text` is required and has no default. It identifies the destination using a non-root JSON Pointer: Text beginning with `/`, other than `/` itself. It is a location, not the greeting value.\n\nThe action's `text` parameter defaults to `\"Hello World\"`. Connection `params` override action defaults; a workflow request is available as `trigger`, but is not automatically merged into `params`. The effective `params.text` must be Text, including possibly empty Text. Otherwise, the action fails with `Hello text must be Text`.\n\nWhen execution reaches the action body, it stages a replacement at `bindings.text` and emits `Hello Said` with `clause` identifying the clause key, `connection` identifying the invoking connection, and `text` containing the same text. Only committed effects establish this result. The event does not establish delivery to a person. The parameter default does not initialize the destination; an absent destination value remains unknown.\n\n## Connections and guards\n\n`bindings.say` maps connection names to connection definitions. Their `on` field selects the source:\n\n- `workflow` exposes an operation through a configured `channel` or `party`; that channel determines caller admission. Defining the action grants no personal permission.\n- `channel` uses an existing named channel; `event` selects emitted events.\n- `embedded` selects a child at `path`; `collection` selects child events below `path`. Both request embedding unless `embed` is `false`.\n- `change` selects document updates at `path`. These path-based sources require a non-root JSON Pointer.\n- `initialized` selects `Clauses Initialized`; `activated` selects `Document Activated`.\n- `timer` invokes the action through a processor-admitted timer firing, as described below.\n\nA connection's `when` defaults to `true`; an unsatisfied condition skips execution. The optional `parameters.conditions.say` also defaults to `true`, but an unsatisfied condition rejects execution with `ACTION_CONDITION_FAILED`. Optional `before` and `after` programs surround the action body and can affect its execution and resulting state.\n\n`once` defaults to `false`. With `once: true`, reaching the end of the connection body stages its `fired` flag as `true`; subsequent attempts are skipped after that state commits. The planned initial flag is `false`. Ordinary connections do not set it, so `fired: false` does not establish that `say` has never run.\n\nClause and connection names must be nonempty and contain no `.`, `/` or `~`. Changing an existing clause's configuration requires a new clause key.\n\n## Optional timers\n\nA timer connection requires exactly one of `timestamp` and `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991 and is requested upon `Clauses Initialized`. It cannot be combined with `delayMs` or `policy`.\n\nA relative timer uses a timestamped `afterEvent` source and a positive integer `delayMs`, in milliseconds, no greater than 9007199254740. Initialization cannot supply that source. The deadline is based on the source's logical timestamp, not a clock read. `policy` defaults to `first`, which suppresses further arming after the connection becomes `armed`; `latest` permits subsequent armings to replace the pending keyed timer. A completed `once` connection suppresses further arming under either policy.\n\n`cancelOn` may select a source that requests cancellation of the pending timer. Cancellation does not undo an earlier firing. The `armed` flag starts with a planned value of `false` and becomes `true` when arming is staged; firing and cancellation do not clear it. It therefore does not report whether a timer is currently pending, and cancellation does not enable rearming under `first`.\n\nTimer connections require the compatible Time runtime. Committed requests register timers; they do not confirm firing. New deadlines must be later than the invocation's logical position, except for the protocol's standalone initialization case with no prior external position. Firing may occur late and requires the runtime's time, history and registration checks."
+}

@@ -1,0 +1,36 @@
+{
+  "blueId": "ArqxwAncQS4e5kpHf5vE7dvyYKHM1bQMUJEzztDHCtZY",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "CJgGWmocYCpqmt9isfL6aJab4Qs4i62qhUt7T7QubHoo",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Bank Method Events",
+    "limitations": [
+      "External handling of Bank Execution Requested and reporting of bank outcomes are not defined by the supplied actions."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Bank Method Events.actions.announce; Connection Planning Functions.planConnections initializes fired and sets it after once execution.",
+        "id": "automaticAnnouncementCompleted",
+        "meaning": "Completion of the automatic announce connection; true suppresses its later executions, not other connections.",
+        "path": "/connectionState_{clauseKey}/announce._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Bank Method Events\n\nA connected clause that announces bank payment instruction creation and turns payment-request events into execution requests labelled for `ACME`.\n\n## Automatic actions\n\n- `announce` responds to `Clauses Initialized`, which denotes successful initial clause installation. It emits a `Payment Event` with `kind: \"Bank Payment Instruction Created\"` and `bank: \"ACME\"`. Its automatic connection has `once: true`.\n- `request` responds to events matching the `Event` pattern with `kind: \"Payment Requested\"`. It emits a `Payment Event` with `kind: \"Bank Execution Requested\"`, `bank: \"ACME\"`, and `request` containing the entire triggering event. This automatic connection is repeatable. The action adds no payment-detail validation or per-request deduplication.\n\nThese emissions establish a local announcement or execution request, not bank acceptance, authorization, transfer or settlement. External bank handling and outcome reporting are not defined by these actions. Event authority comes from authenticated input or document origin; the `bank` label does not authenticate a bank.\n\n## Configuration and local state\n\nNo business parameters or data bindings are declared, and `bank` is fixed to `\"ACME\"`. Inherited `bindings` can add named connections to `announce` or `request`; `_automatic` is reserved and cannot be replaced. The action bodies remain defined by the exact type.\n\nConnections can supply `params`, although these action bodies do not read them, and `before` and `after` steps around the action. A connection's `when` defaults to `true`; a false result skips execution. `parameters.conditions` can add conditions keyed by `announce` or `request`: omitted conditions default to `true`, while a false condition rejects with `ACTION_CONDITION_FAILED`. Unknown condition action names are rejected.\n\n`once` defaults to `false` and applies separately to each connection. The automatic `announce` connection's `fired` flag is initialized to `false` when its state is installed and set to `true` after the action and any `after` steps finish. A true flag suppresses subsequent executions through that connection; it does not prevent announcements through other connections or confirm a bank outcome. An absent flag means unknown.\n\nChanging an installed clause configuration under the same clause key is rejected with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`."
+}

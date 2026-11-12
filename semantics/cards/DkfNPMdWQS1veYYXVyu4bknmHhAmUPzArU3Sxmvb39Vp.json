@@ -1,0 +1,126 @@
+{
+  "blueId": "DkfNPMdWQS1veYYXVyu4bknmHhAmUPzArU3Sxmvb39Vp",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "73mm9Sv5iHZpoyX7zde5WN85aTJxvhGALBnYkpUAtSZ8",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR"
+    ],
+    "displayLabel": "Registration Scope Clause",
+    "limitations": [
+      "The supplied definitions do not specify the native scope rules governing later target-operation execution.",
+      "Only the Active registration guard is established for /status; other lifecycle values and transitions are not supplied."
+    ],
+    "parameterRefs": [
+      "bindings.registry"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no stored limit is established.",
+        "aggregate": null,
+        "binding": "registry",
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.initialize: limit checks and registry write.",
+        "id": "registrationLimit",
+        "meaning": "Maximum distinct-key registrations, copied from positive integer parameters.limit during initialization.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/limit",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; zero applies only after initialization.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Distinct keys successfully added to registry.entries",
+          "unit": "registrations, not grants or successful target operations"
+        },
+        "binding": "registry",
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.initialize and register: used initialization and increment.",
+        "id": "registrationsUsed",
+        "meaning": "Consumed registration slots; identical duplicates add none, and target-operation success is not required.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/used",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no text value is established.",
+        "aggregate": null,
+        "binding": "registry",
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.register: scalar checks, conflict check and entries write.",
+        "id": "registeredText",
+        "meaning": "Stored text identity or request constraint, grouped by registration key; register cannot replace that key's values.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/entries/*/*",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence does not establish Active status.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.register: MANDATE_NOT_ACTIVE guard.",
+        "id": "mandateStatus",
+        "meaning": "Registration requires Active. Other values fail this guard; this clause does not change mandate status.",
+        "path": "/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence does not establish zero entries.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All current entries in the document's /scope dictionary",
+          "unit": "scope entries"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.register: grant insertion with $objectSet on /scope.",
+        "id": "scopeEntryCount",
+        "meaning": "Count of current scope entries, including other contributions; not a count of registrations or executed operations.",
+        "path": "/scope",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; false is the planned initialization value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired=false and once completion write.",
+        "id": "connectionFired",
+        "meaning": "A once-enabled connection reached the wrapper's end; true suppresses repeats, notifies no target-operation success.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false is the planned initialization value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial armed=false and timer arm/cancel bodies.",
+        "id": "connectionArmed",
+        "meaning": "A timer connection recorded arming; this is not pending or fired status, and cancellation does not clear it.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Registration Scope Clause\n\nRegisters bounded, immutable groups of exact document identities and text request constraints supplied by the authorized actor. Each successful new registration adds configured operation grants to the mandate’s `/scope`. Registration does not execute or confirm a target operation, establish document origin or relationships, or embed, snapshot or observe the registered documents.\n\n## Configuration\n\n- `bindings.registry` is required: a non-root JSON pointer identifying the registry in the document where this clause executes. It has no default path.\n- `parameters.limit` must be a positive integer. It limits distinct registration keys, not the number of generated grants or successful target operations.\n- `parameters.registrationPattern` must be an object. The planning hook compiles this owner-approved pattern into the native `qualifiesRegistration` matcher. The actor supplies values, not grant rules or executable code.\n- `parameters.grants` supplies keyed grant definitions. Each definition contains a `grant` template and a `fields` mapping from destination pointers in that template to source pointers in registration values. A new registration copies the referenced text into each template. The resulting `target.initialDocument.blueId`, `target.channel` and `target.operation` must each be text. No default grant definitions are supplied.\n\n`initialize` is automatically connected to `initialized`, meaning the `Clauses Initialized` event. It rejects a missing or non-integer limit, or a limit at or below zero, and writes `{limit, used: 0, entries: {}}` at `bindings.registry`. These values describe initialization’s effect; absent state does not imply that initialization ran.\n\n## Registration\n\n`register` requires `key`, text of 1–200 characters, and `values`, an object. Their action defaults read `trigger.key` and `trigger.values`; connection `params` can override those defaults.\n\nExecution requires `/status` to equal `Active` and `processingEvent/actor` to equal `/contracts/authorizedActorChannel/actor`. The values must satisfy `registrationPattern`. Every supplied top-level field must contain text, and its pointer must appear among the configured grants’ source fields. Each source field needed to construct a new grant must also resolve to text.\n\nAfter those initial checks, an existing key with identical values returns without adding grants or consuming another registration. Different values for that key fail with `MANDATE_REGISTRATION_CONFLICT`. The duplicate check precedes the capacity check, so an otherwise valid identical duplicate remains idempotent when the registry is full.\n\nFor a new key, `used` must be below the stored `limit`. The action constructs and validates every configured grant, inserts it into `/scope` under a key composed of `clauseKey`, the pre-increment `used` value and the grant definition’s key, stores the values in `entries[key]`, and increments `used` once. One registration may therefore produce several grants. Its slot remains consumed even if the target operation never succeeds. The registration action provides no replacement or removal operation.\n\nFailures include inactive status, actor mismatch, invalid or unqualified values, unsupported or non-text fields, missing required grant fields, malformed grant targets and exhausted capacity. A registration attempt alone does not establish that entries or grants were recorded. Later use of a grant remains subject to the approved native scope checks; their detailed enforcement is not supplied here.\n\n## Connections and execution controls\n\nThe exact type declares `initialize` and `register`; action bindings configure named connections to them. Supported connection sources are `initialized`, `activated`, `event`, `change`, `channel`, `workflow`, `embedded`, `collection` and `timer`. A workflow connection requires an authenticated channel binding; the registration actor check still applies. Independently configured `embedded` and `collection` sources arrange embedding unless `embed` is false.\n\nA connection’s false `when` skips execution. A false `parameters.conditions.<action>` rejects it. `before` steps precede the action body; `after` steps run only if that body reaches its end. `once` defaults to false. When true, reaching the wrapper’s end sets `fired`, and later invocations of that connection are skipped. An identical-registration early return occurs after `before`, but skips `after` and does not set `fired`. Consequently, false `fired` does not prove that the action never ran.\n\nTimer connections require exactly one of an absolute `timestamp` or `afterEvent`. Absolute timestamps are integer Unix microseconds from 0 through 9007199254740991, with no `delayMs` or `policy`. Relative timers require a timestamped source other than initialization and integer `delayMs` from 1 through 9007199254740; the resulting deadline must fit the timestamp range. Their `policy` defaults to `first`, which ignores later arming inputs once `armed` is true; `latest` replaces a pending keyed timer. Optional `cancelOn` emits a keyed cancellation request. `armed` records arming, not a currently pending timer or confirmed firing, and cancellation does not clear it. Requests take effect through committed timer processing; emitting one is not a firing.\n\nThe inherited transition validator requires an existing clause’s configuration to remain equal; a changed configuration requires a new clause key."
+}

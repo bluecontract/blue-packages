@@ -1,0 +1,56 @@
+{
+  "blueId": "Cj6XHZr42k1NJZpBNzq3sD8YhUJxX5Rh4H645726TW1N",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Payment Base",
+    "limitations": [
+      "The build function and embedded payment-instruction definition are not supplied; construction effects, financial balances, currencies and payment lifecycle state cannot be established.",
+      "The declared childActions lack supplied implementations, leaving their arguments, actors, guards and financial effects unspecified here.",
+      "The amount binding establishes a pointer location only; its value type, units, currency source and use by build are not established."
+    ],
+    "parameterRefs": [
+      "bindings.amount",
+      "bindings.instruction"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; initialized false when state is installed.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and final once block.",
+        "id": "connectionFired",
+        "meaning": "Completion marker for a once:true connection; start requires acceptedNew. This is not payment completion.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialized false when state is installed.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and timer arm/cancel bodies.",
+        "id": "connectionArmed",
+        "meaning": "Records timer arming. Cancellation and firing do not clear it; true does not establish a pending timer.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Base\n\nA connected clause intended to create and observe a standard payment instruction. It declares the instruction as embedded and provides a `start` action plus automatic event observation.\n\n## Bindings\n\n- `bindings.amount` defaults to `/product/totalMinor`. It identifies the configured amount location. The supplied executable definitions do not establish the value's units, currency, validation or use by the builder.\n- `bindings.instruction` defaults to `/payment`. It selects the embedded instruction observed by this clause and supplies `instructionPath` in observation events.\n\nBoth bindings require non-root pointer strings beginning with `/`. Explicit bindings override these paths; path defaults do not supply missing document values. The type declares `readParametersFromDocument: true`, but no payment-specific parameter schema is supplied.\n\n## Actions and observations\n\n`start` has no automatic trigger. A configured connection invokes it, calling `build` and assigning its return value to `actionResult`. Its `outcome-v1` contract requires an `outcome` of `acceptedNew`, `duplicate`, `rejected` or `skipped`; any other or missing outcome fails validation. Only `acceptedNew` permits subsequent `after` hooks and consumption of a `once` connection. These outcomes describe action handling, not confirmed payment completion. The supplied evidence does not include `build`, so its construction effects, financial checks and payment state are unspecified here.\n\n`observe` automatically receives events from the bound instruction. It ignores inputs whose nested event does not match `Event`. For matching events, it emits `Payment Event Received` containing:\n\n- `clause`: this clause's key.\n- `event`: an exact BlueId reference to the observed event.\n- `instructionPath`: the configured instruction pointer.\n- `kind`: the triggering nested event's `kind` field.\n\nThe filter accepts the general `Event` type; receipt alone does not establish a financial outcome. An event may express a fact or an intention, and its authority depends on authenticated input or document origin.\n\nThe declared `childActions` are `approveRecipient`, `requestCapture`, `requestRefund`, `requestVoid`, `requestPayeeAssignment`, `requestTransactionDetailsUpdate`, `requestFinalAmountResolution`, `requestPaymentCompletionLock`, `requestPaymentCompletionUnlock`, `requestPaymentReversalLock`, `requestPaymentReversalUnlock`, `requestTransactionDetailsUpdateLock`, `requestTransactionDetailsUpdateUnlock` and `requestAuthorize`. Their implementations are not supplied, so their arguments, actors, guards and financial effects cannot be determined from these declarations. An available action name does not establish the viewer's permission, and a request is not confirmation of its external outcome.\n\n## Connection controls and state\n\nNamed connections under `bindings.start` and `bindings.observe` configure invocation. The inherited planner supports `workflow`, `event`, `embedded`, `collection`, `change`, `channel`, `initialized`, `activated` and `timer` sources. `_automatic` is reserved for the built-in observation connection. Workflow connections require an authenticated channel name, selected by `party` when supplied, otherwise `channel`.\n\n`params` supplies connection parameters. A false `when` skips execution; a false action condition in `parameters.conditions` rejects it. Conditions must name declared actions. `before` runs before the action, while `after` runs after it subject to the outcome contract above. `once` defaults to `false`; when true, a completed connection is marked `fired` and later invocations are skipped. Invalid connection names, unsupported fields and invalid property bindings are rejected. Changing an installed clause configuration requires a new clause key.\n\nA timer connection requires exactly one of `timestamp` or `afterEvent`. `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991 and excludes `delayMs` and `policy`. `afterEvent` requires a timestamped source and a positive integer `delayMs` no greater than 9007199254740; initialization cannot supply that source. Relative timers default to `policy: first`, which suppresses later arming after the first arm; `latest` permits replacement. Optional `cancelOn` names a cancellation source. Timer requests require the exact Time runtime, and new deadlines must follow an applicable invocation's logical timestamp. Emitting a request does not establish a firing.\n\nConnection state is maintained under `/connectionState_{clauseKey}`, with members named from the action and connection. Each member is initialized with `armed: false` and `fired: false` when its planned state is installed. Timer arming sets `armed` to true; the shown cancellation and firing handlers do not clear it, so it does not mean a timer remains pending. `fired` records completion only for `once: true`; false does not prove that no action was attempted. Neither flag represents payment status. Missing state is unknown."
+}

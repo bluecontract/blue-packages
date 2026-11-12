@@ -1,0 +1,96 @@
+{
+  "blueId": "8kvafJ4Ez98j54cSgdRLwHbPLhMegDxQNTCF7ExkZVa",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "BJAryTTpFhjTvvvii1hKiHMf3VHqMarwE3fCDzg9w3Ad",
+      "HghdkbesKKN5Mh64CUived1Ygebn4TT3aiFpcCubhk4t",
+      "rzWvzsV3nUXBThaM8f896BBmiBr3zzojz4dBynmBVgm",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "4FqAGskHttczv6E7ge1jqbKFuv8HNMu3h3qjasiLMjAw",
+      "AUbUbE9rcdUxW2gj8p4EnbNDMuGQaC1SKADvLMqEBQ9Z",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Conditional Process Plan",
+    "limitations": [
+      "requestPolicy, policyAction, policyWatches and requestStep have no implementations here. The concrete payment action, policy validation, additional watch paths and request effects are unspecified.",
+      "No payment amounts, currencies, settlement results or payment lifecycle state are established by this definition; the eligibility and connection flags cannot supply those meanings."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; conditional-state initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Conditional Process Plan.plan: conditionalPolicy.initial and generated allowed Compute.",
+        "id": "conditionalEligibility",
+        "meaning": "Generated policyAction() + 'Allowed' member: last recorded request eligibility, not payment completion.",
+        "path": "/paymentProcess_{clauseKey}/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; does not satisfy the exact-true check.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Conditional Process Plan.plan: generated allowed expression checks /activation/active.",
+        "id": "activationGateInput",
+        "meaning": "Activation input that must be exactly true when conditional eligibility is reevaluated.",
+        "path": "/activation/active",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; fails the check if documentSources exists.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Conditional Process Plan.plan: generated allowed expression's documentSources/readiness guard.",
+        "id": "sourceReadinessGateInput",
+        "meaning": "Readiness input requiring exact true when /clauses/documentSources exists; otherwise this check is bypassed.",
+        "path": "/sourceLinks/ready",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; connection initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and timer arm taskBody.",
+        "id": "connectionArmed",
+        "meaning": "Per action.connection timer-arming marker; true blocks policy first rearming and is not pending-timer status.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; connection initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: body once guard and final fired update.",
+        "id": "connectionFired",
+        "meaning": "Per action.connection once-execution marker; true prevents repeats. Non-once executions do not set it.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Conditional Process Plan\n\nA reusable planning definition that extends Connection Planning Functions with conditional eligibility for a payment-process request. It builds contracts and initial-state contributions; creating a plan does not itself execute an action or confirm a payment outcome.\n\nThe functions `requestPolicy`, `policyAction`, `policyWatches` and `requestStep` have declarations but no implementations here. They determine the concrete policy, action name, additional watched paths and request step. This definition therefore establishes the gating mechanism, without specifying which payment operation is requested or its effects.\n\n## Conditional policy\n\n`plan` obtains the policy from `requestPolicy()` and builds the inherited connection plan. A missing policy `mode` is treated as `workflow`. Only `mode: \"when\"` adds conditional-policy behavior; other values return the connection plan without those additions.\n\nFor `when` mode:\n\n- `parameters.sources` defaults to an empty object for planning. Any predicate reference under `/sources/<alias>` must name a declared alias.\n- The plan creates `/paymentProcess_{clauseKey}` with a Boolean field named by appending `Allowed` to `policyAction()`, initially `false`. It stores that field's pointer in the corresponding `policyAction() + \"Gate\"` field of `/paymentTerms`, preserving the other terms. An existing gate pointer targeting another path rejects planning with `PAYMENT_POLICY_GATE_CONFLICT`.\n- Each reevaluation sets eligibility to true only when `/activation/active` is exactly true, the policy's `when` expression evaluates to exactly true, and either `/clauses/documentSources` is absent or `/sourceLinks/ready` is exactly true. The stored flag is replaced only when its value changes.\n- Reevaluation handlers watch the paths returned by `policyWatches()` and the document paths discovered in `when`. Nonempty `parameters.sources` also installs `paymentSources` and `paymentSourcesHandler`, using an Embedded Node Channel and the same steps.\n\nEach handler follows reevaluation with the step produced by `requestStep(gate, policy)`, including when the gate is unchanged or false. Whether that step suppresses, emits or otherwise handles a request depends on its implementation. A true gate records eligibility at the last reevaluation; it does not establish a request, authorization or completed payment. The supplied hooks do not establish which additional changes trigger reevaluation.\n\nPredicates must have static, inspectable dependencies. `$document` requires a literal non-root absolute pointer; `$nodeBlueId` requires an object containing only such a `$document` reference. The scanner permits `$eq`, `$ne`, `$lt`, `$lte`, `$gt`, `$gte`, `$and`, `$or`, `$not`, `$exists`, `$includes`, `$size`, `$add`, `$subtract`, `$literal`, and the operand keys `list` and `val`, alongside those document and identity operators. It traverses lists and objects, skips contents of `$literal`, and rejects unsupported operators, undeclared source aliases and expressions exceeding 33 traversal levels.\n\n`validateConfiguration` calls inherited connection validation and `requestPolicy()`. Detailed connection checks also occur during planning. `validateTransition` always returns `allowed: false` with `PAYMENT_PROCESS_POLICY_IMMUTABLE`.\n\n## Inherited connections\n\nClause `bindings` override `type.defaultBindings`. Property bindings must be declared in `bindingTypes`, except names belonging to `actions` or `childActions`. Required property bindings must exist and match their declared kind; `optionalBindings` permits omission. A `pointer` binding must be a non-root absolute pointer.\n\nActions normally come from `type.actions`; `configurableActions: true` selects `parameters.actions` instead. An object-valued `initialState` permits a structural clause without actions. Its entries require named pointer bindings and object initial values. `embeds` and `embedsCollections` also require declared pointer bindings. `snapshotBindings` captures existing bound values during planning and rejects missing targets. Action constants capture clause parameters without `actions` and `conditions`, unless `readParametersFromDocument: true`, which supplies an empty parameter constant.\n\nEach action binding is a dictionary of named connections. Clause, action and connection names must be nonempty and exclude `.`, `/` and `~`. An action's `automatic` declaration contributes the reserved `_automatic` connection; callers cannot reuse that name. Its `pathBinding`, when supplied, resolves through the property bindings.\n\nConnection `on` selects `workflow`, `event`, `embedded`, `collection`, `change`, `channel`, `initialized`, `activated` or `timer`. `workflow` installs an operation using `party`, falling back to `channel`, and carries any `request` declaration and `event` filter. `channel` names an existing channel. `initialized` selects Clauses Initialized; `activated` selects Document Activated. Embedded, collection and change sources require non-root pointers. Collection handlers additionally restrict events to descendants of their configured `path`. Embedded and collection sources contribute embedding unless `embed: false`.\n\nConnection `params` override action `defaults`, both defaulting to empty objects. Connection `when` defaults to true and skips execution when false. Argument mismatches, a failed action `require.when`, or a failed `parameters.conditions[actionName]` reject execution; conditions naming unknown actions reject planning. Action requirements and conditions default to true.\n\nExecution proceeds through optional `preflight`, connection `before`, action `do`, and connection `after`. A supplied `preflight` must set `actionResult.outcome` to `acceptedNew`, `duplicate`, `rejected` or `skipped`; only `acceptedNew` proceeds. Actions using `resultContract: \"outcome-v1\"` must likewise provide one of those outcomes after `do`; other outcomes stop before `after`. The default `resultContract` is `legacy`, which does not require this post-action outcome check. These outcomes govern local execution, not external payment completion.\n\n`once` defaults to false and must be Boolean. With `once: true`, reaching the final marker sets the connection's `fired` flag and prevents later executions. Skips and non-accepted outcomes do not reach that marker. Merely exposing an operation establishes neither a personal obligation nor a viewer's permission.\n\n## Timers and recorded state\n\nA timer connection requires exactly one of `timestamp` and `afterEvent`. An absolute `timestamp` is an integer Unix instant in microseconds, from 0 through 9007199254740991; it arms from Clauses Initialized and cannot specify `delayMs` or `policy`. A relative timer requires a timestamped `afterEvent` source and a positive integer `delayMs` in milliseconds, at most 9007199254740. Its deadline derives from that event's logical timestamp and must remain within the portable timestamp range. Initialization cannot supply a relative timer's time base.\n\nRelative timer `policy` defaults to `first`; `latest` permits replacement on subsequent qualifying arm events. `cancelOn`, if supplied, must identify a nonempty source. Arming emits a keyed Timer Request; cancellation emits a Cancel Timer Request. Committed requests require the Time runtime, and a request is not a firing. Firings use the requested deadline as their logical timestamp and may be processed later. Newly emitted deadlines must be later than the invocation's logical position, subject to the Time protocol's standalone-initialization exception.\n\nInherited connection state is stored at `/connectionState_{clauseKey}`, keyed by `<actionName>.<connectionName>`, with `armed` and `fired` initially false. `armed` becomes true when timer arming is recorded; this planner does not clear it on cancellation or firing. Consequently, `first` does not rearm after cancellation. `fired` is set only by a completed `once: true` execution, so false does not prove that an ordinary connection has never run. Neither flag confirms an external business outcome. Missing state remains unknown; initialization values apply only after installation."
+}

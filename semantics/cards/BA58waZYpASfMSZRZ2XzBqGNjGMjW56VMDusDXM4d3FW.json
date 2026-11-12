@@ -1,0 +1,86 @@
+{
+  "blueId": "BA58waZYpASfMSZRZ2XzBqGNjGMjW56VMDusDXM4d3FW",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Commission Payout Profile Clause",
+    "limitations": [
+      "The supplied definitions establish no currency source for the minor-unit amounts or units and aggregation semantics for /payment/reversed.",
+      "Core’s consent and linked Agreement checks, and financial outcome handling, are described but their executable implementations are not supplied."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no default is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Profile Clause.actions.validate: netMinor equality checks.",
+        "id": "payoutNetMinor",
+        "meaning": "Required net payout amount in minor units, used for target and request checks; currency source is unspecified.",
+        "path": "/paymentDetails/payoutTerms/netMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; validate skips all profile and request checks.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Profile Clause.actions.validate: targetMinor existence guard and equality.",
+        "id": "paymentTargetMinor",
+        "meaning": "Payment target in minor units, required to equal payoutTerms.netMinor; currency source is unspecified.",
+        "path": "/payment/targetMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no default is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Profile Clause.actions.validate: payoutTerms/payeeChannel comparisons.",
+        "id": "payoutPayeeChannel",
+        "meaning": "Payout terms’ payee channel reference, used to check the payment profile and payee control requests.",
+        "path": "/paymentDetails/payoutTerms/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no default is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Profile Clause.actions.validate: /payment/payeeChannel equality.",
+        "id": "paymentPayeeChannel",
+        "meaning": "Payment payee channel reference, required to equal payoutTerms.payeeChannel when validation proceeds.",
+        "path": "/payment/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence does not establish zero.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Profile Clause.actions.validate: $eq of /payment/reversed and 0.",
+        "id": "paymentReversed",
+        "meaning": "Profile field required to equal numeric zero; its units and accumulation semantics are not established.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Commission Payout Profile Clause\n\nValidates an all-or-nothing commission payout profile against `/paymentDetails/payoutTerms`. Its `validate` action runs automatically on events matching `Event`, checking stored state in the document where the clause executes. It reads fixed document paths and supplies no payout initialization defaults or configurable data bindings.\n\nIf `/payment/targetMinor` is absent, `validate` returns without performing any profile or request checks. This does not establish a zero target or a completed payout.\n\n### Profile and request rules\n\nWhen `/payment/targetMinor` exists, the profile must satisfy all four conditions:\n\n- `/payment/targetMinor` equals `/paymentDetails/payoutTerms/netMinor`, the required net payout amount in minor currency units.\n- `/payment/payeeChannel` equals `/paymentDetails/payoutTerms/payeeChannel`.\n- `/payment/details` equals the empty object `{}`.\n- `/payment/reversed` equals numeric `0`.\n\nEvery entry in `/payment/requests` must have `intent/action` equal to `secure`, `capture` or `void`; `intent/amountMinor` must equal the full `netMinor`; and its dictionary key must respectively be `payout-secure`, `payout-capture` or `payout-void`. A violation raises `PAYOUT_FULL_AMOUNT_REQUIRED`. These checks exclude partial amounts and other financial actions, including refund intents.\n\nEvery entry in `/payment/controlRequests` is also checked according to `intent/action`:\n\n- `payee`: `intent/input/payeeRef` must equal the payout terms’ `payeeChannel`.\n- `finalAmount`: `intent/input/finalAmount` must equal the payout terms’ `netMinor`.\n- `details`: `intent/input/transactionDetails` must equal `{}`.\n\nProfile or control mismatches raise `PAYOUT_PROFILE_IMMUTABLE`. Other control actions receive no action-specific check here. Each invocation examines all stored requests, not merely the request associated with the triggering event.\n\n### Configuration and interpretation\n\nThe inherited connection machinery reserves `_automatic` for the built-in connection, which has no once-only restriction. `bindings.validate` may add named connections to the same type-defined action. The inherited `parameters.conditions.validate` adds a condition, defaulting to `true`; failure raises `ACTION_CONDITION_FAILED`. Changing an existing clause configuration requires a new clause key under the inherited transition check (`CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`).\n\nThe comparisons use the current payout terms. This action does not itself freeze those terms or compare them with a historical snapshot. The supplied definitions establish no currency source, amount-range validation, or units and aggregation semantics for `reversed` beyond its required zero value.\n\n`validate` itself reads and rejects; it does not initiate financial effects or confirm that funds were secured, captured or voided. Stored intentions and successful validation are not payment confirmation or personal authorization. The description assigns consent and linked Agreement checks to Core, but their executable implementation and financial outcome handling are not supplied."
+}

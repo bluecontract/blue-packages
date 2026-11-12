@@ -1,0 +1,144 @@
+{
+  "blueId": "Ns1HJJ2MKMerZKtDhJdX1eZgxJWnQ1J1NgsosS1nH5r",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "3vCzsK9M1W3rvLKS9KTYJGcrWoRBf1SHJ9qBx6Py4b2q",
+      "6nvB6mRrFAZmyv2vP3h8tAWLeDTq4b9BtfqSJdbdNJzS",
+      "Cv8jfAGRxhbAozbmimq1pMiZpypNFToCj6TdRvoZasrW",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Amendments Clause",
+    "limitations": [
+      "proposal.replacement is arbitrary Blue data; the evidence establishes no fixed scalar type or field-specific business meaning for it."
+    ],
+    "parameterRefs": [
+      "bindings.editable",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; does not satisfy the true-only guard.",
+        "aggregate": null,
+        "binding": "editable",
+        "defaultPath": "/termsEditable",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal and approveAmendmentProposal: editable guard.",
+        "id": "editable",
+        "meaning": "Must be true to record a proposal or approve a pending one; applied-ID duplicate approvals bypass this check.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; 1 applies only after initialization.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendments Clause.initialState.state.revision; Amendment Proposal Functions.approveAmendmentProposal.",
+        "id": "revision",
+        "meaning": "Amendment revision, initialized to 1 and incremented once for each applied proposal.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/revision",
+        "type": "number"
+      },
+      {
+        "absent": "No pending ID in initialized or cleared state; otherwise unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: p.id; approveAmendmentProposal: proposal clearing.",
+        "id": "pendingProposalId",
+        "meaning": "Identifier of the sole pending proposal, awaiting approvals from parameters.approvers.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/id",
+        "type": "string"
+      },
+      {
+        "absent": "No pending target in cleared state; otherwise unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: p.path; approveAmendmentProposal: replacement path.",
+        "id": "proposedPath",
+        "meaning": "Document path to replace after all approvals; proposal submission checks membership in parameters.paths.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/path",
+        "type": "string"
+      },
+      {
+        "absent": "No pending revision in cleared state; otherwise unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: p.revision and duplicate comparison.",
+        "id": "proposalRevision",
+        "meaning": "Revision captured when the proposal was recorded; approval does not recheck it.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/revision",
+        "type": "number"
+      },
+      {
+        "absent": "No recorded approval; missing overall state is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.approveAmendmentProposal: actor approval and approvers readiness loop.",
+        "id": "channelApproval",
+        "meaning": "True records the keyed channel's approval of the pending proposal; every configured approver must have true.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/proposal/approvals/*",
+        "type": "boolean"
+      },
+      {
+        "absent": "No applied marker recorded; missing history is unknown.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/amendments",
+        "evidence": "Amendment Proposal Functions.approveAmendmentProposal: history/<proposal id> set to true.",
+        "id": "appliedProposal",
+        "meaning": "True marks the keyed proposal ID as applied. Replaced pending proposals receive no history marker.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/history/*",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no approver-list default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Amendments Functions.propose; Amendment Proposal Functions.approveAmendmentProposal: parameters.approvers.",
+        "id": "requiredApprover",
+        "meaning": "Channel permitted to propose and required to approve; application awaits approval from every listed channel.",
+        "path": "/clauses/{clauseKey}/parameters/approvers/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no allowed-path-list default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Amendment Proposal Functions.recordAmendmentProposal: parameters.paths membership guard.",
+        "id": "amendablePath",
+        "meaning": "Exact document path permitted as a proposal target.",
+        "path": "/clauses/{clauseKey}/parameters/paths/*",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Amendments Clause\n\nCoordinates one pending amendment to an allowed document field. An authorized channel proposes an exact replacement, and every configured approver must approve before the replacement is applied.\n\n## Configuration\n\n- `parameters.approvers` lists the permitted `call/channel` values. Membership is required for both `propose` and `approve`, and every listed channel must approve. Proposing does not automatically record the proposer's approval.\n- `parameters.paths` lists the exact document paths that may be amended. Neither this list nor `parameters.approvers` has a supplied default.\n- `bindings.editable` is a document pointer, defaulting to `/termsEditable`. Its value must be exactly `true` when recording a proposal or approving a pending proposal. This clause supplies no initial value for it; absence does not satisfy the guard.\n- `bindings.state` is a document pointer, defaulting to `/amendments`. It holds `revision`, `proposal` and `history`. Initialization establishes `revision: 1`, `proposal: {}` and `history: {}`. These are initialization values, not fallbacks for missing state. Binding overrides relocate the corresponding reads and writes within the document where the clause executes.\n\nNamed connections under `bindings.propose` and `bindings.approve` determine triggers and supply action `params`; neither action has an automatic connection here. Inherited connection sources include `workflow`, `channel`, `event`, `embedded`, `collection`, `change`, `initialized`, `activated` and `timer`. Workflow connections name their authenticated `channel` or `party`. These connections do not bypass the actions' approver checks. A false connection `when` skips execution; a false `parameters.conditions` entry for the action rejects it.\n\n## Proposing an amendment\n\n`propose` takes `proposalId`, `expectedRevision`, `path` and `replacement`, with optional Boolean `preservePending`, defaulting to `false`. `proposalId` must be nonempty text containing neither `/` nor `~`. `expectedRevision` must equal the current amendment revision, `path` must occur in `parameters.paths`, and the editable value must be `true`. `replacement` is the exact Blue value to write; this clause defines no field-specific replacement shape.\n\nA new proposal stores `id`, `path`, `replacement`, the current `revision`, and an empty `approvals` dictionary. It emits a Domain Event with `kind: \"Amendment Proposed\"`, `clause` and `proposalId`. This records a proposal, not an applied change.\n\nRepeating the pending ID with the same path, replacement and revision returns `duplicate` and preserves its approvals. Conflicting content under that ID is rejected. Authorization, revision, allowed-path and editable checks occur before duplicate detection. An ID already present in `history` cannot be proposed again.\n\nBy default, a different new proposal replaces the pending proposal and discards its approvals. With `preservePending: true`, that replacement is rejected. Displaced proposals are not added to `history`.\n\n## Approving and applying\n\n`approve` takes `proposalId`. After checking channel authorization, an ID marked `true` in `history` returns `duplicate`, even if there is no pending proposal or terms are now frozen. Otherwise, the ID must match the pending proposal and the editable value must be `true`. A channel whose pending approval is already `true` then receives `duplicate`.\n\nA new approval records `true` under that channel in `proposal.approvals`. When every configured approver has approved, the action replaces the document value at the stored `path` with the stored `replacement`, marks `history[proposalId]` as `true`, increments `revision`, clears `proposal` to `{}`, and emits a Domain Event with `kind: \"Amendment Applied\"`, `clause` and `proposalId`. Approval uses the stored proposal without repeating its revision or allowed-path checks. `history` retains applied-ID markers, not old field values or discarded proposals.\n\nBoth actions return `acceptedNew` for a newly recorded change. For `approve`, this may mean only an additional approval; it does not necessarily mean application. Failed guards reject the attempt. Committed application state and its emitted event distinguish application from a submitted action or recorded approval.\n\nUnder the inherited `outcome-v1` connection handling, only `acceptedNew` runs connection `after` hooks and marks a `once` connection as fired. `once` defaults to `false`. Configured `before` hooks run before the action's duplicate detection, so a duplicate amendment outcome does not imply those hooks were skipped."
+}
