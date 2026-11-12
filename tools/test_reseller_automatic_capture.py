@@ -243,10 +243,79 @@ def main():
         TEMPLATE.rsplit('/clauses/payment', 1)[0] + '/paymentTerms/recipientApprovalRequired': True,
     }
 
-    scenarios = [cancelled, before, after, groups, combined_after, past_date, alternative, immediate, undated, fee, recipient]
+    fulfilled_at = first['proposedStartMicros'] + 14400000000
+    fulfilment = '/orders/o1/fulfilment'
+    fulfil = {
+        'operation': 'fulfilOrder', 'channel': 'seller', 'target': '/orders/o1',
+        'request': {'key': 'execution-1'}, 'timestampMicros': fulfilled_at,
+        'expect': {fulfilment + '/status': 'fulfilled', fulfilment + '/fulfilledAtMicros': fulfilled_at,
+                   fulfilment + '/actor': 'seller', fulfilment + '/requestKey': 'execution-1'},
+    }
+    def rejected_fulfil(**changes):
+        step = {**copy.deepcopy(fulfil), 'status': 'FAILED', 'expectNoPublicEffects': True,
+                'unchangedPaths': [fulfilment, '/orders/o1/reservations', '/orders/o1/reservationRequests', PAYMENT]}
+        step.pop('expect')
+        return {**step, **changes}
+
+    executed = copy.deepcopy(groups)
+    executed['name'] = 'Fulfilment: whole accepted multi-product order executes once and cannot be cancelled afterwards'
+    approved_index = next(i for i, s in enumerate(executed['steps']) if s.get('operation') == 'approve_seller')
+    executed['steps'].insert(approved_index, rejected_fulfil(
+        timestampMicros=approval['timestampMicros'],
+        status='APPLIED', diagnosticContains='DOCUMENT_NOT_ACTIVE',
+        expect={'/orders/o1/activation/active': False, fulfilment + '/status': 'not_fulfilled'},
+        unchangedPaths=[fulfilment, '/orders/o1/reservations', '/orders/o1/reservationRequests']))
+    completed = copy.deepcopy(fulfil)
+    for group_id in ('trip', 'rental'):
+        group_path = '/orders/o1/reservations/' + group_id
+        completed['expect'].update({group_path + '/status': 'fulfilled', group_path + '/fulfilledAtMicros': fulfilled_at})
+    repeated_fulfil = copy.deepcopy(completed)
+    repeated_fulfil.update(restore=True, timestampMicros=fulfilled_at + 1, expectNoPublicEffects=True,
+                          unchangedPaths=[fulfilment, '/orders/o1/reservations', '/orders/o1/reservationRequests', PAYMENT])
+    cancelled_after = copy.deepcopy(cancel)
+    cancelled_after.update(timestampMicros=fulfilled_at + 2, status='FAILED', expectNoPublicEffects=True,
+                           unchangedPaths=[fulfilment, '/orders/o1/reservations', PAYMENT])
+    cancelled_after.pop('expect')
+    cancelled_after.pop('absent')
+    supplier_cancelled_after = copy.deepcopy(cancelled_after)
+    supplier_cancelled_after.update(operation='cancelBySupplier', channel='seller')
+    executed['steps'].extend([
+        rejected_fulfil(channel='customer'),
+        rejected_fulfil(channel='partner'),
+        # The first date has started, the second has not: neither group can change.
+        rejected_fulfil(timestampMicros=first['proposedStartMicros'] + 1),
+        rejected_fulfil(request={'key': 'execution-1', 'fulfilledAtMicros': fulfilled_at - 1}),
+        completed, repeated_fulfil,
+        rejected_fulfil(request={'key': 'execution-2'}, timestampMicros=fulfilled_at + 2),
+        cancelled_after, supplier_cancelled_after,
+    ])
+
+    cancelled_execution = copy.deepcopy(cancelled)
+    cancelled_execution['name'] = 'Fulfilment: cancelled order cannot execute or change its settled refund'
+    cancelled_execution['steps'].append(rejected_fulfil())
+
+    undated_execution = copy.deepcopy(undated)
+    undated_execution['name'] = 'Fulfilment: accepted undated order executes once without reservation requirements'
+    undated_execution['steps'].extend([
+        copy.deepcopy(fulfil),
+        {**copy.deepcopy(fulfil), 'timestampMicros': fulfilled_at + 1, 'restore': True,
+         'expectNoPublicEffects': True, 'unchangedPaths': [fulfilment]},
+        rejected_fulfil(request={'key': 'execution-2'}, timestampMicros=fulfilled_at + 2,
+                       unchangedPaths=[fulfilment, '/orders/o1/reservations', '/orders/o1/reservationRequests']),
+    ])
+
+    scenarios = [cancelled, before, after, groups, combined_after, past_date, alternative, immediate,
+                 undated, fee, recipient, executed, cancelled_execution, undated_execution]
     for scenario in scenarios:
         # Use the authored example, including an absent binding in the red run.
-        scenario.setdefault('sourcePatch', {}).update({
+        scenario['sourcePatch'] = {
+            '/clauses/orders/parameters/template/clauses': {
+                **fixture['clauses']['orders']['parameters']['template']['clauses'],
+                'fulfilment': example['orderTemplate']['clauses']['fulfilment'],
+            },
+            **scenario.get('sourcePatch', {}),
+        }
+        scenario['sourcePatch'].update({
             TEMPLATE.rsplit('/clauses/payment', 1)[0] + '/businessContext': payment_template['businessContext'],
             TEMPLATE.rsplit('/clauses/payment', 1)[0] + '/sources': payment_template['sources'],
             TEMPLATE.rsplit('/clauses/payment', 1)[0] + '/paymentTerms/captureGate': terms['captureGate'],
@@ -275,6 +344,7 @@ def main():
         }
         clause_path = '/clauses/orders/parameters/template/clauses/payment'
         scenario['sourcePatch'] = {
+            clause_path.rsplit('/payment', 1)[0]: scenario['sourcePatch'][clause_path.rsplit('/payment', 1)[0]],
             clause_path + '/parameters': {
                 **fixture_payment['parameters'],
                 'sourcePaths': payment_clause['parameters']['sourcePaths'],
@@ -305,7 +375,8 @@ def main():
         # Exercise the Order as its own native root before preparing the observing PI.
         # The legacy fixture's embedded factory is only used to calculate its basket.
         if scenario is not conflicting:
-            scenario['steps'][1]['expect'].update({'/orders/o1/activation/required': ['seller'], '/orders/o1/activation/active': False})
+            scenario['steps'][1]['expect'].update({'/orders/o1/activation/required': ['seller'], '/orders/o1/activation/active': False,
+                                                  '/orders/o1/fulfilment/status': 'not_fulfilled'})
             scenario['steps'][1]['focus'] = '/orders/o1'
         scenario['steps'][2:] = json.loads(json.dumps(scenario['steps'][2:]).replace('/orders/o1', ''))
     scenario_path.write_text(json.dumps({'scenarios': scenarios}, indent=2) + '\n')

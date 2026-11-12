@@ -80,6 +80,25 @@ replace seller acceptance. Repeating acceptance does not create new confirmation
 or a second capture request. The manual capture action applies the same Activation
 and cancellation conditions.
 
+The Order's separate `Reseller/Fulfilment Clause` exposes seller-only `fulfilOrder`
+with `{key: "execution-1"}`. After performing the services, the seller records the
+whole Order as fulfilled. The Order must be active; every reservation group must
+be confirmed and have reached its confirmed start. The existing group guards run
+atomically: a pending, cancelled or previously fulfilled group rejects the entire
+operation. There is no partial execution in this action. An Order without date
+groups can use the same clause without adding a reservation requirement.
+
+`/fulfilment/status` starts as `not_fulfilled` and becomes `fulfilled`, with
+`fulfilledAtMicros`, `requestKey` and `actor`. The timestamp is the operation's
+native time, not a caller-supplied or automatically inferred service-end date.
+Dated groups also retain their own `fulfilledAtMicros`. An identical retry has no
+effects and preserves the original timestamp; a different execution request is
+rejected. Fulfilled groups cannot subsequently be cancelled through the existing
+Cancellation Clause. The action emits `Order Fulfilled` through the existing
+clause-event type. Bindings can relocate the state and reservation paths.
+Acceptance, payment capture, and commission accrual remain separate from this
+seller declaration of actual execution.
+
 Cancellation reconciliation retains its separate request path: a full-price
 capture condition must not prevent collection of a valid cancellation fee.
 The mandatory `paymentTerms.captureGate` points to
@@ -97,13 +116,16 @@ until the Order exists; marking them required in the nested Agreement template
 would reject that Agreement before preparation can supply them.
 The payment process and top-level `sources/order` use the same Order type
 declaration. Different declarations for that alias are rejected by Documents.
-`tools/test_reseller_automatic_capture.py` uses the example's actual payment
-and confirmation configuration with the native component fixture. Twelve cases
+`tools/test_reseller_automatic_capture.py` uses the example's actual payment,
+confirmation and fulfilment configuration with the native component fixture. Fifteen cases
 cover both orderings, multiple reservation groups and dates, atomic rollback,
 alternative-date and immediate-charge consent, an Order without a date clause,
 customer approval, stale or unauthorized seller approval, exact-review enforcement,
 cold restoration, cancellation before capture, fee capture after a failed full-price
 request, later recipient approval and rejection of conflicting source declarations.
+Execution cases cover seller-only access, activation, all-or-nothing date checks,
+immutable execution time, repeated execution, cancellation before/after execution,
+and execution without date groups.
 The fixture calculates a basket using the retained legacy factory, then processes
 the Order as its own native root. It uses the current `sourcePaths` configuration
 and delivers the preparation's native source completion to the bootstrapped PI
