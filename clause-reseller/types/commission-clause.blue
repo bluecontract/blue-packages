@@ -948,6 +948,28 @@ actions:
               $document: {$concat: [{$const: {name: bindings, path: /state}}, /settlements/, {$var: key}]}
         then:
         - $return: {}
+    - $let:
+        name: payout
+        expr:
+          $document: {$concat: [{$const: {name: bindings, path: /payouts}}, /, {$var: key}]}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $var: {name: payout, path: /paymentDetails/method}
+              - myos-account-to-account
+            - $includes:
+                list:
+                - $nodeBlueId:
+                    $get: {object: {type: MyOS/MyOS Test Account to Account Payment Instruction}, key: type}
+                - $nodeBlueId:
+                    $get: {object: {type: MyOS/MyOS Stripe Account to Account Payment Instruction}, key: type}
+                val:
+                  $nodeBlueId:
+                    $var: {name: payout, path: /type}
+        then:
+        - $return: {}
     - $set:
         name: actionResult
         expr:

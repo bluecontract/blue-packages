@@ -102,6 +102,20 @@ public final class CommissionPayoutConformance {
     try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
       var t=new CommissionPayoutConformance(runtime.processor(blue));
       var source=o(WireData.parse(Files.readString(root.resolve("examples/apps/30-commission-a2a-payout.blue")),"yaml"));
+      if(args.length>1 && args[1].equals("--manual-only")) {
+        var legacy=o(WireData.parse(Files.readString(root.resolve("examples/reseller/massage-preview.blue")),"yaml"));
+        source.put("payoutTemplate",legacy.get("payoutTemplate"));
+        o(source.get("clauses")).put("payouts",o(legacy.get("clauses")).get("payouts"));
+        ClauseAppsExamples.wire(source);channels(source,List.of("seller","partner"));
+        t.host=t.init(source);t.root("seller","approve_seller",m("revision",1));t.root("partner","approve_partner",m("revision",1));
+        // Native inline preparation installs the manual wrapper and emits Document Attached before startPayment.
+        var r=t.p.process(t.host,t.event("seller","startPayout",t.host.blueId(),m("key","manual","amountMinor",1000)),++t.sequence);
+        check(r.commits(),"Manual startPayout must attach before payment exists: "+ClauseGasProbe.diagnostic(r));t.host=r.document();
+        check(t.number("/commission/reserved")==1000&&t.number("/commission/paid")==0,"Manual attachment retains gross reservation");
+        t.apply("seller","startPayment",t.embedded("/payouts/manual"),m());
+        check(t.number("/payouts/manual/payment/paymentTerms/amountMinor")==1000,"Manual startPayment creates the payment instruction");
+        System.out.println("PASS native manual startPayout attachment then startPayment");return;
+      }
       // Expose inherited request actions in this test fixture so the profile, not convenience mappings,
       // must reject alternative amounts, request IDs, recipients and details.
       var templateBindings=o(o(o(o(source.get("payoutTemplate")).get("clauses")).get("payment")).get("bindings"));
@@ -113,7 +127,7 @@ public final class CommissionPayoutConformance {
         params.put(field,m("$var",m("name","trigger","path","/"+field)));
         o(templateBindings.computeIfAbsent(probe.get(0),k->m())).put(probe.get(1),m("on","workflow","party",probe.get(2),"params",params));
       }
-      if(args.length>1 && args[1].equals("--guard-only")) {
+      if(args.length>1 && (args[1].equals("--guard-only") || args[1].equals("--receipt-only"))) {
         var pi=o(source.get("payoutTemplate"));
         o(pi.get("paymentTerms")).put("amountMinor",800);o(pi.get("paymentTerms")).put("limitMinor",800);
         o(pi.get("paymentDetails")).put("payoutTerms",m("netMinor",800,"payeeChannel","partner"));
@@ -122,6 +136,15 @@ public final class CommissionPayoutConformance {
         o(activation.get("parties")).forEach((role,party)->o(party).put("myosAccountId","test-"+role));
         channels(pi,List.of("seller","partner","guarantor"));t.host=t.init(pi);
         t.root("guarantor","acceptPaymentInstruction",m());
+        if(args[1].equals("--receipt-only")) {
+          t.deny("guarantor","confirmAccountSettlement",t.host.blueId(),m("debitReference","debit","transferReference","transfer"));
+          check(!t.literal("").containsKey("accountSettlement"),"Early report must not freeze a receipt");
+          t.root("guarantor","recordTransactionInitiated",m("type","PaymentInstruction/Transaction Initiation Input","transactionId","receipt-test","railType","myos-account-to-account","attachmentPoint","instruction","providerReference","test"));
+          t.root("guarantor","confirmAccountSettlement",m("debitReference","debit","transferReference","transfer"));
+          check("receipt-test".equals(t.read("/accountSettlement/transactionId"))&&t.number("/payment/completed")==0,"Valid receipt is allowed before completion");
+          t.root("guarantor","confirmAccountSettlement",m("debitReference","debit","transferReference","transfer"));
+          System.out.println("PASS early receipt rejected, initiated receipt accepted before completion and idempotent");return;
+        }
         t.root("guarantor","recordTransactionInitiated",m("type","PaymentInstruction/Transaction Initiation Input","transactionId","guard-only","railType","myos-account-to-account","attachmentPoint","instruction","providerReference","test"));
         t.deny("seller","probeFinal",t.host.blueId(),m("requestId","change-amount","finalAmount",400));
         t.deny("guarantor","probeSecure",t.host.blueId(),m("requestId","payout-secure","amountMinor",400));
