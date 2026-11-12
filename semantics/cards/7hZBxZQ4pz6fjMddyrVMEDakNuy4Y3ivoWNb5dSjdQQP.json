@@ -1,0 +1,86 @@
+{
+  "blueId": "7hZBxZQ4pz6fjMddyrVMEDakNuy4Y3ivoWNb5dSjdQQP",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "2sSugnwiV9M2YxKDg42MuRpcG48RJgxteq76tHbYFmdi",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "BPMByZokSM9z9aVJWWzmEdPwa45uRvvAWjMWuRnkWWnV",
+      "6nvB6mRrFAZmyv2vP3h8tAWLeDTq4b9BtfqSJdbdNJzS",
+      "3oTdc9SchzpwbkSuqmkRhmXQ9DAwEQHBUefwsobqigDX",
+      "3WukTexA1Nex951RDHoA6S6QfNgFmdiBpigfRUzi9YMh",
+      "26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG",
+      "HW7dw1gGvAMknFW6HXvHc432TZfzCut2mW4KCk4rj8o1",
+      "GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy",
+      "8Q9B7pjNtDSdYcsQepntUpDKqBzw2MXyxF67thMW2z5C",
+      "7dL9TXBk1TmaAuzEeui7rGX2D9X2apTDMenQmFP1z5Xu",
+      "HN5JMeurkfSWYamyNumcBHu23ExHmDTMZB8SQYFFwWZu",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "J1GeF4sGkCY6E5QyrCY4G5kn1EzCkRUgcZe1MSXew6Bx",
+      "EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs",
+      "EpAGfKidGeyW6nEe3QKyYyvzBKXfT9c3PHj6GSz9vc7e"
+    ],
+    "displayLabel": "Activation Functions",
+    "limitations": [
+      "Supplied documentPaths omit scalar locations for status, active, accessReady, functional, termsAccepted, everActivated, reason, closed, frozen, approvals and per-request readiness. Their proven semantics are described in prose; no unsupported fact paths are introduced.",
+      "Initial activation-roster defaults and the operations setting closed or frozen are not supplied.",
+      "The definitions establish function bodies and generated handlers, but not complete calling-workflow trigger rules or the approval collection preceding admitApprovedParties."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; initial revision is not established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions: approve, updateParty, admitApprovedParties",
+        "id": "activationRevision",
+        "meaning": "Activation review revision checked by approvals and admissions; incremented by successful roster changes.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown until terms initialization establishes it.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions: initializeTerms, commitState, approve",
+        "id": "termsReference",
+        "meaning": "Exact terms reference checked by approvals; changes when committed parties or required roles change.",
+        "path": "/activation/terms/ref",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; not an implied true or false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions: initializeTerms; approve active-result branch",
+        "id": "negotiationEditable",
+        "meaning": "Initialized true; set false when a new party approval commits an active state.",
+        "path": "/activation/negotiation/editable",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No ID in an initialized empty proposal; else unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions: initializeTerms, approve, commitState",
+        "id": "pendingNegotiationProposalId",
+        "meaning": "Identifies the pending proposal cleared as SUPERSEDED on activation or AUTHORITY_CHANGED on roster changes.",
+        "path": "/activation/negotiation/proposal/id",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Activation Functions\n\nReusable functions for maintaining a document’s participant roster, acceptance of terms and access readiness. They operate on `/activation` in the document where they execute. The functions supply behavior for calling workflows; their presence alone does not activate a document or authorize an actor.\n\n## Readiness and acceptance\n\n`refresh` initializes terms when absent, commits computed activation state and refreshes pending access requests. `computeState` distinguishes:\n\n- `WAITING_FOR_ACCESS`: required access is missing and the document has never activated.\n- `SUSPENDED_ACCESS`: access is missing after an earlier activation.\n- `AWAITING_ACCEPTANCE`: access is ready, but required party approvals or current agreed field values are missing.\n- `ACTIVE`: access is ready, every role in `required` is approved, agreed fields remain current and the document is not closed.\n- `CLOSED`: `closed` is true, overriding the other statuses.\n\n`accessReady` and `functional` record the same access check. `termsAccepted` combines required approvals with `termsCurrent`, which compares stored `terms.fields` against their document locations. `active` additionally requires that the document is not closed. `everActivated` preserves whether activation has occurred. `reason` is `PARTICIPANT_ACCESS_MISSING`, `ACCEPTANCE_REQUIRED` or an empty string; it does not independently explain closure.\n\nAccess checks include party lead channels and declared representative channels. External Channel descendants bypass the Timeline Channel access-document check. Other channels must be Timeline Channels: each needs a matching-provider Timeline Access document covering its timeline and at least one key from **every** reader group. All groups must be satisfied within that matching document; keys are not combined across documents for this check. Reader groups start with `readers`, then party `readerKeys` and representative `readerKeys` replace entries with matching role names. Current-revision `accessRequests` also contribute proposed parties to the computed access roster.\n\n`commitState` emits `Document Activated` on first activation, `Document Access Suspended` when a previously active document loses access, and `Document Access Restored` when an already-activated document becomes active after its previous access check failed. These events carry `revision`; acceptance changes alone do not necessarily emit an access event.\n\n## Approving and changing parties\n\n`approve` requires `call/requireExactDocumentVersion=true`, a `call/channel` matching a party role, the current `revision`, and valid participant access. With nonempty `negotiation.allowedPaths`, a text `termsRef` is required; any supplied `termsRef` must equal `/activation/terms/ref`. `approveWithTerms` delegates to the same checks. An existing approval returns true without another acceptance event. A new approval records `approved[party]=true`, commits state and emits `Terms Accepted` with the party and revision. A true return confirms that party’s approval, not necessarily document activation. When that commit is active, negotiation becomes noneditable and any pending proposal is cleared with outcome `SUPERSEDED`.\n\n`updatePartyPublic` accepts `replacement` and optional `party`, removes the input’s `type` field and delegates to `updateParty`. Omitted `party` targets the invoking party. Updating requires exact-document review, an unfrozen roster and a party-role caller. Existing parties may manage only themselves; adding a new role requires `allowNewParties`. A replacement must contain `lead.channel`. Party and representative keys must be nonempty text without `.`, `/`, `~` or `__`.\n\nThe resulting roster must pass access checks and avoid conflicts with unrelated contract names. A successful update installs roster channels and approval/update handlers, clears all approvals and increments `revision`. Adding a party also appends its role to `required`. No revision argument is required for this update; exact-document review remains required. `Party Changed` identifies the affected role and new revision.\n\n`admitApprovedParties` is a separate admission function. It requires an unfrozen roster, matching `expectedRevision` and nonempty `admission.approvers`; this function does not itself collect their approvals. Each addition needs a lead channel and nonempty, distinct primary reader keys. An existing role must retain the same lead channel and the same primary-key set; its roster entry is retained. An unchanged roster returns `duplicate`. Otherwise, access and contract-conflict checks precede installation, the revision increases, and `Party Changed` events include `admissionRef` and kind `Participants admitted`. This route does not append admitted roles to `required`.\n\n## Terms and access requests\n\nConfiguration is read from `/clauses/activation/parameters`. Missing `negotiation.allowedPaths` and `admission.approvers` are read as empty lists. Terms initialization uses `/clauseRuntime/initialDocument`, excluding configured access-document locations, activation `accessPaths` and `readers` configuration, and parties’ primary `readerKeys`. Every negotiable path must exist and contain text, integer, double or boolean data. Its current value is stored in `terms.fields` and excluded from the fixed definition reference. `terms.ref` identifies the resulting terms. Initialization sets `termsRevision=1` and negotiation `revision=1`, `editable=true`, with empty proposal, history and outcomes.\n\nChanging parties or `required` after terms exist changes the terms reference, increments `termsRevision`, clears a pending proposal and records its outcome as `AUTHORITY_CHANGED`. This also clears approvals when negotiable paths are configured; `updateParty` clears approvals regardless.\n\n`requestPartyAddition` consumes event fields including `admissionRef`, `expectedRevision`, `parties` and `accessDocuments`. Stale revisions and already-recorded references return without a new request. Supplied access documents are validated and embedded. For existing parties lacking access coverage under the enlarged reader groups, it emits `Party Access Update Requested` for each selected transport. The request identifies its parent `party`, transport `channel`, `accessPath`, `expectedAccessEntry`, revision and admission context. It requests provider-owned permission changes; it neither grants access nor admits the parties. `refreshAccessRequests` updates current-revision request readiness by checking every transport of the parent party.\n\nInherited `installTimelineAccess` accepts 1–16 documents per call, checks initialization, provider-history evidence and the exact executable access policy, deduplicates by original document identity, and registers access-update refresh handlers. Initial roster channels use empty composite placeholders until access is ready. Installing evidence does not itself change provider permissions.\n\nInherited amendment helpers record proposals only for configured paths, the expected amendment revision and an editable target. Proposal IDs must be nonempty text without `/` or `~`; conflicting or previously used IDs are rejected. `preservePending` can prevent replacement of a different pending proposal. Listed approvers approve the matching proposal; only unanimous approval applies its replacement, records history, increments the amendment revision and clears the proposal. These generic helpers use caller-supplied state locations; they do not establish additional fixed Activation paths.\n\nInherited party-mapping helpers resolve declared receiver roles to supplied parties while preserving main channel and primary-key identity. Mapping grants neither access nor consent. Inherited activity guards separately check activation, access and, where requested, whether a channel still names a party lead or declared representative.\n\nAbsent stored state is unknown, even where a function uses a fallback during execution. Initial activation-roster defaults, closure/freeze transitions and complete calling-workflow trigger rules are not established by the supplied definitions."
+}

@@ -2,6 +2,7 @@ package blue.packages;
 
 import blue.bex.Values;
 import blue.contracts.Contracts;
+import blue.contracts.ContractsExecution;
 import blue.contracts.RuntimeBindings;
 import blue.language.next.Blue;
 import blue.language.next.BluePackage;
@@ -86,6 +87,7 @@ public final class ResellerScenarios {
       Map<String, Object> evidence = map("name", name, "passed", false);
       long started = System.nanoTime();
       try (Runner runner = new Runner()) {
+        evidence.put("captures", runner.captures);
         Map<String, Object> source = object(parse(sourcePath));
         for (var entry : object(scenario.getOrDefault("sourcePatch", map())).entrySet()) {
           updateExisting(source, entry.getKey(), entry.getValue(), false);
@@ -105,6 +107,7 @@ public final class ResellerScenarios {
             if (row.containsKey("bootstrapPrepared")) runner.bootstrapPrepared(row);
             else runner.operation(row, step);
             runner.expect(row, name + " step " + step + " " + row.get("operation"));
+            if (row.containsKey("focus")) runner.focus(text(row.get("focus")));
           }
           evidence.put("operations", step);
         } else {
@@ -167,6 +170,7 @@ public final class ResellerScenarios {
     private final List<Object> quoteEvidence = new ArrayList<>();
     private final List<Object> captures = new ArrayList<>();
     private final Map<String,Object> remembered = new LinkedHashMap<>();
+    private Contracts.Result lastOperation;
 
     Runner() {
       open();
@@ -208,8 +212,34 @@ public final class ResellerScenarios {
       equal(1, entries.size(), "Expected one prepared instruction");
       var entry = object(entries.values().iterator().next());
       equal("awaiting_provider", entry.get("status"), "Instruction must await its supplier");
+      retainMemberHistories(document);
       var result = processor.initialize(map("blueId", entry.get("requirementRef")));
       equal("APPLIED", result.status(), "Prepared instruction bootstrap: " + diagnostic(result));
+      if (step.containsKey("receivePreparedSource")) {
+        check(lastOperation != null, "Prepared source must have a committed operation");
+        String sourcePath = text(step.get("receivePreparedSource"));
+        var snapshot = processor.execution().snapshot(lastOperation.document());
+        String member = sourcePath.isEmpty() ? snapshot.root : snapshot.edges.values().stream()
+            .filter(edge -> edge.source().equals(snapshot.root) && edge.path().equals(sourcePath))
+            .findFirst().orElseThrow().target();
+        result = processor.receive(result.document(), List.of(processor.capture(lastOperation, List.of(member))));
+        equal("APPLIED", result.status(), "Prepared source completion: " + diagnostic(result));
+      }
+      for (var binding : object(step.getOrDefault("bindPreparedSources", map())).entrySet()) {
+        var values = processor.execution().values();
+        String sourceVersion = NativeRuntime.identity(values.exact(
+            values.select(new Exact.Ref(document.blueId()), text(binding.getValue()))));
+        Object request = map("type", "Documents/Source Binding Input", "alias", binding.getKey(),
+            "document", map("blueId", sourceVersion));
+        Object input = map("source", step.get("sourceBindingSource"), "operation", map(
+            "type", "Contracts/Operation Request", "document", map("blueId", result.document().blueId()),
+            "operation", step.get("sourceBindingOperation"), "channel", step.get("sourceBindingChannel"),
+            "request", request));
+        result = processor.process(result.document(), input,
+            Long.parseLong(WireData.write(step.get("timestampMicros"))));
+        equal("APPLIED", result.status(), "Prepared source binding: " + diagnostic(result));
+      }
+      retainMemberHistories(result.document());
       for (var expectation : object(step.getOrDefault("expectBootstrapped", map())).entrySet()) {
         sameValue(expectation.getValue(), processor.read(result.document(), expectation.getKey()),
             "Bootstrapped instruction " + expectation.getKey());
@@ -224,7 +254,28 @@ public final class ResellerScenarios {
       System.out.println("BOOTSTRAP " + name + " status=" + result.status() + " gas=" + result.gas());
     }
 
+    void retainMemberHistories(Contracts.Document source) {
+      var execution = processor.execution();
+      var snapshot = execution.snapshot(source);
+      var outgoing = ContractsExecution.outgoing(snapshot);
+      for (var member : snapshot.documents.values())
+        execution.chooseHistory(member.blueId,
+            ContractsExecution.rooted(snapshot, member.key, outgoing));
+    }
+
+    void focus(String path) {
+      retainMemberHistories(document);
+      var snapshot = processor.execution().snapshot(document);
+      var edge = snapshot.edges.values().stream()
+          .filter(item -> item.source().equals(snapshot.root) && item.path().equals(path))
+          .findFirst().orElseThrow();
+      document = ContractsExecution.rooted(snapshot, edge.target(),
+          ContractsExecution.outgoing(snapshot)).document();
+    }
+
     void operation(Map<String, Object> step, int timestamp) {
+      // A prepared source may pin the version immediately before this operation.
+      retainMemberHistories(document);
       Map<String, Object> before = new LinkedHashMap<>();
       for (Object rawPath : array(step.getOrDefault("unchangedPaths", List.of()))) {
         String path = text(rawPath);
@@ -263,14 +314,19 @@ public final class ResellerScenarios {
         check(WireData.write(result.observations()).contains(text(step.get("diagnosticContains"))),
             label + " missing diagnostic: " + step.get("diagnosticContains") + " actual=" + diagnostic(result));
       }
-      if (Boolean.TRUE.equals(step.get("expectNoEffects"))) {
+      if (Boolean.TRUE.equals(step.get("expectNoEffects"))
+          || Boolean.TRUE.equals(step.get("expectNoPublicEffects"))) {
         Map<String, Object> observations = object(result.observations());
-        for (String key : List.of("changes", "events", "publicEvents")) {
+        // Failed reactions may retain tentative events as diagnostics, never as published output.
+        List<String> empty = Boolean.TRUE.equals(step.get("expectNoEffects"))
+            ? List.of("changes", "events", "publicEvents") : List.of("publicEvents");
+        for (String key : empty) {
           equal(List.of(), observations.get(key), label + " unexpected " + key);
         }
         equal(List.of(), processor.emitted(result), label + " emitted effects");
       }
       document = result.document();
+      lastOperation = result;
       if (step.containsKey("expectProvisionRequested")) {
         var entries = object(processor.read(document, text(step.get("expectProvisionRequested")) + "/entries"));
         equal(1, entries.size(), label + " prepared instruction count");
@@ -407,6 +463,7 @@ public final class ResellerScenarios {
   }
 
   private static void sameValue(Object expected, Object actual, String label) {
+    check(actual != Values.UNDEFINED, label + ": expected field is absent");
     equal(WireData.write(expected), WireData.write(actual), label);
   }
 

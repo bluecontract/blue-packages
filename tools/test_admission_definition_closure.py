@@ -28,7 +28,8 @@ class AdmissionDefinitionClosureTest(unittest.TestCase):
                 node = yaml.safe_load(path.read_text())
                 if isinstance(node, dict):
                     definitions.update({name: body for name, body in node.get('functions', {}).items()
-                                        if isinstance(body, dict) and set(body) != {'blueId'}})
+                                        if isinstance(body, dict) and set(body) != {'blueId'}
+                                        and '$blue:functionFrom' not in body})
         found = {}
         def visit(node):
             if isinstance(node, dict):
@@ -50,5 +51,40 @@ class AdmissionDefinitionClosureTest(unittest.TestCase):
                     pending.extend(calls(definitions[name]))
                 self.assertEqual(set(selected), reached)
                 self.assertEqual(len(selected), len(set(selected)))
+
+    def test_refresh_selection_is_the_complete_shared_refresh_closure(self):
+        libraries = {}
+        for folder, namespace in [('clause-documents/types', 'Documents'),
+                                  ('blue-parties/types', 'Parties'),
+                                  ('clause-activation/types', 'Activation'),
+                                  ('clause-amendments/types', 'Amendments')]:
+            for path in (ROOT/folder).glob('*.blue'):
+                node = yaml.safe_load(path.read_text())
+                if isinstance(node, dict) and 'name' in node:
+                    libraries[namespace + '/' + node['name']] = node
+        refresh = libraries['Documents/Refresh Functions']['functions']
+        def function(library, name):
+            node = libraries[library]
+            if name in node.get('functions', {}):
+                return node['functions'][name]
+            return function(node['type'], name)
+        def body(node):
+            if '$blue:functionFrom' not in node:
+                return node
+            link = node['$blue:functionFrom']
+            return body(function(link['type'], link['function']))
+        pending, reached = ['sharedRefresh'], set()
+        while pending:
+            name = pending.pop()
+            if name in reached:
+                continue
+            reached.add(name)
+            pending.extend(calls(body(refresh[name])))
+        self.assertEqual(reached, set(refresh))
+        plan = libraries['Documents/Preparation Plan']['functions']['plan']['do']
+        selection = next(step['$let']['expr']['$call']['args']['names'] for step in plan
+                         if step.get('$let', {}).get('name') == 'refreshDefinition')
+        self.assertEqual(set(selection), reached)
+        self.assertEqual(len(selection), len(reached))
 
 if __name__ == '__main__': unittest.main()

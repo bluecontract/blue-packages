@@ -14,7 +14,7 @@ package build proves a completed Stripe payment.
 - `Customer Orders Clause` reads the template, order collection, catalog and optional fulfilment parameters through pointer bindings. Moving or renaming these fields requires updating a binding, not copying implementation. Removing the fulfilment clause removes the date and confirmation requirement from new orders.
 - `Commercial Terms Negotiation Clause` invalidates earlier approvals when terms change before activation. Both parties must approve the resulting version. `Commercial Terms Validation Clause` checks the commission range and this example's USD currency.
 - `Commission Clause` reads confirmed net payment results and the configured commission rate. `Commission Payouts Clause` prepares a payout and reserves its amount once. A payout document is not evidence of a completed transfer.
-- `Catalog Clause` owns the authored offer description and points to the catalog and quote collections. Descriptive content does not introduce executable booking requirements.
+- `Catalog Clause` owns the authored offer description and points to the catalog. These agreements do not configure a separate quote collection. Descriptive content does not introduce executable booking requirements.
 
 ## Independent customer orders
 
@@ -32,11 +32,11 @@ The Adventures in Paradise example has two catalog lines in one order: two child
 
 ## Card Payment Instruction
 
-The order uses the existing `Payment/Payment Clause`, with `obtain: provide`, `suppliedBy: seller`, `prepare.onOrderCreated.on: initialized` and seller-only `providePayment`. The PI template uses `PaymentInstruction/Payment Instruction with Clauses` and `Payment/Payment Process Clause` with `method: card`. Its amount, limit and currency are mapped from the created order; a zero-price order has no payment clause or PI.
+The order uses the existing `Payment/Payment Clause`, with `obtain: provide`, `suppliedBy: seller`, an immediate one-shot preparation after native Order initialization and seller-only `providePayment`. The PI template uses `PaymentInstruction/Payment Instruction with Clauses` and `Payment/Payment Process Clause` with `method: card`. Its amount, limit and currency are mapped from the created order; a zero-price order has no payment clause or PI.
 
 The example follows MyOS Core's `examples/independent-processes/corpus/payments/12-agreement-orders-payments.blue` for party bindings and `14-existing-authorized-card-pi.blue` for the card process. `payments@example.test` is the example MyOS account constrained in the PI template’s guarantor declaration. The guarantor is a supplied party at bootstrap, so no channel from another document is copied. It is not a production payment service. Replace it with the admitted guarantor account for an actual integration; the guarantor does not become a party to the reseller agreement.
 
-Orders do not require a second customer approval (`required: []`). Seller date confirmation remains a separate operation when the Agreement includes fulfilment terms. The Payment Clause uses `prepareFor: bootstrap`; its prepared PI must receive fresh participant transports through Core bootstrap. Access and exact party matching remain required.
+Orders do not require a second customer approval. The cancellation-enabled Agreement requires seller acceptance (`required: [seller]`), which also confirms the proposed dates through its Confirmation Clause. The earlier preview agreements retain `required: []` and separate date confirmation. The Payment Clause uses `prepareFor: bootstrap`; its prepared PI must receive fresh participant transports through Core bootstrap. Access and exact party matching remain required.
 
 The integration must handle `Documents/Document Provision Requested`, retrieve the prepared document identified by `requirementRef`, bootstrap it, and call `providePayment` as seller with the original `inResponseTo`, `requirementRef`, and the bootstrapped document reference. Deduplicate bootstrap by the originating document and preparation correlation; reuse the same PI when retrying. The native scenario exercises provision validation and a repeated response. It does not implement or qualify a hosted provisioning handler.
 
@@ -44,6 +44,101 @@ The integration must handle `Documents/Document Provision Requested`, retrieve t
 
 ## Local verification and preview
 
-Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `preview-booking.case.json` covers conditional booking requirements and the free variant; `preview-card.case.json` covers card preparation/provision and a renamed fulfilment clause; `preview-clauses.case.json` covers bilateral approval and invalid commercial terms.
+Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `bootstrap-preparation.case.json` covers the current independent Order preparation; `cancellation-settlement.case.json` qualifies native settlement and retries. The older preview cases retain evidence for the former embedded factory, not the current hosted flow.
 
-The local generated document, clause definitions, semantic cards, Overview and Terms are in `reports/reseller-20261103/business-preview/index.html`. These are local review artifacts, not a deployed agreement or proof of real card processing. The separate broader settlement qualification remains incomplete.
+The local generated document, clause definitions, semantic cards, Overview and Terms are in `reports/reseller-20261103/business-preview/index.html`. These are local review artifacts, not a deployed agreement or proof of real card processing.
+
+The `onOrderCreated` binding uses `on: timer`, `timestamp: 0` and requires the
+initialized marker and an empty preparation registry. The PI retains the Order
+as a named source, so preparing it inside Order initialization is too early:
+that source does not yet have a native process origin. The timer starts the same
+prepare step immediately after initialization, without customer approval or a
+manual payment action. The Activation configuration permits the timer and its
+arming channel while ordinary consent and access requirements remain in force.
+
+The [cancellation-enabled Agreement](cancellation-enabled-agreement.blue) adds
+Order settlement observation and the PI cancellation reconciliation clauses.
+The automatic preparation was qualified on Core 64abcd6de with the current
+package selection: one multi-product Order of 93.10 USD initialized and prepared
+exactly one PI. The former `on: initialized` version fails Order initialization.
+The cancellation-enabled example requires seller acceptance through
+`approve_seller`, with the current Activation revision and exact reviewed document.
+Its PI requests full capture when the Order is active and authorization is available.
+An embedded Order event or a payment state change can wake this request, so either
+acceptance or authorization may arrive first. Its Confirmation Clause binds
+`confirmAcceptance` to `Activation/Terms Accepted` for the seller. In the same
+atomic transition, pending groups receive their exact proposed start as the
+confirmed start. Different groups may have different dates. A passed start,
+expired response deadline, or outstanding customer consent rejects the entire
+approval, including Activation, all group changes and payment effects.
+An alternative date or an immediate cancellation charge still needs the existing
+customer `acceptProposal` step; `confirmReservation` remains available to request
+that consent before approval. Confirmed, fulfilled and cancelled/closed groups
+are not changed or revived. Orders without the Confirmation Clause require no
+date confirmation. `confirmReservation` and an optional customer approval do not
+replace seller acceptance. Repeating acceptance does not create new confirmations
+or a second capture request. The manual capture action applies the same Activation
+and cancellation conditions.
+
+The Order's separate `Reseller/Fulfilment Clause` exposes seller-only `fulfilOrder`
+with `{key: "execution-1"}`. After performing the services, the seller records the
+whole Order as fulfilled. The Order must be active; every reservation group must
+be confirmed and have reached its confirmed start. The existing group guards run
+atomically: a pending, cancelled or previously fulfilled group rejects the entire
+operation. There is no partial execution in this action. An Order without date
+groups can use the same clause without adding a reservation requirement.
+
+`/fulfilment/status` starts as `not_fulfilled` and becomes `fulfilled`, with
+`fulfilledAtMicros`, `requestKey` and `actor`. The timestamp is the operation's
+native time, not a caller-supplied or automatically inferred service-end date.
+Dated groups also retain their own `fulfilledAtMicros`. An identical retry has no
+effects and preserves the original timestamp; a different execution request is
+rejected. Fulfilled groups cannot subsequently be cancelled through the existing
+Cancellation Clause. The action emits `Commerce/Domain Event` with
+`kind: Order Fulfilled`. Bindings can relocate the state and reservation paths.
+Acceptance, payment capture, and commission accrual remain separate from this
+seller declaration of actual execution.
+
+Cancellation reconciliation retains its separate request path: a full-price
+capture condition must not prevent collection of a valid cancellation fee.
+The mandatory `paymentTerms.captureGate` points to
+`/sources/order/activation/active`. Every capture route therefore waits for seller
+acceptance, including collection of a retained cancellation charge. Cancellation
+reconciliation additionally requires resolved groups before collecting that charge.
+A cancellation before acceptance can release an authorization without approval.
+The full-price request remains blocked once cancellation settlement has begun;
+a late acceptance cannot revive it. Reciprocal document and frozen-terms checks
+still apply in the managed provider.
+Payment preparation freezes the native Order origin, revision and terms reference
+in `businessContext`. The terms reference is a `Text` field: an empty object
+cannot be refined with its string value. These template slots remain unfilled
+until the Order exists; marking them required in the nested Agreement template
+would reject that Agreement before preparation can supply them.
+The payment process and top-level `sources/order` use the same Order type
+declaration. Different declarations for that alias are rejected by Documents.
+`tools/test_reseller_automatic_capture.py` uses the example's actual payment,
+confirmation and fulfilment configuration with the native component fixture. Fifteen cases
+cover both orderings, multiple reservation groups and dates, atomic rollback,
+alternative-date and immediate-charge consent, an Order without a date clause,
+customer approval, stale or unauthorized seller approval, exact-review enforcement,
+cold restoration, cancellation before capture, fee capture after a failed full-price
+request, later recipient approval and rejection of conflicting source declarations.
+Execution cases cover seller-only access, activation, all-or-nothing date checks,
+immutable execution time, repeated execution, cancellation before/after execution,
+and execution without date groups.
+The fixture calculates a basket using the retained legacy factory, then processes
+the Order as its own native root. It uses the current `sourcePaths` configuration
+and delivers the preparation's native source completion to the bootstrapped PI
+before provision. Omitting that delivery imports an older Order occurrence instead
+of joining the current Order/PI cycle. This is native component qualification,
+not a qualification of the hosted Reader provisioning path.
+Payment state changes also wake the capture binding, so a changed payment lock
+or recipient approval cannot leave an otherwise eligible request asleep.
+Separate local Business evidence on 9 November verified the previous,
+reservation-confirmation-based multi-product flow:
+partner preparation, independent Order bootstrap and provision, seller PI creation,
+managed Test authorization of USD 93.10, seller confirmation, automatic capture,
+customer cancellation, automatic full refund, settled Order and reversed commission.
+Core used `2f44c4f1d` with the imported package selection from `766f39d`; Business
+retains the browser ledger and results in `reports/cancellation-flow/`.
+This is managed Test-provider evidence, not a real card or Stripe qualification.

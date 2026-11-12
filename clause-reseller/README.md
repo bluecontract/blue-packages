@@ -20,6 +20,27 @@ The package exports reusable clauses and shared function definitions. The follow
 
 The optional `fulfilment` clause declares the proposed date and seller confirmation requirement. The Customer Orders Clause prepares its exact terms and quote for independent Core bootstrap and adds the Confirmation Clause only when that parent clause exists. Without it, the same catalog can produce an order without a date or confirmation workflow. The order request records the customer’s proposed date without requiring a second order approval; a supplier alternative requires separate customer acceptance. Free entries create zero-price orders without a payment instruction. Confirmation without a cancellation policy does not manufacture cancellation charges or a free-cancellation deadline.
 
+The cancellation-enabled example connects `Confirmation Clause.confirmAcceptance`
+to the seller's `Activation/Terms Accepted` event. One exact `approve_seller` accepts
+the Order and confirms every pending proposed date atomically. It reuses the same
+date, deadline and customer-consent checks as `confirmReservation`; a failed group
+rejects the whole approval. Alternative dates and immediate cancellation charges
+still require customer acceptance first. Closed groups remain closed, and repeated
+approval creates no extra confirmation. This is an explicit connection in that
+template, not a change to Activation or to all existing Confirmation Clauses.
+
+The separate [Fulfilment Clause](types/fulfilment-clause.blue) records execution of
+the whole accepted Order. The cancellation-enabled template exposes seller-only
+`fulfilOrder({key})`. Every dated group must be confirmed and have reached its
+start; all group changes and the Order's fulfilment record commit together.
+Cancelled or previously fulfilled groups reject execution. Orders without dates
+use the same clause without reservation requirements. `/fulfilment` records
+`status: fulfilled`, the operation time in `fulfilledAtMicros`, its request key
+and actor. An identical retry preserves that record without effects; a new
+execution request is rejected. This records the supplier's declaration of actual
+execution, independently of order acceptance, capture and commission accrual.
+It does not change existing templates or the legacy per-group `fulfil` action.
+
 The local [Terms/Overview and semantic-card preview](../reports/reseller-20261103/business-preview/index.html) uses the Business generators, validators, value resolver and presentation components, with source-bound repeated items added in an isolated Business worktree. The model selects the source and row fields, not copies of products or prices. Both Overview and clause Terms iterate `/products/entries`, using `/products/currency` to format prices. The description and its groups are also read from the document under the same Catalog Clause. Long descriptions and priced lists beyond six options have native disclosures; Terms use flat clause details and collapsible child-document sections. The overview includes complete order and payout collection counts, including known zeros, while unknown counts stay absent. Payout records are not presented as confirmed transfers. Generated Terms and Overview are accepted only after Business validation. A presentation regression check covers 40 variants, a price change and a newly added variant using the same template, including 0% and 5% customer discounts. This is local presentation qualification, not a deployed or end-to-end qualified customer agreement.
 
 The four [booking requirement scenarios](../examples/reseller/tests/preview-booking.case.json) pass on native Contracts: required date and seller confirmation, absence of the clause, customer acceptance of an alternative and a free variant. The native baseline and bilateral-amendment scenario passed. All 33 reservation regression scenarios pass with optional cancellation policies and the date requirement. After correcting the payment fixture's clause edition, four of six settlement scenarios passed; failed/unknown reversal requests still require correction. Settlement observation is not qualified end to end. Generated semantic cards describe implementation, not proof of successful execution.
@@ -94,3 +115,30 @@ The task's native component tests and upstream reservation/catalog examples have
 separate qualification boundaries. Package selection and semantic cards alone do
 not establish hosted execution or financial acceptance. No semantic model call is
 required to build or verify the native archive.
+
+## Automatic cancellation settlement
+
+The Cancellation Clause records the commercial decision on the Order, including
+the amount to retain. It does not confirm that money moved. Configure
+[Cancellation Payment Clause](types/cancellation-payment-clause.blue) on the PI
+with `bindings.order: /sources/order` and
+[Cancellation Settlement Clause](types/cancellation-settlement-clause.blue) on
+the Order with `bindings.instruction: /payment`. Both use
+[Cancellation Settlement Functions](types/cancellation-settlement-functions.blue).
+
+The PI observes the exact bound Order and reconciles its cancellation decision
+against the confirmed payment ledger. It requests a refund of confirmed excess,
+captures only a retained fee when permitted by the existing capture gate, and
+releases unused authorization. Only a guarantor outcome changes settled money.
+Pending or unknown requests keep their reservations; replay and repeated
+cancellation cannot create a second refund. The Order observes that settlement
+separately and remains cancelled while it is pending, blocked or failed.
+
+All 16 [native scenarios](../examples/reseller/tests/cancellation-settlement.case.json)
+pass against the current package selection and Core 64abcd6de. They exercise full and partial refunds, void, fee retention, multiple groups, pending
+and failed outcomes, replay, and unauthorized refund confirmation. Their
+[fixture](../examples/reseller/cancellation-settlement-native.blue) uses the legacy
+embedded factory only to qualify the settlement clauses; new hosted Orders use
+the `prepareOrder` / independent bootstrap / `provideOrder` contract above.
+One PI covers the complete Order. This does not implement installments, calendar
+availability, provider checkout, or a Business UI integration.

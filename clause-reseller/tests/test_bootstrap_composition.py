@@ -35,13 +35,14 @@ class BootstrapCompositionTest(unittest.TestCase):
     def test_import_provenance_and_explicitly_evolved_sources(self):
         source = json.loads((PACKAGE / 'source-import.json').read_text())
         self.assertEqual(len(source['sourceFiles']), 14)
-        # Historical provenance remains immutable. These three authored sources
-        # evolved deliberately: main's optional quotes/catalog bootstrap and the
-        # qualified guarded commission attachment. All other imports stay exact.
+        # Historical provenance stays immutable; reviewed catalogue/bootstrap,
+        # commission and atomic date-confirmation changes have explicit source pins.
         evolved = {
             'types/catalog-functions.blue': '0f24eab9c459cd2f58baec2d383ddf3337517554be84417d308c64514126f1eb',
-            'types/customer-orders-clause.blue': 'c77ddfc0332a33026c1b21dab7563136b6c0899d6051e0dd9d5a9c1449e7a091',
+            'types/customer-orders-clause.blue': '4accb5776ff1ab0cbd279ffdcd64cf62a8ad030a0343bf1115db8e45dc4148e4',
             'types/commission-clause.blue': '3d5905f1c9d8d74f687738c9fc384dce6db1d5b497d301d156e5725bf17a80a0',
+            'types/confirmation-clause.blue': '74e1ea9d73ba3b7eed599c2ce5c6bd1f2b2205424942b66b7c39bc0869d05695',
+            'types/order-functions.blue': 'bad8b51a33e93ec5efa36b6bdbc8e4b94d95eba7a028cf0354cbf14319168493',
         }
         seen = set()
         for item in source['sourceFiles']:

@@ -64,6 +64,12 @@ use the reserved spelling; there is no heuristic compatibility fallback. Dynamic
 native definitions; explicitly mapped public workflows retain their own input
 shape instead of guessing that an action argument equals the external request.
 
+`$blue:functionFrom: {type: Namespace/Library, function: helper}` selects an exact
+function from a library, including inherited functions. Omitting `function`
+retains the existing standalone-function form. Both forms publish a native
+`blueId` reference; they add no runtime loader or execution capability. Missing
+functions, non-function targets and extra selector fields fail publication.
+
 Document-level `operationPreparation` and automatic technical bindings were removed.
 The model can use unambiguous current technical state, while user business choices
 remain explicit. Confirm still sends the exact reviewed request; package public

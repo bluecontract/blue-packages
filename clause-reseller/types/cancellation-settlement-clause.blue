@@ -1,0 +1,34 @@
+name: Cancellation Settlement Clause
+description: Observe the selected PI's cancellation settlement without changing the Order's cancelled status
+  or treating a payment request as money received or refunded.
+type: Connections/Connected Clause
+actionDefinition:
+  type: Reseller/Cancellation Settlement Functions
+bindingTypes:
+  instruction: pointer
+  settlement: pointer
+  state: pointer
+defaultBindings:
+  instruction: /payment
+  settlement: /payment/cancellationSettlement
+  state: /paymentSettlement
+  observe:
+    instructionLinked:
+      'on': change
+      path: /payment
+initialState:
+  state: {}
+actions:
+  observe:
+    observation: true
+    automatic:
+      'on': embedded
+      pathBinding: instruction
+      embed: false
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: observeCancellationSettlement
+            args: {}

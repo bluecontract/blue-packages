@@ -1,0 +1,110 @@
+{
+  "blueId": "2k7MQ291qEdAa6sRWnxXq8ZJw5K9tJ5ZcdUSFcY6bHdw",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde"
+    ],
+    "displayLabel": "Cancellation Settlement Functions",
+    "limitations": [
+      "One PI must cover the complete frozen Order amount and currency; split payments, deposits and instalments are not allocated.",
+      "No automatic new authorization or automatic retry of failed/declined financial requests.",
+      "Source observation requires a valid initialized Order and authorized source/provision wiring; this clause grants no access.",
+      "Normal capture routes need a cancellation guard. A mandatory capture gate can block settlement and its changes need a reconcile trigger."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown when absent; initialization must execute first.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "This PI confirmed payment ledger",
+          "unit": "currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Cancellation Settlement Functions.cancellationPlan / reconcileCancellationPayment.",
+        "id": "capturedMinor",
+        "meaning": "Cumulative confirmed PI captures, including money subsequently refunded. Minor units of /paymentTerms/currency.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent; initialization must execute first.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "This PI confirmed payment ledger",
+          "unit": "currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Cancellation Settlement Functions.cancellationPlan / reconcileCancellationPayment.",
+        "id": "refundedMinor",
+        "meaning": "Cumulative confirmed PI refunds, including earlier refunds outside cancellation settlement. Minor units of /paymentTerms/currency.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent; initialization must execute first.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "This PI confirmed payment ledger",
+          "unit": "currency minor units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Cancellation Settlement Functions.cancellationPlan / reconcileCancellationPayment.",
+        "id": "authorizedMinor",
+        "meaning": "Remaining secured authorization; neither cumulative authorizations nor captured money. Minor units of /paymentTerms/currency.",
+        "path": "/payment/secured",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent; initialization must execute first.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Cancellation Settlement Functions.cancellationPlan / reconcileCancellationPayment.",
+        "id": "currency",
+        "meaning": "Currency of this PI; the frozen Order quote and cancellation decisions must match it.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown when absent; initialization must execute first.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Cancellation Settlement Functions.cancellationPlan / reconcileCancellationPayment.",
+        "id": "accepted",
+        "meaning": "Whether the guarantor has accepted this PI. True is required before requesting cancellation-related money operations.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown when absent; initialization must execute first.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Cancellation Settlement Functions.cancellationPlan / reconcileCancellationPayment.",
+        "id": "transactionId",
+        "meaning": "Initiated payment transaction identifier; a nonempty value is required before new financial requests.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Cancellation Settlement Functions\n\nInternal reusable functions shared by the PI-side Cancellation Payment Clause and Order-side Cancellation Settlement Clause. The calling clause supplies its data bindings; this helper does not define a default projection path or install triggers on its own.\n\nA cancellation decision specifies the charge to retain, not a refund amount. The calculation validates the frozen quote identity, currency and whole-Order PI amount, each group proposal and line membership, and each terminal decision identity, basis and charge bounds. Groups without a cancellation decision keep their price in the target. Pending supplier/customer decisions prevent extra capture or authorization release, while confirmed excess receipts may be refunded.\n\nReconciliation reads the PI ledger: completed captures and reversals are cumulative; secured funds are the remaining authorization. It waits for pending/unknown financial operations. It requests refund of an excess, otherwise capture of the required retained charge, then void of any remaining authorization after capture confirmation. It never authorizes additional money. Native activation, acceptance/initiation, locks, capture gate, recipient approval, remaining authorization and capture limit still apply. Failed/declined requests are not retried automatically; an explicit payment-workflow retry can recover them. Deterministic request identifiers and unchanged-state suppression prevent duplicate requests/projections. Only guarantor outcomes confirm financial results; a request or Cancellation Settlement Changed event does not.\n\nThis covers one PI for the entire frozen Order amount and currency. It does not allocate deposits or multiple PIs. The Order origin and current decision/amount projection are checked on return; stale PI projections are ignored. The reservation business status is not changed by settlement."
+}

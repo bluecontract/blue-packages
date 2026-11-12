@@ -177,6 +177,9 @@ orderTemplate:
         required: []
         preActivationChannels:
         - cx.payment.prepare.onOrderCreated_source
+        - cx.payment.prepare.onOrderCreated_arm_source
+        preActivationTimerChannels:
+        - cx.payment.prepare.onOrderCreated_source
         preActivationOperations:
         - providePayment
     payment:
@@ -267,7 +270,16 @@ orderTemplate:
           observer: partner
         prepare:
           onOrderCreated:
-            'on': initialized
+            'on': timer
+            timestamp: 0
+            when:
+              $and:
+              - $exists:
+                  $document: /contracts/initialized
+              - $eq:
+                - $size:
+                    $document: /process_payment/entries
+                - 0
             params:
               values:
                 amountMinor:

@@ -1,0 +1,155 @@
+{
+  "blueId": "4WwRg2GL5HhBbzxau7r7wKFzyemZj6r3wgiAxCjZBiFv",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "DSWEChWS9dy1WGj3W5wW7pJfFVvGfMa4dihCFjwHetf",
+      "2sSugnwiV9M2YxKDg42MuRpcG48RJgxteq76tHbYFmdi",
+      "7hZBxZQ4pz6fjMddyrVMEDakNuy4Y3ivoWNb5dSjdQQP",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "3WukTexA1Nex951RDHoA6S6QfNgFmdiBpigfRUzi9YMh",
+      "8Dd12DcFEA1kiGauJwvVHEwJAMKRPKDGDDxgxWgsdyRG",
+      "Ff1CegGgBpYqfdpiZTaETSzodJXf7rh5FNZNJE7KBcdx",
+      "26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG"
+    ],
+    "displayLabel": "Document Access",
+    "limitations": [
+      "The implementation of the refresh step copied into embedded-update handlers is omitted; its effects cannot be established from its reference alone.",
+      "Activation's active, accessReady, functional, termsAccepted, status and reason fields are defined by computeState but are absent from supplied documentPaths, so no structured facts target them."
+    ],
+    "parameterRefs": [
+      "bindings.grants",
+      "bindings.refresh"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; installation treats absence as an empty map.",
+        "aggregate": {
+          "operation": "count",
+          "over": "grants",
+          "unit": "registered access documents"
+        },
+        "binding": "grants",
+        "defaultPath": "/documentAccess",
+        "evidence": "Timeline Access Functions.installTimelineAccess: known, added and basePath",
+        "id": "registeredAccessDocuments",
+        "meaning": "Count of locally registered access documents by original identity; not a count of effective permissions.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown if list missing; empty list grants no key.",
+        "aggregate": null,
+        "binding": "grants",
+        "defaultPath": "/documentAccess",
+        "evidence": "Timeline Access.allowedKeys; Coordination §§2.2, 7.1",
+        "id": "allowedReaderKey",
+        "meaning": "Ed25519 reader key, 64 lowercase hex characters, permitted to read every timeline in this access document.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/allowedKeys/*",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; a timeline requires its URL.",
+        "aggregate": null,
+        "binding": "grants",
+        "defaultPath": "/documentAccess",
+        "evidence": "Timeline.url; Coordination §§2.2–2.3, 7.1",
+        "id": "allowedTimelineUrl",
+        "meaning": "Canonical HTTPS history URL; exact timeline identity also includes its provider and publicRead value.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/allowedTimelines/*/url",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence does not mean private.",
+        "aggregate": null,
+        "binding": "grants",
+        "defaultPath": "/documentAccess",
+        "evidence": "Timeline.publicRead; Coordination §4.1",
+        "id": "allowedTimelinePublicRead",
+        "meaning": "Whether the timeline independently allows public reads, without a reader grant.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/allowedTimelines/*/publicRead",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; provider channel requires a URL.",
+        "aggregate": null,
+        "binding": "grants",
+        "defaultPath": "/documentAccess",
+        "evidence": "Timeline Access.contracts.provider; Coordination §§7.1–7.3",
+        "id": "accessControlTimelineUrl",
+        "meaning": "Public provider control history carrying permission publications and updates; remains public after revocation.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/contracts/provider/url",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; provider requires a verification key.",
+        "aggregate": null,
+        "binding": "grants",
+        "defaultPath": "/documentAccess",
+        "evidence": "Timeline Provider.publicKey; Coordination §§3, 7.1",
+        "id": "accessProviderVerificationKey",
+        "meaning": "Provider's Ed25519 verification key for authenticated access history; distinct from allowed reader keys.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/contracts/provider/provider/publicKey",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; access checks use an empty-list fallback.",
+        "aggregate": {
+          "operation": "count",
+          "over": "/activation/accessPaths",
+          "unit": "access-document paths"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Timeline Access Functions.installTimelineAccess; Party Access Functions.accessValid",
+        "id": "activationAccessPathCount",
+        "meaning": "Count of embedded access-document paths used by Activation, including paths supplied outside this clause.",
+        "path": "/activation/accessPaths",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; commitState uses false as its fallback.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.commitState: everActivated",
+        "id": "everActivated",
+        "meaning": "Whether Activation has ever been active; remains true through later access suspension or closure.",
+        "path": "/activation/everActivated",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; do not infer revision 1.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.computeState, refreshAccessRequests and approve",
+        "id": "activationRevision",
+        "meaning": "Activation revision used to match pending admission access requests and reviewed acceptance.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Document Access Clause\n\nRegisters existing executable Timeline Access documents as embedded permission evidence and connects them to Activation's access checks. Registration records evidence locally; permission changes remain provider-owned.\n\n## Bindings and actions\n\n- `bindings.grants` is a required non-root JSON pointer, defaulting to `/documentAccess`. Its collection contains embedded access documents keyed by their original initialized document identity. Changing this binding changes the registration and embedding location.\n- `bindings.refresh` configures connections for `refresh`. Its default connection, `accessRegistered`, observes changes to `/activation/accessPaths`. It is an action connection, not a data location.\n- `register` takes `documents`, defaulting to the trigger's `documents`, or `[]` when absent; connection `params` can override this default. Registration requires one to sixteen documents, so the empty default fails validation. No default `register` connection is declared.\n\n`register` requires `call/requireExactDocumentVersion=true` and a `call/channel` matching a party key in `/activation/parties`. A listed additional representative does not satisfy this lead-only check. Failures include `ACCESS_EXACT_REVIEW_REQUIRED` and `ONLY_PARTY_LEAD_CAN_MANAGE`; connection and document dispatch rules may impose further conditions.\n\nEach submitted document must be Timeline Access with a Public Timeline Channel at `contracts.provider`, an original document at `contracts.initialized.document`, and a provider checkpoint entry. Both the original contracts and the current contracts, excluding current `initialized` and `checkpoint`, must match the expected provider channel and Update Timeline Access operation. Missing initialization, history or matching executable policy rejects registration.\n\nDocuments already registered under the same original identity, including repeats within a batch, are not added again. A newer submitted state with that identity does not replace the existing registration. If nothing is new, the result is `duplicate`. Otherwise, `acceptedNew` records new document references, appends their paths to `/activation/accessPaths`, and installs embedded Timeline Access Updated channels with handlers copied from `/contracts/activationInitializedRefresh/steps`. Under `outcome-v1`, only `acceptedNew` proceeds to connection `after` steps and any `once` completion marker. These outcomes describe local registration, not newly granted provider permissions.\n\n## Permissions and refresh\n\nA registered document's required `allowedKeys` and `allowedTimelines` lists describe read permission: each listed Ed25519 key may read every listed timeline. Lists may be empty, must contain distinct values, and timelines must belong to the declared provider. Provider-authorized updates replace both lists atomically. Timeline Access Updated reports successful update execution, including unchanged-list updates; authoritative permissions come from verified history and the executed access document. Read permission grants no append, resharing or business-operation authority.\n\n`refresh` initializes the terms record if needed, recalculates Activation, and refreshes current-revision admission access requests. For each transport requiring Timeline Access, a single registered access document must match its exact timeline and provider and contain at least one alternative key from every required reader group. Coverage from separate access documents is not pooled for that check. Groups include configured readers, parties and representatives; pending party additions at the current Activation revision also affect the access roster. External Channel transports are exempt from this matching; other transports must be Timeline Channel values.\n\nRecalculation distinguishes `WAITING_FOR_ACCESS` before first activation, `SUSPENDED_ACCESS` after previous activation, `AWAITING_ACCEPTANCE` when access is sufficient but required approvals or current terms are missing, `ACTIVE` when both conditions hold, and `CLOSED` when closed. `everActivated` preserves whether activation has occurred. Registration alone does not establish readiness or acceptance. The installed embedded-update handlers reuse existing refresh steps whose implementation is not supplied here.\n\nInherited connection planning rejects changes to an existing clause configuration with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`."
+}

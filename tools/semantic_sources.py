@@ -165,14 +165,39 @@ def collection_inventory(root, rows, *, retained=False):
     return discover(exports, definitions, aliases['Clauses/Clause']), definitions
 
 
+def equivalent_definition(left, right, left_definitions, right_definitions):
+    """Compare pinned representations, expanding only bare exact references."""
+    def compare(a, b, left_seen, right_seen):
+        if type(a) is type(b):
+            if isinstance(a, dict):
+                if a.keys() == b.keys():
+                    return all(compare(a[key], b[key], left_seen, right_seen) for key in a)
+            elif isinstance(a, list):
+                return len(a) == len(b) and all(
+                    compare(x, y, left_seen, right_seen) for x, y in zip(a, b))
+            else:
+                return a == b
+        if isinstance(a, dict) and set(a) == {'blueId'}:
+            ref = a['blueId']
+            if isinstance(ref, str) and ref in left_definitions and ref not in left_seen:
+                return compare(left_definitions[ref], b, left_seen | {ref}, right_seen)
+        if isinstance(b, dict) and set(b) == {'blueId'}:
+            ref = b['blueId']
+            if isinstance(ref, str) and ref in right_definitions and ref not in right_seen:
+                return compare(a, right_definitions[ref], left_seen, right_seen | {ref})
+        return False
+    return compare(left, right, set(), set())
+
+
 def inventory(root):
     subjects, definitions = {}, {}
     for name, rows, retained in source_collections(root):
         selected, exact = collection_inventory(root, rows, retained=retained)
         for blue_id, definition in exact.items():
-            require(blue_id not in definitions or definitions[blue_id] == definition,
+            require(blue_id not in definitions or equivalent_definition(
+                    definitions[blue_id], definition, definitions, exact),
                     'Conflicting exact definition across collections: ' + blue_id)
-            definitions[blue_id] = definition
+            definitions.setdefault(blue_id, definition)
         for blue_id, subject in selected.items():
             subjects.setdefault(blue_id, dict(subject, collections=[]))['collections'].append(name)
     return dict(sorted(subjects.items())), definitions

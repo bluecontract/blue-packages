@@ -82,6 +82,9 @@ public final class OperationInputConformance {
       var operation=m("name","Fixture","contracts",m("differentPublicName",m("type","Contracts/Sequential Workflow Operation",
           "channel","owner","$blue:requestFrom",m("definition",m("type","Fixture/Library"),"function","approve","argument","input"),
           "steps",List.of())));
+      operation.put("functions",m(
+          "local",m("$blue:functionFrom",m("type","Fixture/Library","function","approve")),
+          "inherited",m("$blue:functionFrom",m("type","Fixture/Inherited","function","approve"))));
       var externalLibrary=m("name","External library","type","Contracts/Compute Definition","functions",m("approve",
           m("args",m("input",m("proposalId",m("type","Text"))),"do",List.of(m("$return",true)))));
       Path externalDist=root.resolve("external/dist");
@@ -117,6 +120,13 @@ public final class OperationInputConformance {
       try(var blue=Blue.builder().packages(PackageBundle.builder().mount("Fixture",pkg).build()).build()) {
         var values=new Contracts(blue,QualificationRuntime.bindings()).execution().values();
         var document=new Exact.Ref(pkg.exportId("Fixture"));
+        for(String name:List.of("local","inherited")) {
+          var selected=values.select(document,"/functions/"+name);
+          var original=values.select(new Exact.Ref(pkg.exportId(name.equals("local")?"Library":"Inherited")),"/functions/approve");
+          require(NativeRuntime.identity(values.exact(selected)).equals(NativeRuntime.identity(values.exact(original))),
+              "Selected function must retain exact identity: "+name);
+          require(values.select(document,"/functions/"+name+"/$blue:functionFrom")==null,"Function marker must not be published");
+        }
         var request=values.select(document,"/contracts/differentPublicName/request");
         require(request!=null,"Builder must publish requestFrom function input as contract.request");
         require(values.select(document,"/contracts/differentPublicName/$blue:requestFrom")==null,"Authoring marker must not be published");
@@ -149,6 +159,14 @@ public final class OperationInputConformance {
         @SuppressWarnings("unchecked") var generated=(Map<String,Object>)bex.execute(program,context,100000).value();
         require(!generated.containsKey("$blue:requestFrom")&&generated.containsKey("request"),"Native generator must return only the standard request matcher");
         require(values.matches(m("revision",4),generated.get("request")),"Generated request accepts its declared input");
+      }
+      for(Object selector:List.of(m("type","Fixture/Library","function","missing"),
+          m("type","Fixture/Library","function",""),m("type","Fixture/Library","function",7),
+          m("type","Fixture/Library","function","approve","extra",true),m("type","Fixture/Optional Input","function","approve"))) {
+        boolean denied=false;
+        try {OperationInputs.publish("Probe",m("Bad",m("selected",m("$blue:functionFrom",selector))),Map.of("Fixture",pkg));}
+        catch(IllegalArgumentException expected){denied=expected.getMessage().contains("Invalid function reference");}
+        require(denied,"Invalid function selector must be rejected: "+selector);
       }
       contracts.put("invalidAdapter",m("request",m(),"$blue:requestFrom",m("definition",m("type","Fixture/Library"),
           "function","missingFunction","argument","input")));

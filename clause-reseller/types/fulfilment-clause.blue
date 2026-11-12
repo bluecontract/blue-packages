@@ -1,0 +1,130 @@
+name: Fulfilment Clause
+description: The configured supplier records execution of the whole accepted Order once, at the operation's
+  timestamp. Every dated group must be confirmed and have reached its start. Cancelled or already fulfilled
+  groups cannot be executed. An identical request is a no-op; another execution request is rejected.
+type: Connections/Connected Clause
+bindingTypes:
+  activation: pointer
+  fulfilment: pointer
+  state: pointer
+  snapshot: pointer
+  requests: pointer
+defaultBindings:
+  activation: /activation
+  fulfilment: /fulfilment
+  state: /reservations
+  snapshot: /orderSnapshot
+  requests: /reservationRequests
+initialState:
+  fulfilment:
+    status: not_fulfilled
+actionDefinition:
+  type:
+    type: Reseller/Order Functions
+    functions:
+      fulfilOrder:
+        args:
+          input: {}
+        do:
+        - $call:
+            function: validateFields
+            args:
+              candidate: {$var: input}
+              allowed: [key]
+              required: [key]
+              error: INVALID_FULFILMENT_FIELDS
+        - $call:
+            function: validateIdentifier
+            args:
+              candidate: {$var: {name: input, path: /key}}
+              error: INVALID_REQUEST_KEY
+        - $let:
+            name: previous
+            expr:
+              $document: {$const: {name: bindings, path: /fulfilment}}
+        - $if:
+            cond:
+              $eq: [{$var: {name: previous, path: /status}}, fulfilled]
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $eq: [{$var: {name: previous, path: /requestKey}}, {$var: {name: input, path: /key}}]
+                    - $eq: [{$var: {name: previous, path: /actor}}, {$binding: call/channel}]
+                message: ORDER_ALREADY_FULFILLED
+            - $return: {outcome: duplicate}
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $pointerGet:
+                    object:
+                      $document: {$const: {name: bindings, path: /activation}}
+                    path: /active
+                - true
+            message: ORDER_NOT_ACCEPTED
+        - $if:
+            cond:
+              $exists:
+                $document: {$const: {name: bindings, path: /state}}
+            then:
+            - $let:
+                name: groups
+                expr:
+                  $document: {$const: {name: bindings, path: /state}}
+            - $failIf:
+                cond:
+                  $gt:
+                  - $add:
+                    - $size:
+                        $document: {$const: {name: bindings, path: /requests}}
+                    - $size: {$var: groups}
+                  - 500
+                message: REQUEST_LIMIT
+            - $forEach:
+                in: {$var: groups}
+                item: group
+                key: groupId
+                do:
+                - $call:
+                    function: fulfilGroup
+                    args:
+                      input:
+                        key:
+                          $concat:
+                          - fulfilment-
+                          - $nodeBlueId:
+                              request: {$var: {name: input, path: /key}}
+                              group: {$var: groupId}
+                              proposal: {$var: {name: group, path: /proposalBlueId}}
+                        groupId: {$var: groupId}
+                        expectedProposalBlueId: {$var: {name: group, path: /proposalBlueId}}
+        - $appendChange:
+            op: replace
+            path: {$const: {name: bindings, path: /fulfilment}}
+            val:
+              status: fulfilled
+              fulfilledAtMicros: {$binding: timestamp}
+              requestKey: {$var: {name: input, path: /key}}
+              actor: {$binding: call/channel}
+        - $appendEvent:
+            $merge:
+            - type:
+                blueId: HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9
+            - clause: {$const: clauseKey}
+              kind: Order Fulfilled
+              fulfilledAtMicros: {$binding: timestamp}
+              requestKey: {$var: {name: input, path: /key}}
+        - $return: {outcome: acceptedNew}
+actions:
+  fulfil:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: fulfilOrder
+            args:
+              input: {$var: params}

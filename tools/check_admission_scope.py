@@ -100,7 +100,7 @@ def check_selection(bridge, plan, stock_id, anchor_id, function_ids, selections)
     for step, names in selections.items():
         program = {
             'functions': {name: plan['functions'][name] for name in
-                          ('assembleAdmissionDefinition', 'admissionDefinition')},
+                          ('assembleAdmissionDefinition', 'admissionDefinition', 'projectCanonicalDefinition')},
             'do': [{'$return': {'$call': {'function': 'assembleAdmissionDefinition', 'args': {
                 'definition': {'$binding': 'input'}, 'names': names,
                 'definitionPath': actual_path, 'canonicalPath': anchor_path,
