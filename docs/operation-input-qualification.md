@@ -120,3 +120,39 @@ replay, guard rejection and routing. Focused cases are `source-binding-cyclic`,
 `source-binding-guards` and `source-binding-routing`. The public case uses actual
 DocumentClause prepare/configureSources and the generated requestFrom matcher,
 then binds the supplied cyclic source; it does not substitute a handwritten matcher.
+
+## Admission before commercial activation
+
+`admission-provision` is an unconditional native scenario; it needs no retained
+capture. Run it against Java 21 and the Core runtime/test classpath described above:
+
+```sh
+python3 tools/check_operation_inputs.py --case admission-provision \
+  --report-dir reports/admission-provision
+```
+
+The fixture uses an inherited-transport Order prepared by a parent Documents
+clause. Its initial Activation profile explicitly permits preparing/providing a
+nested document, approving that document's admission, and the two generated
+admission-update channels before commercial activation. Consent is deliberately
+absent from this allowlist: the generated consent registration must authorize it.
+The nested document requires a guarantor. Actual owner approval and guarantor
+consent admit that party while the Order remains inactive, at Activation revision
+2 and clause-runtime revision 1. The frozen original roster has two parties and
+the candidate has three, so outer `provideOrder` exercises the added-party branch
+of `providedAdmissionProof`, not its unchanged-roster early return.
+
+The parent must retain the inactive candidate as `awaiting_activation`. After
+actual seller/customer approvals, provision selects the active Order. Repeated
+provision preserves the exact obligation identity. Independent copies with a
+changed consent or operation registration are rejected without changing the
+parent or emitting effects; the unmodified copy must preserve native identity.
+No positive witness, access grant or consent registration is manually fabricated.
+
+This qualifies the explicitly configured inherited profile in native
+`AuthoringRuntime`, not signed hosted transport, arbitrary production templates,
+Business clients or a deployed payment flow. The report records package catalogue
+identities, classpath, source revision and dirty/untracked source digests. The
+initial qualification uses Core `64ae47d21c6ba7064fc60738a4ddc6a1d838fb9e` and
+Packages executable artifacts from `5b7d95417285a178ab9a6c811d99010f365387c8`;
+subsequent semantic-card and test-only commits do not rebuild those artifacts.
