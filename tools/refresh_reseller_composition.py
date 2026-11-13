@@ -12,6 +12,45 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def refresh_program_roots(plan):
+    """Read actual emitted Compute programs, including their step-level overrides."""
+    roots = set()
+    overrides = None
+    def calls(value):
+        if isinstance(value, dict):
+            if '$call' in value:
+                name = value['$call']['function']
+                if not isinstance(name, str):
+                    raise ValueError('Dynamic refresh function requires explicit closure review')
+                roots.add(name)
+            for key, child in value.items():
+                if key != '$literal':
+                    calls(child)
+        elif isinstance(value, list):
+            for child in value:
+                calls(child)
+    def visit(value):
+        nonlocal overrides
+        if isinstance(value, dict):
+            if value.get('$let', {}).get('name') == 'refreshFunctions':
+                overrides = value['$let']['expr']
+            if value.get('functions') == {'$var': 'refreshFunctions'}:
+                program = value.get('do', {})
+                if set(program) != {'$literal'}:
+                    raise ValueError('Refresh Compute must expose its complete literal program')
+                calls(program['$literal'])
+                calls({key: child for key, child in value.items() if key != 'do'})
+            for child in value.values():
+                visit(child)
+        elif isinstance(value, list):
+            for child in value:
+                visit(child)
+    visit(plan)
+    if not roots or not isinstance(overrides, dict):
+        raise ValueError('No complete Documents refresh Compute was found')
+    calls(overrides)
+    return roots, overrides
+
 def refresh(root=ROOT):
     records = {}
     # Dependencies first; the candidate Documents archive supplies its exact closure.
@@ -53,6 +92,30 @@ def refresh(root=ROOT):
     metadata = json.loads((root/'clause-documents/dist/package.json').read_text())
     exports = {row['name']: row['blueId'] for row in metadata['exports']}
     functions = effective(exports['Document Preparation Functions'])
+    plan_path = root/'clause-documents/types/preparation-plan.blue'
+    plan_source = plan_path.read_text()
+    plan = yaml.safe_load(plan_source)
+    roots, overrides = refresh_program_roots(plan)
+    reached, pending = set(), list(roots)
+    while pending:
+        name = pending.pop()
+        if name in reached:
+            continue
+        reached.add(name)
+        # Step-level functions take precedence, as in Contracts Compute.
+        body = overrides.get(name, functions.get(name))
+        if body is None:
+            raise ValueError('Missing Documents refresh dependency: '+name)
+        pending.extend(calls(plain(body)))
+    selected = {name: reference(functions[name])['blueId'] for name in sorted(reached - overrides.keys())}
+    generated = yaml.safe_dump({'refreshCanonicalFunctions': selected}, sort_keys=False)
+    generated = ''.join('  '+line+'\n' for line in generated.splitlines())
+    if 'refreshCanonicalFunctions' in plan.get('constants', {}):
+        plan_source, count = re.subn(r'(?ms)^  refreshCanonicalFunctions:\n.*?(?=^  [A-Za-z]|^functions:)', generated, plan_source)
+        assert count == 1
+    else:
+        plan_source = plan_source.replace('constants:\n', 'constants:\n'+generated, 1)
+    plan_path.write_text(plan_source)
     manifest_path = root/'clause-reseller/bootstrap-composition.json'
     manifest = json.loads(manifest_path.read_text())
     source_path = root/'clause-reseller/types/customer-orders-bootstrap-clause.blue'
@@ -87,10 +150,14 @@ def refresh(root=ROOT):
             reached.add(name)
             pending.extend(calls(plain(library[name])))
         return reached
-    updated = yaml.safe_load(source)['actionDefinition']['type']['functions']
-    selected = sorted(closure(['sharedRefresh'], updated))
-    selection = '    refreshFunctionNames:\n'+''.join('    - '+name+'\n' for name in selected)
-    source, count = re.subn(r'(?m)^    refreshFunctionNames:\n(?:    - .*\n)+', selection, source)
+    # The copied planner must carry the same guard metadata. Its plan delegates
+    # directly, so it cannot undo the generic selector's custom-library path.
+    selection = ''.join('    '+line+'\n' for line in yaml.safe_dump(
+        {'refreshCanonicalFunctions': selected}, sort_keys=False).splitlines())
+    if 'refreshFunctionNames' in authored['hookDefinition'].get('constants', {}):
+        source, count = re.subn(r'(?m)^    refreshFunctionNames:\n(?:    - .*\n)+', selection, source)
+    else:
+        source, count = re.subn(r'(?ms)^    refreshCanonicalFunctions:\n.*?(?=^    [A-Za-z]|^  functions:)', selection, source)
     assert count == 1
     planning = effective(exports['Preparation Plan'])
     needed = closure(['plan', 'validateConfiguration', 'validateTransition'], planning)
@@ -104,9 +171,8 @@ def refresh(root=ROOT):
             source, count = re.subn(pattern, replacement, source)
             assert count == 1, target
         else:
-            marker = '  functions:\n'
-            assert source.count(marker) == 1
-            source = source.replace(marker, marker+replacement+'\n')
+            source, count = re.subn(r'(?m)^  functions:\n', lambda match: match.group()+replacement+'\n', source)
+            assert count == 1
     manifest['sourceDefinition'] = exports['Document Preparation Functions']
     manifest['sourcePackageId'] = metadata['packageBlueId']
     source_path.write_text(source)

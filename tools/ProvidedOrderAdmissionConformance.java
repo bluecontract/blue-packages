@@ -24,7 +24,9 @@ public final class ProvidedOrderAdmissionConformance {
     var imports=new LinkedHashMap<String,BluePackage>();
     var config=o(WireData.parse(Files.readString(root.resolve("clause-documents/blue-package.yaml")),"yaml"));
     for(var entry:o(config.get("imports")).entrySet())imports.put(entry.getKey(),BluePackage.open(root.resolve("clause-documents").resolve((String)o(entry.getValue()).get("path")).normalize()));
-    imports.put("Documents",BluePackage.open(root.resolve("clause-documents/dist/package.bluepkg")));
+    var documentPackage=BluePackage.open(root.resolve("clause-documents/dist/package.bluepkg"));
+    imports.put("PublishedDocuments",documentPackage);
+    shared=o(WireData.json(WireData.write(shared).replace("Documents/Admission Functions","PublishedDocuments/Admission Functions")));
     var consumer=m("functions",m("assembleAdmissionPlan",authored.get("assembleAdmissionPlan")));
     var prepared=OperationInputs.publish("Documents",m("Admission Plan Function",shared,"Reference Consumer",consumer),imports);
     shared=o(prepared.get("Admission Plan Function"));
@@ -73,7 +75,8 @@ public final class ProvidedOrderAdmissionConformance {
           if(custom)base.put("actionDefinition",clauseType.get("actionDefinition"));
           base.put("type","Clauses/Clause");
           var freshFunctions=new LinkedHashMap<String,Object>(o(v.bexData(v.select(new Exact.Ref(documents.exportId("Preparation Plan")),"/functions"))));freshFunctions.put("planAdmission",authored.get("planAdmission"));freshFunctions.put("assembleAdmissionDefinition",authored.get("assembleAdmissionDefinition"));freshFunctions.put("assembleAdmissionPlan",preparedReference);
-          base.put("hookDefinition",m("type",m("type","Connections/Connection Planning Functions","constants",m("admissionCanonicalDefinition",m("type","Documents/Admission Functions")),"functions",freshFunctions)));
+          var currentConstants=o(v.bexData(v.select(new Exact.Ref(documents.exportId("Preparation Plan")),"/constants")));
+          base.put("hookDefinition",m("type",m("type","Connections/Connection Planning Functions","constants",currentConstants,"functions",freshFunctions)));
           clauseType=base;
         }
         o(clauses.get("orders")).put("type",clauseType);

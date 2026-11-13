@@ -16,46 +16,60 @@
     ],
     "displayLabel": "Run On Initialization Clause",
     "limitations": [
-      "The supplied documentPaths do not include individual request dispositions or scalar fields within latestReport, so those outcomes cannot be represented as separate path-based state facts."
+      "No per-request document paths or typed scalar paths within latestReport are supplied.",
+      "The schemas of input and instructions are unspecified; successful report content depends on the selected work clause's parameters.reportRequest."
     ],
     "parameterRefs": [
       "parameters.workClause"
     ],
     "stateFacts": [
       {
-        "absent": "Unknown; false applies only after initialization.",
+        "absent": "Unknown; initialization sets false.",
         "aggregate": null,
         "binding": null,
         "defaultPath": null,
-        "evidence": "Run On Initialization Clause.actions.request; Connection Planning Functions.planConnections fired update.",
+        "evidence": "Run On Initialization Clause.actions.request; Connection Planning Functions.planConnections",
         "id": "automaticRequestAccepted",
-        "meaning": "True consumes the automatic connection's once rule after acceptedNew; it does not confirm task success.",
+        "meaning": "True after acceptedNew and after steps finish; blocks another automatic launch, without confirming task completion.",
         "path": "/connectionState_{clauseKey}/request._automatic/fired",
         "scope": "clause",
         "suffix": "",
         "type": "boolean"
       },
       {
-        "absent": "Unknown; the workClause default does not prove ownership.",
+        "absent": "Unknown; do not infer an installed work clause.",
         "aggregate": null,
         "binding": null,
         "defaultPath": null,
-        "evidence": "Task Work Clause.plan states.taskWork.initial.ownerClause; Task Work Functions.request.",
-        "id": "workOwnerClause",
-        "meaning": "Clause key owning the shared Task Work ledger; must match parameters.workClause for a launch.",
+        "evidence": "Task Launch Policy.parameters.workClause; Task Work Functions.request",
+        "id": "selectedWorkClause",
+        "meaning": "Key selecting the exact Task Work Clause that owns the ledger; inherited configuration default is work.",
+        "path": "/clauses/{clauseKey}/parameters/workClause",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; ledger ownership is not established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.hookDefinition.functions.plan; Task Work Functions.request",
+        "id": "ledgerOwner",
+        "meaning": "Task Work Clause key owning this document's request ledger; must match parameters.workClause for launch.",
         "path": "/taskWork/ownerClause",
         "scope": "document",
         "suffix": "",
         "type": "string"
       },
       {
-        "absent": "Unknown; 1 applies only after ledger initialization.",
+        "absent": "Unknown; do not substitute the initial value 1.",
         "aggregate": null,
         "binding": null,
         "defaultPath": null,
-        "evidence": "Task Work Clause.plan states.taskWork; Task Work Functions.request number allocation.",
+        "evidence": "Task Work Clause.hookDefinition.functions.plan; Task Work Functions.request",
         "id": "nextRequestNumber",
-        "meaning": "Sequence number used for the next request identifier; advances on accepted launch, not on task completion.",
+        "meaning": "Sequence number for the next request ID; initialized to 1 and advanced per accepted launch, not a completion count.",
         "path": "/taskWork/nextRequestNumber",
         "scope": "document",
         "suffix": "",
@@ -63,5 +77,5 @@
       }
     ]
   },
-  "semanticText": "# Run On Initialization Clause\n\nAutomatically requests task work on `Clauses Initialized`, the event for successful initial clause installation. Its `request` action has an automatic connection with `on: initialized` and `once: true`. Request acceptance does not establish that the work has succeeded.\n\n## Configuration\n\n`parameters.workClause` defaults to `work`. It must identify a nonempty clause key in the executing document. That clause must have the exact `Task Work Clause` type, and `/taskWork/ownerClause` must match its key. The request rejects an invalid launch-policy type, missing or invalid work binding, incorrect owner type, or owner mismatch.\n\nThe built-in automatic connection supplies no action parameters. Additional named connections under `bindings.request` can supply `params.input`; the request also captures `/instructions` from the executing document. These are request contents, not instructions executed by this launch clause.\n\nAdditional connections may use `initialized` or `workflow`; other source modes are rejected by the request function. A `workflow` connection requires an authenticated channel binding through `channel` or `party`. Connections support `when`, `before`, `after`, and `once`, whose default is `false`. A false `when` skips the connection; a false `parameters.conditions.request` rejects the invocation. The reserved `_automatic` connection cannot be replaced. Clause and connection names must be nonempty and exclude dots, slashes and tildes. Changing an installed clause configuration requires a new clause key.\n\n## Requests and outcomes\n\nAn accepted launch uses `/taskWork/nextRequestNumber` to allocate a `request-<number>` identifier, advances that sequence, creates a `pending` entry in the shared Task Work request ledger, and emits `Task Work Requested`. The event captures the request identifier, instructions and supplied input. The function returns `acceptedNew` with the identifier.\n\nFor a connection with `once: true`, `fired` becomes true only after `acceptedNew` and any `after` steps complete. Later invocations through that connection are skipped. This flag records accepted request creation, not task completion. Each accepted invocation otherwise creates a fresh request; the automatic connection's once rule does not prevent other connections from requesting work.\n\nThe separate Task Work Clause receives correlated reports through `performer`. A `succeeded` report requires a `result` matching its configured `reportRequest` contract. A `failed` report requires a nonempty `error` and forbids `result`. A newly accepted report changes the request's disposition, updates `/taskWork/latestReport`, and emits `Task Report Accepted`. Unknown request identifiers and conflicting final reports are rejected; an identical final report returns `alreadyFinal` without recording another acceptance. The latest report concerns one request and does not establish the outcome of every request in the ledger.\n\nThe work ledger initializes its sequence to `1`, its requests to an empty dictionary, and `latestReport` to an empty object. Connection initialization sets `fired` to `false`. These initialization values do not give absent state a known value."
+  "semanticText": "# Run On Initialization Clause\n\nLaunches a task request after successful initial clause installation. Its `request` action has a built-in `_automatic` connection with `on: initialized` and `once: true`. The trigger is `Clauses Initialized`; issuing the request does not establish that the task has started or completed.\n\n## Configuration\n\n`parameters.workClause` defaults to `work`. It must be a nonempty clause key identifying an exact `Task Work Clause` in the same executing document. The request function checks the installed policy's `Task Launch Policy` parent and requires `/taskWork/ownerClause` to match the selected work clause. Invalid policy, work-clause or ownership configuration rejects the launch.\n\nThe emitted request copies `instructions` from `/instructions` and `input` from the action's `params.input`. The built-in connection supplies no input value. This type declares no input or instructions schema and no data bindings.\n\nAdditional named action connections can be configured under `bindings.request`; `_automatic` is reserved. Request execution accepts only `initialized` and `workflow` sources. A workflow connection requires an authenticated channel binding, with `party` taking precedence over `channel`; its existence does not establish a reader's permission. Additional connections can supply `params`, `when`, `before`, `after` and `once`. Their defaults are empty `params`, true `when`, empty hook lists and false `once`. A false `when` skips execution. Optional `parameters.conditions.request` defaults to true; a false condition rejects execution with `ACTION_CONDITION_FAILED`. Changing an installed clause's configuration under the same clause key is rejected.\n\n## Launch and reported outcome\n\nAn accepted launch allocates `request-<nextRequestNumber>`, advances `/taskWork/nextRequestNumber`, records a `pending` entry in `/taskWork/requests`, and emits `Task Work Requested` containing `requestId`, `input` and `instructions`. The function returns `acceptedNew` with the request ID. These effects establish a new request, not successful performance.\n\nThe connection's `fired` flag is set only after an `acceptedNew` outcome and completion of any `after` steps. Once true, the automatic connection skips subsequent invocations. Failed or skipped attempts do not set that flag, and no separate retry schedule is defined. This once rule applies to the connection: separately configured workflow connections can issue further requests.\n\nThe selected `Task Work Clause` initializes the ledger with `nextRequestNumber: 1`, empty `requests`, empty `latestReport`, and its own clause key as `ownerClause`. Missing state is unknown, not an initialization default.\n\nA pending request awaits a correlated report through the work clause's `performer` channel. A `succeeded` report must match that clause's `parameters.reportRequest` and include `result`. A `failed` report requires a nonempty `error` and forbids `result`. Unknown request IDs are rejected. A newly accepted final report changes the request's disposition, updates `/taskWork/latestReport`, and emits `Task Report Accepted`. Repeating the identical final report returns `alreadyFinal` without another update; a conflicting final report is rejected. `latestReport` describes the most recently accepted final report across the ledger, not the status of every request."
 }

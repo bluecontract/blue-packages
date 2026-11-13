@@ -3,17 +3,15 @@
   "metadata": {
     "covers": [],
     "dependencies": [
-      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
-      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
       "EDMAoBztjCBtY1S7yPRVkxCJen5dgg9fYotDKwtBQxgi",
-      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
-      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
-      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
-      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR"
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
     ],
     "displayLabel": "Termination Clause",
     "limitations": [
-      "The type does not define lifecycle initialization or how readiness is established."
+      "The supplied definitions establish neither lifecycle initialization nor how the document determines readiness."
     ],
     "parameterRefs": [
       "bindings.ready",
@@ -21,13 +19,13 @@
     ],
     "stateFacts": [
       {
-        "absent": "Unknown; request duplicates; finish fails.",
+        "absent": "Unknown; no initial lifecycle value is supplied.",
         "aggregate": null,
         "binding": "state",
         "defaultPath": "/lifecycle",
-        "evidence": "Termination Functions.request/finish; Termination Clause.defaultBindings.state.",
+        "evidence": "Termination Functions.request and finish; Termination Clause.defaultBindings.state",
         "id": "lifecycle",
-        "meaning": "Active permits request; WindingDown awaits ready=true and finish; Terminated records completed termination.",
+        "meaning": "Active permits request; WindingDown awaits readiness and finish; Terminated records the completed lifecycle transition.",
         "path": null,
         "scope": "binding",
         "suffix": "",
@@ -38,9 +36,9 @@
         "aggregate": null,
         "binding": "ready",
         "defaultPath": "/canTerminate",
-        "evidence": "Termination Functions.finish; Termination Clause.defaultBindings.ready.",
-        "id": "terminationReady",
-        "meaning": "Exact true satisfies finish's readiness guard while WindingDown; this clause does not maintain the value.",
+        "evidence": "Termination Functions.finish; Termination Clause.defaultBindings.ready",
+        "id": "readyToTerminate",
+        "meaning": "Document-supplied readiness gate: finish requires Boolean true while WindingDown; this clause does not compute it.",
         "path": null,
         "scope": "binding",
         "suffix": "",
@@ -48,5 +46,5 @@
       }
     ]
   },
-  "semanticText": "# Termination Clause\n\nManages a two-stage lifecycle transition: requesting termination moves `Active` to `WindingDown`; finishing moves `WindingDown` to `Terminated` when readiness is explicitly confirmed.\n\n## Bindings\n\n- `bindings.state` defaults to `/lifecycle`. It points to the lifecycle value read and updated by both actions.\n- `bindings.ready` defaults to `/canTerminate`. It points to the readiness value checked by `finish`; only Boolean `true` satisfies that check. This clause does not update readiness or determine whether outstanding work has been resolved.\n\nBoth bindings require non-root JSON Pointer strings. Overrides relocate the corresponding data within the document where the clause executes. These defaults select locations, not initial values: the type initializes neither field. Missing lifecycle or readiness remains unknown.\n\n## Actions\n\n- **`request`**: If `state` is exactly `Active`, sets it to `WindingDown`, emits a `Domain Event` with `kind: \"Termination Requested\"`, and returns `acceptedNew`. For every other value, including absence, returns `duplicate` without a lifecycle change or termination event. Here, `duplicate` does not prove that a valid termination request previously occurred. Readiness is not checked.\n- **`finish`**: If `state` is already `Terminated`, returns `duplicate` without checking readiness. Otherwise, requires `state` to be exactly `WindingDown`, failing with `WIND_DOWN_REQUIRED` if it is not. Then requires `ready` to be exactly `true`, failing with `OUTSTANDING_WORK` otherwise. On success, sets `state` to `Terminated`, emits a `Domain Event` with `kind: \"Terminated\"`, and returns `acceptedNew`.\n\nBoth events identify the clause instance in `clause`. The functions receive `input` but do not inspect it. A termination request records winding down; completion is the successful, committed transition to `Terminated`.\n\n## Connections\n\nThe action definitions are fixed by the type. Named connections under `bindings.request` and `bindings.finish` determine their triggers; no default connection or actor is supplied. Supported sources are `workflow`, `event`, `channel`, `embedded`, `collection`, `change`, `initialized`, `activated`, and `timer`. Workflow connections select an authenticated channel through `channel` or `party`; action availability alone establishes no viewer permission or personal obligation.\n\nConnection `params` supplies action inputs. A false `when` ignores the trigger. `parameters.conditions` can impose an additional requirement for each action, failing with `ACTION_CONDITION_FAILED`. Optional `before` steps run before the function, including when it subsequently returns `duplicate`. Under these actions' `outcome-v1` contract, `after` steps run only for `acceptedNew`. `once` defaults to `false`; when enabled, an accepted invocation marks that connection fired and suppresses later invocations. Changing an installed clause's configuration requires a new clause key.\n\nOptional timer connections use either an absolute `timestamp` in Unix microseconds, armed at initialization, or `afterEvent` with a positive integer `delayMs` in milliseconds. Relative timers cannot use initialization as their source. Their `policy` defaults to `first`, which ignores later arming events once armed; `latest` emits replacements for the pending keyed timer. Absolute timers cannot specify `delayMs` or `policy`. `cancelOn` requests cancellation without resetting the connection's armed flag. Timer deadlines must satisfy the Time runtime's range and logical ordering rules. Emitting a timer request is not a firing: an admitted firing invokes the action subject to its guards, and processing may occur later than the requested deadline."
+  "semanticText": "# Termination Clause\n\nRecords a two-stage lifecycle transition: request wind-down, then mark termination when the document’s readiness value permits it. Requesting termination and completing termination are distinct outcomes.\n\n## Bindings\n\n- `bindings.state` defaults to `/lifecycle`. It identifies the lifecycle value read and updated by both actions. The recognized values are `Active`, `WindingDown` and `Terminated`.\n- `bindings.ready` defaults to `/canTerminate`. It identifies the readiness value read by `finish`; only Boolean `true` satisfies its readiness guard.\n\nBoth bindings must be non-root JSON pointers in the document where the clause executes. Overrides redirect those reads and writes. These are location defaults, not initial values: the clause neither initializes the lifecycle nor calculates or changes readiness. Missing values remain unknown.\n\n## Actions and outcomes\n\n`request` acts only when `state` is exactly `Active`. It changes the lifecycle to `WindingDown`, emits a `Domain Event` with `kind: \"Termination Requested\"` and `clause` identifying this clause, and returns `outcome: \"acceptedNew\"`. It does not check readiness. For every other lifecycle value—including an absent or unrecognized value—it returns `outcome: \"duplicate\"` without its own changes or events. Consequently, this duplicate result does not prove an earlier termination request succeeded.\n\n`finish` first checks whether the lifecycle is already `Terminated`; if so, it returns `duplicate` without checking readiness. Otherwise it rejects with `WIND_DOWN_REQUIRED` unless the lifecycle is exactly `WindingDown`. It then rejects with `OUTSTANDING_WORK` unless `ready` is exactly Boolean `true`. Passing both guards changes the lifecycle to `Terminated`, emits a `Domain Event` with `kind: \"Terminated\"` and this clause’s identifier, and returns `acceptedNew`.\n\nNeither function uses its `input` fields. The committed lifecycle change establishes the recorded transition; an attempted action does not. `Termination Requested` records entry into wind-down, not completed termination. The clause relies on the supplied readiness value rather than independently inspecting outstanding work, and its termination transition does not itself shut down document processing or perform external cleanup.\n\n## Connections and authority\n\nThe type supplies no automatic connections for either action. Named connections under `bindings.request` and `bindings.finish` determine their triggers; readiness becoming true does not by itself invoke `finish`. Connections can use workflow operations, events, channels, embedded or collection events, document changes, initialization, activation or timers. Workflow connections require an authenticated channel binding; the clause names no fixed actor or viewer permission.\n\nA connection’s false `when` skips execution. An unsatisfied `parameters.conditions` entry for the action rejects with `ACTION_CONDITION_FAILED`. Configured `before` steps precede the action, while `after` steps run only for `acceptedNew`. With `once: true`, the connection is marked fired after that accepted execution and its `after` steps; duplicates do not consume it. `once` defaults to false. Thus a duplicate termination function performs no lifecycle effects of its own, but configured `before` steps may already have run."
 }

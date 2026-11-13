@@ -7,9 +7,11 @@
       "EbCfAgGdGzqdNGkDAXfeZCzmbghuB1oJNACdKRrtWnQD",
       "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
       "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
       "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
       "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
       "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
       "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
       "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
       "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
@@ -17,78 +19,52 @@
     ],
     "displayLabel": "Status Clause",
     "limitations": [
-      "Business meanings and terminality of status labels depend on the configured state machine; no initial status value is defined."
+      "The supplied evidence does not specify admission rules for the concrete channels selected by workflow or channel connections."
     ],
     "parameterRefs": [
       "bindings.state"
     ],
     "stateFacts": [
       {
-        "absent": "Unknown; this clause defines no initial status.",
+        "absent": "Unknown; this type declares no initial status.",
         "aggregate": null,
         "binding": "state",
         "defaultPath": "/status",
-        "evidence": "Status Clause.defaultBindings.state; State Machine Functions.functions.transition",
-        "id": "status",
-        "meaning": "Current configured status; permitted next targets come from parameters.transitions. No fixed terminal labels are defined.",
+        "evidence": "Status Clause.defaultBindings; State Machine Functions.transition reads and replaces bindings.state.",
+        "id": "currentStatus",
+        "meaning": "Current configured status label. Successors depend on parameters.transitions; no fixed terminal labels or awaited actor are defined.",
         "path": null,
         "scope": "binding",
         "suffix": "",
         "type": "string"
       },
       {
-        "absent": "Unknown; false is supplied only by initialization.",
+        "absent": "Unknown; planned false applies only after initialization.",
         "aggregate": null,
         "binding": null,
         "defaultPath": null,
-        "evidence": "Connection Planning Functions.planConnections: initial state and outcome-v1 body",
+        "evidence": "Connection Planning Functions.planConnections: initial fired and generated outcome-v1/once handling.",
         "id": "connectionFired",
-        "meaning": "True records an acceptedNew run of a once connection and suppresses later runs; false does not prove no transition occurred.",
+        "meaning": "For once=true, true records acceptedNew followed by completed after steps. False does not universally mean no prior transition.",
         "path": "/connectionState_{clauseKey}/*/fired",
         "scope": "clause",
         "suffix": "",
         "type": "boolean"
       },
       {
-        "absent": "Unknown; false is supplied only by initialization.",
+        "absent": "Unknown; planned false applies only after initialization.",
         "aggregate": null,
         "binding": null,
         "defaultPath": null,
-        "evidence": "Connection Planning Functions.planConnections: initial state and timer arm task",
+        "evidence": "Connection Planning Functions.planConnections: initial armed, timer arm guard and arm change.",
         "id": "connectionArmed",
-        "meaning": "Records timer arming; remains true after cancellation or firing and does not establish that a timer is still pending.",
+        "meaning": "For timers, true records arming and blocks further first-policy arming. It does not establish a pending timer or accepted transition.",
         "path": "/connectionState_{clauseKey}/*/armed",
         "scope": "clause",
         "suffix": "",
         "type": "boolean"
-      },
-      {
-        "absent": "Unknown; a relative or non-timer source may be used.",
-        "aggregate": null,
-        "binding": null,
-        "defaultPath": null,
-        "evidence": "Connection Planning Functions.planConnections: absolute timestamp validation",
-        "id": "absoluteTimerDeadline",
-        "meaning": "Configured absolute timer deadline in Unix microseconds; it is not an observed firing or transition time.",
-        "path": "/clauses/{clauseKey}/bindings/transition/*/timestamp",
-        "scope": "clause",
-        "suffix": "",
-        "type": "date-micros"
-      },
-      {
-        "absent": "Unknown; no relative delay is established.",
-        "aggregate": null,
-        "binding": null,
-        "defaultPath": null,
-        "evidence": "Connection Planning Functions.planConnections: delayMs validation and arm deadline",
-        "id": "relativeTimerDelay",
-        "meaning": "Positive integer duration in milliseconds added to the afterEvent source's logical timestamp for a relative timer.",
-        "path": "/clauses/{clauseKey}/bindings/transition/*/delayMs",
-        "scope": "clause",
-        "suffix": "",
-        "type": "number"
       }
     ]
   },
-  "semanticText": "# Status Clause\n\nMaintains a configurable document status and allows transitions according to the current status. Status labels have document-specific meanings; this type defines no fixed vocabulary or terminal state.\n\n## Configuration\n\n- `bindings.state` points to the status in the executing document. It defaults to `/status` and must be a non-root JSON Pointer. This is a location default, not an initial status value; the clause does not initialize the status.\n- `parameters.transitions` maps current status values to lists of allowed target values.\n- `parameters.subject` supplies the prefix for the emitted event's `kind`. Neither parameter has a defined default.\n- The `transition` function requires a text `to` target. Its optional text `reason` becomes an empty string when omitted.\n\n## Transition behavior\n\nThe function reads the bound status as `from` and checks the requested `to`:\n\n1. If they are equal, it returns `duplicate` before checking the allowed targets. The function makes no status change and emits no event.\n2. Otherwise, if `to` is absent from `parameters.transitions[from]`, it fails with `DISALLOWED_TRANSITION`.\n3. For an allowed target, it stages replacement of the bound status and a `Domain Event`, then returns `acceptedNew`. The event carries `clause`, `from`, `to`, `reason`, and `kind`, consisting of `parameters.subject`, a space, and `to`.\n\nA committed transition records the document's status change. Requesting a transition is not confirmation that it succeeded, and a status label or emitted event does not independently prove an external business outcome.\n\n## Connections\n\nNamed entries in `bindings.transition` determine when the action runs; this type supplies no automatic connection. Supported `on` sources are `workflow`, `channel`, `event`, `embedded`, `collection`, `change`, `initialized`, `activated`, and `timer`. They connect respectively to an authenticated operation, an existing channel, emitted events, embedded-document events, collection-member events, document updates, `Clauses Initialized`, `Document Activated`, or processor-admitted timer firings. Applicable `event` patterns filter sources; `path` selects document or embedded locations. Embedded and collection sources enable processing of their selected documents unless `embed` is false.\n\nA workflow uses `party`, falling back to `channel`, as its authenticated channel binding. This configuration does not itself establish a viewer's permission or obligation. Connection `params` supplies the transition arguments; the source request or event is available as `trigger`, rather than automatically becoming those arguments.\n\nConnection `when` defaults to true; false skips execution. `parameters.conditions.transition` also defaults to true, but false fails with `ACTION_CONDITION_FAILED`. Configured `before` steps precede the transition. Only `acceptedNew` proceeds to `after` steps and, when `once` is true, marks that connection `fired`. `once` defaults to false. A marked once connection skips subsequent invocations. A duplicate can therefore have run `before` steps, although it skips `after` and does not consume the once allowance.\n\nA timer connection requires exactly one of `timestamp` or `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991; it arms on initialization and disallows `delayMs` and `policy`. A relative timer uses a timestamped `afterEvent` source, excluding initialization, and a positive integer `delayMs` no greater than 9007199254740. Its resulting deadline must fit the same timestamp range. `policy` defaults to `first`; `latest` allows subsequent triggers to replace a pending keyed timer. `first` stops arming once the connection's `armed` marker is true. Neither firing nor `cancelOn` clears that marker in this implementation. `cancelOn` emits a keyed cancellation request.\n\nTimer requests require the compatible Time runtime and are not confirmations of firing. New deadlines must follow the invocation's logical timestamp; fresh standalone initialization without a prior external position may use an elapsed absolute deadline. Processing may occur later than the logical deadline. The connection's `fired` marker records an accepted once action, not every timer firing.\n\nChanging an installed connected clause's configuration requires a new clause key; the inherited transition validator accepts the existing key only for an unchanged clause."
+  "semanticText": "# Status Clause\n\nControls changes to a document’s configured status through the `transition` action. State names and their business meanings come from configuration; the type defines no fixed lifecycle, terminal state or starting status.\n\n## Configuration\n\n- `bindings.state` points to the current status in the document where the clause executes. It defaults to `/status` and must be a non-root pointer beginning with `/`. Changing the binding changes the location read and updated; it does not initialize a status value. An absent status is unknown.\n- `parameters.transitions` maps a current state to its allowed target list. A different target can be accepted only when that list contains it.\n- `parameters.subject` supplies the prefix of the emitted event’s `kind`. No default is declared for `subject` or `transitions`.\n\n## Transition behavior\n\n`transition` takes a required text `to` and optional text `reason`. Once its function runs:\n\n- If `to` equals the current state, it returns `duplicate` before checking the allowed-target list. The function makes no status change and emits no transition event.\n- Otherwise, a target outside the current state’s allowed list fails with `DISALLOWED_TRANSITION`.\n- An allowed new target stages replacement of the bound status, emits a `Domain Event`, and returns `acceptedNew`.\n\nThe event carries `clause` identifying the clause key, `from`, `to`, `reason`, and `kind` formed from `parameters.subject`, a space, and the target. Omitted `reason` becomes an empty string in this event; it does not retrieve a previous explanation.\n\n`duplicate` and `acceptedNew` are action outcomes, not status labels. The state change and event become effective through a committed invocation. A request or trigger alone does not establish a transition, and a status label does not independently confirm an external business outcome.\n\n## Connections and guards\n\nNamed entries under `bindings.transition` connect the action to sources. The type supplies no default connection. Supported `on` values are `workflow`, `event`, `channel`, `change`, `embedded`, `collection`, `initialized`, `activated`, and `timer`. Path-based sources use `path`; channel sources use an existing channel name. Collection handling restricts events to descendants of its selected path. Embedded and collection sources also contribute paths for embedded processing unless `embed` is false.\n\nConnection `params` supplies the transition arguments. Source data is available as `trigger`: the request for a workflow, the underlying event for embedded or collection sources, and the captured initiating trigger for a timer. Arguments are not automatically copied from that trigger.\n\nA false connection `when` skips execution. A false `parameters.conditions.transition` fails with `ACTION_CONDITION_FAILED`. Both checks precede `before` steps. Those steps run before the transition function, so they may already have effects even when the function subsequently returns `duplicate`. Only `acceptedNew` proceeds to `after` steps.\n\n`once` defaults to false. When true, the connection records `fired=true` after an accepted new transition and its `after` steps, then skips later invocations. A duplicate does not consume this allowance. For connections without `once=true`, `fired=false` is not evidence that no transition has occurred.\n\nA `workflow` connection selects `party` when supplied, otherwise `channel`, to name its operation channel. The planner validates the name; these definitions do not establish any particular caller’s permission.\n\n### Optional timers\n\nA timer connection requires exactly one of `timestamp` and `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991, armed by `initialized`; it forbids `delayMs` and `policy`. An `afterEvent` timer requires a timestamped source and positive integer `delayMs` no greater than 9007199254740. Its deadline uses the source’s logical timestamp plus that duration and must remain within the portable timestamp range. Initialization cannot supply this relative-time source.\n\nRelative timer `policy` defaults to `first`, which suppresses later arming once `armed` is true. `latest` instead replaces the connection’s pending keyed timer. The supplied code never clears `armed`, including after cancellation or firing, so it is not a current pending-timer indicator. `cancelOn` emits cancellation for the connection’s timer key; it cannot reverse an earlier firing.\n\nTimers require an explicitly supported Time runtime. Only committed requests register timers. Firing also requires authoritative time, sufficient closed input history, and a still-pending registration; processing may occur late. New deadlines must follow any established causal timestamp, with elapsed absolute deadlines permitted for genuinely new standalone initialization without a committed external position. Neither arming nor timer firing proves that the guarded transition was accepted.\n\nThe planner declares initial `armed=false` and `fired=false` for each connection; missing flags remain unknown. Clause and connection names must be nonempty and exclude `.`, `/`, and `~`. Inherited configuration-transition validation requires an unchanged clause under an existing key; changing its configuration requires a new clause key (`CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`)."
 }

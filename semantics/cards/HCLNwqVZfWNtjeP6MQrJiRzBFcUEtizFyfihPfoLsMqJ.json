@@ -6,50 +6,16 @@
       "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
       "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
       "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
-      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
-      "3x6QGNycNcWQf2no3pa9BemUeLw7EwBUd1quNNQkvc8X",
-      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
-      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
-      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
-      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
-      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk"
     ],
     "displayLabel": "Task Launch Policy",
     "limitations": [
-      "The supplied definitions do not show how parameters.workClause is consumed or how changing it affects Work request routing.",
-      "No launch action body or Work request implementation is supplied. Work-specific arguments, admission rules, outcomes and task lifecycle state are therefore not established."
+      "No concrete launch action or task lifecycle state is declared by this abstract marker. The Work request function's implementation and executable use of parameters.workClause are not supplied."
     ],
     "parameterRefs": [
       "parameters.workClause"
     ],
-    "stateFacts": [
-      {
-        "absent": "Unknown if absent; planned initial value is false.",
-        "aggregate": null,
-        "binding": null,
-        "defaultPath": null,
-        "evidence": "Connection Planning Functions.planConnections: initial state and timer arm task /armed.",
-        "id": "connectionArmed",
-        "meaning": "Records timer arming per connection; remains true after cancellation or firing, so does not establish a pending timer.",
-        "path": "/connectionState_{clauseKey}/*/armed",
-        "scope": "clause",
-        "suffix": "",
-        "type": "boolean"
-      },
-      {
-        "absent": "Unknown if absent; planned initial value is false.",
-        "aggregate": null,
-        "binding": null,
-        "defaultPath": null,
-        "evidence": "Connection Planning Functions.planConnections: initial state and generated body /fired.",
-        "id": "connectionFired",
-        "meaning": "Records the final marker of a once connection; suppresses repeats but does not confirm Work completion.",
-        "path": "/connectionState_{clauseKey}/*/fired",
-        "scope": "clause",
-        "suffix": "",
-        "type": "boolean"
-      }
-    ]
+    "stateFacts": []
   },
-  "semanticText": "# Task Launch Policy\n\nAn abstract Connected Clause marker for policies that invoke the package-owned Work request function. This type supplies no launch action body, task lifecycle or completion guarantee. Its inherited connection machinery determines when declared actions may run; requesting work does not confirm that work started or completed.\n\n## Configuration\n\n`parameters.workClause` defaults to `\"work\"`. The supplied definitions do not show how the Work request function consumes this parameter or how changing it affects routing. No required-value validation for it is shown.\n\n`bindingTypes` is empty, so this marker declares no data bindings. Inherited action bindings associate declared action names with dictionaries of named connections. Executable actions and hooks come from the admitted exact clause type. Clause, action and connection names must be nonempty and contain no dot, slash or tilde. Transition validation rejects a changed clause under its existing key with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`.\n\n## Inherited connection behavior\n\nWhere actions are declared, connections can use `workflow`, `event`, `channel`, `embedded`, `collection`, `change`, `initialized`, `activated` or `timer` sources. `initialized` observes Clauses Initialized; `activated` observes Document Activated. Workflow connections require an authenticated channel binding, selected by `party` when supplied, otherwise `channel`. This does not establish the current viewer's permission or a personal obligation.\n\nAction `defaults` are merged with connection `params`. A false connection `when` skips execution; it defaults to true. Declared `args` must satisfy their argument pattern. Action `require.when` and the corresponding `parameters.conditions` entry must pass or the attempt fails. Conditions naming an unknown action are rejected.\n\nExecution proceeds through optional `preflight`, connection `before`, action `do`, and connection `after`. A declared preflight must set `actionResult.outcome` to `acceptedNew`, `duplicate`, `rejected` or `skipped`; only `acceptedNew` proceeds to `before` and `do`. An action using `resultContract: \"outcome-v1\"` must likewise provide one of those outcomes after `do`; only `acceptedNew` proceeds to `after` and the final once marker. These are action-processing outcomes, not confirmation of external Work completion.\n\n`once` defaults to false. When true, an already marked connection skips subsequent execution. Its marker is written only after the action passes the applicable outcome checks and `after` finishes.\n\nTimer connections require exactly one of `timestamp` or `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991 and cannot use `delayMs` or `policy`. An `afterEvent` timer requires a timestamped source and a positive integer `delayMs` no greater than 9007199254740. Its `policy` defaults to `first`, which suppresses further arming once marked armed; `latest` allows replacement of the pending keyed timer. Optional `cancelOn` emits a cancellation request. Committed requests require the Time runtime: emission is not firing, and cancellation cannot undo an earlier firing.\n\n## Connection state\n\nThe inherited planner supplies `armed: false` and `fired: false` for each connection under `/connectionState_{clauseKey}`, keyed by the joined action and connection names. Missing state is unknown, not an initialized false value.\n\n`armed` records timer arming. Neither cancellation nor firing clears it in the supplied implementation, so it is not a current pending-timer indicator; a cancelled `first` timer remains blocked from rearming by this flag. `fired` records reaching the final marker of a `once` connection, not task completion or every timer firing. Connections without `once` do not set it through this execution path. No Work request status, task result or task completion date is established by these flags."
+  "semanticText": "# Task Launch Policy\n\nAn abstract Connected Clause marker for policies that invoke the package-owned Work request function. It supplies shared configuration without declaring a concrete task-launch action.\n\n`parameters.workClause` defaults to `\"work\"` and identifies the intended Work clause. The supplied definition does not implement lookup or invocation using this parameter, so the behavior of another value depends on the concrete policy.\n\nThe inherited Connected Clause framework turns named connections into native channels and workflows. Executable hooks and actions come from the admitted exact clause type. This marker declares no concrete actions, and `bindingTypes` is empty; it therefore establishes no task trigger, requesting actor or task lifecycle state.\n\nInherited planning requires a nonempty clause key without `.`, `/` or `~` and rejects undeclared bindings. Changing an existing clause's configuration under the same key fails transition validation with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`.\n\nThe Work request function's implementation is not supplied, so its arguments, acceptance rules and task outcomes are not established here. A request alone does not confirm that a task started or completed."
 }

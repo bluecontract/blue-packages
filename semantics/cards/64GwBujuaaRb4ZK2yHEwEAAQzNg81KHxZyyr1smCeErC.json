@@ -15,39 +15,39 @@
     ],
     "stateFacts": [
       {
-        "absent": "Unknown; missing value fails validation.",
+        "absent": "Unknown; missing value fails validation when checked.",
         "aggregate": null,
         "binding": "terms",
         "defaultPath": "/terms",
-        "evidence": "Commercial Terms Validation Clause.actions.validate.do: commissionBps checks.",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do[0]: commissionBps checks.",
         "id": "commissionBps",
-        "meaning": "Commission rate in basis points; validation requires an integer from 0 through 10000 inclusive.",
+        "meaning": "Commission rate in basis points; validation requires an integer from 0 through 10000, inclusive.",
         "path": null,
         "scope": "binding",
         "suffix": "/commissionBps",
         "type": "number"
       },
       {
-        "absent": "Unknown; missing value fails validation.",
+        "absent": "Unknown; missing value fails its validation check.",
         "aggregate": null,
         "binding": "terms",
         "defaultPath": "/terms",
-        "evidence": "Commercial Terms Validation Clause.actions.validate.do: currency comparison.",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do[1]: currency comparison.",
         "id": "settlementCurrency",
-        "meaning": "Settlement currency; validation accepts only the exact value USD.",
+        "meaning": "Settlement currency read from the terms; validation requires exactly USD.",
         "path": null,
         "scope": "binding",
         "suffix": "/currency",
         "type": "currency"
       },
       {
-        "absent": "Unknown; the planned initial value is false.",
+        "absent": "Unknown; false applies only after initialization.",
         "aggregate": null,
         "binding": null,
         "defaultPath": null,
-        "evidence": "Connection Planning Functions.planConnections: initial fired=false, once guard and final fired=true write.",
+        "evidence": "Connection Planning Functions.planConnections: initial fired=false and once completion update.",
         "id": "automaticValidationCompleted",
-        "meaning": "True records completed automatic validation; false means no completion recorded. Clauses Initialized triggers the check.",
+        "meaning": "True records completed automatic validation on Clauses Initialized; false does not distinguish waiting from failure.",
         "path": "/connectionState_{clauseKey}/validate._automatic/fired",
         "scope": "clause",
         "suffix": "",
@@ -55,5 +55,5 @@
       }
     ]
   },
-  "semanticText": "# Commercial Terms Validation Clause\n\nChecks a document’s percentage commission and USD settlement currency on clause initialization.\n\n`bindings.terms` is a required non-root document pointer, defaulting to `/terms`. Changing it selects a different terms object. The `validate` action checks these fields in order:\n\n- `commissionBps` must be an integer from 0 through 10000 inclusive, representing 0% through 100% in basis points. Otherwise it fails with `INVALID_COMMISSION_TERMS`.\n- `currency` must equal `\"USD\"` exactly. Otherwise it fails with `UNSUPPORTED_CURRENCY`.\n\nNeither field has a default. Missing values fail their respective checks. Validation reads the bound values without changing them, calculating a commission amount or performing settlement.\n\nThe automatic connection uses `on: initialized`, mapped by the inherited planner to `Clauses Initialized`, the event for successful initial clause installation. It has `once: true`: completing the connection records `fired: true`, and subsequent invocations of that connection are skipped. A failed attempt does not establish successful validation. The completion flag records a past check; it does not establish that subsequently edited terms remain valid.\n\nAn optional inherited `parameters.conditions.validate` condition must pass before the checks run; otherwise the action fails with `ACTION_CONDITION_FAILED`. Additional named connections in `bindings.validate` can invoke the same action, but cannot replace the reserved `_automatic` connection. The automatic connection’s once-only rule does not apply globally to those other connections.\n\nInherited transition validation requires a new clause key to change an installed clause configuration, reporting `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY` for a change under the existing key."
+  "semanticText": "# Commercial Terms Validation Clause\n\nValidates a percentage commission and the USD settlement currency when clauses are initialized. It checks commercial terms; it does not calculate or settle a commission.\n\n`bindings.terms` identifies the terms within the executing document and defaults to `/terms`. It must be a non-root pointer beginning with `/`. An override changes where both fields are read:\n\n- `commissionBps` must be an integer from `0` through `10000`, inclusive, representing 0% through 100% in basis points. A missing, non-integer or out-of-range value fails with `INVALID_COMMISSION_TERMS`.\n- `currency` must equal the text `USD`. This check follows the commission check and fails with `UNSUPPORTED_CURRENCY` for any other or missing value.\n\nNeither field has a default, and validation does not populate or correct them.\n\nThe runtime invokes `validate` through its built-in `_automatic` connection: `on: initialized` selects the `Clauses Initialized` event, and `once: true` applies to this connection. Its `fired` flag starts as false when connection state is initialized and becomes true after successful completion. Later invocations through that connection are skipped. An attempted validation alone does not establish completion; an absent flag is unknown.\n\nInherited configuration permits additional named connections under `bindings.validate`; `_automatic` is reserved. A connection's `when` condition can skip its execution. If supplied, `parameters.conditions.validate` must hold before the terms checks, otherwise the action fails with `ACTION_CONDITION_FAILED`. The inherited transition check requires a new clause key to change an existing clause's configuration (`CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`).\n\nThe default connection does not recheck later edits to the bound terms. Its completion flag records a past successful validation, not a guarantee that the current terms still satisfy the checks."
 }
