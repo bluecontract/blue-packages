@@ -132,27 +132,48 @@ python3 tools/check_operation_inputs.py --case admission-provision \
 ```
 
 The fixture uses an inherited-transport Order prepared by a parent Documents
-clause. Its initial Activation profile explicitly permits preparing/providing a
-nested document, approving that document's admission, and the two generated
-admission-update channels before commercial activation. Consent is deliberately
-absent from this allowlist: the generated consent registration must authorize it.
-The nested document requires a guarantor. Actual owner approval and guarantor
-consent admit that party while the Order remains inactive, at Activation revision
-2 and clause-runtime revision 1. The frozen original roster has two parties and
-the candidate has three, so outer `provideOrder` exercises the added-party branch
-of `providedAdmissionProof`, not its unchanged-roster early return.
+clause. Its initial Activation profile permits nested preparation/provision,
+owner approval and generated admission-update channels before commercial
+activation. Participant consent uses its real generated registration. Owner
+approval alone does not add the guarantor; actual participant consent completes
+admission while the Order remains commercially inactive. Admission records its
+revision and progress event without producing `admittedTerms`.
 
-The parent must retain the inactive candidate as `awaiting_activation`. After
-actual seller/customer approvals, provision selects the active Order. Repeated
-provision preserves the exact obligation identity. Independent copies with a
-changed consent or operation registration are rejected without changing the
-parent or emitting effects; the unmodified copy must preserve native identity.
-No positive witness, access grant or consent registration is manually fabricated.
+Providing that Order to its parent is rejected with
+`PREPARATION_UNDECLARED_PARTY`: the prepared roster has seller/customer and the
+candidate additionally has a guarantor. Missing, plausible and tampered legacy
+witness fields cannot authorize this exception. Each rejection preserves the
+parent identity and emits no effects. Rejection concerns the undeclared roster,
+not the presence of a field, history or an arbitrary revision limit.
 
-This qualifies the explicitly configured inherited profile in native
-`AuthoringRuntime`, not signed hosted transport, arbitrary production templates,
-Business clients or a deployed payment flow. The report records package catalogue
-identities, classpath, source revision and dirty/untracked source digests. The
-initial qualification uses Core `64ae47d21c6ba7064fc60738a4ddc6a1d838fb9e` and
-Packages executable artifacts from `5b7d95417285a178ab9a6c811d99010f365387c8`;
-subsequent semantic-card and test-only commits do not rebuild those artifacts.
+A separately initialized candidate retains its original seller/customer roster.
+Ordinary provision stores it as `awaiting_activation`; real seller/customer
+approvals make it `usable`. Repeating either inactive or accepted provision
+preserves the exact obligation identity without duplicate effects.
+
+`admission-planner` independently qualifies the general admission planner,
+exact function references, malformed-reference rejection and native output parity
+for canonical and custom definitions. `reseller-bootstrap-pins` checks the full
+copied action-function library against the current Documents definition and
+package provenance, preserving domain overrides and excluding proof-only pins.
+
+```sh
+python3 tools/check_operation_inputs.py --case refresh-definition \
+  --case admission-provision --case admission-planner \
+  --case reseller-bootstrap-pins --report-dir reports/admission-cleanup
+```
+
+The undeployed exception allowing a document with newly admitted parties to
+satisfy an earlier parent's prepared roster has been withdrawn. General
+Documents/Activation admission, owner approval, participant consent, access
+coverage, reader-only access and refresh custom-definition support remain.
+This scenario intentionally exercises admission; the target payment reader flow
+prepares the guarantor as an Order reader and a PI party without late admission
+to the Order. Complete reader-flow and four-party `newOrder` integration belong
+to the subsequent Core qualification.
+
+These probes qualify native `AuthoringRuntime`, not signed hosted transport,
+Business clients or a deployed payment flow. Reports record exact package
+catalogue identities, classpath, source revision, dirty/untracked source digests,
+operation gas and timings. Gas uses the existing runtime and limits; an older
+Core measurement is not a result for this candidate.

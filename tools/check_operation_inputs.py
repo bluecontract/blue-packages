@@ -39,6 +39,8 @@ CASES = {
     'refresh-definition': ('RefreshDefinitionConformance',),
     'admission-consent-declarations': ('AdmissionConsentDeclarationConformance',),
     'admission-provision': ('AdmissionProvisionConformance',),
+    'admission-planner': ('ProvidedOrderAdmissionConformance',),
+    'reseller-bootstrap-pins': ('ResellerBootstrapFunctionPinsConformance',),
     'admission-definition': ('AdmissionDefinitionConformance',),
     'static-identity-predicate': ('StaticIdentityPredicateConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
@@ -83,7 +85,7 @@ def main():
     sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
-    if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance', 'RefreshDefinitionConformance', 'AdmissionProvisionConformance'} & sources:
+    if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance', 'RefreshDefinitionConformance', 'AdmissionProvisionConformance', 'ProvidedOrderAdmissionConformance'} & sources:
         sources.add('BootstrapPreparationConformance')
     if {'StaticIdentityPredicateConformance', 'AdmissionProvisionConformance'} & sources:
         sources.add('AdmissionConsentDispatchConformance')

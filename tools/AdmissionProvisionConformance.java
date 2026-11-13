@@ -29,6 +29,7 @@ public final class AdmissionProvisionConformance {
     var parent=BootstrapPreparationConformance.source(null);
     parent.put("orders",m());
     var outer=o(o(parent.get("clauses")).get("orders"));
+    o(outer.get("parameters")).put("specialization",m("dataPaths",List.of("/size")));
     var order=o(o(outer.get("parameters")).get("template"));
     order.put("payments",m());
     var activation=o(o(o(order.get("clauses")).get("activation")).get("parameters"));
@@ -47,6 +48,20 @@ public final class AdmissionProvisionConformance {
     o(order.get("clauses")).put("payment",inner);
     return parent;
   }
+  static void rejected(Contracts p,Contracts.Document parent,Object input,long time,String expected){
+    var denied=p.process(parent,input,time);
+    check(!denied.commits(),"Accepted invalid provision: "+expected);
+    boolean precise=false;
+    try {ClauseGasProbe.diagnose(p,parent,input,time);}
+    catch(blue.bex.BexError failure) {
+      precise=failure.getMessage().contains(expected);
+      if(!precise)throw failure;
+    }
+    check(precise,"Expected rejection "+expected);
+    check(parent.identity().equals(denied.document().identity()),"Rejected provision changed parent");
+    check(p.emitted(denied).isEmpty(),"Rejected provision emitted effects");
+    System.out.println("Rejected invalid provision: "+expected);
+  }
   public static void main(String[] args)throws Exception{
     var root=Path.of(args[0]);var bundle=PackageBundle.builder();
     for(String[] a:List.of(new String[]{"Contracts","blue-contracts"},new String[]{"Clauses","blue-clauses"},new String[]{"Connections","clause-connections"},new String[]{"Activation","clause-activation"},new String[]{"Parties","blue-parties"},new String[]{"Documents","clause-documents"},new String[]{"Orders","blue-orders"},new String[]{"Agreements","blue-agreements"}))bundle.mount(a[0],BluePackage.open(root.resolve(a[1]+"/dist/package.bluepkg")));
@@ -56,9 +71,11 @@ public final class AdmissionProvisionConformance {
       parent=apply(p,parent.document(),event(parent.document(),"merchant","merchant","approve_merchant",m("revision",1)),++clock);
       parent=apply(p,parent.document(),event(parent.document(),"merchant","merchant","prepareOrder",m("type","Documents/Preparation Input","key","one","values",m("size",42))),++clock);
       var outer=item(p,parent.document(),"orders");
+      check(((List<?>)outer.get("slots")).stream().anyMatch(slot->"/size".equals(o(slot).get("path"))),"Fixture must declare size as a provider data slot");
       var orderSource=exact(p,parent.document(),outer.get("itemPath")+"/prepared");
       var initialized=p.initialize(orderSource);if(!initialized.commits())ClauseGasProbe.diagnose(p,orderSource);
       var order=ok(initialized);
+      var initialTermsRef=p.read(order.document(),"/activation/terms/ref");
       check(!Boolean.TRUE.equals(p.read(order.document(),"/activation/active")),"Order must start inactive");
       check(((Number)p.read(order.document(),"/clauseRuntime/revision")).intValue()==1,"Initial clause revision");
       order=apply(p,order.document(),event(order.document(),"seller","merchant","preparePayment",m("type","Documents/Preparation Input","key","payment","values",m("size",42))),++clock);
@@ -71,37 +88,69 @@ public final class AdmissionProvisionConformance {
       var contracts=o(exact(p,order.document(),"/contracts"));String consent=contracts.keySet().stream().filter(x->x.startsWith("consentAdmission_payment_")).findFirst().orElseThrow();
       String channel=(String)o(contracts.get(consent)).get("channel");
       check(!Boolean.TRUE.equals(p.read(order.document(),"/activation/active")),"Consent must be available before commercial activation");
+      check(!o(p.read(order.document(),"/activation/parties")).containsKey("guarantor"),"Approval without participant consent must not admit");
+      var values=p.execution().values();
+      // Predicate-level stale-token guard; the positive admission below still requires real consent.
+      var pendingExact=new Exact.Ref(order.document().blueId());
+      var admissionDefinition=values.source(m("type","Documents/Document Preparation Functions"),"definition");
+      var library=values.bexData(values.select(admissionDefinition,"/functions"));
+      for(boolean stale:List.of(false,true)) {
+        var modeled=o(Values.copy(values.literal(pendingExact)));
+        AdmissionConsentDispatchConformance.patch(values,pendingExact,modeled,staged.get("itemPath")+"/consents/guarantor","approve");
+        if(stale)AdmissionConsentDispatchConformance.patch(values,pendingExact,modeled,"/activation/revision",999);
+        var expression=m("functions",library,"constants",m("clauseKey","payment","bindings",m()),"expr",m("$call",m("function","admissionInstallRequest","args",m())));
+        var result=p.execution().evaluatePredicate(values.source(modeled),values.source(m()),"input",values.source(expression),10000000);
+        check(Boolean.TRUE.equals(o(result.value()).get("ready"))!=stale,"Admission token freshness guard stale="+stale);
+        System.out.println("Predicate admission token stale="+stale+" gas="+result.gasUsed());
+      }
+
       order=apply(p,order.document(),event(order.document(),channel,"guarantor",consent,m("admissionRef",staged.get("admissionRef"),"decision","approve")),++clock);
       check(o(p.read(order.document(),"/activation/parties")).containsKey("guarantor"),"Guarantor admitted");
       check(((Number)p.read(order.document(),"/activation/revision")).intValue()==2,"Admission advances activation revision");
       check(((Number)p.read(order.document(),"/clauseRuntime/revision")).intValue()==1,"Admission preserves clause revision");
       check(!Boolean.TRUE.equals(p.read(order.document(),"/activation/active")),"Admission must not commercially activate Order");
       check(o(p.read(order.document(),"/clauseRuntime/initialDocument/clauses/activation/parameters/parties")).keySet().equals(Set.of("seller","customer")),"Frozen original roster must have two parties");
-      check(o(p.read(order.document(),"/activation/parties")).keySet().equals(Set.of("seller","customer","guarantor")),"Proof must validate an added party, not take equal-roster early return");
+      check(o(p.read(order.document(),"/activation/parties")).keySet().equals(Set.of("seller","customer","guarantor")),"Admission adds a third party to the two-party prepared roster");
       String innerPath=staged.get("itemPath").toString(), outerPath=outer.get("itemPath").toString();
       check("approve".equals(p.read(order.document(),innerPath+"/consents/guarantor")),"Actual consent effect required");
-      check(((Number)p.read(order.document(),innerPath+"/admittedRevision")).intValue()==2,"Completed admission witness revision");
-      var values=p.execution().values();
+      check(((Number)p.read(order.document(),innerPath+"/admittedRevision")).intValue()==2,"Completed admission revision");
+      check(!o(exact(p,order.document(),innerPath)).containsKey("admittedTerms"),"Admission must not produce a provision witness");
       var baselineOrder=new Exact.Ref(order.document().blueId());
-      check(order.document().blueId().equals(NativeRuntime.identity(values.source(Values.copy(values.literal(baselineOrder))))),"Unmodified proof copy preserves exact identity");
-      for(var mutation:Map.of("consent",innerPath+"/consents/guarantor","registration","/activation/admissionConsentOperations/"+consent+"/operationId").entrySet()) {
-        var changed=o(Values.copy(values.literal(baselineOrder)));
-        AdmissionConsentDispatchConformance.patch(values,baselineOrder,changed,mutation.getValue(),mutation.getKey().equals("consent")?false:"foreign");
-        var request=provision(outer,order.document());request.put("document",m("blueId",NativeRuntime.identity(values.source(changed))));
-        var input=event(parent.document(),"merchant","merchant","provideOrder",request);
-        var denied=p.process(parent.document(),input,++clock);
-        check(!denied.commits(),"Accepted tampered "+mutation.getKey());
-        boolean proofRejected=false;
-        try {ClauseGasProbe.diagnose(p,parent.document(),input,clock);}
-        catch(blue.bex.BexError failure) {
-          proofRejected=failure.getMessage().contains("PREPARATION_ADMISSION_PROOF_REQUIRED");
-          if(!proofRejected)throw failure;
+      for(String variant:List.of("absent","plausible","tampered")) {
+        var request=provision(outer,order.document());
+        if(!variant.equals("absent")) {
+          var changed=o(Values.copy(values.literal(baselineOrder)));
+          var witness=m("previousRef",initialTermsRef,"previousRevision",1,
+              "ref",p.read(order.document(),"/activation/terms/ref"),"revision",2,
+              "candidateOrigin",staged.get("candidateOrigin"),"requirementRef",staged.get("requirementRef"),"admissionRef",staged.get("admissionRef"));
+          if(variant.equals("tampered"))witness.put("candidateOrigin","foreign");
+          AdmissionConsentDispatchConformance.patch(values,baselineOrder,changed,innerPath+"/admittedTerms",witness);
+          request.put("document",m("blueId",NativeRuntime.identity(values.source(changed))));
         }
-        check(proofRejected,"Expected strict admission proof rejection for "+mutation.getKey());
-        check(parent.document().identity().equals(denied.document().identity()),"Rejected proof mutated parent");
-        check(p.emitted(denied).isEmpty(),"Rejected proof emitted effects");
-        System.out.println("Rejected tampered "+mutation.getKey());
+        rejected(p,parent.document(),event(parent.document(),"merchant","merchant","provideOrder",request),++clock,"PREPARATION_UNDECLARED_PARTY");
+        System.out.println("Added-party witness variant rejected: "+variant);
       }
+      // A separate candidate retains the originally prepared roster and ordinary commercial gate.
+      order=ok(p.initialize(orderSource));
+      check(o(p.read(order.document(),"/activation/parties")).keySet().equals(Set.of("seller","customer")),"Ordinary roster");
+      var ordinaryExact=new Exact.Ref(order.document().blueId());
+      for(var mutation:Map.of("party","/activation/parties/seller/lead/channel/event/source",
+          "source","/contracts/initialized/document/name","policy","/clauses/activation/parameters/required",
+          "slot","/size").entrySet()) {
+        var changed=o(Values.copy(values.literal(ordinaryExact)));
+        Object replacement=mutation.getKey().equals("policy")?List.of():mutation.getKey().equals("slot")?41:"foreign";
+        AdmissionConsentDispatchConformance.patch(values,ordinaryExact,changed,mutation.getValue(),replacement);
+        var request=provision(outer,order.document());request.put("document",m("blueId",NativeRuntime.identity(values.source(changed))));
+        String expected=switch(mutation.getKey()) {
+          case "party" -> "PARTY_PRIMARY_CHANNEL_MISMATCH";
+          case "source" -> "PREPARATION_UNREVIEWED_SOURCE";
+          case "policy" -> "PREPARATION_EFFECTIVE_POLICY_CHANGED";
+          default -> "PREPARATION_PROVIDER_DATA_CHANGED";
+        };
+        rejected(p,parent.document(),event(parent.document(),"merchant","merchant","provideOrder",request),++clock,expected);
+      }
+      var wrongRequirement=provision(outer,order.document());wrongRequirement.put("requirementRef","foreign");
+      rejected(p,parent.document(),event(parent.document(),"merchant","merchant","provideOrder",wrongRequirement),++clock,"PREPARATION_WRONG_REQUIREMENT");
       var inactiveRequest=provision(outer,order.document());
       parent=apply(p,parent.document(),event(parent.document(),"merchant","merchant","provideOrder",inactiveRequest),++clock);
       check("awaiting_activation".equals(p.read(parent.document(),outerPath+"/status")),"Generic profile preserves commercial activation gate");
@@ -109,18 +158,18 @@ public final class AdmissionProvisionConformance {
       parent=apply(p,parent.document(),event(parent.document(),"merchant","merchant","provideOrder",inactiveRequest),++clock);
       check(p.emitted(parent).isEmpty(),"Inactive retry must not emit duplicate effects");
       check(stagedIdentity.equals(NativeRuntime.identity(values.exact(values.select(new Exact.Ref(parent.document().blueId()),outerPath)))),"Identical inactive provision duplicated or altered obligation");
-      order=apply(p,order.document(),event(order.document(),"seller","merchant","approve_seller",m("revision",2)),++clock);
-      order=apply(p,order.document(),event(order.document(),"customer","customer","approve_customer",m("revision",2)),++clock);
+      order=apply(p,order.document(),event(order.document(),"seller","merchant","approve_seller",m("revision",1)),++clock);
+      order=apply(p,order.document(),event(order.document(),"customer","customer","approve_customer",m("revision",1)),++clock);
       check(Boolean.TRUE.equals(p.read(order.document(),"/activation/active")),"Actual commercial approvals required");
       var activeRequest=provision(outer,order.document());
       parent=apply(p,parent.document(),event(parent.document(),"merchant","merchant","provideOrder",activeRequest),++clock);
-      check("usable".equals(p.read(parent.document(),outerPath+"/status")),"Approved admitted Order must be usable");
+      check("usable".equals(p.read(parent.document(),outerPath+"/status")),"Approved ordinary Order must be usable");
       String acceptedIdentity=NativeRuntime.identity(values.exact(values.select(new Exact.Ref(parent.document().blueId()),outerPath)));
       parent=apply(p,parent.document(),event(parent.document(),"merchant","merchant","provideOrder",activeRequest),++clock);
       check(p.emitted(parent).isEmpty(),"Accepted retry must not emit duplicate effects");
       check(acceptedIdentity.equals(NativeRuntime.identity(values.exact(values.select(new Exact.Ref(parent.document().blueId()),outerPath)))),"Identical accepted provision duplicated or altered obligation");
-      check(((Number)p.read(order.document(),"/activation/revision")).intValue()==2,"No repeated admission");
-      System.out.println("PASS actual inactive consent/admission, strict added-party proof, commercial gate, accepted provision, replay and tamper rejection");
+      check(((Number)p.read(order.document(),"/activation/revision")).intValue()==1,"Ordinary provision never admits a party");
+      System.out.println("PASS native admission without witness, undeclared-party rejection, ordinary provision, commercial gate and retry");
     }
   }
 }

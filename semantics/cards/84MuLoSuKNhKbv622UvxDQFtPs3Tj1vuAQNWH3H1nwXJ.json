@@ -1,0 +1,110 @@
+{
+  "blueId": "84MuLoSuKNhKbv622UvxDQFtPs3Tj1vuAQNWH3H1nwXJ",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "Cj6XHZr42k1NJZpBNzq3sD8YhUJxX5Rh4H645726TW1N",
+      "EtQDMrMCzX3LYvmwn1MpUtgXuZ2VYxjxBVhjTvN9jjsG"
+    ],
+    "displayLabel": "Manual Bank Payment",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.amount",
+      "bindings.instruction"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction /payment; Payment Functions initialize/confirm",
+        "id": "paymentAccepted",
+        "meaning": "Guarantor acceptance recorded for the instruction, distinct from payment completion.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/accepted",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction /payment; Payment Functions initialize/confirm",
+        "id": "paymentSecured",
+        "meaning": "Remaining secured amount in paymentTerms.currency minor units; not historical authorization.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/secured",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction /payment; Payment Functions initialize/confirm",
+        "id": "paymentCompleted",
+        "meaning": "Cumulative confirmed captures in paymentTerms.currency minor units, before reversals.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/completed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction /payment; Payment Functions initialize/confirm",
+        "id": "paymentReversed",
+        "meaning": "Confirmed reversals of completed payment in paymentTerms.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reversed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction /payment; Payment Functions initialize/confirm",
+        "id": "paymentReservedCapture",
+        "meaning": "Pending capture reservation in paymentTerms.currency minor units; not confirmed capture.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reserved/capture",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction /payment; Payment Functions initialize/confirm",
+        "id": "paymentReservedRefund",
+        "meaning": "Pending refund reservation in paymentTerms.currency minor units; not confirmed reversal.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reserved/refund",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction /paymentTerms; Payment Functions configure",
+        "id": "paymentCurrency",
+        "meaning": "Currency of the instruction terms and its monetary ledger.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paymentTerms/currency",
+        "type": "currency"
+      }
+    ]
+  },
+  "semanticText": "# Manual Bank Payment\n\nCreates and observes a manual bank-transfer instruction. The recipient acts as the confirming guarantor; the payer may report a transfer, but reporting does not establish that money arrived. Manual Payment Setup selects the manual-bank-transfer method and recipient confirmation. The amount binding defaults to `/product/totalMinor` and instruction placement to `/payment`.\n\nThe inherited lifecycle prevents conflicting instruction identities and routes named request actions into the instruction. Recipient confirmations and recorded outcomes, rather than creation or a request event, determine accepted, completed, reversed and pending financial state.\n\nConfiguration references: `bindings.amount` defaults to `/product/totalMinor`; `bindings.instruction` defaults to `/payment`."
+}

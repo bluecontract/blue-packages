@@ -1,0 +1,72 @@
+{
+  "blueId": "6BgNZeXVuLh3LRkUJAQLaYbBXRKb8X1FDFTerAhQX1oq",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "H7DZcqxhANyw2PJEwVs8wqykqjFseKA1eoUvViDemWcu",
+      "Hh3FDuHUdfAETMEjKtUR6268f3BTGWcE7829mKidcoXw"
+    ],
+    "displayLabel": "Commission Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.orders",
+      "bindings.payouts",
+      "bindings.rate",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "commission targets by order",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions initialize/setTarget/reserve/settle",
+        "id": "accrued",
+        "meaning": "Maintained sum of commission targets from confirmed net order receipts. Minor units of the underlying obligation currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/accrued",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "unresolved payout reservations",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions initialize/setTarget/reserve/settle",
+        "id": "reserved",
+        "meaning": "Commission obligation reserved for unresolved payouts; not confirmed payment. Minor units of the underlying obligation currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "confirmed payout settlements",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions initialize/setTarget/reserve/settle",
+        "id": "paid",
+        "meaning": "Confirmed settled commission payments maintained by the balance ledger. Minor units of the underlying obligation currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paid",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Commission Clause\n\nAccrues commission from confirmed net Order receipts and reconciles payout reservations against confirmed results. Orders default to `/orders`, payouts to `/payouts`, the basis-points rate to `/terms/commissionBps` and ledger state to `/balance`. Attachment handling verifies the producing clause, matching prepared item, request correlation, initialized origin, active Order and named-source readiness before using its payment totals.\n\nOrder capture and reversal observations update the commission target using completed less reversed amounts and the configured rounded basis-points rate. This is a maintained obligation ledger, not an instruction to recompute authoritative balances. Payout opening reserves funds; subsequent observations reconcile confirmations, reversals or cancellation. Requests and reservations do not prove settlement.\n\nThe inherited balance ledger maintains accrued targets, reserved obligations and paid settlements. Their units follow the underlying order/payout currency; this clause defines no independent currency conversion.\n\nConfiguration references: `bindings.orders` defaults to `/orders`; `bindings.payouts` defaults to `/payouts`; `bindings.rate` defaults to `/terms/commissionBps`; `bindings.state` defaults to `/balance`."
+}

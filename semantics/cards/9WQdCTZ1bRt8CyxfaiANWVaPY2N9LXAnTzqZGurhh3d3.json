@@ -1,0 +1,62 @@
+{
+  "blueId": "9WQdCTZ1bRt8CyxfaiANWVaPY2N9LXAnTzqZGurhh3d3",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "5HQrPjC9MfMBQkyB6x6DHVGVmbqF4LRkY6Ft6usWiU89"
+    ],
+    "displayLabel": "Commission Payouts Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.collection",
+      "bindings.commission",
+      "bindings.parties",
+      "bindings.sources",
+      "bindings.template",
+      "parameters.allowedFields",
+      "parameters.parties"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions: candidateStage/sharedRefresh",
+        "id": "preparedItemStatus",
+        "meaning": "Per-obligation lifecycle; selection alone does not establish active, source-ready usability.",
+        "path": "/process_{clauseKey}/entries/*/status",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions: checkProvision/sharedRefresh",
+        "id": "selectedOrigin",
+        "meaning": "Initialized document origin selected for this prepared obligation; replacement is forbidden.",
+        "path": "/process_{clauseKey}/entries/*/documentOrigin",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "commission",
+        "defaultPath": "/commission",
+        "evidence": "preparePayout preflight /commission/reserved",
+        "id": "commissionReserved",
+        "meaning": "Commission funds reserved for unresolved payouts, in the commission obligation currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Commission Payouts Clause\n\nPrepares keyed commission payouts through ordinary Documents preparation. `commission` defaults to `/commission`; collection and template bindings determine payout placement and construction. `preparePayout` accepts only `key` and `amountMinor`, with integer amount from 1 through 100,000,000. A new destination is refused when the collection already has 20 entries or commission funds are reserved by an unresolved payout.\n\nThe action passes the amount as an allowed prepared field. It emits `Commission Payout Opened` only for `acceptedNew`; a matching retry does not emit another opening. The event requests reservation processing and does not prove that the recipient has received funds. Provision, cancellation, access and readiness retain the ordinary Documents checks.\n\nConfiguration references: `bindings.collection` is configured by the caller/type context; `bindings.commission` defaults to `/commission`; `bindings.parties` is configured by the caller/type context; `bindings.sources` is configured by the caller/type context; `bindings.template` is configured by the caller/type context; `parameters.allowedFields` declares `[\"amountMinor\"]`; `parameters.parties` declares `[]`."
+}
