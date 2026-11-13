@@ -1,0 +1,127 @@
+name: Commission Payout Profile Clause
+type: Connections/Connected Clause
+description: Require the frozen all-or-nothing commission profile for every native payment event, including inherited
+  configuration and request operations. Core verifies consent and the linked Agreement before any financial effect.
+actions:
+  validate:
+    automatic:
+      'on': event
+      event:
+        type: Events/Event
+    do:
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document: /payment/targetMinor
+        then:
+        - $return: {}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - $document: /payment/targetMinor
+              - $document: /paymentDetails/payoutTerms/netMinor
+            - $eq:
+              - $document: /payment/payeeChannel
+              - $document: /paymentDetails/payoutTerms/payeeChannel
+            - $eq:
+              - $document: /payment/details
+              - {}
+            - $eq:
+              - $document: /payment/reversed
+              - 0
+        message: PAYOUT_PROFILE_IMMUTABLE
+    - $forEach:
+        item: financialRequest
+        in:
+          $document: /payment/requests
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $includes:
+                    list:
+                    - secure
+                    - capture
+                    - void
+                    val:
+                      $var:
+                        name: financialRequest
+                        path: /intent/action
+                - $eq:
+                  - $var:
+                      name: financialRequest
+                      path: /intent/amountMinor
+                  - $document: /paymentDetails/payoutTerms/netMinor
+                - $eq:
+                  - $var: requestKey
+                  - $concat:
+                    - payout-
+                    - $var:
+                        name: financialRequest
+                        path: /intent/action
+            message: PAYOUT_FULL_AMOUNT_REQUIRED
+        key: requestKey
+    - $forEach:
+        item: control
+        in:
+          $document: /payment/controlRequests
+        do:
+        - $failIf:
+            cond:
+              $and:
+              - $eq:
+                - $var:
+                    name: control
+                    path: /intent/action
+                - payee
+              - $ne:
+                - $var:
+                    name: control
+                    path: /intent/input/payeeRef
+                - $document: /paymentDetails/payoutTerms/payeeChannel
+            message: PAYOUT_PROFILE_IMMUTABLE
+        key: controlKey
+    - $forEach:
+        item: control
+        in:
+          $document: /payment/controlRequests
+        do:
+        - $failIf:
+            cond:
+              $and:
+              - $eq:
+                - $var:
+                    name: control
+                    path: /intent/action
+                - finalAmount
+              - $ne:
+                - $var:
+                    name: control
+                    path: /intent/input/finalAmount
+                - $document: /paymentDetails/payoutTerms/netMinor
+            message: PAYOUT_PROFILE_IMMUTABLE
+        key: controlKey
+    - $forEach:
+        item: control
+        in:
+          $document: /payment/controlRequests
+        do:
+        - $failIf:
+            cond:
+              $and:
+              - $eq:
+                - $var:
+                    name: control
+                    path: /intent/action
+                - details
+              - $ne:
+                - $var:
+                    name: control
+                    path: /intent/input/transactionDetails
+                - {}
+            message: PAYOUT_PROFILE_IMMUTABLE
+        key: controlKey

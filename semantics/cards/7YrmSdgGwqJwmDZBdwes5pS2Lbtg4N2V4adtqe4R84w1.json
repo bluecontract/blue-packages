@@ -1,0 +1,49 @@
+{
+  "blueId": "7YrmSdgGwqJwmDZBdwes5pS2Lbtg4N2V4adtqe4R84w1",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "AK34g34RmsrwB9awXvYqgtHFteRbnd18LE4TosHbDQp7",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Commission Payout Settlement",
+    "limitations": [
+      "The settlement record and payout terms are objects, but their child paths are not supplied in documentPaths and there are no data bindings. Their established amounts, currency, references and recorded outcome cannot be represented as individually addressed scalar stateFacts.",
+      "No concrete connection is supplied, so the invoking channel and enforcement of the intended MyOS operator identity are unspecified."
+    ],
+    "parameterRefs": [
+      "parameters.actions"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Acceptance unknown; confirm requires explicit true.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: confirm.do, ACCOUNT_SETTLEMENT_INVALID",
+        "id": "paymentAccepted",
+        "meaning": "Payment acceptance gate for confirm; true alone does not establish a recorded account settlement.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; confirm has no explicit presence check.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: confirm.do, record.transactionId",
+        "id": "transactionId",
+        "meaning": "Transaction identifier copied into the settlement record; confirm does not validate its type or value.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Commission Payout Settlement Clause\n\nRecords the MyOS operator’s report of an executed commission payout: the seller debit, partner transfer and retained MyOS fee. It records the report without initiating those movements or independently verifying their external completion.\n\n## Confirmation\n\nThe supplied `parameters.actions.confirm` action requires `/payment/accepted` to equal `true` and both `debitReference` and `transferReference` in its resolved `params` to be nonempty text. Otherwise it rejects with `ACCOUNT_SETTLEMENT_INVALID`. No defaults for these references are defined.\n\nThe action reads `/paymentDetails/payoutTerms` as the frozen payout terms and constructs a settlement record containing:\n\n- `grossMinor`: the seller debit, in minor units of `currency`.\n- `netMinor`: the partner transfer, in minor units of the same currency.\n- `feeMinor`: the retained MyOS fee, in minor units of that currency.\n- `currency` and `payoutKey`, copied from the terms, plus the complete terms copied as `payoutTerms`.\n- `debitReference` and `transferReference`, copied from the action parameters.\n- `transactionId`, copied from `/payment/transactionId`.\n- `instructionOrigin`, the BlueId of `/contracts/initialized/document`.\n\nThese are reported amounts for one payout, not cumulative totals or remaining balances. The action copies them without recalculating or validating their arithmetic relationship. It does not itself freeze the terms or explicitly validate the copied terms and transaction identifier.\n\nIf `/accountSettlement` is absent, the action adds the record there and emits an `Event` with `kind` equal to `Account Settlement Confirmed` and `settlement` containing the record. If an existing record exactly equals the newly constructed record, it returns without another settlement write or confirmation event. Any difference rejects with `ACCOUNT_SETTLEMENT_CONFLICT`. Equality covers the entire record, including the full terms, references and provenance; the acceptance and reference checks still precede this duplicate check.\n\nThe stored record represents an accepted settlement report. An attempted invocation alone does not establish that outcome, and an absent record does not establish that external funds have not moved. All paths refer to the document executing the clause.\n\n## Configuration and authority\n\nInherited `Feature Clause` behavior makes `parameters.actions` configurable; the rules above describe the supplied `confirm` body. Named connections select invocation sources and resolve action parameters. No default connection or automatic trigger is supplied here. The intended reporter is the MyOS operator, but this body does not check that identity; authority depends on the configured connection and authenticated origin. A workflow connection requires an authenticated channel binding.\n\nInherited connection planning requires a new clause key when changing an existing clause configuration."
+}

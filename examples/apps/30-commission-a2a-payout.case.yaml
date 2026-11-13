@@ -1,0 +1,114 @@
+document: 30-commission-a2a-payout.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+- operation: approve_seller
+  channel: seller
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: approve_partner
+  channel: partner
+  request:
+    revision: 1
+  requireExactDocumentVersion: true
+- operation: startPayout
+  label: Seller prepares G=1000; the agreed 2000 bps fee freezes F=200 and the payout instruction
+    amount N=800
+  channel: seller
+  request:
+    key: p1
+    amountMinor: 1000
+    accountContext:
+      payerBinding: test-seller-binding
+      payeeBinding: test-partner-binding
+      platformAccountId: test-guarantor
+      environment: TEST
+  requireExactDocumentVersion: true
+  expect:
+    /commission/reserved: 1000
+    /commission/paid: 0
+- operation: startPayout
+  label: An identical retry reuses the prepared payout instruction
+  channel: seller
+  request:
+    key: p1
+    amountMinor: 1000
+    accountContext:
+      payerBinding: test-seller-binding
+      payeeBinding: test-partner-binding
+      platformAccountId: test-guarantor
+      environment: TEST
+  requireExactDocumentVersion: true
+  expect:
+    /commission/reserved: 1000
+- operation: startPayout
+  label: A client cannot supply the fee
+  channel: seller
+  request:
+    key: p2
+    amountMinor: 1000
+    feeMinor: 0
+    accountContext:
+      payerBinding: test-seller-binding
+      payeeBinding: test-partner-binding
+      platformAccountId: test-guarantor
+      environment: TEST
+  requireExactDocumentVersion: true
+  status: FAILED
+- operation: startPayout
+  label: One unresolved payout at a time
+  channel: seller
+  request:
+    key: p2
+    amountMinor: 500
+    accountContext:
+      payerBinding: test-seller-binding
+      payeeBinding: test-partner-binding
+      platformAccountId: test-guarantor
+      environment: TEST
+  requireExactDocumentVersion: true
+  status: FAILED
+- operation: cancelPayout
+  label: The seller cancels the unlinked preparation; G is released once and the key
+    cannot be provided again
+  channel: seller
+  request:
+    key: p1
+  requireExactDocumentVersion: true
+  expect:
+    /commission/reserved: 0
+    /commission/paid: 0
+    /commission/settlements/p1/status: closed
+    /commission/settlements/p1/paidMinor: 0
+    /commission/settlements/p1/feeMinor: 0
+- operation: cancelPayout
+  label: A repeated cancellation is a duplicate and releases nothing again
+  channel: seller
+  request:
+    key: p1
+  requireExactDocumentVersion: true
+  expect:
+    /commission/reserved: 0
+- operation: startPayout
+  label: After cancellation a new payout can be prepared
+  channel: seller
+  request:
+    key: p2
+    amountMinor: 500
+    accountContext:
+      payerBinding: test-seller-binding
+      payeeBinding: test-partner-binding
+      platformAccountId: test-guarantor
+      environment: TEST
+  requireExactDocumentVersion: true
+  expect:
+    /commission/reserved: 500
+- operation: cancelPayout
+  label: The partner cannot cancel the seller's payout
+  channel: partner
+  request:
+    key: p2
+  requireExactDocumentVersion: true
+  status: FAILED

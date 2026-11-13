@@ -94,3 +94,42 @@ The task's native component tests and upstream reservation/catalog examples have
 separate qualification boundaries. Package selection and semantic cards alone do
 not establish hosted execution or financial acceptance. No semantic model call is
 required to build or verify the native archive.
+
+## Account-to-account commission payout profile (preview.7)
+
+`Commission Account Payouts Clause` prepares an independent MyOS Test or Stripe
+Payment Instruction. Existing `Commission Payouts Clause` and its manual payment
+profile remain available. The Agreement explicitly accepts `payoutOperator`,
+`payoutOperatorAccountId`, `payoutFeePolicy: myos-commission-fee-v1` and required
+`payoutFeeBps` (an integer from 0 through 9999). Missing or invalid rates reject
+preparation; the policy identifies the rounding algorithm, not a fixed rate.
+
+`preparePayout.startPayout` accepts `{key, amountMinor, accountContext}` where
+`amountMinor` is gross commission G. `accountContext` contains concrete
+`payerBinding`, `payeeBinding`, `platformAccountId` and `environment` returned by
+Core for the Agreement parties. Preparation freezes those bindings, the party
+account IDs and channels, Agreement origin, payout key, currency and G/F/N.
+The only fee resolver reads the agreed `terms.payoutFeeBps` and uses Money
+rounding: F = roundBps(G, payoutFeeBps), N = G-F, requiring N > 0. The prepared
+instruction freezes that rate and split; later execution uses the frozen values. The Payment Instruction authorizes N; the operator reserves/debits G.
+Operator costs are not added to G.
+
+The seller bootstraps the prepared instruction, provides the inactive candidate,
+approves that exact instruction, then provides the same instruction again.
+Current Documents activation, source and reader validation are unchanged.
+Core executes only after the Agreement has linked the exact approved instruction.
+Before linking, native `cancelPayout` permanently closes the attempt and releases
+G once. After linking, only a terminal no-effect result or confirmed full void
+releases G. An unresolved operator result keeps the commission reserved.
+
+The instruction includes `Commission Payout Profile Clause` to enforce full-N
+requests and reject inherited changes of amount, recipient and details, as well
+as refunds. `Commission Payout Settlement Clause` binds the guarantor's debit and
+transfer references to the exact frozen context and instruction origin. Shared
+Commission reconciliation requires both that report and completed N with no
+reversal or unresolved financial request, in either arrival order. Only then is
+G paid and its reservation released exactly once.
+
+Example 30 and `CommissionPayoutConformance` exercise native document behavior;
+the conformance runner models attachment and does not move funds. Hosted Core
+qualification owns actual bootstrap/provision, financial execution and recovery.

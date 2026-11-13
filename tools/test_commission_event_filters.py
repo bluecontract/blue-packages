@@ -13,6 +13,7 @@ class CommissionEventFiltersTest(unittest.TestCase):
             'confirmed': {'type': 'Payment/Payment Event Received', 'event': {'type': 'PaymentInstruction/Payment Completed'}},
             'reversed': {'type': 'Payment/Payment Event Received', 'event': {'type': 'PaymentInstruction/Payment Reversed After Completion'}},
             'observed': {'type': 'Payment/Payment Event Received'},
+            'observedAccountPayout': {'type': 'Events/Event'},
         }
         for action, pattern in expected.items():
             with self.subTest(action=action):
@@ -23,7 +24,7 @@ class CommissionEventFiltersTest(unittest.TestCase):
                 self.assertEqual([{'$return': {}}], guard['then'])
                 self.assertEqual(pattern, source['automatic'].get('event'))
                 self.assertEqual('collection', source['automatic']['on'])
-                self.assertEqual('payouts' if action == 'observed' else 'orders', source['automatic']['pathBinding'])
+                self.assertEqual('payouts' if action in ('observed', 'observedAccountPayout') else 'orders', source['automatic']['pathBinding'])
 
 
 if __name__ == '__main__':

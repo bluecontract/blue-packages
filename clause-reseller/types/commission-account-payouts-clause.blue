@@ -1,0 +1,732 @@
+name: Commission Account Payouts Clause
+type: Documents/Document Base
+description: Prepare one MyOS account-to-account commission payout as an independent Payment Instruction. The settled
+  commission G is reserved once; the instruction freezes the MyOS fee F and the partner transfer N = G - F with
+  the Agreement operator, its MyOS operator account and this Agreement's origin. The seller bootstraps it with that
+  operator as its supplied guarantor and provides it back; any other guarantor is refused. The operator debits the
+  seller's and credits the partner's own payment accounts only for a payout this Agreement linked. Before linking
+  the seller may cancel the preparation natively, which releases G once. Guard unresolved payouts.
+actionDefinition:
+  type:
+    type: Documents/Preparation Functions
+    functions:
+      roundBps:
+        blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
+      resolvePayoutTerms:
+        args:
+          grossMinor:
+            type: Integer
+        do:
+        - $failIf:
+            cond:
+              $ne:
+              - $document: /terms/payoutFeePolicy
+              - myos-commission-fee-v1
+            message: PAYOUT_FEE_POLICY_UNSUPPORTED
+        - $let:
+            name: feeBps
+            expr: {$document: /terms/payoutFeeBps}
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val: {$var: feeBps}
+                  kind: integer
+            message: PAYOUT_FEE_BPS_INVALID
+        - $failIf:
+            cond:
+              $or:
+              - {$lt: [{$var: feeBps}, 0]}
+              - {$gt: [{$var: feeBps}, 9999]}
+            message: PAYOUT_FEE_BPS_INVALID
+        - $let:
+            name: feeMinor
+            expr:
+              $call:
+                function: roundBps
+                args:
+                  basis:
+                    $var: grossMinor
+                  bps:
+                    $var: feeBps
+        - $let:
+            name: netMinor
+            expr:
+              $subtract:
+              - $var: grossMinor
+              - $var: feeMinor
+        - $failIf:
+            cond:
+              $lt:
+              - $var: netMinor
+              - 1
+            message: PAYOUT_NET_NOT_POSITIVE
+        - $return:
+            feePolicy: myos-commission-fee-v1
+            feeBps:
+              $var: feeBps
+            grossMinor:
+              $var: grossMinor
+            feeMinor:
+              $var: feeMinor
+            netMinor:
+              $var: netMinor
+      domainPrepare:
+        args:
+          prepared: {}
+        do:
+        - $let:
+            name: terms
+            expr:
+              $pointerGet:
+                object:
+                  $var: prepared
+                path: /paymentTerms
+        - $let:
+            name: details
+            expr:
+              $pointerGet:
+                object:
+                  $var: prepared
+                path: /paymentDetails
+        - $let:
+            name: split
+            expr:
+              $pointerGet:
+                object:
+                  $var: details
+                path: /payoutTerms
+        - $let:
+            name: parties
+            expr:
+              $pointerGet:
+                object:
+                  $var: prepared
+                path: /clauses/activation/parameters/parties
+        - $let:
+            name: resolved
+            expr:
+              $call:
+                function: resolvePayoutTerms
+                args:
+                  grossMinor:
+                    $var:
+                      name: split
+                      path: /grossMinor
+        - $forEach:
+            item: field
+            in:
+            - feePolicy
+            - feeBps
+            - grossMinor
+            - feeMinor
+            - netMinor
+            do:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $get:
+                      object:
+                        $var: resolved
+                      key:
+                        $var: field
+                  - $get:
+                      object:
+                        $var: split
+                      key:
+                        $var: field
+                message: PAYOUT_TERMS_MISMATCH
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq:
+                  - $nodeBlueId:
+                      $pointerGet:
+                        object:
+                          $var: prepared
+                        path: /type
+                  - $nodeBlueId:
+                      $choose:
+                        cond:
+                          $eq:
+                          - $document: /terms/payoutOperator
+                          - test
+                        then:
+                          $get:
+                            object:
+                              type: MyOS/MyOS Test Account to Account Payment Instruction
+                            key: type
+                        else:
+                          $get:
+                            object:
+                              type: MyOS/MyOS Stripe Account to Account Payment Instruction
+                            key: type
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: details
+                      path: /method
+                  - myos-account-to-account
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /amountMinor
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /netMinor
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /limitMinor
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /netMinor
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /currency
+                  - $document: /terms/currency
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /currency
+                  - $document: /terms/currency
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /operator
+                  - $document: /terms/payoutOperator
+                - $hasKey:
+                    object:
+                      $var: parties
+                    key:
+                      $pointerGet:
+                        object:
+                          $var: terms
+                        path: /payerChannel
+                - $hasKey:
+                    object:
+                      $var: parties
+                    key:
+                      $pointerGet:
+                        object:
+                          $var: terms
+                        path: /payeeChannel
+                - $hasKey:
+                    object:
+                      $var: parties
+                    key:
+                      $pointerGet:
+                        object:
+                          $var: terms
+                        path: /guarantorChannel
+                - $includes:
+                    list:
+                      $pointerGet:
+                        object:
+                          $var: prepared
+                        path: /clauses/activation/parameters/required
+                        default: []
+                    val:
+                      $pointerGet:
+                        object:
+                          $var: terms
+                        path: /payerChannel
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /payerChannel
+                  - seller
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /payeeChannel
+                  - partner
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: terms
+                      path: /guarantorChannel
+                  - guarantor
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /payerAccountId
+                  - $document: /activation/parties/seller/myosAccountId
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /payeeAccountId
+                  - $document: /activation/parties/partner/myosAccountId
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: split
+                      path: /operatorAccountId
+                  - $document: /terms/payoutOperatorAccountId
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: prepared
+                      path: /clauses/payoutProfile/type
+                  - $get:
+                      object:
+                        type: Reseller/Commission Payout Profile Clause
+                      key: type
+                - $eq:
+                  - $var:
+                      name: prepared
+                      path: /clauses/activation/parameters/parties/seller/myosAccountId
+                  - $var:
+                      name: split
+                      path: /payerAccountId
+                - $eq:
+                  - $var:
+                      name: prepared
+                      path: /clauses/activation/parameters/parties/partner/myosAccountId
+                  - $var:
+                      name: split
+                      path: /payeeAccountId
+            message: PAYOUT_INSTRUCTION_INVALID
+        - $return:
+            paymentTerms:
+              $var: terms
+            paymentDetails:
+              $var: details
+            instructionType:
+              $nodeBlueId:
+                $pointerGet:
+                  object:
+                    $var: prepared
+                  path: /type
+      domainValidateCandidate:
+        args:
+          frozenTerms: {}
+          candidate: {}
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /instructionType
+                - $nodeBlueId:
+                    $pointerGet:
+                      object:
+                        $var: candidate
+                      path: /type
+            message: PAYOUT_INSTRUCTION_TYPE_MISMATCH
+        - $failIf:
+            cond:
+              $or:
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /paymentTerms
+                - $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /paymentTerms
+              - $ne:
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /paymentDetails
+                - $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /paymentDetails
+            message: PAYOUT_TERMS_MISMATCH
+        - $failIf:
+            cond:
+              $ne:
+              - $pointerGet:
+                  object:
+                    $var: candidate
+                  path:
+                    $concat:
+                    - /activation/parties/
+                    - $pointerGet:
+                        object:
+                          $var: candidate
+                        path: /paymentTerms/guarantorChannel
+                    - /myosAccountId
+                  default: ''
+              - $document: /terms/payoutOperatorAccountId
+            message: PAYOUT_OPERATOR_MISMATCH
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /activation/parties/seller/myosAccountId
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /paymentDetails/payoutTerms/payerAccountId
+            message: PAYOUT_PARTY_MISMATCH
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /activation/parties/partner/myosAccountId
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /paymentDetails/payoutTerms/payeeAccountId
+            message: PAYOUT_PARTY_MISMATCH
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $pointerGet:
+                    object:
+                      $var: candidate
+                    path: /activation/parties/guarantor/myosAccountId
+                - $pointerGet:
+                    object:
+                      $var: frozenTerms
+                    path: /paymentDetails/payoutTerms/operatorAccountId
+            message: PAYOUT_PARTY_MISMATCH
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                    $pointerGet:
+                      object:
+                        $var: candidate
+                      path: /clauses/activation/parameters/required
+                  val: seller
+            message: PAYOUT_PAYER_APPROVAL_REQUIRED
+        - $failIf:
+            cond:
+              $ne:
+              - $nodeBlueId:
+                  $var:
+                    name: candidate
+                    path: /clauses/payoutProfile/type
+              - $nodeBlueId:
+                  $get:
+                    object:
+                      type: Reseller/Commission Payout Profile Clause
+                    key: type
+            message: PAYOUT_PROFILE_REQUIRED
+        - $return: true
+      domainNextActions:
+        args:
+          documentRef: {}
+        do:
+        - $return: []
+cardinality: keyed
+destinationBinding: collection
+parameters:
+  prepareFor: bootstrap
+  obtain: provide
+  suppliedBy: seller
+  suppliedParties:
+  - guarantor
+  allowedFields: []
+  fieldPaths:
+    amountMinor: /paymentTerms/amountMinor
+    limitMinor: /paymentTerms/limitMinor
+    payoutTerms: /paymentDetails/payoutTerms
+bindingTypes:
+  collection: pointer
+  commission: pointer
+defaultBindings:
+  collection: /payouts
+  commission: /commission
+embedsCollections:
+- collection
+actions:
+  preparePayout:
+    resultContract: outcome-v1
+    defaults:
+      fields: {}
+      values: {}
+    preflight:
+    - $forEach:
+        item: field
+        in:
+          $keys:
+            $var: trigger
+        do:
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - key
+                  - amountMinor
+                  - accountContext
+                  val:
+                    $var: field
+            message: UNKNOWN_INPUT_FIELD
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /amountMinor
+                kind: integer
+            - $gte:
+              - $var:
+                  name: trigger
+                  path: /amountMinor
+              - 1
+            - $lte:
+              - $var:
+                  name: trigger
+                  path: /amountMinor
+              - 100000000
+        message: INVALID_AMOUNT
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /accountContext
+                kind: object
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /accountContext/payerBinding
+                kind: text
+            - $ne:
+              - $var:
+                  name: trigger
+                  path: /accountContext/payerBinding
+              - ''
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /accountContext/payeeBinding
+                kind: text
+            - $ne:
+              - $var:
+                  name: trigger
+                  path: /accountContext/payeeBinding
+              - ''
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /accountContext/platformAccountId
+                kind: text
+            - $ne:
+              - $var:
+                  name: trigger
+                  path: /accountContext/platformAccountId
+              - ''
+            - $isKind:
+                val:
+                  $var:
+                    name: trigger
+                    path: /accountContext/environment
+                kind: text
+            - $ne:
+              - $var:
+                  name: trigger
+                  path: /accountContext/environment
+              - ''
+            - $includes:
+                list:
+                - TEST
+                - LIVE
+                val:
+                  $var:
+                    name: trigger
+                    path: /accountContext/environment
+        message: PAYOUT_ACCOUNT_CONTEXT_REQUIRED
+    - $if:
+        cond:
+          $not:
+            $exists:
+              $document:
+                $concat:
+                - /process_
+                - $const: clauseKey
+                - /entries/
+                - $nodeBlueId:
+                    $var:
+                      name: trigger
+                      path: /key
+        then:
+        - $failIf:
+            cond:
+              $gte:
+              - $size:
+                  $keys:
+                    $document:
+                      $concat:
+                      - /process_
+                      - $const: clauseKey
+                      - /entries
+              - 20
+            message: DOCUMENT_LIMIT_REACHED
+        - $failIf:
+            cond:
+              $ne:
+              - $document:
+                  $concat:
+                  - $const:
+                      name: bindings
+                      path: /commission
+                  - /reserved
+              - 0
+            message: PAYOUT_ALREADY_UNRESOLVED
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list:
+              - test
+              - stripe
+              val:
+                $document: /terms/payoutOperator
+        message: PAYOUT_OPERATOR_UNSUPPORTED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $document: /terms/payoutOperatorAccountId
+                kind: text
+            - $ne:
+              - $document: /terms/payoutOperatorAccountId
+              - ''
+        message: PAYOUT_OPERATOR_ACCOUNT_REQUIRED
+    - $let:
+        name: split
+        expr:
+          $call:
+            function: resolvePayoutTerms
+            args:
+              grossMinor:
+                $var:
+                  name: trigger
+                  path: /amountMinor
+    - $set:
+        name: params
+        expr:
+          key:
+            $var:
+              name: trigger
+              path: /key
+          values:
+            amountMinor:
+              $var:
+                name: split
+                path: /netMinor
+            limitMinor:
+              $var:
+                name: split
+                path: /netMinor
+            payoutTerms:
+              $merge:
+              - $var: split
+              - payoutKey:
+                  $var:
+                    name: trigger
+                    path: /key
+                currency:
+                  $document: /terms/currency
+                operator:
+                  $document: /terms/payoutOperator
+                operatorAccountId:
+                  $document: /terms/payoutOperatorAccountId
+                agreementOrigin:
+                  $nodeBlueId:
+                    $document: /contracts/initialized/document
+                payerBinding:
+                  $var:
+                    name: trigger
+                    path: /accountContext/payerBinding
+                payeeBinding:
+                  $var:
+                    name: trigger
+                    path: /accountContext/payeeBinding
+                platformAccountId:
+                  $var:
+                    name: trigger
+                    path: /accountContext/platformAccountId
+                environment:
+                  $var:
+                    name: trigger
+                    path: /accountContext/environment
+                payerAccountId:
+                  $document: /activation/parties/seller/myosAccountId
+                payeeAccountId:
+                  $document: /activation/parties/partner/myosAccountId
+                payerChannel: seller
+                payeeChannel: partner
+                guarantorChannel: guarantor
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: checkPreparation
+            args:
+              input:
+                $var: params
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: sharedPrepare
+            args:
+              input:
+                $var: params
+              checked:
+                $var: actionResult
+    - $if:
+        cond:
+          $eq:
+          - $var:
+              name: actionResult
+              path: /outcome
+          - acceptedNew
+        then:
+        - $appendEvent:
+            $merge:
+            - type: Events/Event
+            - kind: Commission Payout Opened
+              key:
+                $var:
+                  name: trigger
+                  path: /key
+              amountMinor:
+                $var:
+                  name: trigger
+                  path: /amountMinor
