@@ -1,0 +1,57 @@
+{
+  "blueId": "A6fqEe3ag4xU6CK2pFQDTDuE4E3jTKsgA3WPeXNSEaSF",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "BJAryTTpFhjTvvvii1hKiHMf3VHqMarwE3fCDzg9w3Ad",
+      "HghdkbesKKN5Mh64CUived1Ygebn4TT3aiFpcCubhk4t",
+      "4FqAGskHttczv6E7ge1jqbKFuv8HNMu3h3qjasiLMjAw",
+      "AUbUbE9rcdUxW2gj8p4EnbNDMuGQaC1SKADvLMqEBQ9Z",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "rzWvzsV3nUXBThaM8f896BBmiBr3zzojz4dBynmBVgm",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Document Scope Plan",
+    "limitations": [
+      "Specific document registration actions, their invocation of qualifiesMandateDocument, and their business state are not supplied."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state and arm taskBody /armed",
+        "id": "timerArmed",
+        "meaning": "Timer arming was recorded; true does not establish a pending timer and is not cleared by cancellation or firing.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state and body final /fired change",
+        "id": "onceFired",
+        "meaning": "A once=true connection reached its final marker; this prevents repeats but does not confirm an external outcome.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Document Scope Plan\n\nAn installation-time planner that freezes an approved document pattern into generated connection handlers. It returns contract contributions and state initialization declarations. The registered document cannot supply or replace the frozen matcher.\n\n## Pattern and document embedding\n\nIf the clause has `bindings.pattern`, the planner reads the pattern from that document path; otherwise it uses `parameters.documentPattern`. The selected value must be an object or planning fails with `MANDATE_DOCUMENT_PATTERN_REQUIRED`. A present binding whose target is missing or invalid does not fall back to the parameter.\n\nAfter inherited connection planning, every generated handler receives `qualifiesMandateDocument(candidate)` in its first Compute step. This function applies native Blue `$is` matching against the captured pattern. Later changes to the bound pattern data do not change an already generated matcher. Defining this function does not itself register a document: registration actions and their invocation of the matcher are not established by the supplied definitions.\n\n`parameters.embedDocuments`, when supplied, must be Boolean. When omitted or `true`, the planner appends the explicit `bindings.documents` value to the `Process Embedded.collectionPaths` declaration, preserving existing embedding declarations. `false` suppresses this additional entry; it does not remove embeddings created by inherited planning. The pattern binding lookup and this additional collection entry use the clause’s explicit bindings, rather than the inherited merged binding defaults.\n\n## Inherited connection planning\n\n`type.defaultBindings` is merged with `bindings`, with explicit entries taking precedence. Property bindings must satisfy `type.bindingTypes`; entries in `type.optionalBindings` may be absent. A `pointer` binding must be text beginning with `/` and cannot be `/` itself. Bindings not recognized as properties, actions or `type.childActions` are rejected.\n\nActions come from `type.actions`, or from `parameters.actions` when `type.configurableActions` is `true`. Actions must be an object; absent actions are permitted when `type.initialState` is an object. Structural initial state associates object initial values with named pointer bindings. `type.embeds` and `type.embedsCollections` also require declared pointer bindings and contribute embedding paths.\n\n`type.snapshotBindings` captures existing values at bound paths during planning; a supplied snapshot path must be text and its target must exist. Action constants normally capture clause parameters excluding `actions` and `conditions`. With `type.readParametersFromDocument=true`, that captured parameters object is empty. Executable configuration is retained as literal data during planning, not executed then.\n\nEach action binding contains named connections. Clause, action and connection names must be nonempty and contain no `.`, `/` or `~`. An action’s `automatic` declaration adds the reserved `_automatic` connection; callers cannot replace it. Its `pathBinding`, if present, is resolved through the property bindings.\n\nSupported `on` sources are:\n\n- `event`: a triggered event, optionally selected by `event`.\n- `embedded` or `collection`: events from a non-root document path. Collection handlers restrict events to descendants of that path. These sources add embedding declarations unless `embed=false`.\n- `change`: updates selected by a non-root `path`, with an optional `event` filter.\n- `channel`: an existing named channel, optionally filtered by `event`.\n- `initialized`: `Clauses Initialized`, representing successful initial clause installation.\n- `activated`: `Document Activated`.\n- `workflow`: a generated operation using `party` when supplied, otherwise `channel`, with optional `request` and `event` declarations. The channel name must be valid; authority depends on the configured channel.\n- `timer`: a processor-admitted timer firing, configured as described below.\n\nUnsupported connection fields and source modes are rejected. Inherited configuration validation returns approval, but planning still performs these checks. Transition validation requires the candidate clause to equal the installed clause; changing its configuration requires a new clause key (`CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`).\n\n### Action execution\n\nConnections support `params`, `when`, `before`, `after` and `once`. `once` defaults to `false` and must be Boolean. Parameters merge action `defaults` with connection `params`, with connection values taking precedence. The action’s `trigger` is the workflow request, embedded event, captured timer trigger or direct source event, as appropriate.\n\nA previously completed `once=true` connection is skipped. A false `when` also skips execution. Otherwise, declared action `args` validate the merged parameters; `require.when` and `parameters.conditions[actionName]` must pass. Failed requirements reject the attempt, using `require.message` when supplied. Conditions naming unknown actions are rejected during planning.\n\nExecution proceeds through optional action `preflight`, connection `before`, action `do`, and connection `after`. A preflight must set `actionResult.outcome` to `acceptedNew`, `duplicate`, `rejected` or `skipped`; only `acceptedNew` proceeds. If `resultContract` is `outcome-v1`, the action must likewise supply one of those outcomes after `do`, and only `acceptedNew` reaches `after` and the final once marker. The default `legacy` contract imposes no such post-action outcome check. A non-accepted outcome stops subsequent steps; the outcome label alone does not undo earlier effects or establish an external result.\n\n## Timers and connection state\n\nA timer requires exactly one of `timestamp` and `afterEvent`:\n\n- `timestamp` is an absolute integer Unix timestamp in microseconds, from 0 through 9007199254740991. It arms on `Clauses Initialized` and cannot include `delayMs` or `policy`.\n- `afterEvent` selects a timestamped event, channel, change, embedded or collection source. `delayMs` must be a positive integer no greater than 9007199254740 and specifies milliseconds after that source’s logical timestamp. A resulting deadline above the portable timestamp range is rejected. Initialization cannot serve as a relative timer’s source.\n\nRelative `policy` defaults to `first`; `latest` is the other supported value. `first` suppresses further arming once the connection’s `armed` flag is true. `latest` emits another request using the same key, replacing a still-pending registration after commit. A completed `once=true` connection suppresses later arming under either policy.\n\nOptional `cancelOn` must name a nonempty supported source: event, channel, change, embedded, collection or initialized. It emits cancellation for key `connection` on the generated timer channel. Cancellation does not reset `armed` or `fired`, so it does not enable a `first` timer to arm again. A missing pending key is a no-op, and cancellation cannot undo an earlier firing.\n\nTimer requests and cancellations take effect only after the originating invocation commits. A request is not a firing. Firings require the selected Time runtime, a valid pending registration and authoritative time and input-history evidence. They may be processed late while retaining the requested deadline as their logical timestamp. New requests must be later than the invocation’s logical position; standalone initialization without a prior position may request an already elapsed absolute deadline.\n\nConnection state is planned at `/connectionState_{clauseKey}`, with a member named by joining the action and connection names with `.`. Each member initially declares `armed=false` and `fired=false`; those defaults apply only after initialization:\n\n- `armed` becomes true when a timer arm handler records its scheduling request. It is not cleared by the supplied firing or cancellation handlers and does not establish that a timer is currently pending.\n- `fired` becomes true only when a `once=true` connection reaches its final marker after the applicable action checks and hooks. It records that wrapper milestone, not confirmation of an external outcome. Connections with `once=false` do not set it even when actions run.\n\nAbsent flags are unknown, not implicit false values."
+}

@@ -1,0 +1,96 @@
+{
+  "blueId": "DkfNPMdWQS1veYYXVyu4bknmHhAmUPzArU3Sxmvb39Vp",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "73mm9Sv5iHZpoyX7zde5WN85aTJxvhGALBnYkpUAtSZ8",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Registration Scope Clause",
+    "limitations": [
+      "The evidence references approved native scope validation but does not define its detailed downstream target and request matching rules."
+    ],
+    "parameterRefs": [
+      "bindings.registry"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; do not substitute the configuration value.",
+        "aggregate": null,
+        "binding": "registry",
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.initialize: registry limit write.",
+        "id": "registrationLimit",
+        "meaning": "Stored maximum number of registration groups, copied from parameters.limit during initialization.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/limit",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; zero applies only after initialization.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Accepted new registration keys recorded in this registry since initialization.",
+          "unit": "registration groups, not grants or executed operations"
+        },
+        "binding": "registry",
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.initialize and register: used writes.",
+        "id": "registrationsUsed",
+        "meaning": "Consumed registration slots; identical retries add none, and target-operation success does not affect this count.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/used",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no recorded value is established.",
+        "aggregate": null,
+        "binding": "registry",
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.register: values checks and entries write.",
+        "id": "registeredTextValue",
+        "meaning": "Text supplied under a registration key for a configured identity or request constraint; immutable through register.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/entries/*/*",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence does not establish Active.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.register: MANDATE_NOT_ACTIVE guard.",
+        "id": "mandateStatus",
+        "meaning": "Mandate status. Only Active passes register's status guard; other lifecycle values are not defined here.",
+        "path": "/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence does not establish an empty scope.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All entries in document /scope, including pre-existing entries and grants added by this clause.",
+          "unit": "scope entries"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Registration Scope Clause.actions.register: grant loop updates /scope.",
+        "id": "scopeEntryCount",
+        "meaning": "Number of current scope entries; one registration can add multiple entries. This does not count executed operations.",
+        "path": "/scope",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      }
+    ]
+  },
+  "semanticText": "# Registration Scope Clause\n\nRegisters bounded, immutable groups of document identities and text request constraints supplied by an authorized actor. Each accepted new registration key adds configured grants to the mandate's `/scope` and consumes one registration slot, regardless of how many grants it adds or whether a granted operation ever succeeds.\n\n## Configuration\n\n- `bindings.registry` is required: a non-root document JSON Pointer identifying the registry's storage location. No default path is defined.\n- `parameters.limit` must be a positive integer. The automatic `initialize` action runs on `Clauses Initialized` and writes `entries: {}`, `used: 0` and the configured `limit` at the registry binding. These values describe completed initialization, not defaults for missing state.\n- `parameters.registrationPattern` must be an object. Planning compiles it into the native `qualifiesRegistration` matcher used to check submitted values.\n- `parameters.grants` supplies named definitions. Each definition has a `grant` template and a `fields` mapping from destination JSON Pointers in that template to source JSON Pointers in submitted `values`. The actor supplies values, not grant rules or executable code. Every mapped source must resolve to text; each populated grant must contain text at `/target/initialDocument/blueId`, `/target/channel` and `/target/operation`.\n\nInherited named connections in `bindings.initialize` and `bindings.register` determine additional action triggers; `register` has no automatic trigger. Connection `params` can override action defaults, `when` can skip execution, and `parameters.conditions` supplies rejecting action guards. Connection `before` and `after` work surrounds the action body. `once` defaults to false; when true, it suppresses later executions after that connection records completion. Changing an existing clause configuration requires a new clause key.\n\n## Registration\n\n`register` requires a text `key` of 1–200 characters and object `values`. Their action defaults read the trigger's `/key` and `/values`.\n\nThe document's `/status` must equal `Active`, and the processing event's actor must equal `/contracts/authorizedActorChannel/actor`. Submitted `values` must match `registrationPattern`. Every supplied top-level field must be text, and its path formed as `/` followed by the field name must appear in at least one configured `fields` mapping. Unlisted fields, nested objects, numbers and booleans are rejected.\n\nAfter those checks, an existing key with exactly equal values returns without adding grants or consuming capacity, even when the registry is full. Reusing a key with different values is rejected. This duplicate return also bypasses connection `after` work and the `once` completion marker.\n\nFor a new key, `used` must be below the stored `limit`. The action copies mapped values into each grant template and checks the required target fields. It adds the resulting grants to `/scope`, using keys composed of the clause key, the previous `used` count and the configured grant key. It then records the submitted values under `entries[key]` and increments `used` by one. The `register` action provides no replacement, removal or capacity-release operation.\n\nThe registry records accepted registration groups, not successful target operations. Registration itself neither executes a granted operation nor proves document origin or relationships. It stores supplied text without embedding, snapshotting or observing the referenced documents. Later execution must validate the actual target and request under the approved native scope rules; the detailed execution rules are not supplied here."
+}

@@ -22,20 +22,20 @@ public final class AdmissionConsentDispatchConformance {
   }
  public static void main(String[] a)throws Exception{
   var root=Path.of(a[0]);var capture=o(WireData.json(Files.readString(Path.of(a[1]))));var responses=o(capture.get("responses"));
-  try(var blue=Blue.builder().packages(PackageBundle.builder().mount("Clauses",BluePackage.open(root.resolve("blue-clauses/dist/package.bluepkg"))).build()).nodeProvider(id->responses.containsKey(id)?NodeProviderResult.found(ContentRecord.fromResponse(o(responses.get(id)))):NodeProviderResult.notFound()).build()){
+  try(var blue=Blue.builder().packages(PackageBundle.builder().mount("Clauses",BluePackage.open(root.resolve("blue-clauses/dist/package.bluepkg"))).mount("Documents",BluePackage.open(root.resolve("clause-documents/dist/package.bluepkg"))).build()).nodeProvider(id->responses.containsKey(id)?NodeProviderResult.found(ContentRecord.fromResponse(o(responses.get(id)))):NodeProviderResult.notFound()).build()){
    var ex=new Contracts(blue,RuntimeBindings.accessEvents().withDefinitionReadV1()).execution();var v=ex.values();var host=new Exact.Ref((String)capture.get("publication"));
-   var operations=(List<?>)o(capture.get("description")).get("operations");var operation=operations.stream().map(AdmissionConsentDispatchConformance::o).filter(x->x.get("name").toString().startsWith("consentAdmission_payment_")).findFirst().orElseThrow();String op=(String)operation.get("name"),channel=(String)operation.get("channel");
+   var contracts=o(v.bexData(v.select(host,"/contracts")));
+   String op=contracts.keySet().stream().filter(name->name.startsWith("consentAdmission_payment_")).findFirst().orElseThrow();
+   String channel=(String)v.bexData(v.select(host,"/contracts/"+op+"/channel"));
    String policy="/contracts/activationDispatch";var functions=m();var body=o(v.bexData(v.select(host,policy)));var source=policySource(WireData.parse(Files.readString(root.resolve("clause-activation/types/plan.blue")),"yaml"));body.put("do",o(source.get("do")).get("$literal"));
    var pending=new LinkedHashSet<String>();calls(body.get("do"),pending);while(!pending.isEmpty()){String fn=pending.iterator().next();pending.remove(fn);if(functions.containsKey(fn))continue;Object f=v.bexData(v.select(host,policy+"/definition/functions/"+fn));functions.put(fn,f);calls(f,pending);}body.remove("definition");body.remove("type");body.put("functions",functions);
    String step="/contracts/admissionUpdate_payment_processHandler/steps/2";
+   // Execute the current published installer and its actual transitive helpers.
+   // The retained capture supplies state, never a positional historical code splice.
+   var documents=BluePackage.open(root.resolve("clause-documents/dist/package.bluepkg"));
+   var installDefinition=new Exact.Ref(documents.exportId("Admission Functions"));
    var installFunctions=m();var pendingInstall=new LinkedHashSet<String>();pendingInstall.add("installAdmissionConsentOperations");
-   while(!pendingInstall.isEmpty()){String fn=pendingInstall.iterator().next();pendingInstall.remove(fn);if(installFunctions.containsKey(fn))continue;Object selected=v.select(host,step+"/definition/functions/"+fn);if(selected==null)throw new AssertionError("Missing function "+fn+" at "+step);Object f=v.bexData(selected);installFunctions.put(fn,f);calls(f,pendingInstall);}
-   var authored=o(o(WireData.parse(Files.readString(root.resolve("clause-documents/types/admission-functions.blue")),"yaml")).get("functions"));
-   var originalDo=new ArrayList<Object>((List<?>)o(installFunctions.get("installAdmissionConsentOperations")).get("do"));
-   var revisedDo=(List<?>)o(authored.get("installAdmissionConsentOperations")).get("do");
-   var loop=o(o(originalDo.get(2)).get("$forEach"));var loopDo=new ArrayList<Object>((List<?>)loop.get("do"));
-   var revisedLoop=(List<?>)o(o(revisedDo.get(4)).get("$forEach")).get("do");loopDo.addAll(revisedLoop.subList(revisedLoop.size()-3,revisedLoop.size()));loop.put("do",loopDo);
-   originalDo.add(2,revisedDo.get(2));originalDo.add(3,revisedDo.get(3));o(installFunctions.get("installAdmissionConsentOperations")).put("do",originalDo);
+   while(!pendingInstall.isEmpty()){String fn=pendingInstall.iterator().next();pendingInstall.remove(fn);if(installFunctions.containsKey(fn))continue;Object selected=v.select(installDefinition,"/functions/"+fn);if(selected==null)throw new AssertionError("Missing current function "+fn);Object f=v.bexData(selected);installFunctions.put(fn,f);calls(f,pendingInstall);}
    String itemPath=(String)v.bexData(v.select(host,"/contracts/"+op+"/steps/0/constants/itemPath"));
    var installer=m("functions",installFunctions,"constants",v.bexData(v.select(host,step+"/constants")),"do",List.of(m("$return",m("$call",m("function","installAdmissionConsentOperations","args",m("item",m("$binding","item")))))));
    var installed=ex.evaluatePredicate(host,v.exact(v.select(host,itemPath)),"item",v.source(installer),10000000);

@@ -2411,16 +2411,24 @@ functions:
         - $return:
             parties: {}
             paths: []
+    - $let:
+        name: candidateInitialId
+        expr:
+          $nodeBlueId:
+            $pointerGet:
+              object:
+                $var: candidate
+              path: /clauseRuntime/initialDocument
+    - $let:
+        name: originalId
+        expr:
+          $nodeBlueId:
+            $var: original
     - $failIf:
         cond:
           $ne:
-          - $nodeBlueId:
-              $pointerGet:
-                object:
-                  $var: candidate
-                path: /clauseRuntime/initialDocument
-          - $nodeBlueId:
-              $var: original
+          - $var: candidateInitialId
+          - $var: originalId
         message: PREPARATION_ADMISSION_PROOF_REQUIRED
     - $failIf:
         cond:
@@ -2715,8 +2723,7 @@ functions:
                           object:
                             $var: token
                           path: /accessScope/processOrigin
-                      - $nodeBlueId:
-                          $var: original
+                      - $var: originalId
                     message: PREPARATION_ADMISSION_PROOF_REQUIRED
                 - $failIf:
                     cond:
@@ -2933,28 +2940,31 @@ functions:
                           - approve
                         message: PREPARATION_ADMISSION_PROOF_REQUIRED
                     - $let:
-                        name: suffix
+                        name: consentNames
                         expr:
-                          $concat:
-                          - $var: clauseKey
-                          - _
-                          - $nodeBlueId:
-                            - $var:
-                                name: entry
-                                path: /admissionRef
-                            - $var: role
+                          $call:
+                            function: admissionConsentNames
+                            args:
+                              clauseKey:
+                                $var: clauseKey
+                              admissionRef:
+                                $var:
+                                  name: entry
+                                  path: /admissionRef
+                              role:
+                                $var: role
                     - $let:
                         name: channel
                         expr:
-                          $concat:
-                          - admissionConsent_
-                          - $var: suffix
+                          $var:
+                            name: consentNames
+                            path: /channel
                     - $let:
                         name: operation
                         expr:
-                          $concat:
-                          - consentAdmission_
-                          - $var: suffix
+                          $var:
+                            name: consentNames
+                            path: /operation
                     - $let:
                         name: channelDeclaration
                         expr:
@@ -2965,69 +2975,47 @@ functions:
                     - $let:
                         name: handler
                         expr:
-                          $merge:
-                          - type: Contracts/Sequential Workflow Operation
-                          - channel:
-                              $var: channel
-                            steps:
-                            - $merge:
-                              - type: Contracts/Compute
-                              - definition:
-                                  $objectFromEntries:
-                                  - key: blueId
-                                    val:
-                                      $nodeBlueId:
-                                        type: Documents/Admission Consent Functions
-                                constants:
-                                  itemPath:
-                                    $var:
-                                      name: entry
-                                      path: /itemPath
-                                  admissionRef:
-                                    $var:
-                                      name: entry
-                                      path: /admissionRef
-                                  party:
-                                    $var: role
-                                do:
-                                  $literal:
-                                  - $return:
-                                      $call:
-                                        function: recordConsent
-                                        args:
-                                          input:
-                                            $binding: call/request
-                          - $literal:
-                              $blue:requestFrom:
-                                definition:
-                                  type: Documents/Admission Consent Functions
-                                function: recordConsent
-                                argument: input
+                          $call:
+                            function: admissionConsentHandler
+                            args:
+                              channel:
+                                $var: channel
+                              itemPath:
+                                $var:
+                                  name: entry
+                                  path: /itemPath
+                              admissionRef:
+                                $var:
+                                  name: entry
+                                  path: /admissionRef
+                              role:
+                                $var: role
                     - $let:
                         name: registration
                         expr:
-                          operationId:
-                            $nodeBlueId:
-                              $var: handler
-                          channel:
-                            $var: channel
-                          channelId:
-                            $nodeBlueId:
-                              $var: channelDeclaration
-                          itemPath:
-                            $var:
-                              name: entry
-                              path: /itemPath
-                          admissionRef:
-                            $var:
-                              name: entry
-                              path: /admissionRef
-                          party:
-                            $var: role
-                          activationRevision:
-                            $var:
-                              name: entry
-                              path: /admissionToken/activationRevision
+                          $call:
+                            function: admissionConsentRegistration
+                            args:
+                              handler:
+                                $var: handler
+                              channel:
+                                $var: channel
+                              channelDeclaration:
+                                $var: channelDeclaration
+                              itemPath:
+                                $var:
+                                  name: entry
+                                  path: /itemPath
+                              admissionRef:
+                                $var:
+                                  name: entry
+                                  path: /admissionRef
+                              role:
+                                $var: role
+                              activationRevision:
+                                $var:
+                                  name: entry
+                                  path: /admissionToken/activationRevision
                     - $failIf:
                         cond:
                           $ne:

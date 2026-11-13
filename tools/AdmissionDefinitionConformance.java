@@ -11,7 +11,7 @@ public final class AdmissionDefinitionConformance {
   static void check(boolean value,String message){if(!value)throw new AssertionError(message);}
   static final List<List<String>> CLOSURES=List.of(
       List.of("nextAdmissionRequest","retireInvalidAdmission","retireAdmission"),
-      List.of("admissionInstallRequest","installAdmissionConsentOperations","accessValid","accessRecordsValid","readerGroups","transports"),
+      List.of("admissionInstallRequest","installAdmissionConsentOperations","admissionConsentNames","admissionConsentHandler","admissionConsentRegistration","accessValid","accessRecordsValid","readerGroups","transports"),
       List.of("finishAdmission","requireRosterCoverage","requireSameMainParty"));
   public static void main(String[] args)throws Exception {
     Path root=Path.of(args[0]);var documents=BluePackage.open(root.resolve("clause-documents/dist/package.bluepkg"));
@@ -51,7 +51,7 @@ public final class AdmissionDefinitionConformance {
           }
           clauseType.put("type","Clauses/Clause");
           var planner=new Exact.Ref(documents.exportId("Preparation Plan"));
-          var hook=m("type","Connections/Connection Planning Functions","constants",m(),"functions",values.bexData(values.select(planner,"/functions")));
+          var hook=m("type","Connections/Connection Planning Functions","constants",m("refreshCanonicalFunctions",values.bexData(values.select(planner,"/constants/refreshCanonicalFunctions"))),"functions",values.bexData(values.select(planner,"/functions")));
           clauseType.put("hookDefinition",m("type",hook));
           obj(clauses.get("orders")).put("type",clauseType);
         }

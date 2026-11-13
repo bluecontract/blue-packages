@@ -1,0 +1,165 @@
+{
+  "provenance": "ba7c06961bd020b77a6e6d4f30a26b63b276b582 installAdmissionConsentOperations expressions",
+  "expressions": {
+    "suffix": {
+      "$concat": [
+        {
+          "$const": "clauseKey"
+        },
+        "_",
+        {
+          "$nodeBlueId": [
+            {
+              "$var": {
+                "name": "item",
+                "path": "/admissionRef"
+              }
+            },
+            {
+              "$var": "role"
+            }
+          ]
+        }
+      ]
+    },
+    "channel": {
+      "$concat": [
+        "admissionConsent_",
+        {
+          "$var": "suffix"
+        }
+      ]
+    },
+    "operation": {
+      "$concat": [
+        "consentAdmission_",
+        {
+          "$var": "suffix"
+        }
+      ]
+    },
+    "channelDeclaration": {
+      "$pointerGet": {
+        "object": {
+          "$var": "party"
+        },
+        "path": "/lead/channel"
+      }
+    },
+    "handler": {
+      "$merge": [
+        {
+          "type": "Contracts/Sequential Workflow Operation"
+        },
+        {
+          "channel": {
+            "$var": "channel"
+          },
+          "steps": [
+            {
+              "$merge": [
+                {
+                  "type": "Contracts/Compute"
+                },
+                {
+                  "definition": {
+                    "$objectFromEntries": [
+                      {
+                        "key": "blueId",
+                        "val": {
+                          "$nodeBlueId": {
+                            "type": "Documents/Admission Consent Functions"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "constants": {
+                    "itemPath": {
+                      "$var": {
+                        "name": "item",
+                        "path": "/itemPath"
+                      }
+                    },
+                    "admissionRef": {
+                      "$var": {
+                        "name": "item",
+                        "path": "/admissionRef"
+                      }
+                    },
+                    "party": {
+                      "$var": "role"
+                    }
+                  },
+                  "do": {
+                    "$literal": [
+                      {
+                        "$return": {
+                          "$call": {
+                            "function": "recordConsent",
+                            "args": {
+                              "input": {
+                                "$binding": "call/request"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "$literal": {
+            "$blue:requestFrom": {
+              "definition": {
+                "type": "Documents/Admission Consent Functions"
+              },
+              "function": "recordConsent",
+              "argument": "input"
+            }
+          }
+        }
+      ]
+    },
+    "registration": {
+      "operationId": {
+        "$nodeBlueId": {
+          "$var": "handler"
+        }
+      },
+      "channel": {
+        "$var": "channel"
+      },
+      "channelId": {
+        "$nodeBlueId": {
+          "$var": "channelDeclaration"
+        }
+      },
+      "itemPath": {
+        "$var": {
+          "name": "item",
+          "path": "/itemPath"
+        }
+      },
+      "admissionRef": {
+        "$var": {
+          "name": "item",
+          "path": "/admissionRef"
+        }
+      },
+      "party": {
+        "$var": "role"
+      },
+      "activationRevision": {
+        "$var": {
+          "name": "item",
+          "path": "/admissionToken/activationRevision"
+        }
+      }
+    }
+  }
+}

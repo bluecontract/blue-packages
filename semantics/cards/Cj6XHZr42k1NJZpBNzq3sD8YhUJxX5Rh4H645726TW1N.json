@@ -1,0 +1,54 @@
+{
+  "blueId": "Cj6XHZr42k1NJZpBNzq3sD8YhUJxX5Rh4H645726TW1N",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Payment Base",
+    "limitations": [
+      "The supplied definitions omit build, so instruction creation effects, required payment inputs, amount units, currency and business rejection rules cannot be established.",
+      "The embedded payment-instruction definition and child-action implementations are not supplied. Payment permissions, balances, per-request outcomes and lifecycle state therefore cannot be described."
+    ],
+    "parameterRefs": [
+      "bindings.amount",
+      "bindings.instruction"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; planned initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and timer arm task.",
+        "id": "connectionArmed",
+        "meaning": "Whether this named connection recorded timer arming; not whether a timer remains pending or payment succeeded.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; planned initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: outcome-v1 gate and once /fired write.",
+        "id": "connectionFired",
+        "meaning": "Whether a once connection reached its completion marker; start requires acceptedNew. This is not payment completion.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Base\n\nPayment Base is a connected clause for constructing a payment instruction and observing events from that embedded instruction. Its declared design places capture connections inside the instruction.\n\n## Bindings\n\n- `bindings.amount` defaults to `/product/totalMinor`. It identifies the configured amount location, but the supplied implementation does not establish how that value is consumed, its units or its currency.\n- `bindings.instruction` defaults to `/payment`. It selects the embedded instruction and the source watched by automatic observation. Overriding it changes both locations.\n\nBoth bindings must be text JSON Pointers beginning with `/` and cannot be the root pointer `/`. These defaults select locations; they do not initialize payment values or prove that an instruction exists. `readParametersFromDocument` is true, so the connection planner leaves its generated `parameters` constant empty.\n\n## Actions and observations\n\n`start` runs through configured connections; no automatic start is declared. It calls `build` and assigns its return value to `actionResult`. Its `outcome-v1` contract requires an `outcome` of `acceptedNew`, `duplicate`, `rejected` or `skipped`. Only `acceptedNew` continues to connection `after` steps and any `once` completion marker. An absent or unsupported outcome fails the invocation. The supplied definitions do not include `build`, so its construction effects, payment inputs and business rejection rules are not established here. An accepted action result does not itself establish payment success.\n\n`observe` automatically handles notifications from the embedded `instruction`. It ignores an inner event that does not match `Event`. Otherwise, it emits `Payment Event Received`, containing:\n\n- `clause`: this clause's key.\n- `event`: an exact reference to the observed event.\n- `instructionPath`: the configured `instruction` pointer.\n- `kind`: the observed event's `kind` value.\n\nThis emission records receipt of an event. Its business meaning depends on that event; an observed request is not confirmation of its external outcome. Event authority comes from authenticated input or document origin, not its name.\n\n`childActions` declares `approveRecipient`, `requestCapture`, `requestRefund`, `requestVoid`, `requestPayeeAssignment`, `requestTransactionDetailsUpdate`, `requestFinalAmountResolution`, `requestPaymentCompletionLock`, `requestPaymentCompletionUnlock`, `requestPaymentReversalLock`, `requestPaymentReversalUnlock`, `requestTransactionDetailsUpdateLock`, `requestTransactionDetailsUpdateUnlock` and `requestAuthorize`. Their implementations and argument contracts are not supplied. These declarations alone establish neither permission to invoke them nor changes to payment balances.\n\n## Connection rules\n\nAction bindings are dictionaries of named connections. Their `on` source can be `event`, `embedded`, `collection`, `change`, `channel`, `initialized`, `activated`, `workflow` or `timer`. Workflow connections require an authenticated channel binding. The automatic observation connection uses the reserved name `_automatic`.\n\nConnection `params` override action defaults. A false `when` skips execution; a false `parameters.conditions.<action>` fails it. `before` steps precede the action, and `after` steps follow its qualifying result. `once` defaults to false. When enabled, reaching the completion marker prevents later execution through that connection; it does not mean the payment is complete. Clause and connection names must be nonempty and exclude `.`, `/` and `~`. Changed clause configuration requires a new clause key.\n\nTimer connections require exactly one of an absolute `timestamp` or an `afterEvent` source. Absolute timestamps are integer Unix microseconds from 0 through 9007199254740991 and cannot include `delayMs` or `policy`. Relative timers require a positive integer `delayMs` no greater than 9007199254740 and a timestamped source other than initialization. Their `policy` defaults to `first`; `latest` replaces the pending keyed request on subsequent qualifying sources. `cancelOn` can select a cancellation source. Deadlines must satisfy the Time runtime's range and causal-order rules. A committed timer request requests a future firing; it is not a firing or payment confirmation, and processing may occur late.\n\nThe planner initializes each connection's `armed` and `fired` flags to false when its planned state is installed. Timer arming sets `armed` to true; the shown firing and cancellation handlers do not clear it, so it is not a pending-timer indicator. `fired` marks completion of a `once` connection, subject to the action's result contract. Missing flags are unknown. No authoritative authorization, capture, refund, void, currency or payment lifecycle state is established by the supplied payment implementation."
+}

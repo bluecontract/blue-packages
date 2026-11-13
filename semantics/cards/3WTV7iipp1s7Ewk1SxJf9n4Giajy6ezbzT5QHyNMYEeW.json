@@ -1,0 +1,49 @@
+{
+  "blueId": "3WTV7iipp1s7Ewk1SxJf9n4Giajy6ezbzT5QHyNMYEeW",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "CJgGWmocYCpqmt9isfL6aJab4Qs4i62qhUt7T7QubHoo",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Method Events",
+    "limitations": [
+      "The supplied definitions do not establish paymentDetails' schema, required fields or permitted method values beyond the myos-customer comparison."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no method default is declared.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Method Events.actions.announce.do and actions.request.do",
+        "id": "paymentMethod",
+        "meaning": "Method copied into execution requests; myos-customer selects the customer-session announcement.",
+        "path": "/paymentDetails/method",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Method Events.actions.announce.automatic; Connection Planning Functions.planConnections state initialization and once guard/write",
+        "id": "announcementFired",
+        "meaning": "True records local automatic announcement completion and suppresses repeats; false awaits that completion.",
+        "path": "/connectionState_{clauseKey}/announce._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Method Events\n\nA Connected Clause that emits payment setup announcements and execution requests. Both actions read `/paymentDetails` from the document where the clause executes; this is a fixed path, not a configurable data binding.\n\n- **`announce`** automatically runs on `Clauses Initialized`, once for its automatic connection. It emits a `Payment Event` with `details` copied from `/paymentDetails`. When `/paymentDetails/method` equals `myos-customer`, `kind` is `Customer Payment Session Requested`; otherwise, it is `Account Payment Instruction Created`. The latter branch does not validate the method or establish a default method.\n- **`request`** automatically responds to an `Event` matching `kind: Payment Requested`. It emits a `Payment Event` with `kind: MyOS Execution Requested`, `details` copied from `/paymentDetails`, `method` copied from `/paymentDetails/method`, and `request` containing the triggering event. This automatic connection is not one-shot and has no action-specific deduplication guard.\n\nThese emissions do not confirm external session creation, execution or payment completion. Event authority comes from authenticated input or document origin, not the event's name. The announcement's local `fired` flag records completion of that connection, not payment success; it is initialized to false and set to true after the action completes.\n\nInherited named connections in `bindings.announce` and `bindings.request` can add triggers. A false connection `when` skips execution; `before` and `after` steps surround the action body. `once` defaults to false and applies separately to each connection. The built-in `_automatic` connection name is reserved. Expressions at `parameters.conditions.announce` and `parameters.conditions.request` can reject their corresponding action when false; absent conditions default to true. Changing an installed clause's configuration requires a new clause key."
+}

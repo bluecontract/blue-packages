@@ -1,0 +1,82 @@
+{
+  "blueId": "Bm66PeCzBymurAqHKAPT7A34xRnksxsTXQrQef8aAp4Q",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "DrWgoLeVxQYSxAhWk1YrvCL5L8mCx27uguNJmSnnzXEq",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Product Clause",
+    "limitations": [
+      "The supplied definitions establish no required currency identifier format or default for parameters.currency."
+    ],
+    "parameterRefs": [
+      "bindings.product"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no initial price is defined.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.functions.quote: price guard and $appendChange.val.unitPriceMinor.",
+        "id": "unitPrice",
+        "meaning": "Quoted price per product unit, from 0 through 1,000,000,000 minor units of product.currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/unitPriceMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no initial quantity is defined.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.functions.quote: quantity guard and $appendChange.val.quantity.",
+        "id": "quantity",
+        "meaning": "Number of product units included in the stored quote, an integer from 1 through 1,000.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/quantity",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no initial total is defined.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "All product units included in the stored quote",
+          "unit": "Minor units of product.currency"
+        },
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.functions.quote: $appendChange.val.totalMinor uses $multiply.",
+        "id": "quoteTotal",
+        "meaning": "Total quoted price for the stored quantity of product units, in minor units of product.currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/totalMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no currency default is defined.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.functions.quote: $appendChange.val.currency reads parameters.currency.",
+        "id": "quoteCurrency",
+        "meaning": "Currency copied from parameters.currency when quoting; applies to unitPriceMinor and totalMinor.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      }
+    ]
+  },
+  "semanticText": "# Product Clause\n\nMaintains a document-owned quote for one product, recording its unit price, quantity, total and currency.\n\n## Configuration and inputs\n\n`bindings.product` is required and identifies the quote’s location through a non-root JSON pointer in the executing document. No default location or initial product value is defined.\n\n`parameters.currency` supplies the currency copied into each quote. The quote function defines no currency default or currency-format check.\n\nThe `quote` action receives these values through its connection’s `params`:\n\n- `unitPriceMinor`: an integer from 0 through 1,000,000,000, in minor units of the configured currency. A zero price is permitted.\n- `quantity`: an integer from 1 through 1,000, representing product units.\n\nNeither input has a default. Values that fail the integer and range checks are rejected with `Invalid product quote`.\n\n## Quote effects\n\nThe action stages replacement of the entire value at `bindings.product` with `unitPriceMinor`, `quantity`, `totalMinor` and `currency`. `totalMinor` is calculated for the quoted quantity at the supplied unit price. Existing fields outside that replacement object are not preserved by this write.\n\nIt also emits a `Domain Event` with `kind` equal to `Product Quoted`, `clause` identifying the clause key, and `totalMinor` carrying the quote total. The event does not carry currency; its amount comes from the same quote calculation.\n\nCommitted effects establish the recorded update. An attempted invocation or matching trigger alone does not establish that the quote changed. The recorded amounts describe a quote, without establishing an order or payment. Absent quote fields are unknown; initialization does not supply zero prices or quantities.\n\n## Connections and guards\n\nNamed connections in `bindings.quote` determine when the action runs and supply its `params`. This type defines no automatic connection. Supported inherited `on` modes are `workflow`, `channel`, `event`, `embedded`, `collection`, `change`, `initialized`, `activated` and `timer`. Workflow connections select an authenticated channel through `party`, taking precedence over `channel`; the type names no fixed business actor or viewer permission. A timer request alone does not establish that quoting ran.\n\nA connection’s `when` defaults to true; false skips execution. `parameters.conditions.quote` also defaults to true, but a false condition rejects execution with `ACTION_CONDITION_FAILED`. Optional `before` and `after` bodies surround the quote body and can add effects. `once` defaults to false; when true, further invocations of that connection are skipped after execution completes through `after`.\n\nChanging an installed clause’s configuration under the same key is rejected with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`; changed configuration requires a new clause key."
+}

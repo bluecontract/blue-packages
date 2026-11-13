@@ -1,0 +1,70 @@
+{
+  "blueId": "8fGPcMAWVsq4ZerwVbmPbwqd8A8GBh6SJqBEA8kXvHRU",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "88TiDu72JqKzkFX6wqEynFG7nvPFoiN5bLDvy3Tk44eU",
+      "EbCfAgGdGzqdNGkDAXfeZCzmbghuB1oJNACdKRrtWnQD",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7"
+    ],
+    "displayLabel": "Status Clause",
+    "limitations": [
+      "The supplied evidence does not specify admission rules for the concrete channels selected by workflow or channel connections."
+    ],
+    "parameterRefs": [
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; this type declares no initial status.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/status",
+        "evidence": "Status Clause.defaultBindings; State Machine Functions.transition reads and replaces bindings.state.",
+        "id": "currentStatus",
+        "meaning": "Current configured status label. Successors depend on parameters.transitions; no fixed terminal labels or awaited actor are defined.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; planned false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired and generated outcome-v1/once handling.",
+        "id": "connectionFired",
+        "meaning": "For once=true, true records acceptedNew followed by completed after steps. False does not universally mean no prior transition.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; planned false applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial armed, timer arm guard and arm change.",
+        "id": "connectionArmed",
+        "meaning": "For timers, true records arming and blocks further first-policy arming. It does not establish a pending timer or accepted transition.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Status Clause\n\nControls changes to a document’s configured status through the `transition` action. State names and their business meanings come from configuration; the type defines no fixed lifecycle, terminal state or starting status.\n\n## Configuration\n\n- `bindings.state` points to the current status in the document where the clause executes. It defaults to `/status` and must be a non-root pointer beginning with `/`. Changing the binding changes the location read and updated; it does not initialize a status value. An absent status is unknown.\n- `parameters.transitions` maps a current state to its allowed target list. A different target can be accepted only when that list contains it.\n- `parameters.subject` supplies the prefix of the emitted event’s `kind`. No default is declared for `subject` or `transitions`.\n\n## Transition behavior\n\n`transition` takes a required text `to` and optional text `reason`. Once its function runs:\n\n- If `to` equals the current state, it returns `duplicate` before checking the allowed-target list. The function makes no status change and emits no transition event.\n- Otherwise, a target outside the current state’s allowed list fails with `DISALLOWED_TRANSITION`.\n- An allowed new target stages replacement of the bound status, emits a `Domain Event`, and returns `acceptedNew`.\n\nThe event carries `clause` identifying the clause key, `from`, `to`, `reason`, and `kind` formed from `parameters.subject`, a space, and the target. Omitted `reason` becomes an empty string in this event; it does not retrieve a previous explanation.\n\n`duplicate` and `acceptedNew` are action outcomes, not status labels. The state change and event become effective through a committed invocation. A request or trigger alone does not establish a transition, and a status label does not independently confirm an external business outcome.\n\n## Connections and guards\n\nNamed entries under `bindings.transition` connect the action to sources. The type supplies no default connection. Supported `on` values are `workflow`, `event`, `channel`, `change`, `embedded`, `collection`, `initialized`, `activated`, and `timer`. Path-based sources use `path`; channel sources use an existing channel name. Collection handling restricts events to descendants of its selected path. Embedded and collection sources also contribute paths for embedded processing unless `embed` is false.\n\nConnection `params` supplies the transition arguments. Source data is available as `trigger`: the request for a workflow, the underlying event for embedded or collection sources, and the captured initiating trigger for a timer. Arguments are not automatically copied from that trigger.\n\nA false connection `when` skips execution. A false `parameters.conditions.transition` fails with `ACTION_CONDITION_FAILED`. Both checks precede `before` steps. Those steps run before the transition function, so they may already have effects even when the function subsequently returns `duplicate`. Only `acceptedNew` proceeds to `after` steps.\n\n`once` defaults to false. When true, the connection records `fired=true` after an accepted new transition and its `after` steps, then skips later invocations. A duplicate does not consume this allowance. For connections without `once=true`, `fired=false` is not evidence that no transition has occurred.\n\nA `workflow` connection selects `party` when supplied, otherwise `channel`, to name its operation channel. The planner validates the name; these definitions do not establish any particular caller’s permission.\n\n### Optional timers\n\nA timer connection requires exactly one of `timestamp` and `afterEvent`. An absolute `timestamp` is an integer Unix-microsecond deadline from 0 through 9007199254740991, armed by `initialized`; it forbids `delayMs` and `policy`. An `afterEvent` timer requires a timestamped source and positive integer `delayMs` no greater than 9007199254740. Its deadline uses the source’s logical timestamp plus that duration and must remain within the portable timestamp range. Initialization cannot supply this relative-time source.\n\nRelative timer `policy` defaults to `first`, which suppresses later arming once `armed` is true. `latest` instead replaces the connection’s pending keyed timer. The supplied code never clears `armed`, including after cancellation or firing, so it is not a current pending-timer indicator. `cancelOn` emits cancellation for the connection’s timer key; it cannot reverse an earlier firing.\n\nTimers require an explicitly supported Time runtime. Only committed requests register timers. Firing also requires authoritative time, sufficient closed input history, and a still-pending registration; processing may occur late. New deadlines must follow any established causal timestamp, with elapsed absolute deadlines permitted for genuinely new standalone initialization without a committed external position. Neither arming nor timer firing proves that the guarded transition was accepted.\n\nThe planner declares initial `armed=false` and `fired=false` for each connection; missing flags remain unknown. Clause and connection names must be nonempty and exclude `.`, `/`, and `~`. Inherited configuration-transition validation requires an unchanged clause under an existing key; changing its configuration requires a new clause key (`CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`)."
+}

@@ -1,0 +1,64 @@
+{
+  "blueId": "GTHDfj3hfUCUxrnYwuB5s7jWLkqq5v7D8WRgytKULGhc",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "JAVfq3idjXE65QjTiGepqJFPb35tjpEQew6af6qPJZHj",
+      "HCLNwqVZfWNtjeP6MQrJiRzBFcUEtizFyfihPfoLsMqJ",
+      "3oGtXdt5rKJwsJbBGC1NWphpRdeB4RQKRgzo27uf1rTY",
+      "G4iHwpy5H6pac4XzMMqGGQ6QojE2ZZme2u4GBuJk91eY",
+      "8Qa2KBSeQAn2ep8ofkBqmrtYgLWrMzM3Ngj5uFPfsF1p",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "32G1ERaDgaiJr8Zntq7qEpJMWB7EwmRXTLHGZ7x6uciY"
+    ],
+    "displayLabel": "Task Work Functions",
+    "limitations": [
+      "The supplied documentPaths omit request entries and expose latestReport only as a whole object; scalar paths for dispositions, result and error are unavailable for structured state facts.",
+      "Task-specific meanings and schemas for input, instructions and result are not established here. Successful report validation depends on the owner's configured reportRequest."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Rejected if missing after parameter resolution.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Launch Policy.parameters.workClause; Task Work Functions.functions.request.",
+        "id": "workClause",
+        "meaning": "Launch policy's selected Task Work Clause key; Task Launch Policy declares the default \"work\".",
+        "path": "/clauses/{clauseKey}/parameters/workClause",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; cannot satisfy the ownership check.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.plan: taskWork.initial.ownerClause; Task Work Functions.request.",
+        "id": "ownerClause",
+        "meaning": "Task Work Clause owning this document's ledger; must match the calling policy's workClause.",
+        "path": "/taskWork/ownerClause",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; request defines no fallback.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.plan: taskWork.initial.nextRequestNumber; Task Work Functions.request.",
+        "id": "nextRequestNumber",
+        "meaning": "Next request ID's sequence number; initialized to 1 and incremented for each newly accepted request.",
+        "path": "/taskWork/nextRequestNumber",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      }
+    ]
+  },
+  "semanticText": "# Task Work Functions\n\nProvides the `request(params)` function used by Task launch policies to record and emit a new work request. Acceptance means a request has been registered as `pending`; it does not establish that the work has started or succeeded.\n\n## Context and requirements\n\n`clauseKey` identifies the calling policy clause. Its declared type must directly derive from `Task Launch Policy`, as checked at `/clauses/{clauseKey}/type/type`. The policy's `parameters.workClause` selects the ledger-owning clause; Task Launch Policy declares `\"work\"` as its default.\n\nBefore creating a request, the function rejects:\n\n- An incompatible calling policy: `TASK_LAUNCH_POLICY_REQUIRED`.\n- A missing or empty string `workClause`: `TASK_WORK_BINDING_REQUIRED`.\n- A selected clause whose exact type is not `Task Work Clause`: `TASK_WORK_OWNER_REQUIRED`.\n- A selected clause key that differs from `/taskWork/ownerClause`: `TASK_WORK_OWNER_MISMATCH`.\n- Any `sourceMode` other than `initialized` or `workflow`: `TASK_LAUNCH_MODE_NOT_SUPPORTED`.\n\nConnection planning supplies `clauseKey` and `sourceMode`. An `initialized` connection responds to `Clauses Initialized`; a `workflow` connection uses its configured channel, with `party` taking precedence over `channel`. The function itself does not designate an initiating person or grant permission to call a workflow.\n\n## Request creation\n\nThe function reads `/taskWork/nextRequestNumber` and creates a `requestId` in the form `request-<number>`. It constructs a `Task Work Requested` event containing that ID, `input` copied from `params.input`, and `instructions` copied from `/instructions` in the executing document. This function defines no fallback or task-specific validation for `input` or `instructions`.\n\nIt increments `nextRequestNumber`, adds an entry under `/taskWork/requests` keyed by the new ID, stores the request's identity reference with `disposition: \"pending\"`, and emits the request. Its return value is `{outcome: \"acceptedNew\", requestId}`. It performs no duplicate-input check: each accepted invocation allocates another request ID.\n\n## Ledger and reported outcomes\n\nThe selected Task Work Clause owns the ledger. Its initialization establishes `ownerClause`, `nextRequestNumber: 1`, an empty `requests` dictionary, and `latestReport: {}`. Missing state does not imply these initial values. All paths refer to the document where the function executes, including a nested instruction's own document.\n\nA pending request awaits a report through the owner's `performer` channel. The owner's `reportSuccess` contract requires a report matching its configured `reportRequest`, with a nonempty `requestId`, `status: \"succeeded\"`, and a present `result`. Its `reportFailure` contract requires `status: \"failed\"` and a nonempty `error`; a failure report must not contain `result`.\n\nAn accepted report changes that request's `disposition` to `succeeded` or `failed`, preserves its request reference, and stores the report reference. It also replaces `/taskWork/latestReport` with the full report and emits `Task Report Accepted`. Thus `latestReport` is the most recently newly accepted report across requests, not a status for all work.\n\nUnknown request IDs are rejected. After a request is final, a valid report with the same identity returns `alreadyFinal` without updating the ledger or emitting another acceptance event; a different report is rejected with `TASK_FINAL_REPORT_CONFLICT`. These report outcomes are distinct from acceptance of the original launch request."
+}

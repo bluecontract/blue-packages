@@ -1,0 +1,79 @@
+{
+  "blueId": "AfTc4GKjsBaWUAFdadUb7ACLNvRrVn4Rh8UZx9UdMpCw",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "DnBvCf7Q7graMZtAGMkN8W9VWkxdpEumZaJDvoJM8A65"
+    ],
+    "displayLabel": "Usage Limit Clause",
+    "limitations": [
+      "Whether a connected source proves business success depends on its configuration; record does not independently confirm external completion."
+    ],
+    "parameterRefs": [
+      "bindings.usage"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no default limit is established.",
+        "aggregate": null,
+        "binding": "usage",
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.initialize and actions.record: limit writes.",
+        "id": "usageLimit",
+        "meaning": "Positive use limit copied from parameters.limit; record preserves it without enforcing a cap.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/limit",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; initialize must run to establish zero.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Previously unseen keys accepted by record under its status, actor and Mandate guards since initialization.",
+          "unit": "Uses, one per accepted key; intended source is a committed successful effect."
+        },
+        "binding": "usage",
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.initialize and actions.record: used writes.",
+        "id": "used",
+        "meaning": "Cumulative distinct accepted uses since initialization; duplicate keys do not increase it.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/used",
+        "type": "count"
+      },
+      {
+        "absent": "An absent key is not deduplicated; a missing map is unknown.",
+        "aggregate": null,
+        "binding": "usage",
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.record: $hasKey on seen and $objectSet to true.",
+        "id": "seenKey",
+        "meaning": "Recorded-key marker, written true; key presence suppresses another increment regardless of marker value.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/seen/*",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; does not establish Active.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Usage Limit Clause.actions.record: initial /status equality guard.",
+        "id": "mandateStatus",
+        "meaning": "Only Active passes record's status guard; this clause defines no other statuses or lifecycle transitions.",
+        "path": "/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Usage Limit Clause\n\nMaintains a shared, deduplicated count of successful uses by the authorized Agent acting under this exact Mandate. Registration does not consume usage. The clause stores a configured limit but does **not** enforce that limit, reject excess uses or deactivate the Mandate.\n\n## Configuration and initialization\n\n- `bindings.usage` is required and has no default. It must be a non-root JSON Pointer to the usage state in the document where the clause executes.\n- `parameters.limit` must be a positive integer, with no default. A missing or non-integer value fails with `MANDATE_USAGE_LIMIT_REQUIRED`; a nonpositive integer fails with `MANDATE_USAGE_LIMIT_MUST_BE_POSITIVE`.\n- `initialize` runs automatically on `initialized`, which selects the **Clauses Initialized** event. Each execution writes fresh state at `bindings.usage`: `limit` receives the configured value, `used` becomes `0`, and `seen` becomes an empty dictionary. These values apply only after initialization succeeds; absent state is unknown.\n- `record` has no automatic connection. Its named connections should select committed successful effects from an observed document. Its `key` defaults to the BlueId of `processingEventSource`; connection `params.key` can override it. Keys define which effects count as the same business use across connections sharing the state.\n\nInherited connection configuration can skip execution through `when` or reject it through `parameters.conditions` for the action. `once` defaults to `false`; when enabled, it suppresses later executions after the action and its `after` effects finish without an early return. Configured `before` effects run before the action's own guards. Inherited transition validation rejects configuration changes under an existing clause key and requires a new key.\n\n## Recording a use\n\n`record` proceeds only when all of these checks pass:\n\n- The executing document's `/status` equals `Active`.\n- `processingEvent/actor` equals `/contracts/authorizedActorChannel/actor`.\n- `processingEventSource/onBehalfOf/mandate` exists, and its BlueId equals the BlueId of `/contracts/initialized/document`.\n\nOtherwise, the action returns without changing usage or emitting **Usage Recorded**. These checks exclude direct owner actions and actions under another Mandate from the intended count; calling the action alone grants no authority.\n\nAfter these guards pass, `key` must be text or the action fails with `MANDATE_USAGE_KEY_REQUIRED`. If the key already exists in `seen`, the action returns without counting or emitting another event. Deduplication checks key presence, not the stored marker's value.\n\nFor a new key, the action preserves `limit`, writes `seen[key] = true`, increments `used` by one, and emits **Usage Recorded**. The event's `clause` identifies the clause instance, `key` identifies the counted use, and `used` contains the new cumulative count. No comparison with `limit` occurs, so the count can exceed it.\n\nThe action verifies status, actor, Mandate identity and deduplication; it does not independently verify external business success. That meaning depends on the connected source effect. An attempted operation or emitted request alone is not confirmation of its external outcome."
+}

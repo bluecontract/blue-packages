@@ -1,0 +1,68 @@
+{
+  "blueId": "6ym9As6SQzNGZQS4xGm9gyMRFMXjjNGLQ8LesQdaMmUv",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HCLNwqVZfWNtjeP6MQrJiRzBFcUEtizFyfihPfoLsMqJ",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "GTHDfj3hfUCUxrnYwuB5s7jWLkqq5v7D8WRgytKULGhc",
+      "3oGtXdt5rKJwsJbBGC1NWphpRdeB4RQKRgzo27uf1rTY",
+      "G4iHwpy5H6pac4XzMMqGGQ6QojE2ZZme2u4GBuJk91eY",
+      "8Qa2KBSeQAn2ep8ofkBqmrtYgLWrMzM3Ngj5uFPfsF1p",
+      "32G1ERaDgaiJr8Zntq7qEpJMWB7EwmRXTLHGZ7x6uciY",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Run On Manual Request Clause",
+    "limitations": [
+      "Supplied documentPaths omit per-request ledger entries and the status, result and error fields inside the structured latestReport.",
+      "No fixed schema for params.input or /instructions is established. Success result details depend on the selected work clause's parameters.reportRequest."
+    ],
+    "parameterRefs": [
+      "parameters.workClause"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; a launch requires a matching owner.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.plan states.taskWork.initial; Task Work Functions.request owner check.",
+        "id": "workOwner",
+        "meaning": "Key of the Task Work Clause owning the ledger; must match parameters.workClause for a launch.",
+        "path": "/taskWork/ownerClause",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; work initialization sets 1 when applied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Task Work Clause.plan states.taskWork.initial; Task Work Functions.request.",
+        "id": "nextRequestNumber",
+        "meaning": "Sequence number for the next request ID; advances on accepted launches, not on completed work.",
+        "path": "/taskWork/nextRequestNumber",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; connection initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: slot initial state and generated body.",
+        "id": "connectionFired",
+        "meaning": "For a once connection, true records an accepted launch reaching the end of after steps and prevents another run.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Run On Manual Request Clause\n\nLaunches task work through its connected `request` action. An accepted launch records and emits a work request; completion depends on a later report from the `performer` channel.\n\n## Configuration and launch\n\n`parameters.workClause` defaults to `\"work\"`. It must be nonempty Text naming an exact **Task Work Clause** in the same document, and `/taskWork/ownerClause` must match that key. The request function rejects an incompatible launch policy, missing or invalid work target, or mismatched ledger owner.\n\n`bindings.request` supplies named connections. This type declares no automatic connection. A manual connection uses `on: workflow`, with `party` selecting the channel when supplied, otherwise `channel`. It can specify a `request` pattern and an `event` filter. The configured channel determines admission; declaring the action does not grant the current viewer permission or create an obligation to perform it. The request function also accepts `on: initialized`; every other source mode is rejected when it reaches that function.\n\nConnection `params` supplies action arguments and defaults to an empty object. The incoming workflow request is available as `trigger`; it is not automatically copied into `params.input`. This action declares no required input schema or input default. Each launch constructs **Task Work Requested** using `params.input`, the executing document's `/instructions`, and a generated `requestId`.\n\nA connection's `when` defaults to true; false skips execution. `parameters.conditions.request`, when supplied, must pass or execution fails. Optional `before` steps precede the request action, and `after` steps follow its `acceptedNew` outcome. `once` defaults to false. When true, a connection is marked `fired` only after an accepted launch reaches the end of its `after` steps; subsequent invocations of that connection are skipped. This flag records launch acceptance, not task completion.\n\nClause and connection names must be nonempty and contain no dot, slash or tilde. Changing an installed clause's configuration requires a new clause key.\n\n## Requests and reported outcomes\n\nThe work ledger initializes `nextRequestNumber` to 1. An accepted launch generates `request-<number>`, advances that number, stores the exact request identity under `/taskWork/requests` with `disposition: pending`, emits **Task Work Requested**, and returns `acceptedNew` with `requestId`. Repeating the same input creates another request unless a connection guard prevents it; this function performs no duplicate detection and does not wait for earlier requests to finish.\n\nA pending entry awaits a correlated report through `performer`. A `succeeded` report must include `result` and match the work clause's configured `parameters.reportRequest`. A `failed` report requires nonempty `error` and forbids `result`. Unknown request IDs are rejected.\n\nA newly accepted report changes that request's disposition to its reported status, retains the request identity, stores the report identity, updates `/taskWork/latestReport`, and emits **Task Report Accepted**. An identical repeat of a final report returns `alreadyFinal` without updating the latest report or emitting another acceptance event; a conflicting final report is rejected. Success and failure therefore describe accepted performer reports, not the earlier launch outcome.\n\nWork initialization creates an empty request ledger and an empty `latestReport`. The latest report is the most recently newly accepted report, which need not concern the most recently launched request. Missing state is unknown; initialization values apply only after initialization runs."
+}
