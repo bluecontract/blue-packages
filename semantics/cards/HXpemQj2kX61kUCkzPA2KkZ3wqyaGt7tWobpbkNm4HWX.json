@@ -1,0 +1,93 @@
+{
+  "blueId": "HXpemQj2kX61kUCkzPA2KkZ3wqyaGt7tWobpbkNm4HWX",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "3yGcXSsEZqJcuuL7V3GBZ9RPYkKiR5yjJusQH45PTMch",
+      "5HQrPjC9MfMBQkyB6x6DHVGVmbqF4LRkY6Ft6usWiU89"
+    ],
+    "displayLabel": "Customer Orders Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.catalog",
+      "bindings.collection",
+      "bindings.fulfilment",
+      "bindings.parties",
+      "bindings.sources",
+      "bindings.template",
+      "parameters.allowedFields",
+      "parameters.obtain",
+      "parameters.prepareFor",
+      "parameters.suppliedBy",
+      "parameters.suppliedParties"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions: candidateStage/sharedRefresh",
+        "id": "preparedItemStatus",
+        "meaning": "Per-obligation lifecycle; selection alone does not establish active, source-ready usability.",
+        "path": "/process_{clauseKey}/entries/*/status",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions: checkProvision/sharedRefresh",
+        "id": "selectedOrigin",
+        "meaning": "Initialized document origin selected for this prepared obligation; replacement is forbidden.",
+        "path": "/process_{clauseKey}/entries/*/documentOrigin",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "collection",
+        "defaultPath": null,
+        "evidence": "Customer Orders Clause allowedFields and preparation",
+        "id": "orderOrderdescription",
+        "meaning": "Prepared description of this customer order.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/orderDescription",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "collection",
+        "defaultPath": null,
+        "evidence": "Customer Orders Clause allowedFields and preparation",
+        "id": "orderAmountminor",
+        "meaning": "Prepared order total in the order currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "collection",
+        "defaultPath": null,
+        "evidence": "Customer Orders Clause allowedFields and preparation",
+        "id": "orderCurrency",
+        "meaning": "Currency of the prepared order amount.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/currency",
+        "type": "currency"
+      }
+    ]
+  },
+  "semanticText": "# Customer Orders Clause\n\nPrepares independent customer Orders from the current catalog and configured prices. Catalog defaults to `/catalog`, fulfilment to `/clauses/fulfilment/parameters`, and seller/partner party mapping is retained. Parameters require provision by partner after independent bootstrap, allowing customer as the supplied party. `startOrder` parses the order input; `prepareOrder` rejects caller-supplied fields because priced fields come from catalog selection.\n\nAllowed prepared business data includes description, amount in minor units, customer account or email, quote, quote identity, order snapshot and currency. `provideOrder` performs ordinary native provision first and verifies the candidate customer against the prepared requirement and initialized source; the customer must be distinct from seller and partner where email resolution is used. Optional fulfilment rules remain in the child Order.\n\nPreparation freezes a requirement before creation or provision. Provision requires the expected supplier, request correlation, requirement reference and initialized document origin. Normalized source, effective policy, every party role and identity, allowed value slots and approval requirements must match. An extra undeclared party is rejected even when the child acquired it through its own admission; a stored witness cannot authorize an expanded roster. An unrelated old field alone is not a rejection rule.\n\nSelection is distinct from usability. General admission can seek authorized approval, the incoming participant's consent and access before linking. A selected child becomes usable only when its Activation is active and its source and reader requirements are ready. Identity substitution is rejected; matching retries do not create a second obligation.\n\nConfiguration references: `bindings.catalog` defaults to `/catalog`; `bindings.collection` is configured by the caller/type context; `bindings.fulfilment` defaults to `/clauses/fulfilment/parameters`; `bindings.parties` is configured by the caller/type context; `bindings.sources` is configured by the caller/type context; `bindings.template` is configured by the caller/type context; `parameters.allowedFields` declares `[\"orderDescription\",\"amountMinor\",\"customerAccountId\",\"customerEmail\",\"quote\",\"quoteBlueId\",\"orderSnapshot\",\"currency\"]`; `parameters.obtain` declares `\"provide\"`; `parameters.prepareFor` declares `\"bootstrap\"`; `parameters.suppliedBy` declares `\"partner\"`; `parameters.suppliedParties` declares `[\"customer\"]`."
+}

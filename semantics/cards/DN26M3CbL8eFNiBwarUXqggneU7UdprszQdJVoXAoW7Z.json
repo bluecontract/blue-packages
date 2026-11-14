@@ -1,0 +1,67 @@
+{
+  "blueId": "DN26M3CbL8eFNiBwarUXqggneU7UdprszQdJVoXAoW7Z",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "3Ap6UYSnZRcVcWsHKy5eVKSpUPdRmRRTyzENXNFtFa7W",
+      "Cr31P1rpz27B8tvQZ5h1JJqQcBz1iryQ4tGbsHmBbqgy"
+    ],
+    "displayLabel": "Commission Account Payouts Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.collection",
+      "bindings.commission",
+      "bindings.parties",
+      "bindings.sources",
+      "bindings.template",
+      "parameters.allowedFields",
+      "parameters.fieldPaths",
+      "parameters.obtain",
+      "parameters.prepareFor",
+      "parameters.suppliedBy",
+      "parameters.suppliedParties"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions: candidateStage/sharedRefresh",
+        "id": "preparedItemStatus",
+        "meaning": "Per-obligation lifecycle; selection alone does not establish active, source-ready usability.",
+        "path": "/process_{clauseKey}/entries/*/status",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions: checkProvision/sharedRefresh",
+        "id": "selectedOrigin",
+        "meaning": "Initialized document origin selected for this prepared obligation; replacement is forbidden.",
+        "path": "/process_{clauseKey}/entries/*/documentOrigin",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown until established by the relevant workflow.",
+        "aggregate": null,
+        "binding": "commission",
+        "defaultPath": "/commission",
+        "evidence": "preparePayout preflight /commission/reserved",
+        "id": "commissionReserved",
+        "meaning": "Commission funds reserved for unresolved payouts, in the commission obligation currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Commission Account Payouts Clause\n\nPrepares independent MyOS account-to-account Payment Instructions for commission payouts. Collection defaults to `/payouts`, commission to `/commission`; parameters require external bootstrap provision by seller with guarantor as the declared supplied party. The configured operator must be `test` or `stripe` with a nonempty operator account. Provision refuses a different guarantor.\n\n`preparePayout` accepts `key`, `amountMinor` and account context. Gross commission must be an integer from 1 through 100,000,000. Account context requires payer/payee bindings, platform account and `TEST` or `LIVE` environment. New preparations are limited to 20 process entries and refused while commission is reserved.\n\nThe prepared instruction freezes gross commission, fee and net partner transfer, agreement origin, currency, operator and seller/partner account routing. Gross reservation is distinct from net instruction amount and fee. The seller bootstraps and provides the instruction; the operator executes only after the Agreement links it. Pre-link native cancellation releases the gross reservation once. An opening event is emitted only for a new accepted preparation, never as proof of settlement.\n\nConfiguration references: `bindings.collection` defaults to `/payouts`; `bindings.commission` defaults to `/commission`; `bindings.parties` is configured by the caller/type context; `bindings.sources` is configured by the caller/type context; `bindings.template` is configured by the caller/type context; `parameters.allowedFields` declares `[]`; `parameters.fieldPaths` declares `{\"amountMinor\":\"/paymentTerms/amountMinor\",\"limitMinor\":\"/paymentTerms/limitMinor\",\"payoutTerms\":\"/paymentDetails/payoutTerms\"}`; `parameters.obtain` declares `\"provide\"`; `parameters.prepareFor` declares `\"bootstrap\"`; `parameters.suppliedBy` declares `\"seller\"`; `parameters.suppliedParties` declares `[\"guarantor\"]`."
+}

@@ -134,7 +134,7 @@ public final class BootstrapPreparationConformance {
           "activation",m("readers",m("guarantor",List.of("pinned-key"),"auditor",List.of("audit-key"))));
       var validation=bex.compile(m("do",List.of(m("$return",m("$call",m("function","validateBootstrapReaders","args",
           m("expected",m("$binding","call/request/expected"),"candidate",m("$binding","call/request/actual"))))))),m("functions",functions),null);
-      for(String variant:List.of("valid","changed-key","extra-key","renamed","missing","missing-legacy-reader","runtime-descriptor","initial-changed","current-changed","unknown-field","empty-key")) {
+      for(String variant:List.of("valid","changed-key","extra-key","renamed","missing","missing-legacy-reader","runtime-descriptor","initial-changed","current-changed","unknown-field","empty-key","empty-account","nontext-account")) {
         var candidate=obj(Values.copy(valid));var frozen=obj(Values.copy(expected));
         var readers=obj(obj(candidate.get("activation")).get("readers"));
         switch(variant) {
@@ -148,11 +148,13 @@ public final class BootstrapPreparationConformance {
           case "current-changed" -> obj(obj(obj(candidate.get("clauses")).get("activation")).get("parameters")).put("readers",m());
           case "unknown-field" -> obj(obj(obj(obj(obj(frozen.get("clauses")).get("activation")).get("parameters")).get("readers")).get("guarantor")).put("email","unsupported@example.test");
           case "empty-key" -> obj(obj(obj(obj(obj(frozen.get("clauses")).get("activation")).get("parameters")).get("readers")).get("guarantor")).put("readerKeys",List.of(""));
+          case "empty-account" -> obj(obj(obj(obj(obj(frozen.get("clauses")).get("activation")).get("parameters")).get("readers")).get("guarantor")).put("myosAccountId","");
+          case "nontext-account" -> obj(obj(obj(obj(obj(frozen.get("clauses")).get("activation")).get("parameters")).get("readers")).get("guarantor")).put("myosAccountId",42);
         }
         var check=new BexContext(m(),m(),m(),Values.UNDEFINED,m(),m("call",m("request",m("expected",frozen,"actual",candidate))),"/",null,
             (x,p)->values.matches(x,values.source(p,"definition")),(x,g)->NativeRuntime.identity(values.source(Values.blueValue(x))));
         boolean rejected=false;try {bex.execute(validation,check,1000000);}catch(BexError failure){
-          require(failure.getMessage().contains(variant.equals("unknown-field")||variant.equals("empty-key")?"PREPARATION_PINNED_READER_INVALID":"PREPARATION_PINNED_READER_MISMATCH"),"Unexpected pinned reader rejection: "+failure.getMessage());rejected=true;}
+          require(failure.getMessage().contains(Set.of("unknown-field","empty-key","empty-account","nontext-account").contains(variant)?"PREPARATION_PINNED_READER_INVALID":"PREPARATION_PINNED_READER_MISMATCH"),"Unexpected pinned reader rejection: "+failure.getMessage());rejected=true;}
         require(rejected!=variant.equals("valid"),"Pinned reader guard "+variant);
       }
       System.out.println("PASS exact pinned reader normalization and initial/current/runtime guards");
