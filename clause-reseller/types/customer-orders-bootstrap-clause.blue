@@ -313,6 +313,30 @@ actionDefinition:
                     $call:
                       function: suppliedCustomerOrderRoles
                       args: {}
+        - $let:
+            name: commissionTerms
+            expr:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /fields/customerCommissionTerms
+                default: {}
+        - $if:
+            cond:
+              $gt:
+              - $size:
+                  $var: commissionTerms
+              - 0
+            then:
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /customerCommissionTerms
+                    val:
+                      $var: commissionTerms
         - $if:
             cond:
               $not:
@@ -1037,6 +1061,52 @@ actionDefinition:
       roundBps:
         blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
       # Exact quote-based helper owned by this separate bootstrap profile.
+      prepareCommissionTerms:
+        args:
+          amountMinor:
+            type: Integer
+        do:
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $document: /terms/commissionBps
+            then:
+            - $return: {}
+        - $let:
+            name: beneficiary
+            expr:
+              $document: /activation/parties/partner/myosAccountId
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: beneficiary
+                    kind: text
+                - $ne:
+                  - $var: beneficiary
+                  - ''
+            message: COMMISSION_BENEFICIARY_REQUIRED
+        - $return:
+            grossMinor:
+              $call:
+                function: roundBps
+                args:
+                  basis:
+                    $var: amountMinor
+                  bps:
+                    $document: /terms/commissionBps
+            commissionBps:
+              $document: /terms/commissionBps
+            beneficiaryAccountId:
+              $var: beneficiary
+            settlementPoolId:
+              $nodeBlueId:
+                $document: /contracts/initialized/document
+            adjustmentPolicy: BLUE_ROUND_BPS_V1
+            recoveryPolicy: BLUE_SCT_SOURCE_RECOVERY_V1
       prepareBooking:
         args:
           input: {}
@@ -1185,6 +1255,42 @@ actionDefinition:
                       $var: input
                     key: groups
                 message: BOOKING_CLAUSE_REQUIRED
+        - $let:
+            name: commissionTerms
+            expr:
+              $call:
+                function: prepareCommissionTerms
+                args:
+                  amountMinor:
+                    $pointerGet:
+                      object:
+                        $var: fields
+                      path: /amountMinor
+        - $if:
+            cond:
+              $gt:
+              - $size:
+                  $var: commissionTerms
+              - 0
+            then:
+            - $set:
+                name: fields
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: fields
+                    path: /customerCommissionTerms
+                    val:
+                      $var: commissionTerms
+            else:
+            - $set:
+                name: fields
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: fields
+                    path: /customerCommissionTerms
+                    op: remove
         - $return:
             $merge:
             - $var: input
@@ -1561,6 +1667,7 @@ parameters:
   allowedFields:
   - orderDescription
   - amountMinor
+  - customerCommissionTerms
   - customerAccountId
   - quote
   - quoteBlueId

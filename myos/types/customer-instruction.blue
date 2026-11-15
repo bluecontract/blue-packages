@@ -65,6 +65,30 @@ contracts:
         type: MyOS/Customer Session Functions
       function: confirmFunding
       argument: input
+  confirmCommissionRecovery:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Customer Commission Recovery Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: confirmRecovery
+          args:
+            input:
+              $object:
+                $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: MyOS/Customer Commission Recovery Functions
+      function: confirmRecovery
+      argument: input
   requestCustomerFunding:
     type: Contracts/Sequential Workflow Operation
     channel: payer

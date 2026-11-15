@@ -12,6 +12,39 @@ actionDefinition:
     functions:
       roundBps:
         blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
+      executionTermsFromContext:
+        args:
+          context: {}
+        do:
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: context
+                    path: /fundingModel
+            then:
+            - $return: {}
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - SCT
+                  - LEGACY_ACCOUNT_DEBIT
+                  val:
+                    $pointerGet:
+                      object:
+                        $var: context
+                      path: /fundingModel
+            message: PAYOUT_FUNDING_MODEL_UNSUPPORTED
+        - $return:
+            fundingModel:
+              $pointerGet:
+                object:
+                  $var: context
+                path: /fundingModel
       resolvePayoutTerms:
         args:
           grossMinor:
@@ -451,6 +484,7 @@ parameters:
     amountMinor: /paymentTerms/amountMinor
     limitMinor: /paymentTerms/limitMinor
     payoutTerms: /paymentDetails/payoutTerms
+    executionTerms: /paymentDetails/executionTerms
 bindingTypes:
   collection: pointer
   commission: pointer
@@ -691,6 +725,34 @@ actions:
                 payerChannel: seller
                 payeeChannel: partner
                 guarantorChannel: guarantor
+    - $let:
+        name: executionTerms
+        expr:
+          $call:
+            function: executionTermsFromContext
+            args:
+              context:
+                $pointerGet:
+                  object:
+                    $var: trigger
+                  path: /accountContext
+                  default: {}
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $var: executionTerms
+          - 0
+        then:
+        - $set:
+            name: params
+            expr:
+              $pointerSet:
+                object:
+                  $var: params
+                path: /values/executionTerms
+                val:
+                  $var: executionTerms
     - $set:
         name: actionResult
         expr:

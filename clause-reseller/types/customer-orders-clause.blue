@@ -23,6 +23,52 @@ actionDefinition:
         blueId: 12iMBcxoxTPHtxKQcN8Dq59TSUcGbM9xQ9kZh5Vt5RGJ
       validateTerms:
         blueId: 9AxmRcd35ToficguVjW16mmfVmNBwWo6Tkto1DmrAbjA
+      prepareCommissionTerms:
+        args:
+          amountMinor:
+            type: Integer
+        do:
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $document: /terms/commissionBps
+            then:
+            - $return: {}
+        - $let:
+            name: beneficiary
+            expr:
+              $document: /activation/parties/partner/myosAccountId
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val:
+                      $var: beneficiary
+                    kind: text
+                - $ne:
+                  - $var: beneficiary
+                  - ''
+            message: COMMISSION_BENEFICIARY_REQUIRED
+        - $return:
+            grossMinor:
+              $call:
+                function: roundBps
+                args:
+                  basis:
+                    $var: amountMinor
+                  bps:
+                    $document: /terms/commissionBps
+            commissionBps:
+              $document: /terms/commissionBps
+            beneficiaryAccountId:
+              $var: beneficiary
+            settlementPoolId:
+              $nodeBlueId:
+                $document: /contracts/initialized/document
+            adjustmentPolicy: BLUE_ROUND_BPS_V1
+            recoveryPolicy: BLUE_SCT_SOURCE_RECOVERY_V1
       prepareBooking:
         args:
           input: {}
@@ -173,6 +219,42 @@ actionDefinition:
                       $var: input
                     key: groups
                 message: BOOKING_CLAUSE_REQUIRED
+        - $let:
+            name: commissionTerms
+            expr:
+              $call:
+                function: prepareCommissionTerms
+                args:
+                  amountMinor:
+                    $pointerGet:
+                      object:
+                        $var: fields
+                      path: /amountMinor
+        - $if:
+            cond:
+              $gt:
+              - $size:
+                  $var: commissionTerms
+              - 0
+            then:
+            - $set:
+                name: fields
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: fields
+                    path: /customerCommissionTerms
+                    val:
+                      $var: commissionTerms
+            else:
+            - $set:
+                name: fields
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: fields
+                    path: /customerCommissionTerms
+                    op: remove
         - $return:
             $merge:
             - $var: input
@@ -403,6 +485,30 @@ actionDefinition:
                     $var: booking
                   checked:
                     $var: checked
+        - $let:
+            name: commissionTerms
+            expr:
+              $pointerGet:
+                object:
+                  $var: booking
+                path: /fields/customerCommissionTerms
+                default: {}
+        - $if:
+            cond:
+              $gt:
+              - $size:
+                  $var: commissionTerms
+              - 0
+            then:
+            - $set:
+                name: child
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: child
+                    path: /customerCommissionTerms
+                    val:
+                      $var: commissionTerms
         - $if:
             cond:
               $exists:
@@ -928,6 +1034,7 @@ parameters:
   allowedFields:
   - orderDescription
   - amountMinor
+  - customerCommissionTerms
   - customerAccountId
   - customerEmail
   - quote

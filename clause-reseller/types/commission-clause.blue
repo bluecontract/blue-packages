@@ -11,6 +11,423 @@ actionDefinition:
         blueId: 5UMRb3G6CPCKmkQKBLBhntAgaA5qjoJSLBbjS4kjS3VB
       rosterCovers:
         blueId: 2VRjCVXah8NQpo69uGhaMJZobwh36J77t6rz4edzv1ii
+      reconcileCommissionRecovery:
+        args: {}
+        do:
+        - $let:
+            name: sourcePath
+            expr:
+              $event: /sourcePath
+        - $let:
+            name: order
+            expr:
+              $document:
+                $var: sourcePath
+        - $let:
+            name: pi
+            expr:
+              $pointerGet:
+                object:
+                  $var: order
+                path: /payment
+        - $let:
+            name: recovery
+            expr:
+              $event: /event/event/recovery
+        - $let:
+            name: commissionTerms
+            expr:
+              $pointerGet:
+                object:
+                  $var: pi
+                path: /paymentDetails/customerPaymentTerms/commissionTerms
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq:
+                  - $nodeBlueId:
+                      $document:
+                        $concat:
+                        - $var: sourcePath
+                        - /payment/type
+                  - $nodeBlueId:
+                      $get:
+                        object:
+                          type: MyOS/MyOS Stripe Customer Payment Instruction
+                        key: type
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: recovery
+                      path: /customerInstructionId
+                  - $nodeBlueId:
+                      $document:
+                        $concat:
+                        - $var: sourcePath
+                        - /payment/contracts/initialized/document
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: commissionTerms
+                      path: /settlementPoolId
+                  - $nodeBlueId:
+                      $document: /contracts/initialized/document
+                - $eq:
+                  - $pointerGet:
+                      object:
+                        $var: commissionTerms
+                      path: /beneficiaryAccountId
+                  - $document: /activation/parties/partner/myosAccountId
+            message: COMMISSION_RECOVERY_SOURCE_MISMATCH
+        - $let:
+            name: stored
+            expr:
+              $get:
+                object:
+                  $pointerGet:
+                    object:
+                      $var: pi
+                    path: /commissionRecoveries
+                    default: {}
+                key:
+                  $pointerGet:
+                    object:
+                      $var: recovery
+                    path: /recoveryId
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var: stored
+                - $var: recovery
+            message: COMMISSION_RECOVERY_REPORT_NOT_CONFIRMED
+        - $let:
+            name: state
+            expr:
+              $document:
+                $const:
+                  name: bindings
+                  path: /state
+        - $let:
+            name: receiptKey
+            expr:
+              $nodeBlueId:
+                customerInstructionId:
+                  $pointerGet:
+                    object:
+                      $var: recovery
+                    path: /customerInstructionId
+                recoveryId:
+                  $pointerGet:
+                    object:
+                      $var: recovery
+                    path: /recoveryId
+        - $let:
+            name: receipts
+            expr:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /recoveries
+                default: {}
+        - $let:
+            name: prior
+            expr:
+              $get:
+                object:
+                  $var: receipts
+                key:
+                  $var: receiptKey
+        - $if:
+            cond:
+              $exists:
+                $var: prior
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $eq:
+                    - $var: prior
+                    - $var: recovery
+                message: COMMISSION_RECOVERY_CONFLICT
+            - $return:
+                outcome: duplicate
+        - $let:
+            name: paidGross
+            expr: 0
+        - $let:
+            name: recoveredNet
+            expr: 0
+        - $let:
+            name: recoveredFee
+            expr: 0
+        - $let:
+            name: recoveredPayouts
+            expr:
+              $pointerGet:
+                object:
+                  $var: state
+                path: /recoveredPayouts
+                default: {}
+        - $forEach:
+            item: payout
+            in:
+              $pointerGet:
+                object:
+                  $var: recovery
+                path: /payouts
+            do:
+            - $let:
+                name: instruction
+                expr:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /payoutInstructionId
+            - $let:
+                name: settlement
+                expr: {}
+            - $failIf:
+                cond:
+                  $not:
+                    $isKind:
+                      val:
+                        $document:
+                          $const:
+                            name: bindings
+                            path: /payouts
+                      kind: object
+                message: COMMISSION_RECOVERY_PAYOUT_COLLECTION_MISSING
+            - $forEach:
+                key: key
+                item: candidate
+                in:
+                  $document:
+                    $const:
+                      name: bindings
+                      path: /payouts
+                do:
+                - $if:
+                    cond:
+                      $eq:
+                      - $nodeBlueId:
+                          $document:
+                            $concat:
+                            - $const:
+                                name: bindings
+                                path: /payouts
+                            - /
+                            - $var: key
+                            - /contracts/initialized/document
+                      - $var: instruction
+                    then:
+                    - $set:
+                        name: settlement
+                        expr:
+                          $get:
+                            object:
+                              $pointerGet:
+                                object:
+                                  $var: state
+                                path: /settlements
+                            key:
+                              $var: key
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $eq:
+                      - $pointerGet:
+                          object:
+                            $var: settlement
+                          path: /status
+                      - closed
+                    - $gt:
+                      - $pointerGet:
+                          object:
+                            $var: settlement
+                          path: /paidMinor
+                          default: 0
+                      - 0
+                message: COMMISSION_RECOVERY_PAYOUT_NOT_PAID
+            - $let:
+                name: used
+                expr:
+                  $get:
+                    object:
+                      $var: recoveredPayouts
+                    key:
+                      $var: instruction
+            - $let:
+                name: grossMinor
+                expr:
+                  $add:
+                  - $pointerGet:
+                      object:
+                        $var: used
+                      path: /grossMinor
+                      default: 0
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /grossMinor
+            - $failIf:
+                cond:
+                  $not:
+                    $lte:
+                    - $var: grossMinor
+                    - $pointerGet:
+                        object:
+                          $var: settlement
+                        path: /paidMinor
+                message: COMMISSION_RECOVERY_EXCEEDS_PAID_PAYOUT
+            - $let:
+                name: netMinor
+                expr:
+                  $add:
+                  - $pointerGet:
+                      object:
+                        $var: used
+                      path: /netMinor
+                      default: 0
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /netMinor
+            - $failIf:
+                cond:
+                  $not:
+                    $lte:
+                    - $var: netMinor
+                    - $pointerGet:
+                        object:
+                          $var: settlement
+                        path: /transferredMinor
+                message: COMMISSION_RECOVERY_EXCEEDS_PAID_PAYOUT
+            - $let:
+                name: feeMinor
+                expr:
+                  $add:
+                  - $pointerGet:
+                      object:
+                        $var: used
+                      path: /feeMinor
+                      default: 0
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /feeMinor
+            - $failIf:
+                cond:
+                  $not:
+                    $lte:
+                    - $var: feeMinor
+                    - $pointerGet:
+                        object:
+                          $var: settlement
+                        path: /feeMinor
+                message: COMMISSION_RECOVERY_EXCEEDS_PAID_PAYOUT
+            - $set:
+                name: recoveredPayouts
+                expr:
+                  $objectSet:
+                    object:
+                      $var: recoveredPayouts
+                    key:
+                      $var: instruction
+                    val:
+                      grossMinor:
+                        $var: grossMinor
+                      netMinor:
+                        $var: netMinor
+                      feeMinor:
+                        $var: feeMinor
+            - $set:
+                name: paidGross
+                expr:
+                  $add:
+                  - $var: paidGross
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /grossMinor
+            - $set:
+                name: recoveredNet
+                expr:
+                  $add:
+                  - $var: recoveredNet
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /netMinor
+            - $set:
+                name: recoveredFee
+                expr:
+                  $add:
+                  - $var: recoveredFee
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /feeMinor
+        - $failIf:
+            cond:
+              $not:
+                $lte:
+                - $var: paidGross
+                - $pointerGet:
+                    object:
+                      $var: state
+                    path: /paid
+            message: COMMISSION_RECOVERY_EXCEEDS_PAID
+        - $set:
+            name: state
+            expr:
+              $merge:
+              - $var: state
+              - paid:
+                  $subtract:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /paid
+                  - $var: paidGross
+                recoveredNetMinor:
+                  $add:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /recoveredNetMinor
+                      default: 0
+                  - $var: recoveredNet
+                recoveredFeeMinor:
+                  $add:
+                  - $pointerGet:
+                      object:
+                        $var: state
+                      path: /recoveredFeeMinor
+                      default: 0
+                  - $var: recoveredFee
+                recoveredPayouts:
+                  $var: recoveredPayouts
+                recoveries:
+                  $objectSet:
+                    object:
+                      $var: receipts
+                    key:
+                      $var: receiptKey
+                    val:
+                      $var: recovery
+        - $appendChange:
+            op: replace
+            path:
+              $const:
+                name: bindings
+                path: /state
+            val:
+              $var: state
+        - $return:
+            outcome: acceptedNew
       reconcile:
         args:
           input: {}
@@ -661,6 +1078,36 @@ actionDefinition:
         - $return:
             outcome: acceptedNew
 actions:
+  recoveredCommission:
+    resultContract: outcome-v1
+    automatic:
+      'on': collection
+      pathBinding: orders
+      event:
+        type: Payment/Payment Event Received
+        event:
+          type: Events/Event
+          kind: Commission Recovery Confirmed
+    do:
+    - $if:
+        cond:
+          $not:
+            $is:
+              node:
+                $event: /event
+              pattern:
+                type: Payment/Payment Event Received
+                event:
+                  type: Events/Event
+                  kind: Commission Recovery Confirmed
+        then:
+        - $return: {}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: reconcileCommissionRecovery
+            args: {}
   reconcile:
     resultContract: outcome-v1
     do:
@@ -724,10 +1171,18 @@ actions:
                             - $event: /sourcePath
                             - /payment/payment/reversed
                       bps:
-                        $document:
-                          $const:
-                            name: bindings
-                            path: /rate
+                        $pointerGet:
+                          object:
+                            $document:
+                              $concat:
+                              - $event: /sourcePath
+                              - /customerCommissionTerms
+                          path: /commissionBps
+                          default:
+                            $document:
+                              $const:
+                                name: bindings
+                                path: /rate
   reversed:
     resultContract: outcome-v1
     automatic:
@@ -780,10 +1235,18 @@ actions:
                             - $event: /sourcePath
                             - /payment/payment/reversed
                       bps:
-                        $document:
-                          $const:
-                            name: bindings
-                            path: /rate
+                        $pointerGet:
+                          object:
+                            $document:
+                              $concat:
+                              - $event: /sourcePath
+                              - /customerCommissionTerms
+                          path: /commissionBps
+                          default:
+                            $document:
+                              $const:
+                                name: bindings
+                                path: /rate
   attached:
     resultContract: outcome-v1
     automatic:
@@ -900,7 +1363,11 @@ actions:
                         $subtract:
                         - {$var: {name: order, path: /payment/payment/completed}}
                         - {$var: {name: order, path: /payment/payment/reversed}}
-                      bps: {$document: {$const: {name: bindings, path: /rate}}}
+                      bps:
+                        $pointerGet:
+                          object: {$var: order}
+                          path: /customerCommissionTerms/commissionBps
+                          default: {$document: {$const: {name: bindings, path: /rate}}}
   payoutAttached:
     resultContract: outcome-v1
     automatic:
