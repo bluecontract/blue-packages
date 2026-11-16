@@ -57,10 +57,46 @@ public final class AccountPayoutCancellationAgreementConformance {
     System.out.println("terminal-refresh modeled rule changes="+WireData.write(v.bexData(v.source(Values.blueValue(result.changeset())))));
     check(result.changeset().isEmpty(),"Refresh must retain cancelled terminal preparation, not reopen selected/usable");
   }
+  static void stoppedApplicationIsAtomicAndIdempotent(Contracts p,Path root)throws Exception {
+    var v=p.execution().values();
+    var definition=v.source(m("type",load(root,"clause-reseller/types/commission-account-payouts-clause.blue")));
+    var library=o(v.bexData(v.select(definition,"/actionDefinition/functions")));
+    var functions=m("applyStoppedPayout",library.get("applyStoppedPayout"));
+    String key="modeled-stop";String itemPath="/process_payouts/entries/"+NativeRuntime.identity(v.source(key));
+    var candidate=m("name","Explicit modeled candidate, not authenticated native history");
+    String origin=NativeRuntime.identity(v.source(candidate));
+    var proof=m("status","STOPPED","requestId","modeled-request","instructionOrigin",origin);
+    var closed=m("amountMinor",1800,"paidMinor",0,"transferredMinor",0,"feeMinor",0,"status","closed","stopProof",proof);
+    var item=m("key",key,"status","awaiting_provider","path","/payouts/"+key,"nextActions",List.of("provide"));
+    var state=m("accrued",1800,"reserved",1800,"paid",0);
+    var checked=m("outcome","acceptedNew","key",key,"itemPath",itemPath,"item",item,
+        "candidate",candidate,"origin",origin,"proof",proof,"state",state,"gross",1800,"stoppedSettlement",closed);
+    var document=m("commission",state,"payouts",m());var exact=v.source(document);
+    var context=new blue.bex.Engine.Context();context.document=v.view(exact);
+    context.readDocument=(path,view,doc)->v.view(v.select(exact,path));
+    context.matcher=(actual,pattern)->v.matches(v.source(Values.blueValue(actual)),v.source(Values.blueValue(pattern),"definition"));
+    context.nodeBlueId=(value,gas)->NativeRuntime.identity(v.source(Values.blueValue(value)));
+    var program=m("functions",functions,"constants",m("bindings",m("commission","/commission","collection","/payouts")),
+        "do",List.of(m("$return",m("$call",m("function","applyStoppedPayout","args",m("checked",checked))))));
+    var result=p.execution().evaluator().execute(program,context,10000000);
+    check(result.changeset().size()==4&&result.events().size()==1,"Stopped application must stage exactly one atomic four-change release and one event");
+    var changes=new LinkedHashMap<String,Object>();var rawChanges=new LinkedHashMap<String,Object>();
+    for(Object raw:result.changeset()){var change=o(raw);changes.put((String)change.get("path"),v.bexData(v.source(Values.blueValue(change.get("val")))));rawChanges.put((String)change.get("path"),change.get("val"));}
+    check(changes.keySet().equals(Set.of(itemPath,"/payouts/"+key,"/commission/reserved","/commission/settlements/"+key)),"Stopped application changed unrelated state");
+    var cancelled=o(changes.get(itemPath));check(cancelled.get("status").equals("cancelled")&&cancelled.get("documentOrigin").equals(origin)&&cancelled.get("nextActions").equals(List.of()),"Terminal attachment must not select or activate");
+    check(Values.blueValue(rawChanges.get("/payouts/"+key)).equals(m("blueId",origin)),"Attachment must retain the exact candidate reference object");
+    check(changes.get("/commission/reserved").toString().equals("0"),"Release must subtract G exactly once");
+    check(NativeRuntime.identity(v.source(changes.get("/commission/settlements/"+key))).equals(NativeRuntime.identity(v.source(closed))),"Release must preserve the exact stopped settlement proof");
+    checked.put("outcome","duplicate");
+    var duplicate=p.execution().evaluator().execute(new LinkedHashMap<>(program),context,10000000);
+    check(duplicate.changeset().isEmpty()&&duplicate.events().isEmpty(),"Validated duplicate must not release, attach or emit twice");
+    System.out.println("PASS modeled checked-result application: exact terminal attachment/proof/G release and duplicate no-op; authentication/history not exercised");
+  }
   public static void main(String[] args)throws Exception {
     var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
       var p=runtime.processor(blue);var failures=new ArrayList<String>();
+      try {stoppedApplicationIsAtomicAndIdempotent(p,root);}catch(AssertionError failure){failures.add(failure.getMessage());}
       try {requestDoesNotRelease(p,root);}catch(AssertionError failure){failures.add(failure.getMessage());}
       try {refreshCannotReopenStopped(p,root);}catch(AssertionError failure){failures.add(failure.getMessage());}
       if(!failures.isEmpty())throw new AssertionError(String.join("; ",failures));
