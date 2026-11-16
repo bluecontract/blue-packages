@@ -1,6 +1,6 @@
 name: Commercial Terms Validation Clause
 type: Connections/Connected Clause
-description: Validate the percentage commission and the USD settlement currency on initialization.
+description: Validate the percentage commission and the PLN, USD or EUR settlement currency on initialization.
 actions:
   validate:
     automatic:
@@ -39,14 +39,31 @@ actions:
         message: INVALID_COMMISSION_TERMS
     - $failIf:
         cond:
-          $ne:
-          - $document:
-              $concat:
-              - $const:
-                  name: bindings
-                  path: /terms
-              - /currency
-          - USD
+          $and:
+          - $ne:
+            - $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /terms
+                - /currency
+            - PLN
+          - $ne:
+            - $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /terms
+                - /currency
+            - USD
+          - $ne:
+            - $document:
+                $concat:
+                - $const:
+                    name: bindings
+                    path: /terms
+                - /currency
+            - EUR
         message: UNSUPPORTED_CURRENCY
 bindingTypes:
   terms: pointer
