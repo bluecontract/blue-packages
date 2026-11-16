@@ -986,6 +986,18 @@ actionDefinition:
                     path: /secured
                     default: 0
                 - 0
+        # New stopped-payout releases are applied atomically by recoverStoppedPayout with exact native proof.
+        # Generic rejection, failed securing, void or another terminal state cannot free this reservation.
+        - $if:
+            cond:
+              $eq:
+              - $pointerGet:
+                  object: {$var: pi}
+                  path: /paymentDetails/executionTerms/executionPolicy
+                  default: ''
+              - BLUE_ACCOUNT_PAYOUT_STOP_V1
+            then:
+            - $set: {name: returned, expr: false}
         - $if:
             cond:
               $not:
@@ -1445,8 +1457,8 @@ actions:
             args:
               input:
                 key: {$var: key}
-  # The seller cancelled a payout preparation that no Agreement-linked instruction executes: the operator
-  # executes only a payout linked under /payouts/<key>, and native cancellation refuses a linked preparation.
+  # Legacy cancellation retains its existing release rule. New execution-policy preparations
+  # retain reserved G until recoverStopped validates the exact native STOPPED proof.
   payoutCancelled:
     resultContract: outcome-v1
     automatic:
@@ -1490,6 +1502,18 @@ actions:
     - $let:
         name: item
         expr: {$document: {$concat: [/process_, {$var: producer}, /entries/, {$nodeBlueId: {$var: key}}]}}
+    # New account-payout preparations retain G until their canonical PI has a verified STOPPED report.
+    # A preparation cancellation request is not evidence that an external transfer was stopped.
+    - $if:
+        cond:
+          $eq:
+          - $pointerGet:
+              object: {$var: item}
+              path: /prepared/paymentDetails/executionTerms/executionPolicy
+              default: ''
+          - BLUE_ACCOUNT_PAYOUT_STOP_V1
+        then:
+        - $return: {}
     - $let: {name: s, expr: {$document: {$const: {name: bindings, path: /state}}}}
     - $let: {name: old, expr: {$pointerGet: {object: {$var: s}, path: {$concat: [/settlements/, {$var: key}]}}}}
     - $if:

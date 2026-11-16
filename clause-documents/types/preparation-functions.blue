@@ -435,7 +435,7 @@ functions:
         $merge:
         - $var: checked
         - outcome: acceptedNew
-  checkProvision:
+  checkProvisionContext:
     args:
       input: {}
     do:
@@ -504,27 +504,15 @@ functions:
               name: item
               path: /requirementRef
         message: PREPARATION_WRONG_REQUIREMENT
-    - $failIf:
-        cond:
-          $includes:
-            list:
-            - reapproval_required
-            - admission_denied
-            - cancelled
-            - cancellation_requested
-            val:
-              $pointerGet:
-                object:
-                  $var: item
-                path: /status
-        message: PREPARATION_SCOPE_NOT_PROVISIONABLE
-    - $let:
-        name: candidate
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /document
+    - $return:
+        key: {$var: key}
+        itemPath: {$var: itemPath}
+        item: {$var: item}
+  validateProvisionCandidate:
+    args:
+      item: {}
+      candidate: {}
+    do:
     - $let:
         name: original
         expr:
@@ -653,6 +641,45 @@ functions:
           - $var: domainValid
           - true
         message: PREPARATION_DOMAIN_REJECTED
+    - $return: {$var: origin}
+  checkProvision:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr: {$call: {function: checkProvisionContext, args: {input: {$var: input}}}}
+    - $let: {name: itemPath, expr: {$var: {name: context, path: /itemPath}}}
+    - $let: {name: item, expr: {$var: {name: context, path: /item}}}
+    - $failIf:
+        cond:
+          $includes:
+            list:
+            - reapproval_required
+            - admission_denied
+            - cancelled
+            - cancellation_requested
+            val:
+              $pointerGet:
+                object:
+                  $var: item
+                path: /status
+        message: PREPARATION_SCOPE_NOT_PROVISIONABLE
+    - $let:
+        name: candidate
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /document
+    - $let:
+        name: origin
+        expr:
+          $call:
+            function: validateProvisionCandidate
+            args:
+              item: {$var: item}
+              candidate: {$var: candidate}
     - $if:
         cond:
           $exists:
@@ -899,10 +926,16 @@ functions:
         do:
         - $if:
             cond:
-              $exists:
-                $var:
-                  name: item
-                  path: /documentOrigin
+              $and:
+              - $exists:
+                  $var:
+                    name: item
+                    path: /documentOrigin
+              - $ne:
+                - $var:
+                    name: item
+                    path: /status
+                - cancelled
             then:
             - $let:
                 name: selected
