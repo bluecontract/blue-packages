@@ -1,0 +1,259 @@
+{
+  "blueId": "3Yr2reva6sR2LyPXK1MFboqNYtRCFtLwmuDCKPDE3c2r",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Customer Commission Recovery Functions",
+    "limitations": [
+      "The guarantor's allocation ledger and the Agreement's original-payout checks are described, but their executable definitions are not supplied."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "confirmRecovery treats absence as no records.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Stored recovery reports keyed by recoveryId",
+          "unit": "Recorded reports"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Customer Commission Recovery Functions.confirmRecovery.",
+        "id": "recoveryReports",
+        "meaning": "Recorded guarantor recovery reports, one per recoveryId; identical repeats add no record.",
+        "path": "/commissionRecoveries",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; initialize sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, accept; confirmRecovery acceptance guard.",
+        "id": "accepted",
+        "meaning": "Guarantor acceptance of the instruction; recovery confirmation requires true.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialize sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, accept, configure.",
+        "id": "rejected",
+        "meaning": "Guarantor rejection; prevents later acceptance and configuration.",
+        "path": "/payment/rejected",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; required for initialization and recovery.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Customer Commission Recovery Functions.confirmRecovery: originalP.",
+        "id": "originalAmount",
+        "meaning": "Original payment basis for commission recovery, in /paymentTerms/currency minor units.",
+        "path": "/paymentTerms/amountMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialization requires nonempty text.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, emit.",
+        "id": "currency",
+        "meaning": "Instruction currency for payment amounts, reservations and commission recovery amounts.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; initialize uses amountMinor.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(finalAmount), request.",
+        "id": "targetAmount",
+        "meaning": "Current payment target in /paymentTerms/currency minor units; bounds securing and capture.",
+        "path": "/payment/targetMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Successful securing less captures and authorization released by successful void",
+          "unit": "Minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm.",
+        "id": "secured",
+        "meaning": "Remaining secured authorization in /paymentTerms/currency minor units; successful void clears it.",
+        "path": "/payment/secured",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Capture requests confirmed succeeded",
+          "unit": "Minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(capture).",
+        "id": "completed",
+        "meaning": "Cumulative successful captures before refunds, in /paymentTerms/currency minor units.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Refund requests confirmed succeeded",
+          "unit": "Minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.confirm(refund); Customer Commission Recovery Functions.confirmRecovery.",
+        "id": "reversed",
+        "meaning": "Cumulative successful refunds bounding recovery, in /paymentTerms/currency minor units; excludes voids.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Secure requests with pending or unknown status",
+          "unit": "Minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request, confirm.",
+        "id": "reservedSecure",
+        "meaning": "Securing capacity awaiting a terminal guarantor outcome, in /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/secure",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Capture requests with pending or unknown status",
+          "unit": "Minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request, confirm.",
+        "id": "reservedCapture",
+        "meaning": "Capture capacity awaiting a terminal guarantor outcome, in /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/capture",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Refund requests with pending or unknown status",
+          "unit": "Minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request, confirm.",
+        "id": "reservedRefund",
+        "meaning": "Refund capacity awaiting a terminal guarantor outcome, in /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/refund",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Void requests with pending or unknown status",
+          "unit": "Minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request(void), confirm.",
+        "id": "reservedVoid",
+        "meaning": "Authorization reserved for cancellation, awaiting the guarantor, in /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/void",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(void), request.",
+        "id": "closed",
+        "meaning": "Successful void has closed further charges; refund requests remain possible.",
+        "path": "/payment/closed",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialize sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request(void), confirm.",
+        "id": "cancellationPending",
+        "meaning": "Void awaits a terminal guarantor outcome, blocking securing and capture even for a zero-amount void.",
+        "path": "/payment/cancellationPending",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialize sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(finalAmount).",
+        "id": "finalResolved",
+        "meaning": "Guarantor has resolved the final target amount; a different later final amount is rejected.",
+        "path": "/payment/finalResolved",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Customer Commission Recovery Functions\n\nExtends `Payment Functions` with validation and recording of guarantor-reported commission recoveries following successful customer refunds. It operates on the payment instruction's own document. Recording a recovery report does not initiate a refund or execute recovery against an external payout.\n\n## Recovery reports\n\n`confirmRecovery(input)` requires a workflow call whose `call/channel` matches `/paymentTerms/guarantorChannel`, and `/payment/accepted` must be true. `recoveryId` and `requestId` must be nonempty text without `/` or `~`.\n\n`validateCommissionAdjustment(candidate)` checks these report fields:\n\n- `grossMinor`: gross commission recovery represented by this report.\n- `retainedGrossMinor`: the portion recovered from retained gross commission.\n- `sellerRecoveryMinor`: seller recovery reported separately from gross commission recovery.\n- `payouts`: a required list. Each entry contains a unique, valid `payoutInstructionId` and `grossMinor`, `netMinor`, and `feeMinor`. Its gross must match its net and fee combined. Across the report, retained gross and all payout gross amounts must match the report's `grossMinor`.\n\nEvery listed monetary field must be an integer from zero through 1,000,000,000,000. These amounts use the instruction currency at `/paymentTerms/currency`. No defaults supply missing recovery fields.\n\nFor a new recovery, `requestId` must identify a `/payment/requests` entry whose `intent/action` is `refund` and whose `status` is `succeeded`. The commission terms at `/paymentDetails/customerPaymentTerms/commissionTerms` must specify `recoveryPolicy` as `BLUE_SCT_SOURCE_RECOVERY_V1` and `adjustmentPolicy` as `BLUE_ROUND_BPS_V1`. `commissionBps` must be an integer from 0 through 10,000. `roundBps` accepts a nonnegative integer basis up to 1,000,000,000,000 and rounds the commission to the nearest minor unit, with half units rounded upward.\n\nThe original gross commission calculated from `/paymentTerms/amountMinor` and `commissionBps` must match the frozen terms' `grossMinor`. Cumulative successful refunds at `/payment/reversed` must lie between zero and the original payment. Remaining gross commission is determined by applying the frozen rate and rounding rule to the original payment after those refunds.\n\nIncluding the candidate and all previously recorded recoveries, gross commission recovery cannot exceed the reduction in gross commission caused by successful refunds. Gross recovery and seller recovery combined cannot exceed those refunds. These are instruction-wide bounds; the function does not impose a separate amount cap for each referenced refund request.\n\nThe function preserves the report and sets `customerInstructionId` to the node BlueId of `/contracts/initialized/document`. It stores the record under `recoveryId` in `/commissionRecoveries`, emits `Commission Recovery Confirmed` with the `recovery` record, and returns `outcome: acceptedNew`. An identical stored record returns `outcome: duplicate` without another write or event; a changed record under the same ID is rejected. Duplicate handling follows authority, acceptance, identifier and report-shape validation, but precedes the new-report refund, policy and cumulative checks.\n\n## Source recovery policy\n\nThe declared policy consumes retained gross commission, G, first, followed by that source's existing payout allocations in stable order. Each allocation's cumulative recovered net, N, follows its original net proportion of cumulative recovered gross, rounded downward. Full recovery restores the exact original N and fee, F; recovered F is the portion of recovered G remaining after recovered N.\n\nThe seller remainder cannot fall below zero after deducting cumulative refunds, remaining G and the original Stripe charge fee from the original payment. New initial source allocations apportion already accepted payout N proportionally to source G, using largest remainders with stable source-order ties. Persisted original allocations are never rebalanced.\n\nThe guarantor performs these effects in its own execution ledger. This instruction checks report splits and cumulative bounds using its frozen rule and successful refunds; the Agreement separately checks original paid payout G/N/F. `confirmRecovery` does not read commercial documents or itself verify the allocation execution. It persists reports, while remaining commission and cumulative validation totals are calculated during confirmation.\n\n## Inherited payment behavior\n\n`initialize` requires empty financial state and valid immutable `/paymentTerms`: positive integer `amountMinor`, integer `limitMinor` at least that amount and at most 1,000,000,000,000, nonempty `currency`, and Boolean `recipientApprovalRequired`. `payerChannel`, `guarantorChannel`, and every member of `allowedPayees` must identify existing contracts. Optional `payeeChannel` defaults to an empty string; a nonempty value must be allowed.\n\nInitialization sets confirmed amounts and reservations to zero; acceptance, rejection, closure, cancellation, final-resolution and recipient-approval flags to false; and locks for `capture`, `refund`, and `details` to false. It creates empty request and details records, sets `targetMinor` to `amountMinor`, and leaves `transactionId` empty. It emits initialization and acceptance-request events. These initialization values do not apply to absent state before initialization.\n\nThe guarantor's `accept` records approval or rejection. Rejection requires a nonempty reason. A recorded decision cannot be reversed; an identical repeated decision makes no change. `initiate` requires acceptance and attaches one transaction. Its `initiatedAmount` defaults to `amountMinor` and must be between zero and `limitMinor`; `providerReference` defaults to `transactionId`, while `railType` and `attachmentPoint` default to `unspecified`. An identical attachment is repeatable; a conflicting attachment is rejected. A configured `initiationGate` must resolve to true.\n\n`initiate` and `request` support `method` values `reservation`, `card`, and `myos-customer`; an absent method defaults to `reservation`. For `request`, `amount` takes precedence over `amountMinor`. A void without either amount uses its previous request amount on replay, otherwise the entire remaining secured authorization. Other actions require a positive integer amount; void permits zero. Amounts cannot exceed 1,000,000,000,000, and `reason` defaults to an empty string. Request IDs cannot conflict with control requests. An identical existing intent is returned without a new reservation; a conflicting reuse is rejected.\n\nNew requests require an accepted, initiated instruction and reserve capacity without changing confirmed money:\n\n- `secure` is bounded by the target after completed payments, remaining secured funds and pending securing reservations.\n- `capture` requires a selected payee and, when configured, recipient approval. It respects available secured funds, capture and void reservations, the target, the capture lock, and any configured `captureGate`.\n- `refund` is bounded by completed captures after successful refunds and pending refund reservations, and respects the refund lock.\n- `void` must release the entire remaining authorization. Pending securing, capture or void reservations prevent it. A pending cancellation blocks further securing and capture; successful closure still permits refunds.\n\nOnly the guarantor's `confirm` changes request outcomes. Requests begin as `pending`. `unknown` awaits guarantor reconciliation and retains the reservation. `succeeded`, `declined`, and `failed` release it; only success changes confirmed amounts. Successful securing increases `secured`; capture reduces `secured` and increases cumulative `completed`; refund increases cumulative `reversed`; void clears `secured` and sets `closed`. A terminal void outcome clears `cancellationPending`. Thus `secured` is remaining authorization, `completed` is cumulative captures before refunds, and `reversed` is successful refunds. A void is not a refund. Identical responses are repeatable, but conflicting terminal outcomes are rejected.\n\nGuarantor-only `configure` can change Boolean `capture`, `refund`, or `details` locks; resolve `finalAmount` within `limitMinor` and no lower than completed plus reserved captures; select an allowed payee before any completed or reserved capture; or replace `details` with an object. Rejected instructions cannot be configured. A resolved final amount cannot later change. The details lock governs payee and details changes, and changing payee clears recipient approval. `approveRecipient` requires a workflow call from the currently selected payee. These callable functions do not themselves establish a viewer's permission or obligation."
+}
