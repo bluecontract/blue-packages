@@ -1,0 +1,59 @@
+{
+  "blueId": "HJioPqBGrCmSTVM1ossxusrXgnqWxXZcDrexJNfhx6JD",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi"
+    ],
+    "displayLabel": "Commercial Terms Validation",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.terms"
+    ],
+    "stateFacts": [
+      {
+        "absent": "No default; validation rejects a missing value.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do[0]",
+        "id": "commissionBps",
+        "meaning": "Commission rate in basis points; validation requires an integer from 0 through 10000 inclusive.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/commissionBps",
+        "type": "number"
+      },
+      {
+        "absent": "No default; validation rejects a missing value.",
+        "aggregate": null,
+        "binding": "terms",
+        "defaultPath": "/terms",
+        "evidence": "Commercial Terms Validation Clause.actions.validate.do[1] and description",
+        "id": "settlementCurrency",
+        "meaning": "Settlement currency; validation accepts exactly PLN, USD or EUR.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; absence does not mean false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: initial fired, once guard and fired update",
+        "id": "automaticValidationCompleted",
+        "meaning": "True records completion of validate._automatic on Clauses Initialized; false is its initial, incomplete state.",
+        "path": "/connectionState_{clauseKey}/validate._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Commercial Terms Validation Clause\n\nChecks a commission rate and settlement currency when clauses are initialized. The validation action checks supplied terms without calculating or collecting commission.\n\n`bindings.terms` is a required document-pointer binding with default `/terms`. It must begin with `/` and cannot be `/` itself. Overriding it changes where `validate` reads these fields:\n\n- `commissionBps`: an integer from 0 to 10000 inclusive, measured in basis points; 100 basis points means 1%. A missing, non-integer or out-of-range value fails with `INVALID_COMMISSION_TERMS`.\n- `currency`: exactly `PLN`, `USD` or `EUR`, identifying the settlement currency. A missing or different value fails with `UNSUPPORTED_CURRENCY`.\n\nThe commission check runs first. Neither field has a default.\n\nThe automatic `validate` connection declares `on: initialized` and `once: true`. Under the inherited connection rules, it responds to `Clauses Initialized`, which identifies successful initial clause installation. Its `fired` flag starts as false and is set to true after the connection finishes. Subsequent invocations of that automatic connection skip validation when the flag is true. An attempted, failed or skipped invocation does not establish completion. Completion does not certify later values: changes to the bound terms do not themselves trigger this automatic connection.\n\nIf supplied, `parameters.conditions.validate` is checked before the validation body; a false condition fails with `ACTION_CONDITION_FAILED`. Additional named connections in `bindings.validate` can invoke the same action and have separate completion tracking. `_automatic` is reserved and cannot be supplied as a replacement connection. The inherited transition check requires a new clause key when changing the clause configuration."
+}
