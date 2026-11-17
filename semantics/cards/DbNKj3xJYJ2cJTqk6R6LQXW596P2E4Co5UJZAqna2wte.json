@@ -1,0 +1,158 @@
+{
+  "blueId": "DbNKj3xJYJ2cJTqk6R6LQXW596P2E4Co5UJZAqna2wte",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "32NnKGr9suifHedgszUGHy3rpjbJYE1GvjHN9PyKn4TH",
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "AK34g34RmsrwB9awXvYqgtHFteRbnd18LE4TosHbDQp7",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "7aBXVD2dffrS8tzLYMhbms7HhWYy6mDdAVqhNuELCSkW",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "FFUQRPa7UV6WYAJefccRC6KW9EV55Xzuaws52XHntCKE",
+      "ARbLv5tfuBfrrsuYvu9KCHKPaye3pPPHyQETVKmcXbxX",
+      "G6chkZF9fXUbRbD6koCtwLfx9c8jJ2QZHTB67mRhWPbF",
+      "BWZxSpWmbP4QkHTnBXNHtVgmNNL8s5jy3DMkS6KbgBwb",
+      "DvDZ2osJuDV2CbtoLUfUt1xNNXffYxKYtTzBdaaSP3Gb",
+      "ERUpqV1ukEE2eZWaDJP6Dxne1Z12WTkrXgDiKDGRgDjV",
+      "8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB",
+      "4t1qR43VeKt6zTyrsnUCivgSTfiEM6hgNiryiED43iz9",
+      "EBuskkMM84G1os5d9eEvLJesCVi6vt2TeQUAoa2Q44At",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Customer Commission Recovery",
+    "limitations": [
+      "The guarantor's source-allocation execution and the Agreement's original paid payout checks are described but their implementations are not supplied. This confirmation function establishes report splits and cumulative bounds, not independent verification of those external effects."
+    ],
+    "parameterRefs": [
+      "parameters.actions"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; initialization sets false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.accept; Customer Commission Recovery Functions.confirmRecovery.",
+        "id": "instructionAccepted",
+        "meaning": "Guarantor acceptance of the instruction; must be true before recovery confirmation.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no amount default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Customer Commission Recovery Functions.confirmRecovery: originalP and originalG.",
+        "id": "originalPaymentAmount",
+        "meaning": "Original payment amount used for commission bounds, in minor units of /paymentTerms/currency.",
+        "path": "/paymentTerms/amountMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialization requires nonempty text.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and emit; Payment Reversed After Completion.amountReversed.",
+        "id": "instructionCurrency",
+        "meaning": "Instruction currency for payment, refund and commission recovery amounts.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; initialization sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Capture requests confirmed succeeded for this instruction.",
+          "unit": "Minor units of /paymentTerms/currency; not net of refunds."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and confirm: succeeded capture increases completed.",
+        "id": "completedAmount",
+        "meaning": "Cumulative successful captures before refunds, in minor units of /paymentTerms/currency.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialization sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Refund requests confirmed succeeded for this instruction.",
+          "unit": "Minor units of /paymentTerms/currency; excludes pending refunds and voids."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.confirm: succeeded refund; Recovery Functions.confirmRecovery: reversed.",
+        "id": "refundedAmount",
+        "meaning": "Cumulative successful refunds bounding recovery, in minor units of /paymentTerms/currency.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialization sets zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Refund requests whose reservation remains pending or unknown.",
+          "unit": "Minor units of /paymentTerms/currency; released on succeeded, declined or failed."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request and confirm: refund reservation additions and releases.",
+        "id": "reservedRefundAmount",
+        "meaning": "Refund capacity reserved while pending or unknown, awaiting the guarantor; /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/refund",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialization creates an empty collection.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All entries in this instruction's /payment/requests.",
+          "unit": "Payment request records, including unresolved and unsuccessful requests."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request and confirm; Customer Commission Recovery Functions.confirmRecovery.",
+        "id": "paymentRequestCount",
+        "meaning": "Recorded requests: pending/unknown await the guarantor; succeeded/declined/failed are terminal. Recovery requires a succeeded refund.",
+        "path": "/payment/requests",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Treated as no prior records by confirmRecovery.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Stored recovery reports accepted by confirmRecovery; identical duplicates add no entry.",
+          "unit": "Recovery report records; not proof of complete external recovery."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Customer Commission Recovery Functions.confirmRecovery: existing, totals and appendChange.",
+        "id": "recoveryReportCount",
+        "meaning": "Accepted recovery reports keyed by recoveryId; each records grossMinor, retainedGrossMinor, sellerRecoveryMinor and payout splits.",
+        "path": "/commissionRecoveries",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      }
+    ]
+  },
+  "semanticText": "# Customer Commission Recovery Clause\n\nAn optional feature for recording a guarantor's commission recovery confirmation for a commissioned customer payment after a successful refund. The confirmation records a validated report; it does not execute a refund or move recovered funds.\n\n## Action and authority\n\n`parameters.actions` supplies the configurable action declarations. Its supplied `confirm` action reads the report from `params.input`, checks activation, then calls `confirmRecovery`. A configured connection supplies the trigger and parameter mapping; no default connection or automatic trigger is declared. The supplied action requires workflow execution on the exact channel named by `/paymentTerms/guarantorChannel` and `/payment/accepted` equal to `true`.\n\nWhen `/activation` exists, the document must be active, participant access must validate, and the calling channel must remain authorized by the party or representative roster. If `/activation` is absent, that check is skipped; the guarantor and accepted-instruction requirements still apply.\n\nChanging `parameters.actions` changes the executable declaration described here. Inherited connection planning requires a new clause key for a changed installed configuration.\n\n## Recovery report and checks\n\nThe report requires:\n\n- `recoveryId`, identifying the recovery record, and `requestId`, identifying the refund request. Both must be nonempty text without `/` or `~`.\n- `grossMinor`, the total recovered commission; `retainedGrossMinor`, its retained portion; and `sellerRecoveryMinor`, the separate seller recovery amount.\n- `payouts`, a list whose entries contain `payoutInstructionId`, `grossMinor`, `netMinor` and `feeMinor`. Payout identifiers follow the same identifier rules and must be unique within the report.\n\nAll reported amounts are integer minor units of the instruction currency at `/paymentTerms/currency`, between zero and 1,000,000,000,000 inclusive. Each payout's gross must equal its net plus fee. The report's gross must equal retained gross plus all payout gross amounts. Zero amounts and an empty payout list are permitted when these checks hold. No monetary input defaults are supplied.\n\nFor a new recovery, the referenced `/payment/requests` entry must have `intent.action` equal to `refund` and `status` equal to `succeeded`. A requested refund is insufficient: `pending` and `unknown` await the guarantor, while `declined` and `failed` are terminal unsuccessful outcomes. Pending and unknown refunds retain their reservation in `/payment/reserved/refund`; only successful refunds increase `/payment/reversed`. `/payment/completed` remains cumulative successful captures before refunds.\n\nThe commission terms at `/paymentDetails/customerPaymentTerms/commissionTerms` must specify `recoveryPolicy: BLUE_SCT_SOURCE_RECOVERY_V1` and `adjustmentPolicy: BLUE_ROUND_BPS_V1`. `commissionBps` must be an integer from 0 through 10,000. Applying that rate with half-up rounding to `/paymentTerms/amountMinor` must agree with the terms' original `grossMinor`.\n\nCumulative successful refunds must lie between zero and the original payment amount. Remaining commission is the rounded commission on the original payment after those refunds. Across all recorded recoveries plus the new report, gross recovery cannot exceed the reduction in commission; gross recovery plus seller recovery cannot exceed cumulative successful refunds. These are cumulative caps, not a requirement to recover the full available amount. Multiple recovery IDs may reference the same successful refund; there is no separate per-request recovery cap in this function.\n\nThe function description specifies an external allocation policy: retained gross is consumed first, followed by existing allocations from the same source in stable order. Recovered net is proportional to the original allocation and rounded down, with exact original net and fee restored at full recovery; the remaining recovered gross is fee. Initial allocations apportion accepted payout net by source gross using largest remainders and stable source-order ties, without rebalancing persisted allocations. Seller remainder deducts refunds, remaining commission and the original Stripe charge fee, with a zero floor. `confirmRecovery` does not execute or verify these allocation steps; its local checks are the report splits and cumulative caps above.\n\n## Recorded outcomes\n\nAfter authority, acceptance, identifier and amount/split checks, an identical existing record under `recoveryId` makes `confirmRecovery` return `duplicate` without another recovery record or confirmation event. A different resulting record fails with `COMMISSION_RECOVERY_CONFLICT`. This duplicate check precedes the fresh refund, policy and cumulative-cap checks.\n\nA new accepted report is stored in `/commissionRecoveries`, keyed by `recoveryId`. It preserves the report and sets `customerInstructionId` to the BlueId of `/contracts/initialized/document`. The function emits an `Event` with `kind: Commission Recovery Confirmed` and the stored `recovery`, then returns `acceptedNew`. It does not change the payment ledger amounts or verify the original paid payout allocations.\n\nAll paths refer to the executing payment instruction's own document. An absent `/commissionRecoveries` is treated as no prior recorded recoveries for this operation, without proving that no external recovery occurred. Other absent financial state is unknown; initialization establishes false acceptance, zero ledger amounts and an empty request collection only after it runs."
+}
