@@ -24,15 +24,18 @@ public final class CommissionRecoveryConformance {
     return p.execution().evaluator().execute(m("functions",functions,"constants",m("sourceMode","workflow","clauseKey","commission","bindings",m("state","/commission","orders","/orders","payouts","/payouts","rate","/terms/commissionBps","catalog","/catalog","quotes","/quotes","fulfilment","/absent")),"do",List.of(m("$return",m("$call",m("function",function,"args",args))))),c,10000000);
   }
   public static void main(String[] args)throws Exception{
-    var root=Path.of(args[0]);var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    var root=Path.of(args[0]);System.setProperty("blue.package.root",root.toString());var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())){
       var p=runtime.processor(blue);var v=p.execution().values();
+      if(args.length>1&&args[1].equals("--factory")){factoryCommissionFields(p,root);return;}
+      if(args.length>1&&args[1].equals("--funding")){fundingModes(p,root);return;}
       if(args.length>1&&args[1].equals("--agreement")){agreementRecovery(p,root);frozenAccrual(p,root);bookingSnapshots(p,root);fundingModes(p,root);return;}
       var generic=args.length>1?o(WireData.parse(Files.readString(Path.of(args[1])),"yaml")):load(root,"payment-instruction/types/payment-functions.blue");var functions=o(v.bexData(v.source(generic.get("functions"))));
 
-      var helper=root.resolve("myos/types/commission-recovery-functions.blue");check(Files.exists(helper),"Missing guarantor recovery operation");
-      functions.putAll(o(v.bexData(v.source(load(root,"myos/types/commission-recovery-functions.blue").get("functions")))));
+      var helper=root.resolve("clause-reseller/types/customer-commission-recovery-functions.blue");check(Files.exists(helper),"Missing optional guarantor recovery clause helper");
+      functions.putAll(o(v.bexData(v.source(load(root,"clause-reseller/types/customer-commission-recovery-functions.blue").get("functions")))));
       refundIntent(p,functions);
+      invalidAmounts(p,functions);
       var adjustment=adjustment(1000,0,800,200);
       run(p,functions,m(),"validateCommissionAdjustment",m("candidate",adjustment),"guarantor");
       var bad=copy(adjustment);bad.put("grossMinor",999);
@@ -58,6 +61,7 @@ public final class CommissionRecoveryConformance {
       nativeFirstReport(p,functions);
       policyBounds(p,functions);
       bookingSnapshots(p,root);
+      factoryCommissionFields(p,root);
       agreementRecovery(p,root);
       frozenAccrual(p,root);
       fundingModes(p,root);
@@ -76,29 +80,104 @@ public final class CommissionRecoveryConformance {
   }
   static void nativeFirstReport(Contracts p,Map<String,Object> functions){
     var report=m("recoveryId","native-first","requestId","refund-1","grossMinor",50,"retainedGrossMinor",50,"sellerRecoveryMinor",450,"payouts",List.of());
-    var intent=m("status","succeeded","intent",m("action","refund","amountMinor",1000));
     var terms=m("grossMinor",100,"commissionBps",1000,"adjustmentPolicy","BLUE_ROUND_BPS_V1","recoveryPolicy","BLUE_SCT_SOURCE_RECOVERY_V1");
-    var invoke=m("$call",m("function","confirmRecovery","args",m("input",m("$object",m("$binding","call/request")))));
-    var compute=m("type","Contracts/Compute","functions",functions,"constants",m("sourceMode","workflow"),"do",List.of(invoke));
-    var operationContract=m("type","Contracts/Sequential Workflow Operation","channel","entry","request",m(),"steps",List.of(compute));
-    var source=m("paymentTerms",m("guarantorChannel","entry","amountMinor",1000),
-        "paymentDetails",m("customerPaymentTerms",m("commissionTerms",terms)),
-        "payment",m("accepted",true,"reversed",1000,"requests",m("refund-1",intent)),
-        "contracts",m("entry",m("type","Contracts/External Channel"),"report",operationContract));
+    // Reuse the already-qualified native payment fixture; never seed its financial state.
+    Map<String,Object> source;
+    try{source=o(WireData.json(WireData.write(AccountPayoutCancellationConformance.source(
+        Path.of(System.getProperty("blue.package.root")))).replace("seller","payer")));}
+    catch(Exception failure){throw new RuntimeException(failure);}
+    source.put("type","MyOS/MyOS Test Customer Payment Instruction");
+    o(source.get("paymentTerms")).put("amountMinor",1000);o(source.get("paymentTerms")).put("limitMinor",1000);
+    source.put("paymentDetails",m("customerPaymentTerms",m("commissionTerms",terms)));
+    var clauses=o(source.get("clauses"));clauses.remove("accountSettlement");
+    o(o(clauses.get("activation")).get("parameters")).remove("preActivationOperations");
+    clauses.put("commissionRecovery",m("type","Reseller/Customer Commission Recovery Clause","bindings",
+        m("confirm",m("report",m("on","workflow","party","guarantor","params",m("input",m("$var","trigger")))))));
+    var bindings=m();
+    for(var pair:List.of(List.of("requestAuthorize","secureRecovery","secure-1"),
+        List.of("requestCapture","captureRecovery","capture-1"),List.of("requestRefund","refundRecovery","refund-1")))
+      bindings.put(pair.get(0),m(pair.get(1),m("on","workflow","party","guarantor","params",
+          m("requestId",pair.get(2),"amountMinor",1000))));
+    clauses.put("payment",m("type","PaymentInstruction/Payment Request Actions","bindings",bindings));
+    var ordinary=copy(source);o(ordinary.get("clauses")).remove("commissionRecovery");
+    var plain=p.initialize(ordinary);check(plain.commits(),"Plain customer component initialization failed");
+    check(!nativeContracts(p,plain.document()).containsKey("report"),"Uncommissioned instruction exposed recovery operation");
+    check(!o(loadUnchecked("myos/types/customer-instruction.blue").get("contracts")).containsKey("confirmCommissionRecovery"),"Shared Customer PI still owns recovery");
     var initialized=p.initialize(source);check(initialized.status().equals("APPLIED"),"Native report fixture initialization failed: "+initialized.receipt());
-    var operation=p.typed("Operation Request",m("channel","entry","operation","report","document",m("blueId",initialized.document().blueId()),"requireExactDocumentVersion",true,"request",report));
-    var first=p.process(initialized.document(),operation,1);
+    check(nativeContracts(p,initialized.document()).containsKey("report"),"Optional recovery operation was not mounted on typed Customer PI");
+    var nativeProgram=o(p.execution().values().bexData(p.execution().values().source(nativeContracts(p,initialized.document()).get("report"))));
+    var actionSteps=(List<?>)o(((List<?>)nativeProgram.get("steps")).getFirst()).get("do");
+    int guardIndex=-1,recoveryIndex=-1;
+    for(int index=0;index<actionSteps.size();index++){
+      var call=o(actionSteps.get(index)).get("$call");
+      if(call instanceof Map<?,?>){if("requireActive".equals(o(call).get("function")))guardIndex=index;
+        if("confirmRecovery".equals(o(call).get("function")))recoveryIndex=index;}
+    }
+    check(guardIndex>=0&&recoveryIndex>guardIndex,"Mounted recovery must enforce the maintained active-party guard before financial report validation");
+    for(String scenario:List.of("inactive","revoked","access")){
+      var refusedSource=copy(source);o(refusedSource.get("clauses")).remove("activation");
+      var state=m("active",!scenario.equals("inactive"),"parties",m());
+      if(scenario.equals("access"))state.put("parties",m("guarantor",m("readerKeys",List.of("reader"),"lead",m("channel",RepresentativeAccessConformance.channel("guarantor")))));
+      refusedSource.put("activation",state);
+      // Contracts exposes the BEX rejection category, not the domain message. Check the exact
+      // maintained guard separately on the same state, and its position in the native program above.
+      String expectedGuard=switch(scenario){case "inactive"->"DOCUMENT_NOT_ACTIVE";case "revoked"->"REPRESENTATIVE_NO_LONGER_AUTHORIZED";default->"PARTICIPANT_ACCESS_MISSING";};
+      try{run(p,functions,refusedSource,"requireActive",m("channel","guarantor","workflow",true),"guarantor");throw new AssertionError("Guard accepted "+scenario);}
+      catch(blue.bex.BexError expected){check(expected.getMessage().contains(expectedGuard),"Wrong guard refusal for "+scenario+": "+expected.getMessage());}
+      var refusedDoc=p.initialize(refusedSource);check(refusedDoc.commits(),"Guard fixture initialization failed: "+scenario);
+      check(nativeContracts(p,refusedDoc.document()).containsKey("report"),"Guard fixture lost mounted operation: "+scenario);
+      var deniedInput=AccountPayoutCancellationConformance.input(refusedDoc.document(),"guarantor","report",report);
+      var refused=p.process(refusedDoc.document(),deniedInput,1);
+      check(!refused.commits()&&refused.document().blueId().equals(refusedDoc.document().blueId())&&p.emitted(refused).isEmpty(),"Inactive/revoked/access-invalid instruction reported recovery: "+scenario);
+    }
+    var document=initialized.document();long time=10;
+    document=AccountPayoutCancellationConformance.apply(p,document,"payer","approve_payer",m("revision",1),time++);
+    document=AccountPayoutCancellationConformance.apply(p,document,"guarantor","acceptPaymentInstruction",m(),time++);
+    document=AccountPayoutCancellationConformance.apply(p,document,"guarantor","provideSession",
+        m("type","MyOS/Customer Session Input","sessionId","recovery-session"),time++);
+    document=AccountPayoutCancellationConformance.apply(p,document,"guarantor","confirmFunding",m("sessionId","recovery-session"),time++);
+    document=AccountPayoutCancellationConformance.apply(p,document,"guarantor","recordTransactionInitiated",
+        m("type","PaymentInstruction/Transaction Initiation Input","transactionId","native-recovery-transaction",
+            "railType","test","attachmentPoint","instruction","providerReference","local-no-psp"),time++);
+    for(var pair:List.of(List.of("secureRecovery","secureFunds","secure-1"),
+        List.of("captureRecovery","completePayment","capture-1"),List.of("refundRecovery","reverseAfterCompletion","refund-1"))){
+      document=AccountPayoutCancellationConformance.apply(p,document,"guarantor",pair.get(0),m(),time++);
+      document=AccountPayoutCancellationConformance.apply(p,document,"guarantor",pair.get(1),
+          m("type","PaymentInstruction/Payment Outcome Input","requestId",pair.get(2)),time++);
+    }
+    check(((Number)p.read(document,"/payment/completed")).longValue()==1000&&
+        ((Number)p.read(document,"/payment/reversed")).longValue()==1000&&
+        "succeeded".equals(p.read(document,"/payment/requests/refund-1/status")),"Recovery fixture must use actual native completed payment and successful refund");
+    var wrongActor=p.process(document,AccountPayoutCancellationConformance.input(document,"payer","report",report),time++);
+    check(!wrongActor.commits()&&wrongActor.document().blueId().equals(document.blueId())&&p.emitted(wrongActor).isEmpty(),"Payer executed guarantor-only native recovery operation");
+    var operation=AccountPayoutCancellationConformance.input(document,"guarantor","report",report);
+    var first=p.process(document,operation,time++);
     check(first.status().equals("APPLIED"),"First native report patch failed: "+first.status()+" "+first.receipt()+" "+first.observations());
     check(p.read(first.document(),"/commissionRecoveries/native-first/recoveryId").equals("native-first"),"First native report was not durably applied");
-    var retry=p.typed("Operation Request",m("channel","entry","operation","report","document",m("blueId",first.document().blueId()),"requireExactDocumentVersion",true,"request",report));
-    var duplicate=p.process(first.document(),retry,2);
+    var retry=AccountPayoutCancellationConformance.input(first.document(),"guarantor","report",report);
+    var duplicate=p.process(first.document(),retry,time++);
     check(duplicate.status().equals("APPLIED")&&p.emitted(duplicate).isEmpty(),"Native duplicate report failed or re-emitted business event: "+duplicate.status()+" "+duplicate.observations()+" "+p.emitted(duplicate));
     var secondReport=copy(report);secondReport.put("recoveryId","native-second");
-    var secondOperation=p.typed("Operation Request",m("channel","entry","operation","report","document",m("blueId",duplicate.document().blueId()),"requireExactDocumentVersion",true,"request",secondReport));
-    var second=p.process(duplicate.document(),secondOperation,3);
+    var secondOperation=AccountPayoutCancellationConformance.input(duplicate.document(),"guarantor","report",secondReport);
+    var second=p.process(duplicate.document(),secondOperation,time++);
     check(second.status().equals("APPLIED"),"Second native report failed: "+second.observations());
     check(p.read(second.document(),"/commissionRecoveries/native-first/recoveryId").equals("native-first")&&p.read(second.document(),"/commissionRecoveries/native-second/recoveryId").equals("native-second"),"New root-map report overwrote existing receipt");
     System.out.println("PASS native first recovery patch without preseeded map; duplicate preserves receipt and emits nothing");
+  }
+  static Map<String,Object> nativeContracts(Contracts p,Contracts.Document document){
+    return o(o(WireData.json(p.toJson(document))).get("contracts"));
+  }
+  static Map<String,Object> loadUnchecked(String path){try{return load(Path.of(System.getProperty("blue.package.root")),path);}catch(Exception e){throw new RuntimeException(e);}}
+  static void invalidAmounts(Contracts p,Map<String,Object> functions){
+    for(String field:List.of("grossMinor","retainedGrossMinor","sellerRecoveryMinor","payoutGrossMinor","netMinor","feeMinor")){
+      for(Object bad:Arrays.asList(null,"1",1.5,-1,1000000000001L)){
+        var value=adjustment(1000,0,800,200);
+        var target=field.equals("payoutGrossMinor")||field.equals("netMinor")||field.equals("feeMinor")?o(((List<?>)value.get("payouts")).getFirst()):value;
+        target.put(field.equals("payoutGrossMinor")?"grossMinor":field,bad);String error=bad==null?"function argument pattern rejected: candidate":target==value?"COMMISSION_ADJUSTMENT_AMOUNT_INVALID":"COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID";
+        try{run(p,functions,m(),"validateCommissionAdjustment",m("candidate",value),"guarantor");throw new AssertionError("Invalid amount accepted "+field+" "+bad);}
+        catch(blue.bex.BexError expected){check(expected.getMessage().contains(error),"Changed amount validation error for "+field+"="+bad+": "+expected.getMessage());}
+      }
+    }
   }
   static void policyBounds(Contracts p,Map<String,Object> functions){
     var v=p.execution().values();
@@ -117,14 +196,40 @@ public final class CommissionRecoveryConformance {
     denied(()->run(p,functions,pi,"confirmRecovery",m("input",last),"guarantor"),"Original G inconsistent with accepted rounding was trusted");
     System.out.println("PASS native cumulative partial/full refund rounding; original G conflict; no external correction input");
   }
+  static void factoryCommissionFields(Contracts p,Path root)throws Exception{
+    var v=p.execution().values();
+    var nativeFactory=load(root,"clause-documents/types/functions.blue");
+    for(String name:List.of("customer-orders-clause","customer-orders-bootstrap-clause")){
+      var clause=load(root,"clause-reseller/types/"+name+".blue");
+      var constructor=name.equals("customer-orders-clause")?o(o(nativeFactory.get("functions")).get("constructDocument")):
+          o(o(o(clause.get("actionDefinition")).get("type")).get("functions"));
+      if(!name.equals("customer-orders-clause"))constructor=o(constructor.get("constructDocument"));
+      Object fieldStep=null;
+      for(Object step:(List<?>)constructor.get("do")){
+        var each=o(step).get("$forEach");
+        if(each instanceof Map<?,?> && "nextValue".equals(o(each).get("item"))&&"field".equals(o(each).get("key"))){fieldStep=step;break;}
+      }
+      check(fieldStep!=null,"Factory lost approved-field copy loop");
+      var config=m("args",m(),"do",List.of(m("$return",clause.get("parameters"))));
+      var steps=List.of(m("$let",m("name","child","expr",m())),fieldStep,m("$return",m("$var","child")));
+      var functions=o(v.bexData(v.source(m("configurationParameters",config,"factoryFieldsForTest",m("args",m("input",m()),"do",steps)))));
+      var accepted=m("grossMinor",335,"commissionBps",333,"beneficiaryAccountId","trusted-partner");
+      var result=run(p,functions,m(),"factoryFieldsForTest",m("input",m("fields",m("customerCommissionTerms",accepted))),"seller");
+      var expectedAccepted=v.bexData(v.source(accepted));
+      check(o(result.value()).get("customerCommissionTerms").equals(expectedAccepted),"Factory did not copy trusted commissionTerms exactly: "+name+" actual="+WireData.write(result.value())+" expected="+WireData.write(expectedAccepted));
+      check(!o(run(p,functions,m(),"factoryFieldsForTest",m("input",m("fields",m())),"seller").value()).containsKey("customerCommissionTerms"),"Absent commission field invented by factory");
+    }
+    System.out.println("PASS native approved field-copy loops retain trusted commission terms in both constructors; no duplicate assignment needed");
+  }
   static void fundingModes(Contracts p,Path root)throws Exception{
     var v=p.execution().values();
       var payoutSource=load(root,"clause-reseller/types/commission-account-payouts-clause.blue");
-      var payoutFuncs=o(v.bexData(v.source(o(o(payoutSource.get("actionDefinition")).get("type")).get("functions"))));
-      check(o(run(p,payoutFuncs,m(),"executionTermsFromContext",m("context",m()),"seller").value()).isEmpty(),"Legacy funding selection must remain absent");
-      for(String mode:List.of("SCT","LEGACY_ACCOUNT_DEBIT"))check(o(run(p,payoutFuncs,m(),"executionTermsFromContext",m("context",m("fundingModel",mode)),"seller").value()).get("fundingModel").equals(mode),"Explicit funding selection lost");
+      var payoutDefinition=v.source(m("type",o(payoutSource.get("actionDefinition")).get("type")));
+      var payoutFuncs=o(v.bexData(v.select(payoutDefinition,"/functions")));
+      check(o(run(p,payoutFuncs,m(),"executionTermsFromContext",m("context",m()),"seller").value()).equals(m("executionPolicy","BLUE_ACCOUNT_PAYOUT_STOP_V1")),"Test context requires stop policy without fundingModel");
+      for(String mode:List.of("SCT","LEGACY_ACCOUNT_DEBIT"))check(o(run(p,payoutFuncs,m(),"executionTermsFromContext",m("context",m("fundingModel",mode)),"seller").value()).equals(m("executionPolicy","BLUE_ACCOUNT_PAYOUT_STOP_V1","fundingModel",mode)),"Explicit funding selection/policy lost");
       denied(()->run(p,payoutFuncs,m(),"executionTermsFromContext",m("context",m("fundingModel","AUTO")),"seller"),"Unknown funding selection accepted");
-    System.out.println("PASS native explicit SCT/legacy funding sibling and absent legacy selection; unknown mode rejected");
+    System.out.println("PASS native exact stop policy for Test without fundingModel and explicit SCT/legacy funding; unknown mode rejected");
   }
   static void agreementRecovery(Contracts p,Path root)throws Exception{
     var v=p.execution().values();var source=load(root,"clause-reseller/types/commission-clause.blue");

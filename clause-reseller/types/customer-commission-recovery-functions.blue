@@ -10,6 +10,40 @@ description: BLUE_SCT_SOURCE_RECOVERY_V1 fixes remaining G as roundBps(original 
   execution ledger for these effects. This PI bounds reports using its frozen rule and successful refunds; the Agreement
   separately checks original paid payout G/N/F. No commercial document reads.
 functions:
+  accessRecordsValid:
+    blueId: BWZxSpWmbP4QkHTnBXNHtVgmNNL8s5jy3DMkS6KbgBwb
+  accessValid:
+    blueId: G6chkZF9fXUbRbD6koCtwLfx9c8jJ2QZHTB67mRhWPbF
+  authority:
+    blueId: ARbLv5tfuBfrrsuYvu9KCHKPaye3pPPHyQETVKmcXbxX
+  readerGroups:
+    blueId: DvDZ2osJuDV2CbtoLUfUt1xNNXffYxKYtTzBdaaSP3Gb
+  requireActive:
+    blueId: FFUQRPa7UV6WYAJefccRC6KW9EV55Xzuaws52XHntCKE
+  transports:
+    blueId: ERUpqV1ukEE2eZWaDJP6Dxne1Z12WTkrXgDiKDGRgDjV
+  validateRecoveryAmount:
+    args:
+      input: {}
+      error:
+        type: Text
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: {name: input, path: /candidate}
+                kind: integer
+            - $gte:
+              - $var: {name: input, path: /candidate}
+              - 0
+            - $lte:
+              - $var: {name: input, path: /candidate}
+              - 1000000000000
+        message:
+          $var: error
   validateCommissionAdjustment:
     args:
       candidate: {}
@@ -18,78 +52,36 @@ functions:
         name: correction
         expr:
           $var: candidate
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $pointerGet:
-                    object:
-                      $var: correction
-                    path: /grossMinor
-                kind: integer
-            - $gte:
-              - $pointerGet:
-                  object:
-                    $var: correction
-                  path: /grossMinor
-              - 0
-            - $lte:
-              - $pointerGet:
-                  object:
-                    $var: correction
-                  path: /grossMinor
-              - 1000000000000
-        message: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $pointerGet:
-                    object:
-                      $var: correction
-                    path: /retainedGrossMinor
-                kind: integer
-            - $gte:
-              - $pointerGet:
-                  object:
-                    $var: correction
-                  path: /retainedGrossMinor
-              - 0
-            - $lte:
-              - $pointerGet:
-                  object:
-                    $var: correction
-                  path: /retainedGrossMinor
-              - 1000000000000
-        message: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $pointerGet:
-                    object:
-                      $var: correction
-                    path: /sellerRecoveryMinor
-                kind: integer
-            - $gte:
-              - $pointerGet:
-                  object:
-                    $var: correction
-                  path: /sellerRecoveryMinor
-              - 0
-            - $lte:
-              - $pointerGet:
-                  object:
-                    $var: correction
-                  path: /sellerRecoveryMinor
-              - 1000000000000
-        message: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
+    - $call:
+        function: validateRecoveryAmount
+        args:
+          error: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
+          input:
+            candidate:
+              $pointerGet:
+                object:
+                  $var: correction
+                path: /grossMinor
+    - $call:
+        function: validateRecoveryAmount
+        args:
+          error: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
+          input:
+            candidate:
+              $pointerGet:
+                object:
+                  $var: correction
+                path: /retainedGrossMinor
+    - $call:
+        function: validateRecoveryAmount
+        args:
+          error: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
+          input:
+            candidate:
+              $pointerGet:
+                object:
+                  $var: correction
+                path: /sellerRecoveryMinor
     - $failIf:
         cond:
           $not:
@@ -152,78 +144,36 @@ functions:
                       $var: payout
                     path: /payoutInstructionId
                 val: true
-        - $failIf:
-            cond:
-              $not:
-                $and:
-                - $isKind:
-                    val:
-                      $pointerGet:
-                        object:
-                          $var: payout
-                        path: /grossMinor
-                    kind: integer
-                - $gte:
-                  - $pointerGet:
-                      object:
-                        $var: payout
-                      path: /grossMinor
-                  - 0
-                - $lte:
-                  - $pointerGet:
-                      object:
-                        $var: payout
-                      path: /grossMinor
-                  - 1000000000000
-            message: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
-        - $failIf:
-            cond:
-              $not:
-                $and:
-                - $isKind:
-                    val:
-                      $pointerGet:
-                        object:
-                          $var: payout
-                        path: /netMinor
-                    kind: integer
-                - $gte:
-                  - $pointerGet:
-                      object:
-                        $var: payout
-                      path: /netMinor
-                  - 0
-                - $lte:
-                  - $pointerGet:
-                      object:
-                        $var: payout
-                      path: /netMinor
-                  - 1000000000000
-            message: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
-        - $failIf:
-            cond:
-              $not:
-                $and:
-                - $isKind:
-                    val:
-                      $pointerGet:
-                        object:
-                          $var: payout
-                        path: /feeMinor
-                    kind: integer
-                - $gte:
-                  - $pointerGet:
-                      object:
-                        $var: payout
-                      path: /feeMinor
-                  - 0
-                - $lte:
-                  - $pointerGet:
-                      object:
-                        $var: payout
-                      path: /feeMinor
-                  - 1000000000000
-            message: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
+        - $call:
+            function: validateRecoveryAmount
+            args:
+              error: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
+              input:
+                candidate:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /grossMinor
+        - $call:
+            function: validateRecoveryAmount
+            args:
+              error: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
+              input:
+                candidate:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /netMinor
+        - $call:
+            function: validateRecoveryAmount
+            args:
+              error: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
+              input:
+                candidate:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /feeMinor
         - $failIf:
             cond:
               $not:
