@@ -15,6 +15,8 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
+    'stripe-bank-transfer': ('StripeBankTransferConformance',),
+    'stripe-bank-transfer-execution': ('blue.core.StripeBankTransferExecutionConformance',),
     'myos-instruction-types': ('blue.core.MyosInstructionTypesConformance',),
     'access-events-behavior': ('blue.core.AccessEventsConformance',),
     'helper-native': ('OperationInputConformance', 'native'),
@@ -85,13 +87,15 @@ def main():
     sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
+    if 'StripeBankTransferConformance' in sources:
+        sources.add('ProviderInputConformance')
     if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance', 'RefreshDefinitionConformance', 'AdmissionProvisionConformance', 'ProvidedOrderAdmissionConformance'} & sources:
         sources.add('BootstrapPreparationConformance')
     if {'StaticIdentityPredicateConformance', 'AdmissionProvisionConformance'} & sources:
         sources.add('AdmissionConsentDispatchConformance')
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
-    if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
+    if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance', 'StripeBankTransferExecutionConformance'} & sources:
         sources.add('CurrentOperationScenarios')
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:
         subprocess.run([javac, '-cp', classpath, '-d', classes,

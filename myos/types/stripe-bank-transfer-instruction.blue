@@ -1,0 +1,66 @@
+name: MyOS Stripe Bank Transfer Instruction
+type: ACME/Bank Transfer Instruction
+description: One self-payout from the payer connected Stripe account to its selected
+  external bank account. Historical completion remains recorded after a late Stripe
+  failure.
+paymentDetails:
+  method: myos-stripe-bank-transfer
+  externalBankAccountId:
+    type: Text
+contracts:
+  requestTransfer:
+    type: Contracts/Sequential Workflow Operation
+    channel: payer
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: ACME/Bank Transfer Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: request
+          args:
+            input:
+              $object:
+                $binding: call/request
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Stripe Bank Transfer Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: validateRequest
+          args: {}
+    $blue:requestFrom:
+      definition:
+        type: ACME/Bank Transfer Functions
+      function: request
+      argument: input
+  reportPayoutFailureAfterConfirmation:
+    type: Contracts/Sequential Workflow Operation
+    channel: guarantor
+    steps:
+    - type: Parties/Require Active Parties
+      constants:
+        workflow: true
+    - type: Contracts/Compute
+      definition:
+        type: MyOS/Stripe Bank Transfer Functions
+      constants:
+        sourceMode: workflow
+      do:
+      - $call:
+          function: reportFailureAfterConfirmation
+          args:
+            input:
+              $binding: call/request
+    $blue:requestFrom:
+      definition:
+        type: MyOS/Stripe Bank Transfer Functions
+      function: reportFailureAfterConfirmation
+      argument: input
