@@ -12,7 +12,7 @@ import tempfile
 from jsonschema import Draft202012Validator
 
 from release import ROOT, digest, local, require, wire
-from semantic_sources import context_wire, definition_digest, evidence, inventory, pointer
+from semantic_sources import context_wire, definition_digest, evidence, inventory, pointer, within_path
 from semantic_s3 import MAX_CARD_BYTES, Store, card_key
 
 ASSETS = Path(__file__).resolve().parents[1] / 'semantics'
@@ -70,6 +70,10 @@ def validate_metadata(metadata, context):
             require(fact['binding'] is None and fact['defaultPath'] is None and fact['suffix'] == '',
                     'Document/clause facts cannot use a binding or suffix')
             path = fact['path']
+            require(not pointer(path) or not any(
+                within_path(path, item['defaultPath'])
+                for item in context.get('configurablePathDefaults', [])
+            ), 'State fact fixed path is configurable: ' + str(path))
             if fact['scope'] == 'document':
                 require(pointer(path) and path in context['documentPaths'],
                         'State fact document path is not established by the source: ' + str(path))

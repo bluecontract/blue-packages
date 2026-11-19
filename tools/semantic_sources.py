@@ -189,6 +189,96 @@ def pointer(value):
     return isinstance(value, str) and value.startswith('/') and len(value) <= 256 and not re.search(r'\s|~(?![01])', value)
 
 
+def clause_path(value):
+    parts = value.get('$concat') if isinstance(value, dict) else None
+    clause_key = {'$const': 'clauseKey'}
+    if not isinstance(parts, list) or clause_key not in parts:
+        return None
+    chunks = [part if isinstance(part, str) else '{clauseKey}' if part == clause_key else None
+              for part in parts]
+    if None not in chunks:
+        path = ''.join(chunks)
+        if pointer(path):
+            return path
+    return None
+
+
+def within_path(path, base):
+    return path == base or path.startswith(base + '/')
+
+
+def planner_functions(blue_id, definitions, supplied):
+    hook = next((node['hookDefinition'] for _, node in type_chain(blue_id, definitions)
+                 if 'hookDefinition' in node), None)
+    hook_type = hook.get('type') if isinstance(hook, dict) else None
+    direct = hook_type.get('blueId') if isinstance(hook_type, dict) else None
+    if not isinstance(direct, str):
+        return {}
+    selected = {}
+    for identity, definition in type_chain(direct, definitions):
+        functions = definition.get('functions')
+        if isinstance(functions, dict):
+            for name, value in functions.items():
+                selected.setdefault(name, (identity, compact(value)) if identity in supplied else None)
+    return selected
+
+
+def planner_prefix(function):
+    body = function.get('do') if isinstance(function, dict) else None
+    if not isinstance(body, list):
+        return
+    for statement in body:
+        if not isinstance(statement, dict):
+            return
+        if set(statement) == {'$return'}:
+            yield None, statement['$return']
+            return
+        assignment = statement.get('$let')
+        if set(statement) != {'$let'} or not isinstance(assignment, dict):
+            return
+        yield assignment.get('name'), assignment.get('expr')
+
+
+def configurable_path_defaults(blue_id, definitions, supplied):
+    """Own-clause fallbacks in the plan's straight-line calls, before control flow."""
+    functions = planner_functions(blue_id, definitions, supplied)
+    pending, visited, result = ['plan'], set(), {}
+    while pending:
+        name = pending.pop()
+        selected = functions.get(name)
+        if name in visited or selected is None:
+            continue
+        visited.add(name)
+        identity, function = selected
+        own_clause = set()
+        for var, expr in planner_prefix(function):
+            if isinstance(var, str):
+                own_clause.discard(var)
+            if not isinstance(expr, dict) or len(expr) != 1:
+                continue
+            operator, operand = next(iter(expr.items()))
+            if operator == '$call' and isinstance(operand, dict) and isinstance(operand.get('function'), str):
+                pending.append(operand['function'])
+            if not isinstance(var, str):
+                continue
+            if operator == '$document' and clause_path(operand) == '/clauseRuntime/work/candidate/{clauseKey}':
+                own_clause.add(var)
+            if operator != '$pointerGet' or not isinstance(operand, dict) or not isinstance(operand.get('object'), dict):
+                continue
+            obj = operand['object']
+            ref = operand.get('path')
+            default = operand.get('default')
+            if set(obj) != {'$var'} or not isinstance(obj['$var'], str) or obj['$var'] not in own_clause:
+                continue
+            if not pointer(ref) or not re.fullmatch(r'/bindings/[^/]+', ref):
+                continue
+            path = default if pointer(default) else clause_path(default)
+            if path:
+                result[(ref, path)] = dict(bindingPointer=ref, defaultPath=path,
+                                           definitionBlueId=identity, function=name)
+    return [result[key] for key in sorted(result)]
+
+
 def executable_references(value):
     if isinstance(value, list):
         return set().union(*(executable_references(child) for child in value))
@@ -265,12 +355,9 @@ def evidence(blue_id, definitions):
         elif isinstance(value, dict):
             if pointer(value.get('$document')):
                 paths.add(value['$document'])
-            parts = value.get('$concat')
-            if isinstance(parts, list) and {'$const': 'clauseKey'} in parts:
-                chunks = [part if isinstance(part, str) else '{clauseKey}'
-                          if part == {'$const': 'clauseKey'} else None for part in parts]
-                if None not in chunks and pointer(''.join(chunks)):
-                    clause_paths.add(''.join(chunks))
+            pattern = clause_path(value)
+            if pattern:
+                clause_paths.add(pattern)
             change = value.get('$appendChange')
             if isinstance(change, dict) and change.get('op') in {'add', 'replace'}:
                 fields(change.get('val'), change.get('path'))
@@ -278,10 +365,16 @@ def evidence(blue_id, definitions):
                 literals(child)
 
     literals([root, *supplied.values()])
+    configurable = configurable_path_defaults(blue_id, definitions, supplied)
+    defaults = {item['defaultPath'] for item in configurable}
+    for fixed in (paths, clause_paths):
+        fixed.difference_update(path for path in list(fixed)
+                                if any(within_path(path, base) for base in defaults))
     return dict(blueId=blue_id, definition=root,
                 bindings=[dict(name=k, defaultPath=v) for k, v in sorted(bindings.items())],
                 parameterRefs=sorted(parameters | {'bindings.' + name for name in bindings}),
                 documentPaths=sorted(paths), clausePaths=sorted(clause_paths),
+                **({'configurablePathDefaults': configurable} if configurable else {}),
                 referencedBlueIds=sorted((visited | omitted) - {blue_id}),
                 dependencyDefinitions=[dict(blueId=k, definition=v) for k, v in sorted(supplied.items())],
                 omittedDependencies=sorted(omitted))
