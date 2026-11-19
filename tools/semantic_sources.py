@@ -189,6 +189,75 @@ def pointer(value):
     return isinstance(value, str) and value.startswith('/') and len(value) <= 256 and not re.search(r'\s|~(?![01])', value)
 
 
+def clause_path(value):
+    parts = value.get('$concat') if isinstance(value, dict) else None
+    clause_key = {'$const': 'clauseKey'}
+    if not isinstance(parts, list) or clause_key not in parts:
+        return None
+    chunks = [part if isinstance(part, str) else '{clauseKey}' if part == clause_key else None
+              for part in parts]
+    if None not in chunks:
+        path = ''.join(chunks)
+        if pointer(path):
+            return path
+    return None
+
+
+def within_path(path, base):
+    return path == base or path.startswith(base + '/')
+
+
+def configurable_path_defaults(blue_id, definitions, supplied):
+    """Proven defaults from a direct read of an instance binding in a compiler definition."""
+    own_candidate = '/clauseRuntime/work/candidate/{clauseKey}'
+    inheritance = [definition for _, definition in type_chain(blue_id, definitions)]
+    result = {}
+    for field in ('hookDefinition', 'actionDefinition'):
+        field_value = next((compact(node[field]) for node in inheritance if field in node), None)
+        if not isinstance(field_value, dict) or not isinstance(field_value.get('type'), dict):
+            continue
+        direct = field_value['type'].get('blueId')
+        if not isinstance(direct, str):
+            continue
+        seen_functions = set()
+        for identity, _ in type_chain(direct, definitions):
+            definition = supplied.get(identity, {})
+            functions = definition.get('functions')
+            if not isinstance(functions, dict):
+                continue
+            for name, function in functions.items():
+                if name in seen_functions:
+                    continue
+                seen_functions.add(name)
+                if not isinstance(function, dict) or not isinstance(function.get('do'), list):
+                    continue
+                read_own_clause = set()
+                for statement in function.get('do', []):
+                    assignment = statement.get('$let') if isinstance(statement, dict) else None
+                    if not isinstance(assignment, dict):
+                        break
+                    var, expr = assignment.get('name'), assignment.get('expr')
+                    if not isinstance(var, str) or not isinstance(expr, dict):
+                        continue
+                    read_own_clause.discard(var)
+                    if clause_path(expr.get('$document')) == own_candidate:
+                        read_own_clause.add(var)
+                    lookup = expr.get('$pointerGet')
+                    if not isinstance(lookup, dict) or not isinstance(lookup.get('object'), dict):
+                        continue
+                    obj = lookup['object']
+                    ref = lookup.get('path')
+                    default = lookup.get('default')
+                    proof = set(obj) == {'$var'} and isinstance(obj['$var'], str) and obj['$var'] in read_own_clause
+                    if not proof or not isinstance(ref, str) or not re.fullmatch(r'/bindings/[^/]+', ref):
+                        continue
+                    path = default if pointer(default) else clause_path(default)
+                    if path:
+                        result[(ref, path)] = dict(bindingPointer=ref, defaultPath=path,
+                                                   definitionBlueId=identity, function=name)
+    return [result[key] for key in sorted(result)]
+
+
 def executable_references(value):
     if isinstance(value, list):
         return set().union(*(executable_references(child) for child in value))
@@ -265,12 +334,9 @@ def evidence(blue_id, definitions):
         elif isinstance(value, dict):
             if pointer(value.get('$document')):
                 paths.add(value['$document'])
-            parts = value.get('$concat')
-            if isinstance(parts, list) and {'$const': 'clauseKey'} in parts:
-                chunks = [part if isinstance(part, str) else '{clauseKey}'
-                          if part == {'$const': 'clauseKey'} else None for part in parts]
-                if None not in chunks and pointer(''.join(chunks)):
-                    clause_paths.add(''.join(chunks))
+            pattern = clause_path(value)
+            if pattern:
+                clause_paths.add(pattern)
             change = value.get('$appendChange')
             if isinstance(change, dict) and change.get('op') in {'add', 'replace'}:
                 fields(change.get('val'), change.get('path'))
@@ -278,10 +344,16 @@ def evidence(blue_id, definitions):
                 literals(child)
 
     literals([root, *supplied.values()])
+    configurable = configurable_path_defaults(blue_id, definitions, supplied)
+    defaults = {item['defaultPath'] for item in configurable}
+    for fixed in (paths, clause_paths):
+        fixed.difference_update(path for path in list(fixed)
+                                if any(within_path(path, base) for base in defaults))
     return dict(blueId=blue_id, definition=root,
                 bindings=[dict(name=k, defaultPath=v) for k, v in sorted(bindings.items())],
                 parameterRefs=sorted(parameters | {'bindings.' + name for name in bindings}),
                 documentPaths=sorted(paths), clausePaths=sorted(clause_paths),
+                **({'configurablePathDefaults': configurable} if configurable else {}),
                 referencedBlueIds=sorted((visited | omitted) - {blue_id}),
                 dependencyDefinitions=[dict(blueId=k, definition=v) for k, v in sorted(supplied.items())],
                 omittedDependencies=sorted(omitted))
