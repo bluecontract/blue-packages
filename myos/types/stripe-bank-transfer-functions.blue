@@ -1,0 +1,202 @@
+name: Stripe Bank Transfer Functions
+type: Contracts/Compute Definition
+functions:
+  validateRequest:
+    args: {}
+    do:
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /paymentTerms/amountMinor
+          - $document: /paymentTerms/limitMinor
+        message: STRIPE_PAYOUT_AMOUNT_LIMIT_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /paymentTerms/payerChannel
+          - $document: /paymentTerms/payeeChannel
+        message: STRIPE_PAYOUT_SELF_PAYEE_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /paymentDetails/method
+          - myos-stripe-bank-transfer
+        message: STRIPE_PAYOUT_METHOD_REQUIRED
+    - $let:
+        name: bank
+        expr:
+          $document: /paymentDetails/externalBankAccountId
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: bank
+                kind: text
+            - $ne:
+              - $var: bank
+              - ''
+        message: STRIPE_PAYOUT_BANK_REQUIRED
+  reportFailureAfterConfirmation:
+    args:
+      input:
+        description: Report a failed payout that was previously confirmed. Reference
+          must identify that same payout.
+        schema:
+          maxFields: 4
+        requestId:
+          type: Text
+          description: Exact confirmed bank transfer request identifier.
+          schema:
+            minLength: 1
+            maxLength: 128
+        reference:
+          type: Text
+          description: Exact confirmed Stripe payout identifier.
+          schema:
+            minLength: 1
+            maxLength: 256
+        failureCode:
+          type: Text
+          description: Stripe payout failure code.
+          schema:
+            minLength: 1
+            maxLength: 128
+        type: MyOS/Stripe Payout Failure Input
+    do:
+    - $let:
+        name: input
+        expr:
+          $pointerSet:
+            object:
+              $var: input
+            path: /type
+            op: remove
+    - $failIf:
+        cond:
+          $ne:
+          - $binding: call/channel
+          - $document: /paymentTerms/guarantorChannel
+        message: STRIPE_PAYOUT_GUARANTOR_REQUIRED
+    - $let:
+        name: requestId
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /requestId
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: requestId
+                kind: text
+            - $ne:
+              - $var: requestId
+              - ''
+            - $lte:
+              - $size:
+                  $var: requestId
+              - 128
+        message: STRIPE_PAYOUT_REQUESTID_REQUIRED
+    - $let:
+        name: reference
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /reference
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: reference
+                kind: text
+            - $ne:
+              - $var: reference
+              - ''
+            - $lte:
+              - $size:
+                  $var: reference
+              - 256
+        message: STRIPE_PAYOUT_REFERENCE_REQUIRED
+    - $let:
+        name: failureCode
+        expr:
+          $pointerGet:
+            object:
+              $var: input
+            path: /failureCode
+            default: ''
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: failureCode
+                kind: text
+            - $ne:
+              - $var: failureCode
+              - ''
+            - $lte:
+              - $size:
+                  $var: failureCode
+              - 128
+        message: STRIPE_PAYOUT_FAILURECODE_REQUIRED
+    - $failIf:
+        cond:
+          $ne:
+          - $var: requestId
+          - $document: /bankTransfer/requestId
+        message: STRIPE_PAYOUT_REQUEST_MISMATCH
+    - $failIf:
+        cond:
+          $ne:
+          - $var: reference
+          - $document: /bankTransfer/reference
+        message: STRIPE_PAYOUT_REFERENCE_MISMATCH
+    - $if:
+        cond:
+          $eq:
+          - $document: /bankTransfer/status
+          - failed_after_confirmation
+        then:
+        - $failIf:
+            cond:
+              $ne:
+              - $var: input
+              - $document: /bankTransfer/payoutFailure
+            message: STRIPE_PAYOUT_FAILURE_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $failIf:
+        cond:
+          $ne:
+          - $document: /bankTransfer/status
+          - completed
+        message: STRIPE_PAYOUT_CONFIRMATION_REQUIRED
+    - $appendChange:
+        op: replace
+        path: /bankTransfer/status
+        val: failed_after_confirmation
+    - $appendChange:
+        op: add
+        path: /bankTransfer/payoutFailure
+        val:
+          $var: input
+    - $appendEvent:
+        $merge:
+        - type: MyOS/Stripe Bank Transfer Event
+        - kind: Payout Failed After Confirmation
+          status: failed_after_confirmation
+        - $var: input
+    - $return:
+        outcome: acceptedNew

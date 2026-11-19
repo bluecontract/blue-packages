@@ -14,3 +14,26 @@ do not implement Stripe transfers, account debits or commission payouts, and add
 separate provider field or operation permissions.
 
 Unpublished candidate. Authored Blue/BEX definitions are authoritative. See ../docs/payment-family.md for the tested package selection and integration boundaries.
+
+### Stripe bank withdrawals
+
+`MyOS/MyOS Stripe Bank Transfer Instruction` extends `ACME/Bank Transfer Instruction`
+for a single self-payout. Set `paymentTerms.amountMinor == limitMinor`, equal payer
+and payee channels, and `paymentDetails.externalBankAccountId`; the method is
+`myos-stripe-bank-transfer`. Source Stripe account resolution belongs to Core.
+Existing bank request, unknown, decline and confirmation operations remain inherited.
+The subtype validates these self-payout terms atomically when requesting a transfer.
+
+The guarantor-only `reportPayoutFailureAfterConfirmation` accepts `requestId`,
+`reference` (the confirmed payout ID), `failureCode` and optional
+`failureBalanceTransaction`. Use native input type `MyOS/Stripe Payout Failure Input`.
+It changes `bankTransfer.status` to `failed_after_confirmation`, stores the input
+as `bankTransfer.payoutFailure`, and emits `MyOS/Stripe Bank Transfer Event` with
+kind `Payout Failed After Confirmation`. Historical confirmation/reference and
+`payment.completed`/`payment.reversed` are preserved. An identical correction has
+no second effect; conflicting corrections and later confirmations are rejected.
+This event records a late failure, never a synthetic refund.
+
+Focused local qualification (requires the qualified companion Core classpath):
+`python3 tools/check_operation_inputs.py --case stripe-bank-transfer`.
+This checks published input schemas and native BEX effects, not live Stripe payouts.

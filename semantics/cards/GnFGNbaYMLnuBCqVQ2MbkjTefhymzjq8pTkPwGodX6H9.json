@@ -1,0 +1,112 @@
+{
+  "blueId": "GnFGNbaYMLnuBCqVQ2MbkjTefhymzjq8pTkPwGodX6H9",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "2V76vQUWmPGpn4Y8z5DLcJqGHXvuQNpVkehKURsivE2D",
+      "2gGnzyhzrw9pkcU2YM6oQxMM4AGrDYcJpE1eQbzF46ZF",
+      "AK5LQgnGGyffx2FgweRFrxUbPHwbhXN4K9Bp5RZtHbHj",
+      "E5EPri6BEKSor38VSDuwz7eqKuQpiYZW2MPbV3EF1MMe"
+    ],
+    "displayLabel": "Stripe Bank Transfer Functions",
+    "limitations": [
+      "No currency field or currency selection rule is supplied for amountMinor and limitMinor.",
+      "The supplied definitions do not establish how bankTransfer reaches completed or how its original bank confirmation is verified."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; absence does not establish completion.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Stripe Bank Transfer Functions.reportFailureAfterConfirmation: status guards and replacement.",
+        "id": "transferStatus",
+        "meaning": "completed permits a new guarantor correction; failed_after_confirmation records an accepted late payout failure report.",
+        "path": "/bankTransfer/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no identifier is initialized here.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Stripe Bank Transfer Functions.reportFailureAfterConfirmation: requestId argument and match guard.",
+        "id": "requestId",
+        "meaning": "Stored bank-transfer request identifier that the guarantor's failure report must match exactly.",
+        "path": "/bankTransfer/requestId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no reference is initialized here.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Stripe Bank Transfer Functions.reportFailureAfterConfirmation: reference argument and match guard.",
+        "id": "payoutReference",
+        "meaning": "Stored confirmed Stripe payout identifier that the failure report's reference must match exactly.",
+        "path": "/bankTransfer/reference",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no amount default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Stripe Bank Transfer Functions.validateRequest: amountMinor/limitMinor equality guard.",
+        "id": "amountMinor",
+        "meaning": "Configured payout amount in minor units; must equal limitMinor. Its currency source is not supplied.",
+        "path": "/paymentTerms/amountMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no limit default is supplied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Stripe Bank Transfer Functions.validateRequest: amountMinor/limitMinor equality guard.",
+        "id": "limitMinor",
+        "meaning": "Configured payout limit in minor units; must equal amountMinor. Its currency source is not supplied.",
+        "path": "/paymentTerms/limitMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; the required method is not a default.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Stripe Bank Transfer Functions.validateRequest: paymentDetails/method guard.",
+        "id": "transferMethod",
+        "meaning": "Payment method that validateRequest requires to be exactly myos-stripe-bank-transfer.",
+        "path": "/paymentDetails/method",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; validation requires nonempty text.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Stripe Bank Transfer Functions.validateRequest: externalBankAccountId text and nonempty checks.",
+        "id": "externalBankAccountId",
+        "meaning": "External bank-account identifier required for the request; validation checks only that it is nonempty text.",
+        "path": "/paymentDetails/externalBankAccountId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Stripe Bank Transfer Functions\n\nDefines checks for a Stripe bank-transfer request and an operation for recording a payout failure after confirmation. Both functions use the document in which they execute; no automatic invocation is established here.\n\n## Request validation\n\n`validateRequest()` takes no arguments and rejects the request unless:\n\n- `/paymentTerms/amountMinor` equals `/paymentTerms/limitMinor`.\n- `/paymentTerms/payerChannel` equals `/paymentTerms/payeeChannel`, making the payer and payee the same channel.\n- `/paymentDetails/method` is exactly `myos-stripe-bank-transfer`.\n- `/paymentDetails/externalBankAccountId` is nonempty text.\n\nThe amount check establishes equality only; it adds no numeric range checks or currency selection rule. Validation does not change state, emit an event, initiate a payout or confirm transferred money.\n\n## Failure after confirmation\n\n`reportFailureAfterConfirmation(input)` accepts calls only from the channel recorded at `/paymentTerms/guarantorChannel`. Its input requires nonempty text fields:\n\n- `requestId`: the confirmed bank-transfer request identifier, at most 128 characters.\n- `reference`: the confirmed Stripe payout identifier, at most 256 characters.\n- `failureCode`: the Stripe payout failure code, at most 128 characters.\n\nThe input schema permits one additional field, `failureBalanceTransaction`: optional Stripe balance-transaction evidence of returned failed-payout funds, with a length of 1–256 characters. The schema allows only these four fields. The function removes the input's `type` marker before comparing or storing the report.\n\n`requestId` and `reference` must exactly match `/bankTransfer/requestId` and `/bankTransfer/reference`. A new correction requires `/bankTransfer/status` to be `completed`. The function then changes it to `failed_after_confirmation`, stores the report at `/bankTransfer/payoutFailure`, and emits a `Stripe Bank Transfer Event` containing the report fields, `kind: Payout Failed After Confirmation` and `status: failed_after_confirmation`. It returns `outcome: acceptedNew`.\n\nIf the status is already `failed_after_confirmation`, an identical stored report returns `outcome: duplicate` without another change or event. A different report is rejected. Calls from another channel, invalid required fields, mismatched identifiers and other prior statuses are also rejected.\n\nThe correction preserves the earlier `Payment Completed` event and does not represent a refund. The inherited event contract distinguishes a request from transferred money: `Payment Completed` with `bankConfirmation` evidence records a transfer. These functions do not establish that original confirmation or verify the optional balance transaction with Stripe. Acceptance records the guarantor's report; it does not itself move funds or independently confirm their return."
+}
