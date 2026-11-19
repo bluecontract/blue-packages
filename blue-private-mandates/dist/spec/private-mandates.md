@@ -4,15 +4,17 @@ Protocol name: `Private Mandates / proof-decided operation authority/1`
 Package namespace: `PrivateMandates`
 Release status: Core Java integration preview, 19 November 2026
 
-This package extends Mandates and the Coordination evidence channels. It is
-additive: `Mandates/Mandate Authority`, which names its mandate in clear, stays
-supported and keeps its rules. Names and grammar details marked *provisional* are
+This package extends Mandates and the timeline channels with evidence of
+Coordination (section 14 of the Coordination specification). It requires the exact
+Coordination edition that defines those channels and the Mandates publication built
+on it. It is additive: `Mandates/Mandate Authority`, which names its mandate in
+clear, stays supported and keeps its rules. Names and grammar details marked *provisional* are
 working choices of this preview; changing one produces new exact identities.
 
 Terms: E is an operation entry of the agent and K its full Coordination input key.
 D is the state of the target document strictly before E. M is the salted mandate
-commitment carried by E. T is the proof timeline named by the channel E is
-performed on (`CoordinationEvidence/Timeline Channel with Evidence`).
+commitment carried by E. T is the evidence timeline named by the channel E is
+performed on (`Coordination/Timeline Channel with Evidence`).
 
 ## 1. Scope and layer boundary
 
@@ -28,11 +30,11 @@ the mandate, and a zero-knowledge proof published on T states the verdict:
 
 Every processor verifies the proof and reaches the same decision without the
 mandate. The rules for reading T (considered entries, first entry, waiting, halting)
-are those of the Coordination evidence channels specification. This specification
+are those of section 14 of the Coordination specification. This specification
 defines the authority claim, the evidence profile, and when a proof matches.
 
 A processor MUST explicitly support this exact package and protocol, the required
-Coordination evidence protocol and the required Mandates protocol. A host that does
+Coordination protocol and the required Mandates protocol. A host that does
 not support the profile type a channel declares MUST refuse the document where the
 channel is declared. Installing this data package grants no native support.
 
@@ -41,7 +43,7 @@ channel is declared. Installing this data package grants no native support.
 | Type | Kind | Purpose |
 |---|---|---|
 | Mandate Commitment Authority | `Mandates/Authority` | Authority claim that carries M and names no mandate |
-| RISC Zero Succinct Receipt Profile | `CoordinationEvidence/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
+| RISC Zero Succinct Receipt Profile | `Coordination/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
 
 ## 3. The authority claim
 
@@ -78,7 +80,7 @@ takes no part in the proof flow. M tells the prover which mandate is meant and l
 a processor match a proof to the operation.
 
 An operation whose authority claim is a `Mandate Commitment Authority` is
-evidence-decided in the sense of the Coordination evidence channels specification.
+evidence-decided in the sense of section 14 of the Coordination specification.
 
 **Checked by every processor, outside the proof.** These are the checks a processor
 performs today for a `Mandates/Mandate Authority` without reading the mandate. They
@@ -102,8 +104,22 @@ of the mandate; that the actor of E is the actor of the mandate's
 order of grant keys, document validation before request validation, each predicate
 with its own fresh gas ledger, the first grant that passes admits).
 
-A predicate that ends in an execution error, exhausted gas included, makes the
-operation unauthorized at its own time: the proof carries a denial.
+**A predicate that ends in an error.** When the evaluation of a predicate of the
+mandate ends in an error — an execution error, an invalid operand, a result that is
+not a Boolean, exhausted gas, or a check inside the proved statement that fails by
+throwing — the outcome of the statement is "the mandate does not admit E". The proof
+carries a denying verdict, E is rejected at its own time, and the target document
+continues with the next input. Repairing the mandate needs an update of the mandate,
+which applies to later operations.
+
+This is a deliberate difference from mandates named in clear. For a
+`Mandates/Mandate Authority` the Mandates specification says only that an error
+never authorizes, and a processor that evaluates the predicate itself may give no
+verdict and stop processing the target document. Here the represented party
+answers for its own mandate: the other participants cannot read it, so a faulty
+mandate must not stop the document for everyone. Content that the prover cannot
+obtain and a local interruption of proving or of verification are not predicate
+errors: they give no proof or a retry, never a verdict.
 
 ## 4. Evidence profiles
 
@@ -113,7 +129,7 @@ deterministically only when they use the same profile, so a channel declares a
 profile value and never a name such as "latest". The profile is identified by a
 hash of its content: the BlueId of the declared value (*provisional*).
 
-`CoordinationEvidence/Evidence Profile` is the base type and has no fields. A
+`Coordination/Evidence Profile` is the base type and has no fields. A
 channel's `evidenceProfile` MUST be a value of a supported specialisation.
 
 ### 4.1 RISC Zero Succinct Receipt Profile
@@ -146,8 +162,8 @@ source at a provider outside the set can never get a matching proof.
 each key and of `programImageId`, distinct list elements and the value of
 `factsRule`. The processor additionally requires `programImageId` and every key to
 be 64 characters `0-9a-f`, and the list to be strictly ascending by key bytes. A
-profile that fails any of these is malformed; under the Coordination evidence
-channels specification the channel then lacks its profile, and every operation with
+profile that fails any of these is malformed; under section 14 of the Coordination
+specification the channel then lacks its profile, and every operation with
 a `Mandate Commitment Authority` on it is rejected from the document state.
 
 **Facts rule.** FULL(D) is the least set of rows (recipe key, goal, root) closed
@@ -166,7 +182,18 @@ the mandate processor key, the provider set digest, a salted commitment to the
 mandate processor's signed statement, the digest of the validation facts about D
 that were reused, and the verdict.
 
-A `CoordinationEvidence/Proof Entry` is a matching proof for E only if all hold:
+A well-formed `Coordination/Proof Entry` (Coordination section 14.5; the processor,
+not the schema, decides well-formedness) is a matching proof for E only if all hold.
+The entry's `document` and `operationEntry` references are a routing hint and are
+not among the comparisons: a processor may skip an entry whose hint does not name
+this document and E without verifying it, and an entry whose hint disagrees with
+the proof's own public output is skipped (Coordination sections 14.5 and 14.6).
+Under this profile the hint disagrees with the public output when `operationEntry`
+does not name the entry whose BlueId the public output carries, or when the proof
+satisfies comparisons 2 and 4 for this document while `document` does not name this
+document's initial BlueId. The public output carries the BlueId of D, not the
+document's initial BlueId, so `document` is compared with the document the
+processor is processing.
 
 | # | Comparison | Against |
 |---|---|---|
@@ -186,12 +213,14 @@ A `CoordinationEvidence/Proof Entry` is a matching proof for E only if all hold:
 - One profile means one classification of one entry on every host.
 
 A matching proof carries its verdict. With an admitting verdict the processor
-applies the target document's own rules to E; with a denying verdict it rejects E.
+applies the target document's own rules to E; with a denying verdict it rejects E
+and the document continues. A denying verdict includes the case of §3 in which a
+predicate of the mandate ended in an error.
 
 ## 6. Compatibility
 
-Documents that use `Mandates/Mandate Authority`, and every earlier publication,
-are unaffected. This package and its protocol are unused unless a document declares
+Documents that use `Mandates/Mandate Authority` keep their rules, and every earlier
+publication is unchanged and remains selectable. This package and its protocol are unused unless a document declares
 a channel with a profile of this package or an operation carries a
 `Mandate Commitment Authority`. On a channel without the three evidence fields an
 operation with this claim is rejected from the document state.

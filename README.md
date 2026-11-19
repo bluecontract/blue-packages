@@ -11,10 +11,14 @@ schema. Its [integration contract](docs/execution-profile-contract.md) describes
 per-node selection and the separate Core implementation qualification. Adding
 this schema changes neither existing native publications nor deployed defaults.
 
-`blue-coordination-evidence` and `blue-private-mandates` add evidence channels,
-proof profiles and a mandate commitment authority on top of the exact current
-Coordination and Mandates publications. They are [additive](docs/private-mandates-evidence.md):
-no existing publication changes, and native support is a separate Core qualification.
+The current Coordination edition (`0.2.0-access-events.1.evidence.1`) adds timeline
+channels with evidence: a channel that names a proof timeline, the evidence profile
+base type and the two entry types on a proof timeline. Every package that depends on
+Coordination is rebuilt on it with the version suffix `.evidence.1`. The previous
+edition's archives are retained unchanged under `retained/pre-evidence-20261119/`.
+`blue-private-mandates` adds the first proof profile and a mandate commitment
+authority and requires this edition. See [the edition record](docs/private-mandates-evidence.md);
+native support is a separate Core qualification.
 
 ## Runtime editions
 

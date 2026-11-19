@@ -59,7 +59,9 @@ Every conforming provider implements the baseline in sections 2–9 and 11, incl
 Timeline Access and the combined signed read operation. Section 4.2's
 owner-ingest creation/append interface and section 10's
 committed update-stream interface are optional extensions. Section 12 defines
-feeder obligations; section 13 defines package use and validation. See the
+feeder obligations; section 13 defines package use and validation; section 14
+defines timeline channels with evidence, which a feeder applies only to a document
+that declares such a channel. See the
 [worked examples](../docs/examples.md) for a timeline, entries, and a complete
 signed HTTP exchange using these types.
 
@@ -960,3 +962,282 @@ identity; Contracts defines execution. No alternative cycle or execution algorit
 is introduced here.
 
 This edition selects the exact 10M gas prerequisites. Previously published content retains its original semantics.
+
+## 14. Timeline channels with evidence: evidence timelines for operations decided by evidence
+
+This section is part of this Coordination edition. Sections 1–13 are unchanged by
+it: transport, access, ordering, completeness and admission of every document that
+declares no channel of section 14.3 are exactly as those sections state. Because
+the rules text is part of every exact type identity, this edition has new package,
+protocol, rules and type BlueIds; earlier Coordination publications remain
+immutable and selectable, and their documents keep their runtime.
+
+Names and grammar details marked *provisional* are working choices of this edition.
+Changing one of them produces new exact type identities and a new protocol identity.
+
+Terms: E is an operation entry and K its full Coordination input key (timestamp,
+source timeline, entry). D is the state of the target document strictly before E.
+T is the evidence timeline named by the channel the operation is performed on.
+
+### 14.1 Scope and layer boundary
+
+A participant may be represented by agents whose authority the other participants
+cannot read. For such a participant the document's channel names where the decisions
+about those operations appear (T), whose signature on a private authority state the
+participant accepts, and under which published rules a piece of evidence is checked.
+This section defines that channel, the base type of an evidence profile, the two
+entry kinds on T, and how a processor reads T. It does not define any authority type
+or any concrete evidence profile. Those are defined by packages whose protocol
+requires this one.
+
+An operation is *evidence-decided* when its authority claim (`onBehalfOf`) has a type
+that a supported protocol requiring this edition defines as decided from T. This
+edition alone defines no such type. Direct operations and operations under an
+authority that names its mandate keep their existing Coordination and Mandates rules.
+
+A processor MUST explicitly support this exact package and protocol. Loading the
+definitions for inspection is not support. A host that does not support this
+protocol, or the protocol of the profile a channel declares, MUST refuse the document
+rather than process it differently. It refuses where the channel is declared: for a
+channel in the initial document it processes nothing; for a channel added later it
+stops at the entry that adds the channel. It MUST NOT treat the channel as a plain
+`Timeline Channel`.
+
+### 14.2 Exported types
+
+| Type | Kind | Purpose |
+|---|---|---|
+| Timeline Channel with Evidence | `Timeline Channel` | Participant channel that also names T, the mandate processor key and the evidence profile |
+| Evidence Profile | base type | Published, immutable rules under which evidence on a channel is checked; it has no fields and is used only through its specialisations |
+| Proof Entry | message of a Timeline Entry on T | Carries one whole proof |
+| Rejection Entry | message of a Timeline Entry on T | States that one operation is not to be processed in one document |
+
+### 14.3 The channel
+
+`Timeline Channel with Evidence` inherits `timeline` and `actor` from
+`Timeline Channel` and adds three required fields:
+
+| Field | Content |
+|---|---|
+| `evidenceTimeline` | The evidence timeline T of this channel, a `Signed Timeline` |
+| `mandateProcessorKey` | The public key whose signature on a private authority state the participant accepts, an `Ed25519 Public Key` (*provisional*: the key type) |
+| `evidenceProfile` | The published evidence profile under which evidence for this channel is checked, an `Evidence Profile` (*provisional*: the field name). The exact specialisation is defined by the profile's own package and selects the native part a host must implement; its content carries the profile's data. A name such as "latest" is never a profile |
+
+Rules:
+
+1. The channel is an ordinary input source for its `timeline`, exactly as a
+   `Timeline Channel`. T is not an input source (section 14.4).
+2. The three fields are read from the document state strictly before K, like every
+   other part of the document.
+3. The three fields are fixed for the life of the document. *Provisional* placement
+   of the rule: a processor rejects an entry that would change any of the three
+   fields of an existing channel; a channel added later with all three fields is
+   accepted.
+4. Same-provider rule: T MUST be at the provider of the channel's `timeline`.
+5. There is one T per participant channel, whatever the number of representatives.
+   A representative writes on its own timeline; the operation is performed on the
+   participant's channel, and that channel names T.
+6. Each participant declares the three fields of its own channel. The other
+   participants accept them by accepting the document.
+7. An evidence timeline serves exactly one document. It MUST NOT be named by a
+   channel of another document. A reader of another document could not resolve the
+   references of its entries (section 14.5), and would learn from it that a mandate
+   was used in this document.
+
+A participant with no representatives may use a plain `Timeline Channel`.
+
+**Values the type system cannot exclude.** The Language schema fixes the length of
+`mandateProcessorKey` and the base type of `evidenceProfile`. It cannot express a
+character set, and it admits a value whose exact type is the base `Evidence Profile`.
+A processor therefore applies these rules itself, from the document state alone:
+
+1. `mandateProcessorKey` is well formed only as 64 characters `0-9a-f`.
+2. `evidenceProfile` is well formed only if its exact type is a specialisation of
+   `Evidence Profile`, not the base type, and its content is well formed under that
+   specialisation's own rules.
+3. A host that does not support the specialisation's protocol refuses the document
+   (section 14.1). A host that supports it and finds the value malformed under
+   rules 1–2 does not refuse and does not wait: for section 14.6 the channel lacks
+   that field.
+
+### 14.4 What the evidence timeline is to the processor
+
+T delivers no input to the document and takes no part in establishing which entries
+are safe to process: it is not part of completeness, candidate selection or ordering.
+There is no requirement on T before the document starts. T is read only to decide an
+evidence-decided operation performed on the channel that names it.
+
+No timestamp of T is compared with a timestamp of any other timeline. An entry on T
+may appear at any time; only its place in T's own authenticated chain matters.
+
+Anything may be written on T. Whoever can write on T was allowed to by the
+participant; the processor does not ask who that is. The readers of T are the
+participants of the one document T serves. Reader access to T uses T's own
+Timeline Access document, handled like those of the document's other timelines.
+
+### 14.5 Entries on the evidence timeline
+
+Both kinds are the `message` of an ordinary `Timeline Entry` on T. Both name the
+document and the operation in the same way, by two references by content BlueId:
+
+| Field | Content |
+|---|---|
+| `document` | Reference `{blueId: …}` to the document by its initial BlueId, the same for every participant. This is the convention an `Operation Request` uses for its `document` |
+| `operationEntry` | Reference `{blueId: …}` to the operation's `Timeline Entry` E (*provisional*: the field name) |
+
+**Open schemas.** The Blue definitions of `Proof Entry` and `Rejection Entry` name
+their fields and constrain nothing: no field is typed or required, and the field set
+is not closed. A schema of these two types therefore never makes a message
+inadmissible as Blue content, whatever its fields, so a malformed entry does not
+prevent T from being imported or read. Whether such a message is a well-formed entry
+is decided by the processor alone, under the rules of this section. The channel, the
+profile and the authority claims of requiring protocols keep their schema
+constraints.
+
+The two references are Blue references and are resolved as such. A `{blueId: …}`
+value is a reference wherever it stands, declared or not: Language opens it when the
+entry is admitted. The two fields are declared as an `Operation Request` declares
+`document`: free fields with no type. The writer of an entry holds the document and
+the operation entry, since it made the proof or the rejection for them. The readers
+of T are the participants of the one document T serves (section 14.3 rule 7): they
+hold the document and receive the operation entry as an input of the document. A
+reference in a well-formed entry therefore resolves for every reader, possibly after
+a wait for the operation entry.
+
+Known limit. A value that is not a valid reference is not Blue content, and an
+entry whose reference can never be resolved by the readers blocks the reading of T
+for them. The open schemas do not remove this; it lasts until timeline import can
+skip an entry it cannot read (section 14.8). Writing such an entry is the fault of
+the channel's party, on whose timeline T it stands, and it stops only the operations
+decided from that T.
+
+**Proof Entry.** The whole proof is the content of the entry, so an authenticated
+entry never lacks its proof.
+
+| Field | Content |
+|---|---|
+| `receipt` | The complete proof in the single encoding admitted by the declared profile, as canonical base64 text: RFC 4648 §4 standard alphabet, with padding, zero pad bits, no line breaks or other characters, so that decoding and re-encoding gives the same text (*provisional*: field name and text encoding) |
+| `document` | As above |
+| `operationEntry` | As above |
+
+A well-formed Proof Entry has exactly these three fields: `receipt` is present, is
+a non-empty text in that canonical base64 form and its decoded bytes are the
+profile's one admitted encoding; `document` and `operationEntry` are each present
+and each a reference by content BlueId with no other content; the message has no
+other field.
+
+In a Proof Entry `document` and `operationEntry` are a routing hint only. Whether a
+proof is accepted for E is decided only by the proof's public output, as the
+declared profile defines; the hint is never evidence. A processor MAY skip, without
+verifying the proof, a Proof Entry whose `document` or `operationEntry` does not
+name this document and E. A Proof Entry whose hint disagrees with its own public
+output is skipped. A processor that verifies every proof and one that uses the hint
+therefore skip the same entries.
+
+**Rejection Entry.** "E is not to be processed in this document", with no proof.
+
+A well-formed Rejection Entry has exactly the two fields `document` and
+`operationEntry`: each is present and is a reference by content BlueId with no
+other content, and the message has no other field. A rejection needs no signature
+of its writer. It counts because it is on the participant's timeline.
+
+**Well-formedness is checked by the processor.** For every message on T that
+carries one of the two types, the processor itself checks the field set and the
+form of each field stated above. The check uses the entry alone (and, for the
+receipt encoding, the declared profile), so every processor decides it alike. An
+entry that is not well formed — another field, a missing field, a `document` or
+`operationEntry` that is not a reference, a `receipt` that is not a text, is empty
+or is not canonical base64, or decoded bytes that are not the profile's one
+admitted encoding — conforms to neither kind and is skipped (section 14.6). A
+skipped entry never causes a wait or a halt of its own and never fails the reading
+of T. No size limit is imposed on an entry by these rules. The byte-exact grammar is
+not final in this edition (section 14.8).
+
+A message on T of any other type is not covered by this guarantee: whether it can
+be admitted as Blue content is decided by its own type.
+
+### 14.6 Deciding an evidence-decided operation
+
+**Immediate rejection from the document state.** E is rejected at once, without
+reading T, when at the position of E:
+
+- the channel E is performed on lacks any of the three fields; this includes a plain
+  `Timeline Channel` and a field whose value is malformed (section 14.3);
+- the authority claim of E is malformed under the rules of its own protocol;
+- T is at another provider than the channel's `timeline`.
+
+Every processor reads the same document state at that position, so the rejection is
+deterministic.
+
+**Considered entries.** Otherwise the processor considers an entry on T for E only
+if both hold:
+
+1. T's provider attributes the entry to the channel's `actor`;
+2. the entry is a well-formed Proof Entry that the declared profile classifies as a
+   matching proof for E and whose `document` and `operationEntry` agree with its own
+   public output, or a well-formed Rejection Entry whose `document` names this
+   document's initial BlueId and whose `operationEntry` names E.
+
+Everything else on T is skipped. A skipped entry is the same as no entry.
+
+| What is on T | Treatment |
+|---|---|
+| An entry attributed to another actor | Skipped |
+| An entry of one of the two types that is not well formed (section 14.5) | Skipped |
+| An entry that carries neither type | Skipped |
+| A well-formed Proof Entry whose verification completes with "invalid" | Skipped |
+| A well-formed Proof Entry whose `document` or `operationEntry` does not name this document and E | Skipped; the proof need not be verified |
+| A proof that verifies but that the profile classifies as mismatching | Skipped as mismatching; never a denial |
+| A proof that verifies but whose public output disagrees with the entry's own `document` or `operationEntry` | Skipped |
+| A rejection for another document or for another operation | Skipped |
+| A matching proof for E | Considered; carries its verdict |
+| A rejection naming this document and E | Considered; E is rejected in this document only |
+
+**Which entry decides.** The first considered entry for E in T's authenticated
+chain, counted from the beginning of the chain, also when it precedes E. Later
+entries for the same E are ignored, whatever their verdict. T is read from its first
+entry in chain order, not in the order in which data happens to arrive.
+
+A matching proof with an admitting verdict lets E proceed to the target document's
+own rules. A matching proof with a denying verdict, or a considered rejection,
+rejects E. A rejected E is a deterministic rejected input: the document continues
+with the next input.
+
+**When there is no decision.**
+
+| Situation | What the processor does |
+|---|---|
+| No considered entry for E on T | Waits. Absence of an entry is never a denial |
+| No access to T | Waits. A local read failure of T is never a denial. With access it reads T from the start |
+| Verification of a well-formed Proof Entry was interrupted locally | Retries and finalises nothing. It does not pass over that entry to a later one. A local resource limit may only interrupt and retry; it is never part of a classification |
+| The processor holds two chains of T | Halts; earlier results stand |
+
+**Waiting.** The document processes inputs in full-key order and stops at the first
+unresolved evidence-decided operation. A later operation, also of another
+participant, is not processed before it. There is no deadline in this edition.
+
+### 14.7 Host support and compatibility
+
+The protocol identity of this Coordination edition is the capability a host must
+support for a document that declares `Timeline Channel with Evidence`. It is
+selected the way every Coordination edition is selected: by the exact type
+identities the document uses, which name these rules. There is no separate
+capability declaration. A host that supports this edition processes a document
+that declares no such channel exactly as sections 1–13 state. Earlier Coordination
+publications remain selectable and their documents keep their runtime.
+
+### 14.8 Not decided in this edition
+
+- The name of the profile field and of the entry fields, and the byte-exact entry
+  grammar including the text encoding of the proof.
+- Where the fixed-for-life rule is finally placed (section 14.3 rule 3).
+- An `evidenceTimeline` that does not exist at the provider: reject or wait.
+- Whether two channels of one document may share one T.
+- Whether the reason for a rejection is visible to the document's contracts.
+- How a participant supplies T, and how the others consent to a channel added later.
+- A message on T whose own type makes it inadmissible as Blue content still fails
+  the reading of T at the provider or the host; the open schemas of section 14.5
+  remove this only for the two entry types.
+- An entry on T whose `document` or `operationEntry` is not a valid reference, or
+  can never be resolved by the readers, blocks the reading of T (section 14.5).
+  This lasts until timeline import can skip an entry it cannot read.

@@ -1,10 +1,15 @@
 # Coordination: timelines and timestamped inputs to Contracts
 
-`blue-coordination` **0.2.0-access-events.1** defines how timelines supply verified,
+`blue-coordination` **0.2.0-access-events.1.evidence.1** defines how timelines supply verified,
 ordered and complete inputs to Contracts. Providers preserve history and access
 evidence; feeders establish the next original event and its timestamp.
 
 - [Specification](spec/coordination.md): frozen provider, public channel, read, access and feeder rules.
+- Section 14 of the specification: timeline channels with evidence. `Timeline Channel with Evidence`
+  is a `Timeline Channel` that also names `evidenceTimeline`, `mandateProcessorKey` and
+  `evidenceProfile`; `Evidence Profile` is the base type of a profile; `Proof Entry` and
+  `Rejection Entry` are the two messages on an evidence timeline. Their schemas are open: the
+  processor checks an entry and skips one that is not well formed.
 - [Access-event addendum](spec/timeline-access-events.md): the new exact access program and its ordinary events.
 - [Worked example](docs/examples.md): ACME provider subtype, human/agent actors,
   Hello entries, an executable Timeline Access document, atomic updates and reads.
@@ -25,6 +30,12 @@ accepted timeline order. Every successful update then emits the ordinary
 consumed request does not emit again. Parent embedded channels read the completed
 child state; the event itself is not proof of permission. Private read signatures are reusable for their exact
 query while access remains granted; every use rechecks current permissions.
+
+This edition descends from 0.2.0-access-events.1. Sections 1–13 of the rules are unchanged; because
+the rules text is part of every exact type identity, all type, rules, protocol and package BlueIds are
+new. The earlier publication is retained unchanged under `retained/pre-evidence-20261119/` in the
+package repository, and its documents keep their runtime. A host learns that a document needs this
+edition from the exact type identities the document uses, as for every edition.
 
 ## Build and verify
 
