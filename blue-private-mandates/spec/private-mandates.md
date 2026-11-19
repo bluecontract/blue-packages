@@ -69,14 +69,28 @@ message:
 | `actor` | Inherited from `Mandates/Authority`: the represented holder |
 | `mandateCommitment` | M = SHA-256(salt ‖ BlueId of the mandate before initialization), as 64 lower-case hexadecimal characters (*provisional*: field name and text encoding). The byte encoding of the two inputs is fixed by the proving program of the channel's profile |
 
-The claim has exactly these two fields. It has no `mandate` field, and a value with
-any other field is not a `Mandate Commitment Authority`: the Language schema rejects
-it, and it is handled as any authority claim of an unrecognized type is today.
+The claim has exactly these two fields and its type. It has no `mandate` field.
+
+**The field set is checked by the processor.** The Language schema limits the claim
+to two fields with a value, but it does not close the field set: it admits a further
+field that carries only a type, such as `mandate: {type: Mandates/Operation
+Mandate}`, and a further field written as a reference that resolves. A processor
+therefore checks the field set itself, from the entry alone: a claim whose fields
+are not exactly `actor` and `mandateCommitment`, beside its type, is malformed, and
+the operation is rejected at once from the document state, without reading T. A
+claim never carries or points to a mandate.
+
+A claim that the schema does reject, for example one with a third field that has a
+value or with a `mandateCommitment` of another length, is a different case. The
+whole `Timeline Entry` that carries it is then not admissible Blue content. This is
+existing Coordination behaviour for any inadmissible entry and is not changed here:
+there is no operation to decide, and a reader cannot import the agent's operation
+timeline past such an entry. It is the fault of that timeline's writer.
 
 `mandateCommitment` is well formed only as 64 characters `0-9a-f`. The schema fixes
 the length; the processor checks the characters. An operation whose claim carries a
-malformed `mandateCommitment` is rejected from the document state, without reading T. The agent announces nothing before writing and
-takes no part in the proof flow. M tells the prover which mandate is meant and lets
+malformed `mandateCommitment` is rejected from the document state, without reading
+T. The agent announces nothing before writing and takes no part in the proof flow. M tells the prover which mandate is meant and lets
 a processor match a proof to the operation.
 
 An operation whose authority claim is a `Mandate Commitment Authority` is
@@ -104,22 +118,33 @@ of the mandate; that the actor of E is the actor of the mandate's
 order of grant keys, document validation before request validation, each predicate
 with its own fresh gas ledger, the first grant that passes admits).
 
-**A predicate that ends in an error.** When the evaluation of a predicate of the
-mandate ends in an error — an execution error, an invalid operand, a result that is
-not a Boolean, exhausted gas, or a check inside the proved statement that fails by
-throwing — the outcome of the statement is "the mandate does not admit E". The proof
-carries a denying verdict, E is rejected at its own time, and the target document
-continues with the next input. Repairing the mandate needs an update of the mandate,
-which applies to later operations.
+**When the mandate or a predicate is at fault.** The statement always ends in a
+verdict in these cases; none of them is a missing proof:
+
+1. *An error in a grant's predicate.* A predicate that ends in an execution error
+   or meets an invalid operand makes that grant not match. So does a completed
+   result that is not the Boolean true, as in Mandates today. The remaining grants
+   of the scope are tried, so the verdict does not depend on the order of the
+   grants: E is admitted exactly when at least one grant passes.
+2. *Exhausted gas.* A predicate that exhausts its gas ledger ends the whole decision
+   with "the mandate does not admit E". The remaining grants are not tried.
+3. *A fault of the mandate.* The signed state is not an Operation Mandate, it
+   belongs to another Mandates package than the profile's program was built with,
+   or it lacks its approval, its participants or its scope: the verdict is "the
+   mandate does not admit E".
+
+In every such case the proof carries a denying verdict, E is rejected at its own
+time, and the target document continues with the next input. Repairing the mandate
+needs an update of the mandate, which applies to later operations.
 
 This is a deliberate difference from mandates named in clear. For a
 `Mandates/Mandate Authority` the Mandates specification says only that an error
-never authorizes, and a processor that evaluates the predicate itself may give no
-verdict and stop processing the target document. Here the represented party
-answers for its own mandate: the other participants cannot read it, so a faulty
-mandate must not stop the document for everyone. Content that the prover cannot
-obtain and a local interruption of proving or of verification are not predicate
-errors: they give no proof or a retry, never a verdict.
+never authorizes, and a processor that evaluates the predicate or reads the mandate
+itself may give no verdict and stop processing the target document. Here the
+represented party answers for its own mandate: the other participants cannot read
+it, so a faulty mandate must not stop the document for everyone. Content that the
+prover cannot obtain and a local interruption of proving or of verification are not
+faults of the mandate: they give no proof or a retry, never a verdict.
 
 ## 4. Evidence profiles
 
@@ -131,6 +156,14 @@ hash of its content: the BlueId of the declared value (*provisional*).
 
 `Coordination/Evidence Profile` is the base type and has no fields. A
 channel's `evidenceProfile` MUST be a value of a supported specialisation.
+
+The Language schema of the channel does not enforce this. Typing of the
+`evidenceProfile` field is structural: the schema admits a value with no type and
+values of unrelated types. What protects is the native rule of Coordination section
+14.3, which a processor MUST implement: the exact type of the value must be a
+supported specialisation of `Coordination/Evidence Profile`; anything else counts
+as a missing field, and every operation with a `Mandate Commitment Authority` on
+that channel is rejected from the document state.
 
 ### 4.1 RISC Zero Succinct Receipt Profile
 
@@ -158,10 +191,13 @@ carries the list; the digest is derived and is not a field:
 For the empty list this is the SHA-256 of the empty byte string. A mandate with a
 source at a provider outside the set can never get a matching proof.
 
-**Well-formed profile.** The Language schema enforces the field set, the length of
-each key and of `programImageId`, distinct list elements and the value of
-`factsRule`. The processor additionally requires `programImageId` and every key to
-be 64 characters `0-9a-f`, and the list to be strictly ascending by key bytes. A
+**Well-formed profile.** For a value whose exact type is this profile, the Language
+schema enforces the three required fields, at most three fields with a value, the
+length of each key and of `programImageId`, distinct list elements and the value of
+`factsRule`. As for the authority claim (§3) it admits a further field that carries
+only a type. The processor additionally requires that the fields are exactly these
+three, that `programImageId` and every key are 64 characters `0-9a-f`, and that
+the list is strictly ascending by key bytes. A
 profile that fails any of these is malformed; under section 14 of the Coordination
 specification the channel then lacks its profile, and every operation with
 a `Mandate Commitment Authority` on it is rejected from the document state.
@@ -214,8 +250,8 @@ processor is processing.
 
 A matching proof carries its verdict. With an admitting verdict the processor
 applies the target document's own rules to E; with a denying verdict it rejects E
-and the document continues. A denying verdict includes the case of §3 in which a
-predicate of the mandate ended in an error.
+and the document continues. A denying verdict includes the cases of §3 in which
+the mandate or a predicate is at fault.
 
 ## 6. Compatibility
 

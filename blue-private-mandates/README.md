@@ -15,9 +15,11 @@ built on it (0.3.0-preview.1.evidence.1).
   `allowedProviders` and `factsRule`. The provider set digest is derived from
   the list and is not a field.
 
-A predicate of the mandate that ends in an error gives "the mandate does not
-admit": the operation is rejected and the document continues. This differs on
-purpose from mandates named in clear; see §3 of the specification.
+A faulty mandate never stops the document. A grant whose predicate ends in an
+error does not match and the other grants are tried; exhausted gas or a fault of
+the mandate itself gives "the mandate does not admit". The operation is then
+rejected and the document continues. This differs on purpose from mandates named
+in clear; see §3 of the specification.
 
 This is an extension. `Mandates/Mandate Authority` with a clear mandate reference
 stays supported and unchanged. A runtime must explicitly support this package's

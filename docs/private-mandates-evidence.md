@@ -23,16 +23,16 @@ commitment and no `mandate` reference). The normative rules are the two `spec/` 
 
 | Item | Version | BlueId |
 | --- | --- | --- |
-| Coordination package | 0.2.0-access-events.1.evidence.1 | `FF7vQrNAZSATL6GwxYXdwtuR9xSiBTYMizvraBEExAQc` |
-| Coordination protocol | | `5e4NgPeAqS4ToVDiRJdPScNKGQGahjzBKuUR85uaQJLP` |
-| Coordination rules | | `DKSQLfTLQncVfoJL85NQHoShR36YD5U5t8zdqPgUdEcr` |
-| Mandates package | 0.3.0-preview.1.evidence.1 | `EktwAbNdM6fUF1GqYzzSjAgXqiLLpHSt5VVpT7zM5rxY` |
-| Mandates protocol | | `AkK3aMRA7ZtBkPx7kYNLo7v9gbJ3fyMu37m4KqmnFwnn` |
-| Time package | 0.2.0-gas10m.1.finalgas.1.evidence.1 | `B6FT4ipNEtGsnj5d3mMura6B1sfobnfZpARHYqJLRdaP` |
-| Time protocol | | `8RsWVecPqq8vkz5Q7hFu3ViQKq4sY8cUEDjrmoZGU88K` |
-| Private Mandates package | 0.1.0-preview.1 | `EmNKZCSCP6nNc8fgC1fczGmQj7gm3GwTYfgWvPWA9nR1` |
-| Private Mandates protocol | | `FXXMkCiha8hS3HBNyN8r6s873kUao93bk274HFku31rV` |
-| Private Mandates rules | | `3PZprGbDbtCagSYTK8raSDdEMCftFgkfcLpvhGYap7t3` |
+| Coordination package | 0.2.0-access-events.1.evidence.1 | `EfD9Evsy8Uk37sgVW5FoZ7ZHYETETeyDZwKtuCa827vC` |
+| Coordination protocol | | `5TH6F74QEEVgL6X2dr6TyqLGkHFCHUff56Z5iTw5Phmc` |
+| Coordination rules | | `9MdKsAApwjLjFXTw75necZ5XPuY4o5M7SX2bF5zNrwij` |
+| Mandates package | 0.3.0-preview.1.evidence.1 | `844HpnaEGPgJDkaMBL62MMRRSqF1pByLKEKaRA1HAbp1` |
+| Mandates protocol | | `GxCcpduSLDenAhsiDD2RLMTR1BjSDVFVchj3WNAzs6Yz` |
+| Time package | 0.2.0-gas10m.1.finalgas.1.evidence.1 | `E5DJ6N9ZiTWxdY4cyT7G9R1iMxJezuytic5Q5b8hAjte` |
+| Time protocol | | `4E6oq67afbGES738jLoac61UQD2wCWtWuXMNLaV3DS5m` |
+| Private Mandates package | 0.1.0-preview.1 | `JAnCD8voGYUbuVeEhpqXy2EQmG6Fv7tcpNyJBn6zAzom` |
+| Private Mandates protocol | | `7cjcv1LWupas8oYCQmiXscAufweTjwmaxzCEXdUME1r4` |
+| Private Mandates rules | | `DU9dGxnvPg5nVW4MjEooZm1HcZTMQKausGGFeCHPXHqh` |
 
 `PACKAGES.json` is the authority for every current package identity and checksum.
 
@@ -59,7 +59,7 @@ previous edition (Coordination and its 31 dependants) are retained byte for byte
 under `retained/pre-evidence-20261119/<package>/package.bluepkg` and pinned in
 `PACKAGE-SOURCES.json` under `retainedArchives`; `tools/release.py check` verifies
 them and release bundles carry them as `retained-data`. Documents on an earlier
-edition keep their runtime. The ten packages that do not embed Coordination are
+edition keep their runtime. The nine packages that do not embed Coordination are
 unchanged. `blue-coordination-evidence`, an earlier unpublished layered candidate,
 was removed.
 
@@ -74,35 +74,58 @@ processes a document that declares no such channel as sections 1–13 state.
 
 ## What the schemas enforce and what the processor decides
 
-Closed and typed by the Language schema: the channel (three required fields, key
-length, profile of the base type), the profile (exact field set, lengths, distinct
-provider keys, the facts rule value) and the commitment authority (exact field set,
-so a clear `mandate` field is rejected; commitment length).
+Enforced by the Language schema: on the channel, the three required fields and the
+key length; on a value whose exact type is the RISC Zero profile, the three required
+fields, at most three fields with a value, lengths, distinct provider keys and the
+facts rule value; on the commitment authority, the two required fields, at most two
+fields with a value (so a `mandate` with a value is rejected) and the commitment
+length.
+
+Not enforced by the schema, and therefore native rules a Core implementation must
+apply:
+
+- **The profile is not typed by the schema.** Typing of `evidenceProfile` is
+  structural: an untyped object, a `Signed Timeline` or a channel is admitted there.
+  The rule that protects is native: the exact type must be a supported
+  specialisation of `Evidence Profile`; anything else counts as a missing field.
+- **The field sets are not closed.** The authority and the profile admit a further
+  field that carries only a type (for example `mandate: {type: Mandates/Operation
+  Mandate}`) or is a reference that resolves. The processor requires the exact
+  field set; for the authority a wrong field set is an immediate rejection of the
+  operation. A claim the schema does reject makes the whole timeline entry
+  inadmissible, which is existing Coordination behaviour.
 
 Open by design: `Proof Entry` and `Rejection Entry` name their fields and constrain
-nothing. A malformed entry is still Blue content, so it cannot fail the import of an
-evidence timeline. The processor checks the field set and form and skips an entry
-that is not well formed; a skipped entry never causes a wait or a halt of its own.
+nothing. The processor checks the field set and form and skips an entry that is not
+well formed; a skipped entry never causes a wait or a halt of its own.
 
-`document` and `operationEntry` are references by content BlueId, declared as an
-`Operation Request` declares `document`: free fields with no type. Language opens a
-`{blueId: …}` value wherever it stands. An evidence timeline serves exactly one
-document and its readers are that document's participants, so a reference in a
-well-formed entry resolves, possibly after a wait for the operation entry. Known
-limit: an entry whose reference is not a valid BlueId, or can never be resolved by
-the readers, blocks that evidence timeline until timeline import can skip an entry
-it cannot read. The conformance tool records these admission outcomes.
+`document` and `operationEntry` name the document and the operation entry by
+content BlueId and are declared as an `Operation Request` declares `document`: free
+fields with no type. Naming is decided by the BlueId of the field node, never by the
+wire form: a reference and the same content written in full are the same entry.
+An evidence timeline serves exactly one document (two channels of that document may
+share it) and its readers are that document's participants, so the named content
+resolves for them, possibly after a wait for the operation entry.
 
-Decided by a Core implementation, with the outcomes the specifications state:
+Known limit: a `{blueId: …}` value anywhere in an entry, in any field at any depth,
+is opened by Language admission. If its content cannot be obtained, admission of the
+entry is incomplete; a reference with other content beside `blueId`, or with a
+`blueId` that is not a BlueId, is invalid. Such an entry blocks that evidence
+timeline until timeline import can skip an entry it cannot read. The conformance
+tool records these outcomes with their exact failure kinds.
 
-| Value | Outcome |
+| Value | Outcome decided natively |
 | --- | --- |
 | `mandateProcessorKey`, `programImageId` or a provider key that is not 64 characters `0-9a-f` | The channel lacks that field: operations under a commitment authority on it are rejected from the document state |
-| `allowedProviders` not strictly ascending by key bytes | Same |
-| `evidenceProfile` whose exact type is the base type | Same |
-| `mandateCommitment` that is not 64 characters `0-9a-f` | The operation is rejected from the document state, without reading the evidence timeline |
-| An entry of one of the two types that is not well formed | The entry is skipped |
-| A predicate of the mandate that ends in an error | "The mandate does not admit": the operation is rejected and the document continues. A deliberate difference from mandates named in clear |
+| `allowedProviders` not strictly ascending by key bytes; a profile with a further field | Same |
+| `evidenceProfile` whose exact type is not a supported specialisation of `Evidence Profile` | Same |
+| A commitment authority whose fields are not exactly `actor` and `mandateCommitment`, or whose `mandateCommitment` is not 64 characters `0-9a-f` | The operation is rejected from the document state, without reading the evidence timeline |
+| An entry of one of the two types that is not well formed, or that does not name this document and the operation | The entry is skipped |
+| A grant whose predicate ends in an error or gives a non-Boolean result | That grant does not match; the other grants are tried |
+| Exhausted gas in a predicate; a fault of the mandate itself | "The mandate does not admit": the operation is rejected and the document continues. A deliberate difference from mandates named in clear |
+
+Semantic cards for the new type identities are not part of this change; they are
+produced by the workflow described in [semantic cards](semantic-cards.md).
 
 ## Build and verify
 

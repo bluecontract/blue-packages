@@ -12,8 +12,8 @@ per-node selection and the separate Core implementation qualification. Adding
 this schema changes neither existing native publications nor deployed defaults.
 
 The current Coordination edition (`0.2.0-access-events.1.evidence.1`) adds timeline
-channels with evidence: a channel that names a proof timeline, the evidence profile
-base type and the two entry types on a proof timeline. Every package that depends on
+channels with evidence: a channel that names an evidence timeline, the evidence profile
+base type and the two entry types on an evidence timeline. Every package that depends on
 Coordination is rebuilt on it with the version suffix `.evidence.1`. The previous
 edition's archives are retained unchanged under `retained/pre-evidence-20261119/`.
 `blue-private-mandates` adds the first proof profile and a mandate commitment
@@ -23,7 +23,9 @@ native support is a separate Core qualification.
 ## Runtime editions
 
 The standard source tree, build and release preparation use **Access Events**.
-Contracts and Coordination retain the exact Access Events native identities.
+Contracts retains the exact Access Events native identities. Coordination is the
+`.evidence.1` edition built on them, with new exact identities; the Access Events
+Coordination publication is retained under `retained/pre-evidence-20261119/`.
 Compatible business fixes are rebuilt from current authored sources; see the
 [publication comparison](docs/access-events-default.md).
 

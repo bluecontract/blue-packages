@@ -23,38 +23,27 @@ public final class PrivateMandatesTypesConformance {
     if (value == null) copy.remove(field); else copy.put(field, value);
     return copy;
   }
-  static String admitted(Blue blue, String what, Map<String, Object> value) {
-    try {
-      return blue.createJson(WireData.write(value)).blueId();
-    } catch (Failure failure) {
-      throw new AssertionError("Valid " + what + " was rejected: " + failure.getMessage());
-    }
-  }
-  static void rejected(Blue blue, String what, Map<String, Object> value) {
-    try {
-      blue.createJson(WireData.write(value));
-    } catch (Failure failure) {
-      return;
-    }
-    throw new AssertionError("Invalid value was admitted: " + what);
-  }
-  /** Open entry schemas: a malformed entry is Blue content; the processor, not the schema, skips it. */
-  static void skippedByProcessor(Blue blue, List<String> log, String what, Map<String, Object> value) {
-    try {
-      blue.createJson(WireData.write(value));
-    } catch (Failure failure) {
-      throw new AssertionError("Malformed entry must be admitted by the open schema: " + what + ": "
-          + failure.category() + " " + failure.getMessage());
-    }
-    log.add(what);
-  }
-  /** A {blueId} value is a Language reference wherever it stands; returns the admission outcome and category. */
-  static String referenceOutcome(Blue blue, Map<String, Object> value) {
+  static final List<String> MISMATCHES = new ArrayList<>();
+  /** Admission result of one value: "Admitted", or outcome and category of the Language failure. */
+  static String outcome(Blue blue, Object value) {
     try {
       blue.createJson(WireData.write(value));
       return "Admitted";
     } catch (Failure failure) {
       return failure.outcome().get("outcome") + "/" + failure.category();
+    }
+  }
+  /** Asserts the exact Language behaviour, not merely success or any failure, and records it. */
+  static void expect(Blue blue, Map<String, Object> log, String what, Object value, String expected) {
+    String actual = outcome(blue, value);
+    if (!expected.equals(actual)) MISMATCHES.add(what + ": expected " + expected + ", got " + actual);
+    require(log.put(what, actual) == null, "Duplicate case: " + what);
+  }
+  static String admitted(Blue blue, String what, Object value) {
+    try {
+      return blue.createJson(WireData.write(value)).blueId();
+    } catch (Failure failure) {
+      throw new AssertionError("Valid " + what + " was rejected: " + failure.category() + " " + failure.getMessage());
     }
   }
   static void descends(Blue blue, String what, String type, String ancestor) {
@@ -127,6 +116,11 @@ public final class PrivateMandatesTypesConformance {
       Map<String, Object> rejection = Map.of("type", "Coordination/Rejection Entry",
           "document", document, "operationEntry", operationEntry);
 
+      final String ADMITTED = "Admitted", SCHEMA = "Invalid/SchemaViolation", TYPE = "Invalid/TypeCompatibilityViolation",
+          INCOMPLETE = "Incomplete/ProviderUnavailable";
+      Map<String, Object> unavailable = Map.of("blueId", PRIOR.get("Coordination"));
+      Map<String, Object> typeOnlyMandate = Map.of("type", "Mandates/Operation Mandate");
+
       var ids = new TreeMap<String, Object>();
       ids.put("profile", admitted(blue, "profile", profile));
       ids.put("channel", admitted(blue, "channel", channel));
@@ -136,101 +130,164 @@ public final class PrivateMandatesTypesConformance {
       admitted(blue, "plain timeline channel",
           Map.of("type", "Coordination/Timeline Channel", "actor", actor, "timeline", timeline));
 
+      // 1. What the schemas reject, with the exact failure kind.
+      var schema = new TreeMap<String, Object>();
       for (String field : List.of("evidenceTimeline", "mandateProcessorKey", "evidenceProfile", "timeline", "actor"))
-        rejected(blue, "channel without " + field, with(channel, field, null));
-      rejected(blue, "channel with a short key", with(channel, "mandateProcessorKey", "ef"));
-      // A profile is a typed value of a specialisation, never a name or an unrelated value (decision 31).
-      rejected(blue, "channel with a text profile", with(channel, "evidenceProfile", "latest"));
-      rejected(blue, "channel with an integer profile", with(channel, "evidenceProfile", 7));
-      rejected(blue, "channel with an actor as profile", with(channel, "evidenceProfile", actor));
-      rejected(blue, "channel with a bare base profile",
-          with(channel, "evidenceProfile", Map.of("type", "Coordination/Evidence Profile")));
-      admitted(blue, "profile with an empty provider list", with(profile, "allowedProviders", List.of()));
-      rejected(blue, "profile with only a digest", with(with(profile, "allowedProviders", null), "providerSetDigest", HEX));
-      rejected(blue, "profile with an extra field", with(profile, "providerSetDigest", HEX));
-      rejected(blue, "profile with a short provider key", with(profile, "allowedProviders", List.of("01")));
-      rejected(blue, "profile with a repeated provider key",
-          with(profile, "allowedProviders", List.of("01".repeat(32), "01".repeat(32))));
-      rejected(blue, "authority with a clear mandate text", with(authority, "mandate", "someMandateBlueId"));
-      rejected(blue, "authority with a clear mandate reference",
-          with(authority, "mandate", Map.of("blueId", PRIOR.get("Mandates"))));
-      // Proof Entry and Rejection Entry have open schemas: every malformed entry below is admitted as
-      // Blue content, so it cannot fail the import of a evidence timeline. The processor skips it.
-      var skipped = new ArrayList<String>();
-      skippedByProcessor(blue, skipped, "proof entry with an extra field", with(proof, "note", "x"));
-      skippedByProcessor(blue, skipped, "proof entry without receipt", with(proof, "receipt", null));
-      skippedByProcessor(blue, skipped, "proof entry without document", with(proof, "document", null));
-      skippedByProcessor(blue, skipped, "proof entry without operationEntry", with(proof, "operationEntry", null));
-      skippedByProcessor(blue, skipped, "proof entry with an integer receipt", with(proof, "receipt", 7));
-      skippedByProcessor(blue, skipped, "proof entry with an empty receipt", with(proof, "receipt", ""));
-      skippedByProcessor(blue, skipped, "proof entry with a list receipt", with(proof, "receipt", List.of("AAECAw==")));
-      skippedByProcessor(blue, skipped, "proof entry with a text document", with(proof, "document", "someDocumentId"));
-      skippedByProcessor(blue, skipped, "proof entry with an integer operationEntry", with(proof, "operationEntry", 7));
-      skippedByProcessor(blue, skipped, "proof entry with only an unknown field",
-          Map.of("type", "Coordination/Proof Entry", "note", "x"));
-      skippedByProcessor(blue, skipped, "rejection with an extra field", with(rejection, "reason", "x"));
-      skippedByProcessor(blue, skipped, "rejection without document", with(rejection, "document", null));
-      skippedByProcessor(blue, skipped, "rejection without operationEntry", with(rejection, "operationEntry", null));
-      skippedByProcessor(blue, skipped, "rejection with the earlier text fields",
-          Map.of("type", "Coordination/Rejection Entry", "documentId", "x", "operationEntry", "y"));
-      skippedByProcessor(blue, skipped, "rejection with an object that is not a reference as document",
-          with(rejection, "document", Map.of("id", "x")));
-      // The reference convention itself. A {blueId} value is opened by Language admission wherever it
-      // stands, as for the free document field of an Operation Request. The entry schemas cannot change
-      // that; the outcomes are recorded here so that a change of the runtime is noticed.
-      Map<String, Object> unavailable = Map.of("blueId", PRIOR.get("Coordination"));
-      var references = new TreeMap<String, Object>();
-      references.put("proof entry, document content unavailable", referenceOutcome(blue, with(proof, "document", unavailable)));
-      references.put("proof entry, operationEntry content unavailable",
-          referenceOutcome(blue, with(proof, "operationEntry", unavailable)));
-      references.put("rejection, document content unavailable", referenceOutcome(blue, with(rejection, "document", unavailable)));
-      references.put("operation request, document content unavailable", referenceOutcome(blue,
-          Map.of("type", "Contracts/Operation Request", "channel", "c", "operation", "o", "document", unavailable)));
-      references.put("proof entry, document blueId not a BlueId",
-          referenceOutcome(blue, with(proof, "document", Map.of("blueId", "not-a-blue-id"))));
-      for (String what : List.of("proof entry, document content unavailable", "proof entry, operationEntry content unavailable",
-          "rejection, document content unavailable"))
-        require(references.get(what).equals(references.get("operation request, document content unavailable")),
-            "An entry reference must behave as the document reference of an Operation Request: " + what);
-      require("Incomplete/ProviderUnavailable".equals(references.get("operation request, document content unavailable")),
-          "Recorded limit changed: an unavailable reference target is expected to leave admission incomplete");
-      require(references.get("proof entry, document blueId not a BlueId").toString().startsWith("Invalid/"),
-          "Recorded limit changed: a value that is not a reference is expected to be invalid");
-      // The Language schema has no character-set or ordering predicate. These values are admitted as
-      // data and are decided by the native rules stated in the two specifications.
-      var nativeRules = new ArrayList<String>();
-      for (var left : List.of(
-          Map.entry("channel key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32))),
-          Map.entry("channel profile of the base type with a field", with(channel, "evidenceProfile",
-              Map.of("type", "Coordination/Evidence Profile", "anything", "x"))),
-          Map.entry("commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32))),
-          Map.entry("image id not lower-case hex", with(profile, "programImageId", "AB".repeat(32))),
-          Map.entry("provider list not ascending",
-              with(profile, "allowedProviders", List.of("02".repeat(32), "01".repeat(32)))),
-          Map.entry("receipt not canonical base64", with(proof, "receipt", "not base64 !!")))) {
-        admitted(blue, left.getKey(), left.getValue());
-        nativeRules.add(left.getKey());
-      }
+        expect(blue, schema, "channel without " + field, with(channel, field, null), SCHEMA);
+      expect(blue, schema, "channel with a short key", with(channel, "mandateProcessorKey", "ef"), SCHEMA);
+      expect(blue, schema, "channel with a text profile", with(channel, "evidenceProfile", "latest"), TYPE);
+      expect(blue, schema, "channel with an integer profile", with(channel, "evidenceProfile", 7), TYPE);
+      expect(blue, schema, "channel with a list profile", with(channel, "evidenceProfile", List.of(profile)), SCHEMA);
+      expect(blue, schema, "channel with a bare base profile",
+          with(channel, "evidenceProfile", Map.of("type", "Coordination/Evidence Profile")), SCHEMA);
+      expect(blue, schema, "channel with a type-only specialisation as profile", with(channel, "evidenceProfile",
+          Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile")), SCHEMA);
+      expect(blue, schema, "profile with an empty provider list", with(profile, "allowedProviders", List.of()), ADMITTED);
+      expect(blue, schema, "profile with only a digest",
+          with(with(profile, "allowedProviders", null), "providerSetDigest", HEX), SCHEMA);
+      expect(blue, schema, "profile with an extra valued field", with(profile, "providerSetDigest", HEX), SCHEMA);
+      expect(blue, schema, "profile with a short provider key", with(profile, "allowedProviders", List.of("01")), SCHEMA);
+      expect(blue, schema, "profile with a repeated provider key",
+          with(profile, "allowedProviders", List.of("01".repeat(32), "01".repeat(32))), SCHEMA);
       for (String field : List.of("programImageId", "allowedProviders", "factsRule"))
-        rejected(blue, "profile without " + field, with(profile, field, null));
-      rejected(blue, "profile with another facts rule", with(profile, "factsRule", "CANONICAL"));
-      rejected(blue, "profile with a short image id", with(profile, "programImageId", "ab"));
-      rejected(blue, "authority without commitment", with(authority, "mandateCommitment", null));
-      rejected(blue, "authority without holder", with(authority, "actor", null));
-      rejected(blue, "authority with a short commitment", with(authority, "mandateCommitment", "ab"));
+        expect(blue, schema, "profile without " + field, with(profile, field, null), SCHEMA);
+      expect(blue, schema, "profile with another facts rule", with(profile, "factsRule", "CANONICAL"), SCHEMA);
+      expect(blue, schema, "profile with a short image id", with(profile, "programImageId", "ab"), SCHEMA);
+      expect(blue, schema, "authority without commitment", with(authority, "mandateCommitment", null), SCHEMA);
+      expect(blue, schema, "authority without holder", with(authority, "actor", null), SCHEMA);
+      expect(blue, schema, "authority with a short commitment", with(authority, "mandateCommitment", "ab"), SCHEMA);
+      expect(blue, schema, "authority with an integer commitment", with(authority, "mandateCommitment", 7), TYPE);
+      expect(blue, schema, "authority with a clear mandate text", with(authority, "mandate", "someMandateBlueId"), SCHEMA);
+      expect(blue, schema, "authority with a valued mandate object", with(authority, "mandate", Map.of("a", 1)), SCHEMA);
+      expect(blue, schema, "authority with another valued field", with(authority, "note", "x"), SCHEMA);
+      Map<String, Object> operationTimelineEntry = Map.of("type", "Coordination/Timeline Entry", "actor", actor,
+          "timeline", timeline, "timestamp", 200, "message", Map.of("type", "Contracts/Operation Request",
+              "channel", "ownerChannel", "operation", "approve"), "onBehalfOf", authority);
+      expect(blue, schema, "timeline entry with a commitment authority", operationTimelineEntry, ADMITTED);
+      // A claim the schema rejects makes the whole entry inadmissible: existing Coordination behaviour.
+      expect(blue, schema, "timeline entry whose commitment authority has a valued mandate",
+          with(operationTimelineEntry, "onBehalfOf", with(authority, "mandate", "someMandateBlueId")), SCHEMA);
+
+      // 2. The profile field is not typed by the schema: typing is structural. These values are admitted,
+      // and only the native rule (exact type is a supported specialisation of Evidence Profile) excludes them.
+      var profileNative = new TreeMap<String, Object>();
+      expect(blue, profileNative, "untyped object with the profile fields", with(channel, "evidenceProfile",
+          with(profile, "type", null)), ADMITTED);
+      expect(blue, profileNative, "untyped object with arbitrary content",
+          with(channel, "evidenceProfile", Map.of("anything", "x")), ADMITTED);
+      expect(blue, profileNative, "base Evidence Profile with a field", with(channel, "evidenceProfile",
+          Map.of("type", "Coordination/Evidence Profile", "anything", "x")), ADMITTED);
+      expect(blue, profileNative, "a Signed Timeline", with(channel, "evidenceProfile", timeline), ADMITTED);
+      expect(blue, profileNative, "a Timeline Provider", with(channel, "evidenceProfile", provider), ADMITTED);
+      expect(blue, profileNative, "a plain Timeline Channel", with(channel, "evidenceProfile",
+          Map.of("type", "Coordination/Timeline Channel", "actor", actor, "timeline", timeline)), ADMITTED);
+      expect(blue, profileNative, "a commitment authority", with(channel, "evidenceProfile", authority), ADMITTED);
+      // Not evidence of typing: some unrelated typed values happen to be refused. Recorded as observed.
+      expect(blue, profileNative, "a Principal Actor (refused, unlike the values above)",
+          with(channel, "evidenceProfile", actor), TYPE);
+
+      // 3. The commitment authority schema limits valued fields but does not close the field set.
+      // These claims are admitted; the processor rule (fields exactly actor and mandateCommitment) rejects them.
+      var authorityNative = new TreeMap<String, Object>();
+      expect(blue, authorityNative, "mandate carrying only a type", with(authority, "mandate", typeOnlyMandate), ADMITTED);
+      expect(blue, authorityNative, "mandate as a reference that resolves",
+          with(authority, "mandate", Map.of("blueId", mandates.exportId("Mandate"))), ADMITTED);
+      expect(blue, authorityNative, "another field carrying only a type",
+          with(authority, "note", Map.of("type", "Text")), ADMITTED);
+      expect(blue, authorityNative, "timeline entry whose claim has a type-only mandate",
+          with(operationTimelineEntry, "onBehalfOf", with(authority, "mandate", typeOnlyMandate)), ADMITTED);
+      // Not a schema rejection: an unavailable reference target leaves admission incomplete.
+      expect(blue, authorityNative, "mandate as a reference whose content is unavailable",
+          with(authority, "mandate", Map.of("blueId", PRIOR.get("Mandates"))), INCOMPLETE);
+
+      // 4. Proof Entry and Rejection Entry have open schemas: every malformed entry below is admitted as
+      // Blue content. The processor skips it.
+      var skipped = new TreeMap<String, Object>();
+      expect(blue, skipped, "proof entry with an extra field", with(proof, "note", "x"), ADMITTED);
+      expect(blue, skipped, "proof entry without receipt", with(proof, "receipt", null), ADMITTED);
+      expect(blue, skipped, "proof entry without document", with(proof, "document", null), ADMITTED);
+      expect(blue, skipped, "proof entry without operationEntry", with(proof, "operationEntry", null), ADMITTED);
+      expect(blue, skipped, "proof entry with an integer receipt", with(proof, "receipt", 7), ADMITTED);
+      expect(blue, skipped, "proof entry with an empty receipt", with(proof, "receipt", ""), ADMITTED);
+      expect(blue, skipped, "proof entry with a list receipt", with(proof, "receipt", List.of("AAECAw==")), ADMITTED);
+      expect(blue, skipped, "proof entry with a receipt that is not canonical base64",
+          with(proof, "receipt", "not base64 !!"), ADMITTED);
+      expect(blue, skipped, "proof entry with a text document", with(proof, "document", "someDocumentId"), ADMITTED);
+      expect(blue, skipped, "proof entry with an integer operationEntry", with(proof, "operationEntry", 7), ADMITTED);
+      expect(blue, skipped, "proof entry with only its type", Map.of("type", "Coordination/Proof Entry"), ADMITTED);
+      expect(blue, skipped, "proof entry with only an unknown field",
+          Map.of("type", "Coordination/Proof Entry", "note", "x"), ADMITTED);
+      expect(blue, skipped, "rejection with an extra field", with(rejection, "reason", "x"), ADMITTED);
+      expect(blue, skipped, "rejection without document", with(rejection, "document", null), ADMITTED);
+      expect(blue, skipped, "rejection without operationEntry", with(rejection, "operationEntry", null), ADMITTED);
+      expect(blue, skipped, "rejection with only its type", Map.of("type", "Coordination/Rejection Entry"), ADMITTED);
+      expect(blue, skipped, "rejection with the earlier text fields",
+          Map.of("type", "Coordination/Rejection Entry", "documentId", "x", "operationEntry", "y"), ADMITTED);
+      expect(blue, skipped, "rejection with an object that names nothing as document",
+          with(rejection, "document", Map.of("id", "x")), ADMITTED);
+
+      // 5. Naming is by BlueId, never by wire form: a reference and the same content written in full
+      // give the same entry BlueId, so no rule can ask whether a field "is a reference".
+      var records = map(WireData.json(Files.readString(root.resolve("blue-coordination/dist/package-records.json"))));
+      String target = coordination.exportId("Order Key");
+      Object inline = WireData.json(map(records.get(target)).get("text").toString());
+      String byReference = admitted(blue, "rejection naming by reference", with(rejection, "document", Map.of("blueId", target)));
+      String byContent = admitted(blue, "rejection naming by content", with(rejection, "document", inline));
+      require(byReference.equals(byContent), "A reference and its inlined content must give the same BlueId");
+      require(!byReference.equals(ids.get("rejectionEntry")), "Another named document must give another entry BlueId");
+
+      // 6. The known limit. A {blueId} value is opened by Language admission wherever it stands in an entry,
+      // as for the free document field of an Operation Request. The entry schemas cannot change that.
+      var references = new TreeMap<String, Object>();
+      expect(blue, references, "operation request, document content unavailable", Map.of("type", "Contracts/Operation Request",
+          "channel", "c", "operation", "o", "document", unavailable), INCOMPLETE);
+      expect(blue, references, "proof entry, document content unavailable", with(proof, "document", unavailable), INCOMPLETE);
+      expect(blue, references, "proof entry, operationEntry content unavailable",
+          with(proof, "operationEntry", unavailable), INCOMPLETE);
+      expect(blue, references, "proof entry, receipt is an unavailable reference", with(proof, "receipt", unavailable), INCOMPLETE);
+      expect(blue, references, "proof entry, unknown extra field holds an unavailable reference",
+          with(proof, "note", unavailable), INCOMPLETE);
+      expect(blue, references, "proof entry, unavailable reference nested in an extra field",
+          with(proof, "note", Map.of("inner", List.of(unavailable))), INCOMPLETE);
+      expect(blue, references, "rejection, document content unavailable", with(rejection, "document", unavailable), INCOMPLETE);
+      expect(blue, references, "rejection, operationEntry content unavailable",
+          with(rejection, "operationEntry", unavailable), INCOMPLETE);
+      expect(blue, references, "evidence timeline entry whose proof names unavailable content",
+          Map.of("type", "Coordination/Timeline Entry", "actor", actor, "timeline", proofs, "timestamp", 201,
+              "message", with(proof, "document", unavailable)), INCOMPLETE);
+      expect(blue, references, "proof entry, document blueId is not a BlueId",
+          with(proof, "document", Map.of("blueId", "not-a-blue-id")), "Invalid/InvalidBlueId");
+      expect(blue, references, "proof entry, document reference with other content",
+          with(proof, "document", Map.of("blueId", target, "extra", 1)), "Invalid/InvalidReferenceShape");
+
+      // 7. Admitted as data; decided by the native rules stated in the two specifications.
+      var nativeRules = new TreeMap<String, Object>();
+      expect(blue, nativeRules, "channel key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "image id not lower-case hex", with(profile, "programImageId", "AB".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "provider list not ascending",
+          with(profile, "allowedProviders", List.of("02".repeat(32), "01".repeat(32))), ADMITTED);
+      expect(blue, nativeRules, "profile with a further field carrying only a type",
+          with(profile, "note", Map.of("type", "Text")), ADMITTED);
+
+      require(MISMATCHES.isEmpty(), "Language behaviour differs from the recorded expectation:\n" + String.join("\n", MISMATCHES));
 
       var result = new TreeMap<String, Object>();
       result.put("coordinationPackage", coordination.blueId());
       result.put("mandatesPackage", mandates.blueId());
+      result.put("privateMandatesPackage", privateMandates.blueId());
       var typeIds = new TreeMap<String, Object>();
       for (String name : List.of("Timeline Channel", "Timeline Channel with Evidence", "Evidence Profile", "Proof Entry", "Rejection Entry"))
         typeIds.put("Coordination/" + name, coordination.exportId(name));
       for (String name : privateMandates.exports().keySet()) typeIds.put("PrivateMandates/" + name, privateMandates.exportId(name));
       result.put("typeBlueIds", typeIds);
-      result.put("admittedBySchemaSkippedByProcessor", skipped);
-      result.put("referenceAdmissionOutcomes", references);
-      result.put("privateMandatesPackage", privateMandates.blueId());
       result.put("sampleBlueIds", ids);
+      result.put("schemaDecisions", schema);
+      result.put("profileAdmittedBySchemaExcludedByNativeRule", profileNative);
+      result.put("authorityAdmittedBySchemaRejectedByProcessorRule", authorityNative);
+      result.put("entriesAdmittedBySchemaSkippedByProcessor", skipped);
+      result.put("referenceAndInlinedContentSameBlueId", byReference.equals(byContent));
+      result.put("referenceAdmissionOutcomes", references);
       result.put("leftToNativeRules", nativeRules);
       result.put("scope", "Language schema, inheritance and retained prior identities; not native execution qualification");
       System.out.println(WireData.write(result));

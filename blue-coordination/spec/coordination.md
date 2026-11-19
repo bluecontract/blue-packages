@@ -1034,27 +1034,37 @@ Rules:
    fields of an existing channel; a channel added later with all three fields is
    accepted.
 4. Same-provider rule: T MUST be at the provider of the channel's `timeline`.
-5. There is one T per participant channel, whatever the number of representatives.
-   A representative writes on its own timeline; the operation is performed on the
-   participant's channel, and that channel names T.
+5. A channel names one T, whatever the number of representatives. A representative
+   writes on its own timeline; the operation is performed on the participant's
+   channel, and that channel names T.
 6. Each participant declares the three fields of its own channel. The other
    participants accept them by accepting the document.
 7. An evidence timeline serves exactly one document. It MUST NOT be named by a
-   channel of another document. A reader of another document could not resolve the
-   references of its entries (section 14.5), and would learn from it that a mandate
+   channel of another document. A reader of another document could not obtain the
+   content its entries name (section 14.5), and would learn from it that a mandate
    was used in this document.
+8. Two channels of the same document MAY name the same T. Each operation is decided
+   under the fields (`mandateProcessorKey`, `evidenceProfile`) of the channel it is
+   performed on. An entry on T counts for a channel only if T's provider attributes
+   it to that channel's `actor` (section 14.6). The first considered entry decides
+   per operation, so the entries for one channel's operations are skipped for the
+   other channel's operations.
 
 A participant with no representatives may use a plain `Timeline Channel`.
 
 **Values the type system cannot exclude.** The Language schema fixes the length of
-`mandateProcessorKey` and the base type of `evidenceProfile`. It cannot express a
-character set, and it admits a value whose exact type is the base `Evidence Profile`.
-A processor therefore applies these rules itself, from the document state alone:
+`mandateProcessorKey`. It cannot express a character set. It does not type the
+profile: Language typing of the `evidenceProfile` field is structural, so the schema
+admits a value with no type and values of unrelated types, such as an untyped
+object, a `Signed Timeline` or a channel, as well as a value whose exact type is
+the base `Evidence Profile`. The schema is no protection here. The native rule
+below is, and a processor MUST implement it, from the document state alone:
 
 1. `mandateProcessorKey` is well formed only as 64 characters `0-9a-f`.
-2. `evidenceProfile` is well formed only if its exact type is a specialisation of
-   `Evidence Profile`, not the base type, and its content is well formed under that
-   specialisation's own rules.
+2. `evidenceProfile` is well formed only if its exact type is a supported
+   specialisation of `Evidence Profile`, not the base type, no type or any other
+   type, and its content is well formed under that specialisation's own rules.
+   Anything else counts as a missing field.
 3. A host that does not support the specialisation's protocol refuses the document
    (section 14.1). A host that supports it and finds the value malformed under
    rules 1–2 does not refuse and does not wait: for section 14.6 the channel lacks
@@ -1078,38 +1088,28 @@ Timeline Access document, handled like those of the document's other timelines.
 ### 14.5 Entries on the evidence timeline
 
 Both kinds are the `message` of an ordinary `Timeline Entry` on T. Both name the
-document and the operation in the same way, by two references by content BlueId:
+document and the operation in the same way, by content BlueId:
 
 | Field | Content |
 |---|---|
-| `document` | Reference `{blueId: …}` to the document by its initial BlueId, the same for every participant. This is the convention an `Operation Request` uses for its `document` |
-| `operationEntry` | Reference `{blueId: …}` to the operation's `Timeline Entry` E (*provisional*: the field name) |
+| `document` | The document, named by its initial BlueId, the same for every participant. It is normally written as the reference `{blueId: …}`, the convention an `Operation Request` uses for its `document` |
+| `operationEntry` | The operation's `Timeline Entry` E, named by its BlueId and normally written as the reference `{blueId: …}` (*provisional*: the field name) |
+
+**Naming is by BlueId, never by wire form.** An entry *names this document* when the
+BlueId of its `document` field node equals the document's initial BlueId. It *names
+E* when the BlueId of its `operationEntry` field node equals the BlueId of E. A
+reference and the same content written in full have the same BlueId and are the same
+Blue content, so an entry cannot be told apart by which of the two was written, and
+no rule of this section depends on it. A field that holds anything else, a text for
+example, has another BlueId and names neither.
 
 **Open schemas.** The Blue definitions of `Proof Entry` and `Rejection Entry` name
 their fields and constrain nothing: no field is typed or required, and the field set
-is not closed. A schema of these two types therefore never makes a message
-inadmissible as Blue content, whatever its fields, so a malformed entry does not
-prevent T from being imported or read. Whether such a message is a well-formed entry
-is decided by the processor alone, under the rules of this section. The channel, the
-profile and the authority claims of requiring protocols keep their schema
-constraints.
-
-The two references are Blue references and are resolved as such. A `{blueId: …}`
-value is a reference wherever it stands, declared or not: Language opens it when the
-entry is admitted. The two fields are declared as an `Operation Request` declares
-`document`: free fields with no type. The writer of an entry holds the document and
-the operation entry, since it made the proof or the rejection for them. The readers
-of T are the participants of the one document T serves (section 14.3 rule 7): they
-hold the document and receive the operation entry as an input of the document. A
-reference in a well-formed entry therefore resolves for every reader, possibly after
-a wait for the operation entry.
-
-Known limit. A value that is not a valid reference is not Blue content, and an
-entry whose reference can never be resolved by the readers blocks the reading of T
-for them. The open schemas do not remove this; it lasts until timeline import can
-skip an entry it cannot read (section 14.8). Writing such an entry is the fault of
-the channel's party, on whose timeline T it stands, and it stops only the operations
-decided from that T.
+is not closed. The schema of these two types therefore never makes a message
+inadmissible as Blue content, whatever its fields. Whether such a message is a
+well-formed entry is decided by the processor alone, under the rules of this
+section. The channel, the profile specialisations and the authority claims of
+requiring protocols keep their schema constraints.
 
 **Proof Entry.** The whole proof is the content of the entry, so an authenticated
 entry never lacks its proof.
@@ -1120,41 +1120,58 @@ entry never lacks its proof.
 | `document` | As above |
 | `operationEntry` | As above |
 
-A well-formed Proof Entry has exactly these three fields: `receipt` is present, is
-a non-empty text in that canonical base64 form and its decoded bytes are the
-profile's one admitted encoding; `document` and `operationEntry` are each present
-and each a reference by content BlueId with no other content; the message has no
-other field.
+A well-formed Proof Entry has exactly these three fields, each present: `receipt`
+is a non-empty text in that canonical base64 form and its decoded bytes are the
+profile's one admitted encoding; the message has no other field.
 
 In a Proof Entry `document` and `operationEntry` are a routing hint only. Whether a
 proof is accepted for E is decided only by the proof's public output, as the
 declared profile defines; the hint is never evidence. A processor MAY skip, without
-verifying the proof, a Proof Entry whose `document` or `operationEntry` does not
-name this document and E. A Proof Entry whose hint disagrees with its own public
-output is skipped. A processor that verifies every proof and one that uses the hint
-therefore skip the same entries.
+verifying the proof, a Proof Entry that does not name this document and E. A Proof
+Entry whose hint disagrees with its own public output is skipped. A processor that
+verifies every proof and one that uses the hint therefore skip the same entries.
 
 **Rejection Entry.** "E is not to be processed in this document", with no proof.
 
 A well-formed Rejection Entry has exactly the two fields `document` and
-`operationEntry`: each is present and is a reference by content BlueId with no
-other content, and the message has no other field. A rejection needs no signature
+`operationEntry`, each present, and no other field. A rejection needs no signature
 of its writer. It counts because it is on the participant's timeline.
 
 **Well-formedness is checked by the processor.** For every message on T that
 carries one of the two types, the processor itself checks the field set and the
-form of each field stated above. The check uses the entry alone (and, for the
-receipt encoding, the declared profile), so every processor decides it alike. An
-entry that is not well formed — another field, a missing field, a `document` or
-`operationEntry` that is not a reference, a `receipt` that is not a text, is empty
-or is not canonical base64, or decoded bytes that are not the profile's one
-admitted encoding — conforms to neither kind and is skipped (section 14.6). A
-skipped entry never causes a wait or a halt of its own and never fails the reading
-of T. No size limit is imposed on an entry by these rules. The byte-exact grammar is
-not final in this edition (section 14.8).
+form of `receipt` stated above, and whether the entry names this document and E.
+The check uses the entry alone (and, for the receipt encoding, the declared
+profile), so every processor decides it alike. An entry that is not well formed —
+another field, a missing field, a `receipt` that is not a text, is empty or is not
+canonical base64, or decoded bytes that are not the profile's one admitted encoding
+— conforms to neither kind and is skipped (section 14.6). A skipped entry never
+causes a wait or a halt of its own. No size limit is imposed on an entry by these
+rules. The byte-exact grammar is not final in this edition (section 14.8).
 
-A message on T of any other type is not covered by this guarantee: whether it can
-be admitted as Blue content is decided by its own type.
+**Who holds the named content.** The writer of an entry holds the document and the
+operation entry, since it made the proof or the rejection for them. The readers of
+T are the participants of the one document T serves (section 14.3 rule 7): they
+hold the document and receive the operation entry as an input of the document. In
+an entry that names this document and E, both references therefore resolve for
+every reader, possibly after a wait for the operation entry.
+
+**Known limit.** The open schemas do not cover what Language itself requires of any
+Blue content, and the skip rule applies only to an entry that was admitted:
+
+- A `{blueId: …}` value is a reference wherever it stands in an entry: in
+  `document`, in `operationEntry`, in `receipt`, or in any other field at any depth.
+  Language opens every reference when the entry is admitted. If the content of one
+  of them cannot be obtained, admission of the entry is incomplete for that reader
+  and stays so until the content is available.
+- A reference that carries anything beside `blueId`, or whose `blueId` is not a
+  BlueId, is invalid: the entry is not Blue content.
+
+An entry with a reference that the readers can never resolve, or with an invalid
+reference, therefore blocks the reading of T for them. This lasts until timeline
+import can skip an entry it cannot read (section 14.8). Writing such an entry is the
+fault of the channel's party, on whose timeline T it stands, and it stops only the
+operations decided from that T. A message on T of any other type is likewise
+outside the open schemas: whether it is Blue content is decided by its own type.
 
 ### 14.6 Deciding an evidence-decided operation
 
@@ -1173,10 +1190,10 @@ deterministic.
 if both hold:
 
 1. T's provider attributes the entry to the channel's `actor`;
-2. the entry is a well-formed Proof Entry that the declared profile classifies as a
-   matching proof for E and whose `document` and `operationEntry` agree with its own
-   public output, or a well-formed Rejection Entry whose `document` names this
-   document's initial BlueId and whose `operationEntry` names E.
+2. the entry is a well-formed Proof Entry that names this document and E, that the
+   declared profile classifies as a matching proof for E and whose `document` and
+   `operationEntry` agree with its own public output, or a well-formed Rejection
+   Entry that names this document and E (section 14.5).
 
 Everything else on T is skipped. A skipped entry is the same as no entry.
 
@@ -1186,12 +1203,12 @@ Everything else on T is skipped. A skipped entry is the same as no entry.
 | An entry of one of the two types that is not well formed (section 14.5) | Skipped |
 | An entry that carries neither type | Skipped |
 | A well-formed Proof Entry whose verification completes with "invalid" | Skipped |
-| A well-formed Proof Entry whose `document` or `operationEntry` does not name this document and E | Skipped; the proof need not be verified |
+| A well-formed Proof Entry that does not name this document and E | Skipped; the proof need not be verified |
 | A proof that verifies but that the profile classifies as mismatching | Skipped as mismatching; never a denial |
 | A proof that verifies but whose public output disagrees with the entry's own `document` or `operationEntry` | Skipped |
-| A rejection for another document or for another operation | Skipped |
+| A well-formed Rejection Entry that does not name this document and E | Skipped |
 | A matching proof for E | Considered; carries its verdict |
-| A rejection naming this document and E | Considered; E is rejected in this document only |
+| A well-formed Rejection Entry that names this document and E | Considered; E is rejected in this document only |
 
 **Which entry decides.** The first considered entry for E in T's authenticated
 chain, counted from the beginning of the chain, also when it precedes E. Later
@@ -1232,12 +1249,11 @@ publications remain selectable and their documents keep their runtime.
   grammar including the text encoding of the proof.
 - Where the fixed-for-life rule is finally placed (section 14.3 rule 3).
 - An `evidenceTimeline` that does not exist at the provider: reject or wait.
-- Whether two channels of one document may share one T.
 - Whether the reason for a rejection is visible to the document's contracts.
 - How a participant supplies T, and how the others consent to a channel added later.
 - A message on T whose own type makes it inadmissible as Blue content still fails
   the reading of T at the provider or the host; the open schemas of section 14.5
   remove this only for the two entry types.
-- An entry on T whose `document` or `operationEntry` is not a valid reference, or
-  can never be resolved by the readers, blocks the reading of T (section 14.5).
-  This lasts until timeline import can skip an entry it cannot read.
+- An entry on T that holds, in any field, a reference the readers can never resolve
+  or an invalid reference blocks the reading of T (section 14.5). This lasts until
+  timeline import can skip an entry it cannot read.

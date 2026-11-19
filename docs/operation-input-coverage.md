@@ -14,8 +14,8 @@ Baseline: source `e1114704825b29e4ca584f6000b6a9a8ae345b51`, Core `150f45b4cfef3
 | `blue-language` | 1.0.0 → 1.0.0 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
 | `blue-bex` | 1.0.0-final-gas.1 → 1.0.0-final-gas.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
 | `blue-contracts` | 1.0.0-final-gas.1 → 1.0.0-final-gas.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
-| `blue-coordination` | 0.2.0-access-events.1 → 0.2.0-access-events.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
-| `blue-time` | 0.2.0-gas10m.1.finalgas.1 → 0.2.0-gas10m.1.finalgas.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
+| `blue-coordination` | 0.2.0-access-events.1 → 0.2.0-access-events.1.evidence.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
+| `blue-time` | 0.2.0-gas10m.1.finalgas.1 → 0.2.0-gas10m.1.finalgas.1.evidence.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
 | `blue-dispatch` | 0.1.0-preview.1 → 0.1.0-preview.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
 | `blue-events` | 0.7.0-preview.1.finalgas.1 → 0.7.0-preview.1.finalgas.1 | A10 protocol/type definitions: `blue-package.yaml`, exported definitions; no installed business operation missing an input | EXCEPTION |
 | `blue-parties` | 0.8.0-preview.1 → 0.8.0-preview.1 | A10 shared/inherited types: `types/`; concrete public operations belong to implementing clauses | INHERITED |
