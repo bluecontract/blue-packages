@@ -59,13 +59,49 @@ class KnownConfigurablePathsTests(TestCase):
         self.assertNotIn('configurablePathDefaults', evidence(SUBJECT, values))
 
     def test_let_alias_shadow_does_not_claim_a_foreign_lookup_as_own(self):
-        body = [
+        for replacement in ({'$document': '/anotherClause'}, 'literal', [], None):
+            body = [
+                let('candidate', {'$document': {'$concat': ['/clauseRuntime/work/candidate/', CLAUSE_KEY]}}),
+                let('candidate', replacement),
+                let('slot', lookup('candidate', 'target', {'$concat': ['/other_', CLAUSE_KEY]})),
+            ]
+            values = {
+                SUBJECT: {'hookDefinition': {'type': {'blueId': PLANNER}}},
+                PLANNER: {'functions': {'plan': {'do': body}}},
+            }
+            with self.subTest(replacement=replacement):
+                self.assertNotIn('configurablePathDefaults', evidence(SUBJECT, values))
+
+    def test_uncalled_helper_does_not_remove_a_host_path(self):
+        helper = [
             let('candidate', {'$document': {'$concat': ['/clauseRuntime/work/candidate/', CLAUSE_KEY]}}),
-            let('candidate', {'$document': '/anotherClause'}),
-            let('slot', lookup('candidate', 'target', {'$concat': ['/other_', CLAUSE_KEY]})),
+            let('slot', lookup('candidate', 'target', '/status')),
+        ]
+        native_read = {'$document': '/status'}
+        values = {
+            SUBJECT: {'hookDefinition': {'type': {'blueId': PLANNER}}},
+            PLANNER: {'functions': {
+                'plan': {'do': [{'$return': native_read}]},
+                'other': {'do': helper},
+            }},
+        }
+        result = evidence(SUBJECT, values)
+        self.assertNotIn('configurablePathDefaults', result)
+        self.assertIn('/status', result['documentPaths'])
+
+    def test_direct_plan_call_uses_the_inherited_helper(self):
+        helper = [
+            let('candidate', {'$document': {'$concat': ['/clauseRuntime/work/candidate/', CLAUSE_KEY]}}),
+            let('slot', lookup('candidate', 'target', '/status')),
         ]
         values = {
             SUBJECT: {'hookDefinition': {'type': {'blueId': PLANNER}}},
-            PLANNER: {'functions': {'plan': {'do': body}}},
+            PLANNER: {'type': {'blueId': PARENT}, 'functions': {'plan': {'do': [
+                {'$return': {'$call': {'function': 'selectPath', 'args': {}}}},
+            ]}}},
+            PARENT: {'functions': {'selectPath': {'do': helper}}},
         }
-        self.assertNotIn('configurablePathDefaults', evidence(SUBJECT, values))
+        self.assertEqual([
+            {'bindingPointer': '/bindings/target', 'defaultPath': '/status',
+             'definitionBlueId': PARENT, 'function': 'selectPath'},
+        ], evidence(SUBJECT, values)['configurablePathDefaults'])
