@@ -413,6 +413,39 @@ class CardTests(unittest.TestCase):
         self.assertEqual(expected, payload)
         self.assertEqual(request['context'], json.loads(payload))
 
+    def test_large_prepared_request_is_accepted_locally_and_in_ci(self):
+        definitions = deepcopy(DEFINITIONS)
+        nested = {'value': 'test'}
+        for _ in range(8):
+            nested = {'node': nested}
+        definitions[B]['functions'] = {'large': {'body': [nested] * 2000}}
+
+        def run(command, **kwargs):
+            Path(command[-2]).write_bytes(wire(response(B)))
+            return subprocess.CompletedProcess(command, 0)
+
+        version = request(B)['generator']['codexVersion']
+        with patch.object(cards, 'inventory', return_value=(self.subjects, definitions)), \
+             patch.object(cards.subprocess, 'check_output', return_value='codex-cli ' + version), \
+             patch.object(cards.subprocess, 'run', side_effect=run):
+            cards.generate(self.root, self.output, 1, refresh=[B])
+
+        request_path = self.output / 'requests' / (B + '.json')
+        self.assertGreater(len(wire(cards.read_request(request_path))), cards.MAX_REQUEST_BYTES)
+        self.assertEqual(response(B), cards.read_json(self.output / 'cards' / (B + '.json')))
+        with patch.object(ci, 'inventory', return_value=(self.subjects, definitions)):
+            result = ci.collect(self.root, self.output, self.output / 'responses')
+        self.assertEqual({'accepted': [B], 'failed': []}, result)
+        self.assertEqual(response(B), cards.read_json(self.destination / (B + '.json')))
+
+    def test_preparation_rejects_oversize_request_before_running_model(self):
+        with patch.object(cards, 'MAX_REQUEST_BYTES', 1), \
+             patch.object(cards.subprocess, 'check_output') as model:
+            with self.assertRaisesRegex(ValueError, 'Semantic request exceeds its size limit'):
+                cards.generate(self.root, self.output, 1)
+        model.assert_not_called()
+        self.assertEqual([], list((self.output / 'requests').iterdir()))
+
     def test_local_card_not_uploaded_is_reused_even_after_package_version_changes(self):
         card = self.card()
         self.subjects[B]['package']['version'] = '2.0'

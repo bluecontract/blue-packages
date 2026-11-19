@@ -12,7 +12,7 @@ from urllib.parse import urlencode, quote
 from jsonschema import ValidationError
 
 from release import local, require, wire
-from semantic_cards import accept, cards_in, inventory, read_json, save_card, validate_card
+from semantic_cards import accept, cards_in, inventory, read_json, read_request, save_card, validate_card
 
 
 def gh(*args):
@@ -66,7 +66,7 @@ def collect(root, prepared, responses):
             failed.append(blue_id)
             continue
         try:
-            request = read_json(prepared / 'requests' / (blue_id + '.json'), 1_000_000)
+            request = read_request(prepared / 'requests' / (blue_id + '.json'))
             # Recheck source evidence and identity before saving to the candidate.
             with tempfile.TemporaryDirectory() as tmp:
                 card = accept(request, read_json(response), Path(tmp), definitions)
