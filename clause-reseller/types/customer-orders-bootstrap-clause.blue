@@ -7,6 +7,10 @@ actionDefinition:
   type:
     type: Contracts/Compute Definition
     functions:
+      validateProvisionCandidate:
+        blueId: KUFx3wtKc823rXQvCi5wGYtfWzRYo5sUxuWcgBDJQvB
+      checkProvisionContext:
+        blueId: 4US1s1HVMP94t97PrhmLi1YwPUQXSUPtnwM14eUCS1GC
       admissionConsentRegistration:
         blueId: FjMXVXvRVXQ3aD1zZBCyiZmFAF7PoLpfSGz1w1umQzB4
       admissionConsentNames:
@@ -711,7 +715,7 @@ actionDefinition:
       checkPreparation:
         blueId: DaQmWD2oXGcwtiUpMbrj33dT6UGkF1gcKzDDJBoegLuk
       checkProvision:
-        blueId: G7o89QucqwA496TjMWSfdDg4Qj8HWwW3jDX6gWLum6sq
+        blueId: 3gcZU2Ae56TvBKjiudnoGciXoD2SvwHoAMvUapuPpAge
       checkedDomainNextActions:
         blueId: ARzZgck3qEStHv5377YNq39fLf18XWYHqg9Lfy94iBeR
       checkedDomainPrepare:
@@ -1013,7 +1017,7 @@ actionDefinition:
       sharedProvide:
         blueId: FZFj2x3kpHy8TBoRmdVuZtNU4P8pcvqd4LyWPzFTzaav
       sharedRefresh:
-        blueId: AynC5EBRaeU35R5bVn12setevqkqGx8pZAe3K1bzwmye
+        blueId: DyBYKUbg6JqEyBcgoS9JCREHFusPqEc9kYMVTZrUAx7e
       slotWitness:
         blueId: 3U4hCAhHJxSnEtMbb3dxtDpqojPFKKffPz8xjbXo479V
       specializationSlots:
@@ -1036,7 +1040,9 @@ actionDefinition:
         blueId: Fqc3hnFEpfvCSJe1EZwZgR8EqPXuAFqVtZNHXcdDL4dq
       roundBps:
         blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
-      # Exact quote-based helper owned by this separate bootstrap profile.
+      # Shared exact quote-based helper; trusted parent context and roundBps remain local.
+      prepareCommissionTerms:
+        blueId: 7bKnkvhNkYnxFKZSf6sZipjDqVMsYvo81aPcekEeh2y8
       prepareBooking:
         args:
           input: {}
@@ -1185,6 +1191,42 @@ actionDefinition:
                       $var: input
                     key: groups
                 message: BOOKING_CLAUSE_REQUIRED
+        - $let:
+            name: commissionTerms
+            expr:
+              $call:
+                function: prepareCommissionTerms
+                args:
+                  amountMinor:
+                    $pointerGet:
+                      object:
+                        $var: fields
+                      path: /amountMinor
+        - $if:
+            cond:
+              $gt:
+              - $size:
+                  $var: commissionTerms
+              - 0
+            then:
+            - $set:
+                name: fields
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: fields
+                    path: /customerCommissionTerms
+                    val:
+                      $var: commissionTerms
+            else:
+            - $set:
+                name: fields
+                expr:
+                  $pointerSet:
+                    object:
+                      $var: fields
+                    path: /customerCommissionTerms
+                    op: remove
         - $return:
             $merge:
             - $var: input
@@ -1561,6 +1603,7 @@ parameters:
   allowedFields:
   - orderDescription
   - amountMinor
+  - customerCommissionTerms
   - customerAccountId
   - quote
   - quoteBlueId
@@ -1599,7 +1642,7 @@ hookDefinition:
       rootSourceReaderScope: 9UBgJm6Nrw3iMKAu9CpfS9mkZwqN6jLAwdDGusdaGdGa
       rootSourceReadersReady: 3r1imQW6LZVbsV3cbe9FMzc379ad7KtWX2ja7RSP5xrR
       rosterCovers: 2VRjCVXah8NQpo69uGhaMJZobwh36J77t6rz4edzv1ii
-      sharedRefresh: AynC5EBRaeU35R5bVn12setevqkqGx8pZAe3K1bzwmye
+      sharedRefresh: DyBYKUbg6JqEyBcgoS9JCREHFusPqEc9kYMVTZrUAx7e
       sourceDeclarationMatches: 6UieaF5Xk9n84qdN95v8XE2ZsRoQhwcDA1KVxAPJz5Zf
       transports: ERUpqV1ukEE2eZWaDJP6Dxne1Z12WTkrXgDiKDGRgDjV
   functions:

@@ -12,6 +12,40 @@ actionDefinition:
     functions:
       roundBps:
         blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB
+      executionTermsFromContext:
+        args:
+          context: {}
+        do:
+        - $if:
+            cond:
+              $not:
+                $exists:
+                  $pointerGet:
+                    object:
+                      $var: context
+                    path: /fundingModel
+            then:
+            - $return: {executionPolicy: BLUE_ACCOUNT_PAYOUT_STOP_V1}
+        - $failIf:
+            cond:
+              $not:
+                $includes:
+                  list:
+                  - SCT
+                  - LEGACY_ACCOUNT_DEBIT
+                  val:
+                    $pointerGet:
+                      object:
+                        $var: context
+                      path: /fundingModel
+            message: PAYOUT_FUNDING_MODEL_UNSUPPORTED
+        - $return:
+            executionPolicy: BLUE_ACCOUNT_PAYOUT_STOP_V1
+            fundingModel:
+              $pointerGet:
+                object:
+                  $var: context
+                path: /fundingModel
       resolvePayoutTerms:
         args:
           grossMinor:
@@ -433,6 +467,168 @@ actionDefinition:
                     key: type
             message: PAYOUT_PROFILE_REQUIRED
         - $return: true
+      checkStoppedPayout:
+        args:
+          input: {}
+        do:
+        - $let:
+            name: context
+            expr: {$call: {function: checkProvisionContext, args: {input: {$var: input}}}}
+        - $let: {name: item, expr: {$var: {name: context, path: /item}}}
+        - $let: {name: key, expr: {$var: {name: context, path: /key}}}
+        - $let: {name: candidate, expr: {$var: {name: input, path: /document}}}
+        - $let:
+            name: origin
+            expr:
+              $call:
+                function: validateProvisionCandidate
+                args: {item: {$var: item}, candidate: {$var: candidate}}
+        - $let:
+            name: expectedInstanceKey
+            expr:
+              $nodeBlueId:
+              - $nodeBlueId: {$document: /contracts/initialized/document}
+              - $const: clauseKey
+              - $var: key
+        - $let: {name: terms, expr: {$var: {name: item, path: /prepared/paymentDetails/payoutTerms}}}
+        - $let: {name: proof, expr: {$var: {name: candidate, path: /accountCancellation}}}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq: [{$var: {name: terms, path: /preparationClauseId}}, {$const: clauseKey}]
+                - $eq:
+                  - {$var: {name: terms, path: /agreementOrigin}}
+                  - $nodeBlueId: {$document: /contracts/initialized/document}
+                - $eq: [{$var: {name: terms, path: /payoutKey}}, {$var: key}]
+                - $eq: [{$var: {name: item, path: /prepared/instanceKey}}, {$var: expectedInstanceKey}]
+                - $eq: [{$var: {name: candidate, path: /instanceKey}}, {$var: expectedInstanceKey}]
+                - $eq: [{$var: {name: proof, path: /instanceKey}}, {$var: expectedInstanceKey}]
+                - $eq: [{$var: {name: proof, path: /instructionOrigin}}, {$var: origin}]
+                - $eq: [{$var: {name: proof, path: /status}}, STOPPED]
+                - $eq: [{$var: {name: proof, path: /executionPolicy}}, BLUE_ACCOUNT_PAYOUT_STOP_V1]
+                - $eq:
+                  - {$var: {name: candidate, path: /paymentDetails/executionTerms/executionPolicy}}
+                  - BLUE_ACCOUNT_PAYOUT_STOP_V1
+                - $eq: [{$var: {name: proof, path: /payoutTerms}}, {$var: terms}]
+                - $isKind: {val: {$var: {name: proof, path: /requestId}}, kind: text}
+                - $ne: [{$var: {name: proof, path: /requestId}}, '']
+                - $not: {$exists: {$var: {name: candidate, path: /accountSettlement}}}
+                - $eq:
+                  - $pointerGet: {object: {$var: candidate}, path: /payment/completed, default: 0}
+                  - 0
+            message: PAYOUT_NATIVE_STOP_PROOF_REQUIRED
+        - $if:
+            cond: {$exists: {$var: {name: item, path: /documentOrigin}}}
+            then:
+            - $failIf:
+                cond: {$ne: [{$var: {name: item, path: /documentOrigin}}, {$var: origin}]}
+                message: PREPARATION_REPLACEMENT_FORBIDDEN
+        - $let:
+            name: linked
+            expr: {$document: {$concat: [{$const: {name: bindings, path: /collection}}, /, {$var: key}]}}
+        - $if:
+            cond: {$exists: {$var: linked}}
+            then:
+            - $failIf:
+                cond:
+                  $ne:
+                  - $nodeBlueId: {$var: {name: linked, path: /contracts/initialized/document}}
+                  - $var: origin
+                message: PREPARATION_REPLACEMENT_FORBIDDEN
+        - $let: {name: state, expr: {$document: {$const: {name: bindings, path: /commission}}}}
+        - $let:
+            name: settlement
+            expr: {$pointerGet: {object: {$var: state}, path: {$concat: [/settlements/, {$var: key}]}}}
+        - $let: {name: gross, expr: {$var: {name: terms, path: /grossMinor}}}
+        - $let:
+            name: stoppedSettlement
+            expr:
+              amountMinor: {$var: gross}
+              paidMinor: 0
+              transferredMinor: 0
+              feeMinor: 0
+              status: closed
+              stopProof: {$var: proof}
+        - $if:
+            cond: {$eq: [{$var: {name: settlement, path: /status}}, closed]}
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $eq: [{$var: settlement}, {$var: stoppedSettlement}]
+                    - $eq: [{$var: {name: item, path: /status}}, cancelled]
+                    - $eq: [{$var: {name: item, path: /documentOrigin}}, {$var: origin}]
+                message: PAYOUT_STOP_RELEASE_CONFLICT
+            - $return: {outcome: duplicate}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $eq: [{$var: {name: settlement, path: /status}}, reserved]
+                - $eq: [{$var: {name: settlement, path: /amountMinor}}, {$var: gross}]
+                - $gte: [{$var: {name: state, path: /reserved}}, {$var: gross}]
+                - $not:
+                    $includes:
+                      list: [reapproval_required, admission_denied, cancelled]
+                      val: {$var: {name: item, path: /status}}
+            message: PAYOUT_STOP_RESERVATION_REQUIRED
+        - $return:
+            $merge:
+            - $var: context
+            - outcome: acceptedNew
+              candidate: {$var: candidate}
+              origin: {$var: origin}
+              proof: {$var: proof}
+              state: {$var: state}
+              gross: {$var: gross}
+              stoppedSettlement: {$var: stoppedSettlement}
+      applyStoppedPayout:
+        args:
+          checked: {}
+        do:
+        - $if:
+            cond: {$eq: [{$var: {name: checked, path: /outcome}}, duplicate]}
+            then:
+            - $return: {outcome: duplicate}
+        - $let: {name: item, expr: {$var: {name: checked, path: /item}}}
+        - $let: {name: key, expr: {$var: {name: checked, path: /key}}}
+        - $appendChange:
+            op: add
+            path: {$var: {name: checked, path: /itemPath}}
+            val:
+              $merge:
+              - $var: item
+              - status: cancelled
+                documentOrigin: {$var: {name: checked, path: /origin}}
+                nextActions: []
+        - $appendChange:
+            op: add
+            path: {$var: {name: item, path: /path}}
+            val:
+              $objectFromEntries:
+              - key: blueId
+                val: {$nodeBlueId: {$var: {name: checked, path: /candidate}}}
+        - $appendChange:
+            op: replace
+            path: {$concat: [{$const: {name: bindings, path: /commission}}, /reserved]}
+            val:
+              $subtract:
+              - {$var: {name: checked, path: /state/reserved}}
+              - {$var: {name: checked, path: /gross}}
+        - $appendChange:
+            op: replace
+            path: {$concat: [{$const: {name: bindings, path: /commission}}, /settlements/, {$var: key}]}
+            val: {$var: {name: checked, path: /stoppedSettlement}}
+        - $appendEvent:
+            $merge:
+            - type: Events/Event
+            - kind: Commission Payout Stopped
+              key: {$var: key}
+              instructionOrigin: {$var: {name: checked, path: /origin}}
+              stopProof: {$var: {name: checked, path: /proof}}
+        - $return: {outcome: acceptedNew}
       domainNextActions:
         args:
           documentRef: {}
@@ -451,6 +647,7 @@ parameters:
     amountMinor: /paymentTerms/amountMinor
     limitMinor: /paymentTerms/limitMinor
     payoutTerms: /paymentDetails/payoutTerms
+    executionTerms: /paymentDetails/executionTerms
 bindingTypes:
   collection: pointer
   commission: pointer
@@ -655,7 +852,9 @@ actions:
             payoutTerms:
               $merge:
               - $var: split
-              - payoutKey:
+              - preparationClauseId:
+                  $const: clauseKey
+                payoutKey:
                   $var:
                     name: trigger
                     path: /key
@@ -691,6 +890,34 @@ actions:
                 payerChannel: seller
                 payeeChannel: partner
                 guarantorChannel: guarantor
+    - $let:
+        name: executionTerms
+        expr:
+          $call:
+            function: executionTermsFromContext
+            args:
+              context:
+                $pointerGet:
+                  object:
+                    $var: trigger
+                  path: /accountContext
+                  default: {}
+    - $if:
+        cond:
+          $gt:
+          - $size:
+              $var: executionTerms
+          - 0
+        then:
+        - $set:
+            name: params
+            expr:
+              $pointerSet:
+                object:
+                  $var: params
+                path: /values/executionTerms
+                val:
+                  $var: executionTerms
     - $set:
         name: actionResult
         expr:
@@ -730,3 +957,13 @@ actions:
                 $var:
                   name: trigger
                   path: /amountMinor
+  recoverStopped:
+    resultContract: outcome-v1
+    preflight:
+    - $set:
+        name: actionResult
+        expr: {$call: {function: checkStoppedPayout, args: {input: {$var: trigger}}}}
+    do:
+    - $set:
+        name: actionResult
+        expr: {$call: {function: applyStoppedPayout, args: {checked: {$var: actionResult}}}}

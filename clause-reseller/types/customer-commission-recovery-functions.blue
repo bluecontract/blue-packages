@@ -1,0 +1,496 @@
+name: Customer Commission Recovery Functions
+type: PaymentInstruction/Payment Functions
+description: BLUE_SCT_SOURCE_RECOVERY_V1 fixes remaining G as roundBps(original payment minus cumulative successful
+  refunds, frozen commissionBps). Recovery consumes retained G first, then the same source's existing payout allocations
+  in stable order. Each allocation's cumulative recovered N is floor(original N * cumulative recovered G / original
+  G), with exact original N/F at full recovery; recovered F is recovered G minus recovered N. The seller remainder
+  is max(0, original payment minus cumulative refunds minus remaining G minus the original Stripe charge fee). New
+  initial source allocations apportion the already accepted payout N proportionally to source G with largest remainders
+  and stable source-order ties; original persisted allocations are never rebalanced. The guarantor uses its own
+  execution ledger for these effects. This PI bounds reports using its frozen rule and successful refunds; the Agreement
+  separately checks original paid payout G/N/F. No commercial document reads.
+functions:
+  accessRecordsValid:
+    blueId: BWZxSpWmbP4QkHTnBXNHtVgmNNL8s5jy3DMkS6KbgBwb
+  accessValid:
+    blueId: G6chkZF9fXUbRbD6koCtwLfx9c8jJ2QZHTB67mRhWPbF
+  authority:
+    blueId: ARbLv5tfuBfrrsuYvu9KCHKPaye3pPPHyQETVKmcXbxX
+  readerGroups:
+    blueId: DvDZ2osJuDV2CbtoLUfUt1xNNXffYxKYtTzBdaaSP3Gb
+  requireActive:
+    blueId: FFUQRPa7UV6WYAJefccRC6KW9EV55Xzuaws52XHntCKE
+  transports:
+    blueId: ERUpqV1ukEE2eZWaDJP6Dxne1Z12WTkrXgDiKDGRgDjV
+  validateRecoveryAmount:
+    args:
+      input: {}
+      error:
+        type: Text
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val:
+                  $var: {name: input, path: /candidate}
+                kind: integer
+            - $gte:
+              - $var: {name: input, path: /candidate}
+              - 0
+            - $lte:
+              - $var: {name: input, path: /candidate}
+              - 1000000000000
+        message:
+          $var: error
+  validateCommissionAdjustment:
+    args:
+      candidate: {}
+    do:
+    - $let:
+        name: correction
+        expr:
+          $var: candidate
+    - $call:
+        function: validateRecoveryAmount
+        args:
+          error: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
+          input:
+            candidate:
+              $pointerGet:
+                object:
+                  $var: correction
+                path: /grossMinor
+    - $call:
+        function: validateRecoveryAmount
+        args:
+          error: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
+          input:
+            candidate:
+              $pointerGet:
+                object:
+                  $var: correction
+                path: /retainedGrossMinor
+    - $call:
+        function: validateRecoveryAmount
+        args:
+          error: COMMISSION_ADJUSTMENT_AMOUNT_INVALID
+          input:
+            candidate:
+              $pointerGet:
+                object:
+                  $var: correction
+                path: /sellerRecoveryMinor
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val:
+                $pointerGet:
+                  object:
+                    $var: correction
+                  path: /payouts
+              kind: list
+        message: COMMISSION_ADJUSTMENT_PAYOUTS_INVALID
+    - $let:
+        name: gross
+        expr:
+          $pointerGet:
+            object:
+              $var: correction
+            path: /retainedGrossMinor
+    - $let:
+        name: seen
+        expr: {}
+    - $forEach:
+        item: payout
+        in:
+          $pointerGet:
+            object:
+              $var: correction
+            path: /payouts
+        do:
+        - $call:
+            function: key
+            args:
+              candidate:
+                $pointerGet:
+                  object:
+                    $var: payout
+                  path: /payoutInstructionId
+        - $failIf:
+            cond:
+              $not:
+                $not:
+                  $hasKey:
+                    object:
+                      $var: seen
+                    key:
+                      $pointerGet:
+                        object:
+                          $var: payout
+                        path: /payoutInstructionId
+            message: COMMISSION_ADJUSTMENT_DUPLICATE_PAYOUT
+        - $set:
+            name: seen
+            expr:
+              $objectSet:
+                object:
+                  $var: seen
+                key:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /payoutInstructionId
+                val: true
+        - $call:
+            function: validateRecoveryAmount
+            args:
+              error: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
+              input:
+                candidate:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /grossMinor
+        - $call:
+            function: validateRecoveryAmount
+            args:
+              error: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
+              input:
+                candidate:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /netMinor
+        - $call:
+            function: validateRecoveryAmount
+            args:
+              error: COMMISSION_ADJUSTMENT_PAYOUT_AMOUNT_INVALID
+              input:
+                candidate:
+                  $pointerGet:
+                    object:
+                      $var: payout
+                    path: /feeMinor
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $pointerGet:
+                    object:
+                      $var: payout
+                    path: /grossMinor
+                - $add:
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /netMinor
+                  - $pointerGet:
+                      object:
+                        $var: payout
+                      path: /feeMinor
+            message: COMMISSION_ADJUSTMENT_SPLIT_INVALID
+        - $set:
+            name: gross
+            expr:
+              $add:
+              - $var: gross
+              - $pointerGet:
+                  object:
+                    $var: payout
+                  path: /grossMinor
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var: gross
+            - $pointerGet:
+                object:
+                  $var: correction
+                path: /grossMinor
+        message: COMMISSION_ADJUSTMENT_GROSS_INVALID
+    - $return:
+        $var: correction
+  confirmRecovery:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: guarantor
+        args: {}
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $document: /payment/accepted
+            - true
+        message: COMMISSION_RECOVERY_REQUIRES_ACCEPTED_PI
+    - $call:
+        function: key
+        args:
+          candidate:
+            $pointerGet:
+              object:
+                $var: input
+              path: /recoveryId
+    - $call:
+        function: key
+        args:
+          candidate:
+            $pointerGet:
+              object:
+                $var: input
+              path: /requestId
+    - $let:
+        name: report
+        expr:
+          $call:
+            function: validateCommissionAdjustment
+            args:
+              candidate:
+                $var: input
+    - $let:
+        name: record
+        expr:
+          $merge:
+          - $var: report
+          - customerInstructionId:
+              $nodeBlueId:
+                $document: /contracts/initialized/document
+    - $let:
+        name: existing
+        expr:
+          $get:
+            object:
+              $choose:
+                cond:
+                  $exists:
+                    $document: /commissionRecoveries
+                then:
+                  $document: /commissionRecoveries
+                else: {}
+            key:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /recoveryId
+    - $if:
+        cond:
+          $exists:
+            $var: existing
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - $var: existing
+                - $var: record
+            message: COMMISSION_RECOVERY_CONFLICT
+        - $return:
+            outcome: duplicate
+    - $let:
+        name: request
+        expr:
+          $get:
+            object:
+              $document: /payment/requests
+            key:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /requestId
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: request
+                path: /intent/action
+            - refund
+        message: COMMISSION_RECOVERY_REFUND_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: request
+                path: /status
+            - succeeded
+        message: COMMISSION_RECOVERY_REFUND_NOT_SUCCEEDED
+    - $let:
+        name: terms
+        expr:
+          $document: /paymentDetails/customerPaymentTerms/commissionTerms
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: terms
+                path: /recoveryPolicy
+            - BLUE_SCT_SOURCE_RECOVERY_V1
+        message: COMMISSION_RECOVERY_POLICY_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $pointerGet:
+                object:
+                  $var: terms
+                path: /adjustmentPolicy
+            - BLUE_ROUND_BPS_V1
+        message: COMMISSION_RECOVERY_ROUNDING_REQUIRED
+    - $let:
+        name: originalP
+        expr:
+          $document: /paymentTerms/amountMinor
+    - $let:
+        name: reversed
+        expr:
+          $document: /payment/reversed
+    - $let:
+        name: originalG
+        expr:
+          $call:
+            function: roundBps
+            args:
+              basis:
+                $var: originalP
+              bps:
+                $pointerGet:
+                  object:
+                    $var: terms
+                  path: /commissionBps
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $var: originalG
+            - $pointerGet:
+                object:
+                  $var: terms
+                path: /grossMinor
+        message: COMMISSION_RECOVERY_ORIGINAL_G_CONFLICT
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $gte:
+              - $var: reversed
+              - 0
+            - $lte:
+              - $var: reversed
+              - $var: originalP
+        message: COMMISSION_RECOVERY_REFUND_AMOUNT_INVALID
+    - $let:
+        name: remainingG
+        expr:
+          $call:
+            function: roundBps
+            args:
+              basis:
+                $subtract:
+                - $var: originalP
+                - $var: reversed
+              bps:
+                $pointerGet:
+                  object:
+                    $var: terms
+                  path: /commissionBps
+    - $let:
+        name: totalG
+        expr:
+          $pointerGet:
+            object:
+              $var: report
+            path: /grossMinor
+    - $let:
+        name: totalSeller
+        expr:
+          $pointerGet:
+            object:
+              $var: report
+            path: /sellerRecoveryMinor
+    - $forEach:
+        key: priorKey
+        item: prior
+        in:
+          $choose:
+            cond:
+              $exists:
+                $document: /commissionRecoveries
+            then:
+              $document: /commissionRecoveries
+            else: {}
+        do:
+        - $set:
+            name: totalG
+            expr:
+              $add:
+              - $var: totalG
+              - $pointerGet:
+                  object:
+                    $var: prior
+                  path: /grossMinor
+        - $set:
+            name: totalSeller
+            expr:
+              $add:
+              - $var: totalSeller
+              - $pointerGet:
+                  object:
+                    $var: prior
+                  path: /sellerRecoveryMinor
+    - $failIf:
+        cond:
+          $not:
+            $lte:
+            - $var: totalG
+            - $subtract:
+              - $var: originalG
+              - $var: remainingG
+        message: COMMISSION_RECOVERY_EXCEEDS_CUMULATIVE_G
+    - $failIf:
+        cond:
+          $not:
+            $lte:
+            - $add:
+              - $var: totalG
+              - $var: totalSeller
+            - $var: reversed
+        message: COMMISSION_RECOVERY_EXCEEDS_ACTUAL_REFUNDS
+    - $appendChange:
+        op: add
+        path: /commissionRecoveries
+        val:
+          $objectSet:
+            object:
+              $choose:
+                cond:
+                  $exists:
+                    $document: /commissionRecoveries
+                then:
+                  $document: /commissionRecoveries
+                else: {}
+            key:
+              $pointerGet:
+                object:
+                  $var: input
+                path: /recoveryId
+            val:
+              $var: record
+    - $appendEvent:
+        $merge:
+        - type: Events/Event
+        - kind: Commission Recovery Confirmed
+          recovery:
+            $var: record
+    - $return:
+        outcome: acceptedNew
+  roundBps:
+    blueId: 8iDeuRctE9WWrNAH7Zpuy3ET9fqYjS9PpGu6kCbYwksB

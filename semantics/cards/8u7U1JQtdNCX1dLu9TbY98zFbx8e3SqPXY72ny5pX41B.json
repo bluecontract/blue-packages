@@ -1,0 +1,127 @@
+{
+  "blueId": "8u7U1JQtdNCX1dLu9TbY98zFbx8e3SqPXY72ny5pX41B",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "AK34g34RmsrwB9awXvYqgtHFteRbnd18LE4TosHbDQp7",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Commission Payout Settlement",
+    "limitations": [
+      "Concrete action connections are not supplied, so the trigger and authorized channel for confirm are not established by this evidence.",
+      "The supplied documentPaths expose accountSettlement and payoutTerms only as whole objects. Individual paths for their amounts, currency and references, and for payment.completed, are unavailable for scalar state facts."
+    ],
+    "parameterRefs": [
+      "parameters.actions"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no cancellation status is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: requestCancellation and confirmStopped records",
+        "id": "cancellationStatus",
+        "meaning": "REQUESTED awaits guarantor confirmStopped; STOPPED records that guarantor’s matching stop report.",
+        "path": "/accountCancellation/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no request identifier is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: requestCancellation and confirmStopped requestId checks",
+        "id": "cancellationRequestId",
+        "meaning": "Nonempty identifier linking the cancellation request and stop report; an existing request prevents a different ID.",
+        "path": "/accountCancellation/requestId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence does not satisfy the true guard.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: confirm ACCOUNT_SETTLEMENT_INVALID guard",
+        "id": "paymentAccepted",
+        "meaning": "Must be exactly true for confirm; acceptance alone does not establish an account settlement.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; confirm requires a nonempty text value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: confirm guard and record.transactionId",
+        "id": "paymentTransactionId",
+        "meaning": "Payment transaction identifier required by confirm and copied into its settlement record.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no execution policy default is defined.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: requestCancellation and confirmStopped policy guards",
+        "id": "executionPolicy",
+        "meaning": "Both cancellation actions require BLUE_ACCOUNT_PAYOUT_STOP_V1; confirmStopped records the policy.",
+        "path": "/paymentDetails/executionTerms/executionPolicy",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no funding model default is defined.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: confirmStopped ACCOUNT_STOP_POLICY_UNSUPPORTED",
+        "id": "fundingModel",
+        "meaning": "Funding model inspected by confirmStopped, which rejects LEGACY_ACCOUNT_DEBIT.",
+        "path": "/paymentDetails/executionTerms/fundingModel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no payer channel default is defined.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: requestCancellation ACCOUNT_CANCELLATION_PAYER_REQUIRED",
+        "id": "payerChannel",
+        "meaning": "Channel that must match call/channel for a workflow invocation of requestCancellation.",
+        "path": "/paymentTerms/payerChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no guarantor channel default is defined.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commission Payout Settlement Clause: confirmStopped ACCOUNT_STOP_GUARANTOR_REQUIRED",
+        "id": "guarantorChannel",
+        "meaning": "Channel that must match call/channel for the workflow stop report awaited by a REQUESTED cancellation.",
+        "path": "/paymentTerms/guarantorChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Commission Payout Settlement Clause\n\nRecords the MyOS operator’s report of one executed commission payout: the seller debit `grossMinor` (G), partner transfer `netMinor` (N), and retained MyOS fee `feeMinor` (F). These amounts use minor units of `currency` from `/paymentDetails/payoutTerms`. The clause copies the frozen payout terms; it does not calculate the split, execute transfers or independently verify their execution.\n\n## Settlement confirmation\n\n`confirm` requires `/payment/accepted` to be exactly `true`, `/payment/transactionId` to be nonempty text, and action parameters `debitReference` and `transferReference` to be nonempty text. Failure rejects with `ACCOUNT_SETTLEMENT_INVALID`.\n\nThe action constructs `/accountSettlement` containing those references, `transactionId`, the terms’ `payoutKey`, `grossMinor`, `netMinor`, `feeMinor` and `currency`, the complete `payoutTerms`, and `instructionOrigin`: the BlueId of `/contracts/initialized/document`. Amounts and currency are copied without additional validation by this action.\n\nThe first report stores the record and emits `Account Settlement Confirmed` with the record in `settlement`. After the prerequisite checks, an identical existing record returns without another change or event; any difference rejects with `ACCOUNT_SETTLEMENT_CONFLICT`. Equality covers the complete record, including its copied terms and provenance.\n\n## Cancellation request and stop report\n\n`requestCancellation` requires a `workflow` connection whose `call/channel` equals `/paymentTerms/payerChannel`, execution policy `BLUE_ACCOUNT_PAYOUT_STOP_V1`, and a nonempty text `requestId`. It writes `/accountCancellation` with that identifier and status `REQUESTED`, then emits `Account Payment Cancellation Requested`. This records an intention awaiting a guarantor’s stop report; it does not itself stop payment. An existing cancellation with the same identifier returns unchanged, including when already `STOPPED`; another identifier rejects.\n\n`confirmStopped` requires a `workflow` connection whose `call/channel` equals `/paymentTerms/guarantorChannel`, the same execution policy, and a `fundingModel` other than `LEGACY_ACCOUNT_DEBIT`. Its nonempty text `requestId` must match an existing cancellation. It rejects if `/accountSettlement` exists or `payment.completed` is greater than zero. The latter guard reads a missing `completed` member as zero; this does not establish a stored zero completion amount.\n\nFrom `REQUESTED`, it replaces `/accountCancellation` with a `STOPPED` record containing `requestId`, `executionPolicy`, `instanceKey`, `instructionOrigin` and the complete `payoutTerms`, then emits `Account Payment Stopped` with that record in `cancellation`. `STOPPED` represents the guarantor’s recorded stop report. After the preceding guards, an identical existing `STOPPED` record is idempotent; a differing report rejects with `ACCOUNT_STOP_REPORT_CONFLICT`. Any other existing status rejects with `ACCOUNT_STOP_REQUEST_REQUIRED`.\n\nRequesting cancellation does not check whether payment has already occurred, although stop confirmation rejects paid cases. Conversely, `confirm` does not check cancellation status: this clause alone does not make `STOPPED` prevent a later settlement report.\n\n## Action configuration and authority\n\nThe inherited Feature Clause uses the configurable `parameters.actions` map, which supplies these three action bodies. Named action connections determine their triggers and map inputs into `params`; no default connections or action argument values are declared here. Workflow requests are available as `trigger`, while `params` is assembled from action defaults and connection `params`.\n\nConnections can add `before` and `after` steps, skip execution through `when`, or reject it through `parameters.conditions.<action>`. `once` defaults to `false`; when enabled, it suppresses a connection after that connection has been marked fired. Marking occurs after the action and `after` steps reach their end, so an idempotent early return does not reach those steps.\n\nAlthough `confirm` is described as the MyOS operator’s report, its body has no operator-channel guard; its admission depends on the configured connection. The two cancellation actions explicitly enforce their respective workflow channels. All document paths refer to the document executing this clause, including an instruction’s own document."
+}

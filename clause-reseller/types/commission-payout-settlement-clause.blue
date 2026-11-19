@@ -113,3 +113,109 @@ parameters:
           - kind: Account Settlement Confirmed
             settlement:
               $var: record
+    requestCancellation:
+      do:
+      - $failIf:
+          cond:
+            $not:
+              $and:
+              - $eq: [{$const: sourceMode}, workflow]
+              - $eq: [{$binding: call/channel}, {$document: /paymentTerms/payerChannel}]
+          message: ACCOUNT_CANCELLATION_PAYER_REQUIRED
+      - $failIf:
+          cond:
+            $ne:
+            - {$document: /paymentDetails/executionTerms/executionPolicy}
+            - BLUE_ACCOUNT_PAYOUT_STOP_V1
+          message: ACCOUNT_CANCELLATION_POLICY_REQUIRED
+      - $let: {name: requestId, expr: {$var: {name: params, path: /requestId}}}
+      - $failIf:
+          cond:
+            $not:
+              $and:
+              - $isKind: {val: {$var: requestId}, kind: text}
+              - $ne: [{$var: requestId}, '']
+          message: ACCOUNT_CANCELLATION_REQUEST_INVALID
+      - $if:
+          cond: {$exists: {$document: /accountCancellation}}
+          then:
+          - $failIf:
+              cond:
+                $ne:
+                - {$document: /accountCancellation/requestId}
+                - {$var: requestId}
+              message: ACCOUNT_CANCELLATION_REQUEST_CONFLICT
+          - $return: {}
+      - $let:
+          name: record
+          expr: {requestId: {$var: requestId}, status: REQUESTED}
+      - $appendChange: {op: add, path: /accountCancellation, val: {$var: record}}
+      - $appendEvent:
+          $merge:
+          - type: Events/Event
+          - kind: Account Payment Cancellation Requested
+            cancellation: {$var: record}
+    confirmStopped:
+      do:
+      - $failIf:
+          cond:
+            $not:
+              $and:
+              - $eq: [{$const: sourceMode}, workflow]
+              - $eq: [{$binding: call/channel}, {$document: /paymentTerms/guarantorChannel}]
+          message: ACCOUNT_STOP_GUARANTOR_REQUIRED
+      - $failIf:
+          cond:
+            $not:
+              $and:
+              - $eq:
+                - {$document: /paymentDetails/executionTerms/executionPolicy}
+                - BLUE_ACCOUNT_PAYOUT_STOP_V1
+              - $ne:
+                - {$document: /paymentDetails/executionTerms/fundingModel}
+                - LEGACY_ACCOUNT_DEBIT
+          message: ACCOUNT_STOP_POLICY_UNSUPPORTED
+      - $let: {name: requestId, expr: {$var: {name: params, path: /requestId}}}
+      - $failIf:
+          cond:
+            $not:
+              $and:
+              - $isKind: {val: {$var: requestId}, kind: text}
+              - $ne: [{$var: requestId}, '']
+              - $exists: {$document: /accountCancellation}
+              - $eq: [{$document: /accountCancellation/requestId}, {$var: requestId}]
+          message: ACCOUNT_STOP_REQUEST_MISMATCH
+      - $failIf:
+          cond:
+            $or:
+            - $exists: {$document: /accountSettlement}
+            - $gt:
+              - $pointerGet: {object: {$document: /payment}, path: /completed, default: 0}
+              - 0
+          message: ACCOUNT_STOP_ALREADY_PAID
+      - $let:
+          name: record
+          expr:
+            requestId: {$var: requestId}
+            status: STOPPED
+            instructionOrigin:
+              $nodeBlueId: {$document: /contracts/initialized/document}
+            instanceKey: {$document: /instanceKey}
+            executionPolicy: {$document: /paymentDetails/executionTerms/executionPolicy}
+            payoutTerms: {$document: /paymentDetails/payoutTerms}
+      - $if:
+          cond: {$eq: [{$document: /accountCancellation/status}, STOPPED]}
+          then:
+          - $failIf:
+              cond: {$ne: [{$document: /accountCancellation}, {$var: record}]}
+              message: ACCOUNT_STOP_REPORT_CONFLICT
+          - $return: {}
+      - $failIf:
+          cond: {$ne: [{$document: /accountCancellation/status}, REQUESTED]}
+          message: ACCOUNT_STOP_REQUEST_REQUIRED
+      - $appendChange: {op: replace, path: /accountCancellation, val: {$var: record}}
+      - $appendEvent:
+          $merge:
+          - type: Events/Event
+          - kind: Account Payment Stopped
+            cancellation: {$var: record}

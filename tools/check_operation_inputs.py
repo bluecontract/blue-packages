@@ -15,6 +15,9 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 CASES = {
+    'commission-recovery': ('CommissionRecoveryConformance',),
+    'account-payout-cancellation': ('AccountPayoutCancellationConformance',),
+    'account-payout-cancellation-agreement': ('AccountPayoutCancellationAgreementConformance',),
     'myos-instruction-types': ('blue.core.MyosInstructionTypesConformance',),
     'access-events-behavior': ('blue.core.AccessEventsConformance',),
     'helper-native': ('OperationInputConformance', 'native'),
@@ -85,6 +88,10 @@ def main():
     sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
+    if 'AccountPayoutCancellationAgreementConformance' in sources:
+        sources.add('CommissionRecoveryConformance')
+    if 'CommissionRecoveryConformance' in sources:
+        sources.update({'RepresentativeAccessConformance', 'AccountPayoutCancellationConformance'})
     if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance', 'RefreshDefinitionConformance', 'AdmissionProvisionConformance', 'ProvidedOrderAdmissionConformance'} & sources:
         sources.add('BootstrapPreparationConformance')
     if {'StaticIdentityPredicateConformance', 'AdmissionProvisionConformance'} & sources:
