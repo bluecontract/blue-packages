@@ -41,8 +41,7 @@ channel is declared. Installing this data package grants no native support.
 | Type | Kind | Purpose |
 |---|---|---|
 | Mandate Commitment Authority | `Mandates/Authority` | Authority claim that carries M and names no mandate |
-| Evidence Profile | base type | Published, immutable rules under which evidence on a channel is checked |
-| RISC Zero Succinct Receipt Profile | `PrivateMandates/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
+| RISC Zero Succinct Receipt Profile | `CoordinationEvidence/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
 
 ## 3. The authority claim
 
@@ -68,17 +67,33 @@ message:
 | `actor` | Inherited from `Mandates/Authority`: the represented holder |
 | `mandateCommitment` | M = SHA-256(salt ‖ BlueId of the mandate before initialization), as 64 lower-case hexadecimal characters (*provisional*: field name and text encoding). The byte encoding of the two inputs is fixed by the proving program of the channel's profile |
 
-The claim has no `mandate` field. The agent announces nothing before writing and
+The claim has exactly these two fields. It has no `mandate` field, and a value with
+any other field is not a `Mandate Commitment Authority`: the Language schema rejects
+it, and it is handled as any authority claim of an unrecognized type is today.
+
+`mandateCommitment` is well formed only as 64 characters `0-9a-f`. The schema fixes
+the length; the processor checks the characters. An operation whose claim carries a
+malformed `mandateCommitment` is rejected from the document state, without reading T. The agent announces nothing before writing and
 takes no part in the proof flow. M tells the prover which mandate is meant and lets
 a processor match a proof to the operation.
 
 An operation whose authority claim is a `Mandate Commitment Authority` is
 evidence-decided in the sense of the Coordination evidence channels specification.
 
-**Checked by every processor, outside the proof:** that the actor and timeline of E
-belong to a participant of the target document; that the claim's `actor` is the
-owner of the target channel; the target document's delegation and actor policy;
-ordinary operation validation; protection against executing E twice.
+**Checked by every processor, outside the proof.** These are the checks a processor
+performs today for a `Mandates/Mandate Authority` without reading the mandate. They
+are unchanged, they come before T is read, and a failure has the same outcome as it
+has today for `Mandate Authority`:
+
+1. the claim's `actor` is the actor of the target channel the operation selects;
+2. that target channel exists and is a concrete `Coordination/Timeline Channel`
+   (which includes `Timeline Channel with Evidence`);
+3. the target document contains a Timeline Channel with the actor and timeline of E
+   (the delegate participant);
+4. the target document's actor policy admits E as a delegated action.
+
+Ordinary operation validation and protection against executing E twice also remain
+with the processor. Every check that today needs the mandate is in the proof.
 
 **Checked inside the proof,** because only the mandate shows it: status and approval
 of the mandate; that the actor of E is the actor of the mandate's
@@ -98,28 +113,42 @@ deterministically only when they use the same profile, so a channel declares a
 profile value and never a name such as "latest". The profile is identified by a
 hash of its content: the BlueId of the declared value (*provisional*).
 
-`Evidence Profile` is the base type and has no fields. A channel's
-`evidenceProfile` MUST be a value of a supported specialisation.
+`CoordinationEvidence/Evidence Profile` is the base type and has no fields. A
+channel's `evidenceProfile` MUST be a value of a supported specialisation.
 
 ### 4.1 RISC Zero Succinct Receipt Profile
 
 | Field | Content |
 |---|---|
 | `programImageId` | Image identifier of the proving program, 64 lower-case hexadecimal characters. It fixes the proved statement, the format of the public output, and the runtime and package bindings, gas limit and error semantics the program was built with |
-| `providerSetDigest` | Digest of the profile's allowed timeline provider set, as the proving program publishes it, 64 lower-case hexadecimal characters |
+| `allowedProviders` | The profile's allowed timeline provider set: a list of `Coordination/Ed25519 Public Key`, strictly ascending when compared as 32-byte values |
 | `factsRule` | The facts definition. The only value is `FULL(D)` |
 
-(*Provisional*: the three field names and the type name.)
+The value has exactly these three fields. (*Provisional*: the field names and the
+type name.)
 
 The type itself fixes what is not data: the receipt kind (a succinct RISC Zero
 receipt, in one canonical encoding with no other bytes), the verifier, the
-comparison rules of §5 and the facts algorithm.
+comparison rules of §5, the provider set digest function and the facts algorithm.
 
 **Allowed provider set.** The set belongs to the profile, not to a mandate. The
 proving program checks that every provider key the mandate processor signed belongs
-to a list given by the prover and publishes the digest of that list; the processor
-compares the digest. A mandate with a source at a provider outside the set can never
-get a matching proof.
+to a list given by the prover and publishes the digest of that list. The profile
+carries the list; the digest is derived and is not a field:
+
+> provider set digest = SHA-256(key_1 ‖ key_2 ‖ … ‖ key_n), over the raw 32-byte
+> keys in list order, written as 64 lower-case hexadecimal characters.
+
+For the empty list this is the SHA-256 of the empty byte string. A mandate with a
+source at a provider outside the set can never get a matching proof.
+
+**Well-formed profile.** The Language schema enforces the field set, the length of
+each key and of `programImageId`, distinct list elements and the value of
+`factsRule`. The processor additionally requires `programImageId` and every key to
+be 64 characters `0-9a-f`, and the list to be strictly ascending by key bytes. A
+profile that fails any of these is malformed; under the Coordination evidence
+channels specification the channel then lacks its profile, and every operation with
+a `Mandate Commitment Authority` on it is rejected from the document state.
 
 **Facts rule.** FULL(D) is the least set of rows (recipe key, goal, root) closed
 under the step of `validate`, starting from the definition row of every non-core
@@ -146,7 +175,7 @@ A `CoordinationEvidence/Proof Entry` is a matching proof for E only if all hold:
 | 3 | M in the public output | `mandateCommitment` of E's authority claim |
 | 4 | The BlueId of D in the public output | The processor's own state D before E |
 | 5 | The mandate processor key in the public output | `mandateProcessorKey` of the channel |
-| 6 | The provider set digest in the public output | `providerSetDigest` of the profile |
+| 6 | The provider set digest in the public output | The digest derived from `allowedProviders` of the profile (§4.1) |
 | 7 | The validation-facts digest in the public output | The digest of the empty set, or of FULL(D) computed by the processor from D |
 
 - A proof that verifies but fails any comparison is skipped as mismatching. It is
@@ -172,8 +201,6 @@ operation with this claim is rejected from the document state.
 - The names listed as provisional, and the text encodings of M, of the image
   identifier and of the digests.
 - The format of the mandate processor's signed statement and of its commitment.
-- Whether the profile should carry the allowed provider list itself in addition to
-  its digest.
 - Mandates with timers; a second prover; the duty to reject an operation whose M
   matches no mandate.
 - A pinned receiver build for the rules that are code and not profile data.

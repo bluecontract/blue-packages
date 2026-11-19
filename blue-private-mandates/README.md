@@ -9,10 +9,10 @@ it was built against.
   profiles and when a proof matches.
 - `Mandate Commitment Authority`: a `Mandates/Authority` that carries the salted
   mandate commitment and the holder actor, with no `mandate` reference.
-- `Evidence Profile`: base type of the profile a
-  `CoordinationEvidence/Timeline Channel with Evidence` declares.
-- `RISC Zero Succinct Receipt Profile`: the first profile, with `programImageId`,
-  `providerSetDigest` and `factsRule`.
+- `RISC Zero Succinct Receipt Profile`: the first
+  `CoordinationEvidence/Evidence Profile`, with `programImageId`,
+  `allowedProviders` and `factsRule`. The provider set digest is derived from
+  the list and is not a field.
 
 This is an extension. `Mandates/Mandate Authority` with a clear mandate reference
 stays supported and unchanged. A runtime must explicitly support this package's

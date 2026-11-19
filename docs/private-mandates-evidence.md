@@ -10,10 +10,10 @@ agent's operation from a proof on a proof timeline instead of reading the mandat
 
 `blue-coordination-evidence` is the Coordination edition that supports the new
 channel type: `Timeline Channel with Evidence` (a `Coordination/Timeline Channel`
-with `proofTimeline`, `mandateProcessorKey` and `evidenceProfile`), `Proof Entry`
-and `Rejection Entry`. `blue-private-mandates` adds `Evidence Profile`, its first
-specialisation `RISC Zero Succinct Receipt Profile`, and `Mandate Commitment
-Authority`, a `Mandates/Authority` that carries the salted mandate commitment and
+with `proofTimeline`, `mandateProcessorKey` and `evidenceProfile`), the base type
+`Evidence Profile`, `Proof Entry` and `Rejection Entry`. `blue-private-mandates`
+adds the first profile specialisation `RISC Zero Succinct Receipt Profile`, and
+`Mandate Commitment Authority`, a `Mandates/Authority` that carries the salted mandate commitment and
 no `mandate` reference. The normative rules are each package's `spec/` file.
 
 ## Why the edition is a separate package
@@ -76,10 +76,37 @@ capability and proof verification are qualified in Core.
 
 The protocol specification leaves these open; changing any of them gives new
 exact identities. Field names: `evidenceProfile`, `receipt`, `operationEntry`,
-`mandateCommitment`, `programImageId`, `providerSetDigest`, `factsRule`. Type
+`mandateCommitment`, `programImageId`, `allowedProviders`, `factsRule`. Type
 names: `Proof Entry`, `Rejection Entry`, `Evidence Profile`, `RISC Zero Succinct
 Receipt Profile`, `Mandate Commitment Authority`. Encodings: the proof as
 canonical base64 text; the commitment, image identifier and digests as 64
 lower-case hexadecimal characters; `mandateProcessorKey` as a
 `Coordination/Ed25519 Public Key`; the facts rule as the single value `FULL(D)`.
-The profile carries the digest of the allowed provider set, not the list.
+
+## What the schemas enforce and what native rules decide
+
+The Language schema vocabulary has lengths, counts, enumerations and field counts,
+but no character-set, pattern or ordering predicate, and typing without declared
+ancestry is structural. The schemas therefore enforce: a profile is an object, not
+a text, number, list or unrelated typed value; the exact field sets of the proof
+entry, the rejection entry, the profile and the commitment authority (so a clear
+`mandate` field is rejected); 64-character keys, image identifier and commitment;
+distinct provider keys; the facts rule value.
+
+A Core implementation must decide these itself, with the definite outcomes the two
+specifications state:
+
+| Value | Outcome |
+| --- | --- |
+| `mandateProcessorKey`, `programImageId` or a provider key that is not 64 characters `0-9a-f` | The channel lacks that field: operations under a commitment authority on it are rejected from the document state |
+| `allowedProviders` not strictly ascending by key bytes | Same |
+| `evidenceProfile` whose exact type is the base type, or an untyped object | Same |
+| `mandateCommitment` that is not 64 characters `0-9a-f` | The operation is rejected from the document state, without reading the proof timeline |
+| `receipt` that is not canonical base64, or whose bytes are not the profile's one receipt encoding | The entry is skipped |
+
+The provider set digest is not a field. It is SHA-256 over the concatenated raw
+32-byte keys of `allowedProviders` in list order, as the proving program computes it.
+
+Both packages are listed under `foundations` in `PACKAGE-SOURCES.json` because they
+carry native protocols. Listing them under `packages` would add them to the
+generated `PAYMENT-FAMILY-PACKAGES.json` business view and change nothing else here.

@@ -73,7 +73,7 @@ public final class PrivateMandatesTypesConformance {
       descends(blue, "Mandate Commitment Authority", privateMandates.exportId("Mandate Commitment Authority"),
           mandates.exportId("Authority"));
       descends(blue, "RISC Zero Succinct Receipt Profile",
-          privateMandates.exportId("RISC Zero Succinct Receipt Profile"), privateMandates.exportId("Evidence Profile"));
+          privateMandates.exportId("RISC Zero Succinct Receipt Profile"), evidence.exportId("Evidence Profile"));
       require(!NativeRuntime.ancestry(privateMandates.exportId("Mandate Commitment Authority"), new NativeRuntime(blue))
           .contains(mandates.exportId("Mandate Authority")), "The commitment claim must not be a Mandate Authority");
 
@@ -85,7 +85,7 @@ public final class PrivateMandatesTypesConformance {
           "publicRead", false, "url", "https://provider.example/timelines/operations");
       Map<String, Object> proofs = with(timeline, "url", "https://provider.example/timelines/proofs");
       Map<String, Object> profile = Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile",
-          "programImageId", HEX, "providerSetDigest", "cd".repeat(32), "factsRule", "FULL(D)");
+          "programImageId", HEX, "allowedProviders", List.of("01".repeat(32), "02".repeat(32)), "factsRule", "FULL(D)");
       Map<String, Object> channel = Map.of("type", "CoordinationEvidence/Timeline Channel with Evidence",
           "actor", actor, "timeline", timeline, "proofTimeline", proofs,
           "mandateProcessorKey", "ef".repeat(32), "evidenceProfile", profile);
@@ -107,7 +107,39 @@ public final class PrivateMandatesTypesConformance {
       for (String field : List.of("proofTimeline", "mandateProcessorKey", "evidenceProfile", "timeline", "actor"))
         rejected(blue, "channel without " + field, with(channel, field, null));
       rejected(blue, "channel with a short key", with(channel, "mandateProcessorKey", "ef"));
-      for (String field : List.of("programImageId", "providerSetDigest", "factsRule"))
+      // A profile is a typed value of a specialisation, never a name or an unrelated value (decision 31).
+      rejected(blue, "channel with a text profile", with(channel, "evidenceProfile", "latest"));
+      rejected(blue, "channel with an integer profile", with(channel, "evidenceProfile", 7));
+      rejected(blue, "channel with an actor as profile", with(channel, "evidenceProfile", actor));
+      rejected(blue, "channel with a bare base profile",
+          with(channel, "evidenceProfile", Map.of("type", "CoordinationEvidence/Evidence Profile")));
+      admitted(blue, "profile with an empty provider list", with(profile, "allowedProviders", List.of()));
+      rejected(blue, "profile with only a digest", with(with(profile, "allowedProviders", null), "providerSetDigest", HEX));
+      rejected(blue, "profile with an extra field", with(profile, "providerSetDigest", HEX));
+      rejected(blue, "profile with a short provider key", with(profile, "allowedProviders", List.of("01")));
+      rejected(blue, "profile with a repeated provider key",
+          with(profile, "allowedProviders", List.of("01".repeat(32), "01".repeat(32))));
+      rejected(blue, "authority with a clear mandate text", with(authority, "mandate", "someMandateBlueId"));
+      rejected(blue, "authority with a clear mandate reference",
+          with(authority, "mandate", Map.of("blueId", PRIOR.get("Mandates"))));
+      rejected(blue, "proof entry with an extra field", with(proof, "note", "x"));
+      rejected(blue, "rejection with an extra field", with(rejection, "reason", "x"));
+      // The Language schema has no character-set or ordering predicate. These values are admitted as
+      // data and are decided by the native rules stated in the two specifications.
+      var nativeRules = new ArrayList<String>();
+      for (var left : List.of(
+          Map.entry("channel key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32))),
+          Map.entry("channel profile of the base type with a field", with(channel, "evidenceProfile",
+              Map.of("type", "CoordinationEvidence/Evidence Profile", "anything", "x"))),
+          Map.entry("commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32))),
+          Map.entry("image id not lower-case hex", with(profile, "programImageId", "AB".repeat(32))),
+          Map.entry("provider list not ascending",
+              with(profile, "allowedProviders", List.of("02".repeat(32), "01".repeat(32)))),
+          Map.entry("receipt not canonical base64", with(proof, "receipt", "not base64 !!")))) {
+        admitted(blue, left.getKey(), left.getValue());
+        nativeRules.add(left.getKey());
+      }
+      for (String field : List.of("programImageId", "allowedProviders", "factsRule"))
         rejected(blue, "profile without " + field, with(profile, field, null));
       rejected(blue, "profile with another facts rule", with(profile, "factsRule", "CANONICAL"));
       rejected(blue, "profile with a short image id", with(profile, "programImageId", "ab"));
@@ -122,6 +154,7 @@ public final class PrivateMandatesTypesConformance {
       result.put("coordinationEvidencePackage", evidence.blueId());
       result.put("privateMandatesPackage", privateMandates.blueId());
       result.put("sampleBlueIds", ids);
+      result.put("leftToNativeRules", nativeRules);
       result.put("scope", "Language schema, inheritance and unchanged prior identities; not native execution qualification");
       System.out.println(WireData.write(result));
     }

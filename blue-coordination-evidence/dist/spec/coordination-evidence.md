@@ -23,9 +23,10 @@ A participant may be represented by agents whose authority the other participant
 cannot read. For such a participant the document's channel names where the decisions
 about those operations appear (T), whose signature on a private authority state the
 participant accepts, and under which published rules a piece of evidence is checked.
-This edition defines that channel, the two entry kinds on T, and how a processor
-reads T. It does not define any authority type or any evidence profile. Those are
-defined by packages whose protocol requires this one.
+This edition defines that channel, the base type of an evidence profile, the two
+entry kinds on T, and how a processor reads T. It does not define any authority type
+or any concrete evidence profile. Those are defined by packages whose protocol
+requires this one.
 
 An operation is *evidence-decided* when its authority claim (`onBehalfOf`) has a type
 that a supported protocol requiring this edition defines as decided from T. This
@@ -45,6 +46,7 @@ stops at the entry that adds the channel. It MUST NOT treat the channel as a pla
 | Type | Kind | Purpose |
 |---|---|---|
 | Timeline Channel with Evidence | `Coordination/Timeline Channel` | Participant channel that also names T, the mandate processor key and the evidence profile |
+| Evidence Profile | base type | Published, immutable rules under which evidence on a channel is checked; it has no fields and is used only through its specialisations |
 | Proof Entry | message of a Timeline Entry on T | Carries one whole proof |
 | Rejection Entry | message of a Timeline Entry on T | States that one operation is not to be processed in one document |
 
@@ -57,7 +59,7 @@ stops at the entry that adds the channel. It MUST NOT treat the channel as a pla
 |---|---|
 | `proofTimeline` | The proof timeline T of this channel, a `Coordination/Signed Timeline` |
 | `mandateProcessorKey` | The public key whose signature on a private authority state the participant accepts, a `Coordination/Ed25519 Public Key` (*provisional*: the key type) |
-| `evidenceProfile` | The published evidence profile under which evidence for this channel is checked (*provisional*: the field name). Its type is defined by the profile's own package and selects the native part a host must implement; its content carries the profile's data |
+| `evidenceProfile` | The published evidence profile under which evidence for this channel is checked, an `Evidence Profile` (*provisional*: the field name). The exact specialisation is defined by the profile's own package and selects the native part a host must implement; its content carries the profile's data. A name such as "latest" is never a profile |
 
 Rules:
 
@@ -77,6 +79,19 @@ Rules:
    participants accept them by accepting the document.
 
 A participant with no representatives may use a plain `Coordination/Timeline Channel`.
+
+**Values the type system cannot exclude.** The Language schema fixes the length of
+`mandateProcessorKey` and the base type of `evidenceProfile`. It cannot express a
+character set, and it admits a value whose exact type is the base `Evidence Profile`.
+A processor therefore applies these rules itself, from the document state alone:
+
+1. `mandateProcessorKey` is well formed only as 64 characters `0-9a-f`.
+2. `evidenceProfile` is well formed only if its exact type is a specialisation of
+   `Evidence Profile`, not the base type, and its content is well formed under that
+   specialisation's own rules.
+3. A host that does not support the specialisation's protocol refuses the document
+   (§1). A host that supports it and finds the value malformed under rules 1–2 does
+   not refuse and does not wait: for §6 the channel lacks that field.
 
 ## 4. What the proof timeline is to the processor
 
@@ -102,7 +117,9 @@ proof's public output, as the declared profile defines.
 
 | Field | Content |
 |---|---|
-| `receipt` | The complete proof in the single encoding admitted by the declared profile, as canonical base64 text: RFC 4648 standard alphabet, with padding, no line breaks or other characters (*provisional*: field name and text encoding) |
+| `receipt` | The complete proof in the single encoding admitted by the declared profile, as canonical base64 text: RFC 4648 §4 standard alphabet, with padding, zero pad bits, no line breaks or other characters, so that decoding and re-encoding gives the same text (*provisional*: field name and text encoding) |
+
+The entry has no other field.
 
 **Rejection Entry.** "E is not to be processed in this document", with no proof.
 
@@ -111,10 +128,14 @@ proof's public output, as the declared profile defines.
 | `documentId` | The document's initial BlueId, the same for every participant, as text |
 | `operationEntry` | The BlueId of the operation entry E, as text (*provisional*: the field name) |
 
-A rejection needs no signature of its writer. It counts because it is on the
+The entry has no other field. A rejection needs no signature of its writer. It counts because it is on the
 participant's timeline. No size limit is imposed on an entry by these rules.
 Conformance of an entry is decided from the entry alone, so every processor decides
-it alike. The byte-exact grammar is not final in this preview (§8).
+it alike. An entry with another field, a missing field, a `receipt` that is not
+canonical base64, or decoded bytes that are not the profile's one admitted encoding
+conforms to neither kind and is skipped (§6); it never causes a wait of its own. The
+Language schema enforces the field set; the base64 and receipt-encoding rules are
+checked by the processor. The byte-exact grammar is not final in this preview (§8).
 
 ## 6. Deciding an evidence-decided operation
 
@@ -122,7 +143,8 @@ it alike. The byte-exact grammar is not final in this preview (§8).
 reading T, when at the position of E:
 
 - the channel E is performed on lacks any of the three fields; this includes a plain
-  `Coordination/Timeline Channel`;
+  `Coordination/Timeline Channel` and a field whose value is malformed (§3);
+- the authority claim of E is malformed under the rules of its own protocol;
 - T is at another provider than the channel's `timeline`.
 
 Every processor reads the same document state at that position, so the rejection is
