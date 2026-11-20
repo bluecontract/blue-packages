@@ -280,6 +280,74 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, nativeRules, "profile with a further field carrying only a type",
           with(profile, "note", Map.of("type", "Text")), ADMITTED);
 
+      // 8. Mandate State Attestation: the document the mandate processor signs (its BlueId is signed).
+      var attestationCases = new TreeMap<String, Object>();
+      // The referenced documents are written in full here: this tool holds no mandate, and a reference and
+      // its content written in full are the same Blue content (case 5). ref1 and ref2 stand for a timeline
+      // and an entry.
+      Map<String, Object> ref1 = timeline;
+      Map<String, Object> ref2 = with(operationTimelineEntry, "onBehalfOf", null);
+      Map<String, Object> attestation = new TreeMap<>(Map.of("type", "PrivateMandates/Mandate State Attestation",
+          "mandate", actor, "state", provider,
+          "authorityPackage", mandates.blueId(), "mandateProgram", "sha256:" + HEX, "approvedProgram", "sha256:" + HEX,
+          "position", List.of(Map.of("timeline", ref1), Map.of("timeline", ref2, "lastEntry", ref2)),
+          "certifiedNodes", Map.of("count", 1, "root", HEX), "sequence", 0));
+      ids.put("attestation", admitted(blue, "attestation", attestation));
+      expect(blue, attestationCases, "well-formed attestation whose references resolve", attestation, ADMITTED);
+      expect(blue, attestationCases, "with documents, a later sequence and previous", with(with(with(attestation,
+          "documents", List.of(ref1)), "sequence", 3), "previous", ref2), ADMITTED);
+      Map<String, Object> orderKey = Map.of("type", "Coordination/Order Key", "timestamp", 199, "timeline", timeline,
+          "entry", ref2);
+      // A reference to a type definition resolves but is not a value, so it does not satisfy a required field.
+      expect(blue, attestationCases, "mandate that is a reference to a type definition",
+          with(attestation, "mandate", Map.of("blueId", mandates.exportId("Mandate"))), SCHEMA);
+      expect(blue, attestationCases, "with timer fields", with(with(with(attestation, "timerRegistrations", "sha256:" + HEX),
+          "lastTimerFiring", orderKey), "nextTimerFiring", with(orderKey, "timestamp", 900)), ADMITTED);
+      for (String field : List.of("mandate", "state", "authorityPackage", "mandateProgram", "position", "certifiedNodes", "sequence"))
+        expect(blue, attestationCases, "without " + field, with(attestation, field, null), SCHEMA);
+      expect(blue, attestationCases, "without approvedProgram (none approved)", with(attestation, "approvedProgram", null), ADMITTED);
+      expect(blue, attestationCases, "certifiedNodes without count",
+          with(attestation, "certifiedNodes", Map.of("root", HEX)), SCHEMA);
+      expect(blue, attestationCases, "certifiedNodes without root",
+          with(attestation, "certifiedNodes", Map.of("count", 1)), SCHEMA);
+      expect(blue, attestationCases, "certifiedNodes with a short root",
+          with(attestation, "certifiedNodes", Map.of("count", 1, "root", "ab")), SCHEMA);
+      expect(blue, attestationCases, "negative sequence", with(attestation, "sequence", -1), SCHEMA);
+      expect(blue, attestationCases, "sequence that is not a number", with(attestation, "sequence", "first"), TYPE);
+      expect(blue, attestationCases, "short authorityPackage", with(attestation, "authorityPackage", "abc"), SCHEMA);
+      expect(blue, attestationCases, "position that is not a list", with(attestation, "position", "x"), TYPE);
+      expect(blue, attestationCases, "timer firing that is not an Order Key", with(attestation, "nextTimerFiring", "soon"), TYPE);
+      // The worked example of the signer's interface, with this package's type: its references name content that
+      // this tool does not hold, so Language admission is incomplete (the known reference behaviour).
+      Map<String, Object> worked = new TreeMap<>(Map.of("type", "PrivateMandates/Mandate State Attestation",
+          "mandate", Map.of("blueId", "ADsp5BkhCg4y6tNPoVhX1VEa7BmVd5SoGrucLBML5cx4"),
+          "state", Map.of("blueId", "GbNz5yeEZBa1kzfzfNnXXcH7vnkKYz6KneFLW6bcYUrN"),
+          "authorityPackage", "844HpnaEGPgJDkaMBL62MMRRSqF1pByLKEKaRA1HAbp1",
+          "mandateProgram", "sha256:7c02b3015a6cf35214a9b4cfe627ddf5c337af09c0fc40e19cca9bc14b847d38",
+          "approvedProgram", "sha256:7c02b3015a6cf35214a9b4cfe627ddf5c337af09c0fc40e19cca9bc14b847d38",
+          "position", List.of(Map.of("timeline", Map.of("blueId", "5Lv86guRteJU9tbzpmNiwqePbirhGaS5mrDNW2GP7bsw")),
+              Map.of("timeline", Map.of("blueId", "J7FkU9G7Vz5gTdeXLwSTzVzPs3J1v5pWtmEsRC9WjRDx"),
+                  "lastEntry", Map.of("blueId", "CngLs8rTqECQQxrtQdZaoFDBFNwV2k6pWax8b3B3YAWp"))),
+          "certifiedNodes", Map.of("count", 1, "root", "66ab853d5dd0a906d83a0fa802b321476156d0e6076b72322976711a81621e57"),
+          "sequence", 0));
+      expect(blue, attestationCases, "worked example, references not held here", worked, INCOMPLETE);
+
+      // The schema does not close the field set or check the canonical construction: left to the verifier.
+      var attestationVerifier = new TreeMap<String, Object>();
+      expect(blue, attestationVerifier, "extra field with a value", with(attestation, "signature", HEX), ADMITTED);
+      expect(blue, attestationVerifier, "extra field carrying only a type", with(attestation, "note", Map.of("type", "Text")), ADMITTED);
+      expect(blue, attestationVerifier, "sequence written as the text \"0\"", with(attestation, "sequence", "0"), ADMITTED);
+      expect(blue, attestationVerifier, "previous present with sequence 0", with(attestation, "previous", ref2), ADMITTED);
+      expect(blue, attestationVerifier, "later sequence without previous", with(attestation, "sequence", 3), ADMITTED);
+      expect(blue, attestationVerifier, "position rows not ascending",
+          with(attestation, "position", List.of(Map.of("timeline", ref2), Map.of("timeline", ref1))), ADMITTED);
+      expect(blue, attestationVerifier, "position row with another field",
+          with(attestation, "position", List.of(Map.of("timeline", ref1, "note", "x"))), ADMITTED);
+      expect(blue, attestationVerifier, "empty position", with(attestation, "position", List.of()), ADMITTED);
+      expect(blue, attestationVerifier, "root not lower-case hex",
+          with(attestation, "certifiedNodes", Map.of("count", 1, "root", "ZZ".repeat(32))), ADMITTED);
+      expect(blue, attestationVerifier, "mandate that is a text, not a reference", with(attestation, "mandate", "x"), ADMITTED);
+
       require(MISMATCHES.isEmpty(), "Language behaviour differs from the recorded expectation:\n" + String.join("\n", MISMATCHES));
 
       var result = new TreeMap<String, Object>();
@@ -299,6 +367,8 @@ public final class PrivateMandatesTypesConformance {
       result.put("referenceAndInlinedContentSameBlueId", byReference.equals(byContent));
       result.put("referenceAdmissionOutcomes", references);
       result.put("leftToNativeRules", nativeRules);
+      result.put("attestationSchemaDecisions", attestationCases);
+      result.put("attestationAdmittedBySchemaLeftToVerifier", attestationVerifier);
       result.put("scope", "Language schema, inheritance and retained prior identities; not native execution qualification");
       System.out.println(WireData.write(result));
     }

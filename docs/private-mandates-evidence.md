@@ -20,7 +20,9 @@ Coordination edition and the Mandates publication built on it, and adds
 `RISC Zero Succinct Receipt Profile` (a `Coordination/Evidence Profile`; its
 `factsRule` is `FULL(D)` or `MERKLE(FULL(D))`) and
 `Mandate Commitment Authority` (a `Mandates/Authority` with the salted mandate
-commitment and no `mandate` reference). The normative rules are the two `spec/` files.
+commitment and no `mandate` reference), and `Mandate State Attestation`, the
+document a mandate processor signs about one state of a mandate: its BlueId is
+signed, and the attestations of one mandate form a hash chain. The normative rules are the two `spec/` files.
 
 | Item | Version | BlueId |
 | --- | --- | --- |
@@ -31,9 +33,9 @@ commitment and no `mandate` reference). The normative rules are the two `spec/` 
 | Mandates protocol | | `GxCcpduSLDenAhsiDD2RLMTR1BjSDVFVchj3WNAzs6Yz` |
 | Time package | 0.2.0-gas10m.1.finalgas.1.evidence.1 | `E5DJ6N9ZiTWxdY4cyT7G9R1iMxJezuytic5Q5b8hAjte` |
 | Time protocol | | `4E6oq67afbGES738jLoac61UQD2wCWtWuXMNLaV3DS5m` |
-| Private Mandates package | 0.1.0-preview.1 | `WnxS6HtCaR8gSXv2iMZLQcMZcAvGNLuwKv4J14WHxcd` |
-| Private Mandates protocol | | `5QxEHeuURJgR8JmenYvCKpS5LZGMoTp2YZwGx8ZnqAW6` |
-| Private Mandates rules | | `EpB7Vs65aUeM1kHCUqbG9tHYcvVzLE22ApYVo9RsNvN4` |
+| Private Mandates package | 0.1.0-preview.1 | `3orRzica6GfzXFKPcHcJqvJo7TgcaCa2SCkUfw9yYWY9` |
+| Private Mandates protocol | | `8QtZE7yb2p9mSBxywTWauBiK8iUGCE7CULFxMtuKRCEo` |
+| Private Mandates rules | | `9vviNtykATEEqndJyR2caPUfe36JiqaBSMqRNVH7KZY4` |
 
 `PACKAGES.json` is the authority for every current package identity and checksum.
 
@@ -121,6 +123,7 @@ tool records these outcomes with their exact failure kinds.
 | `allowedProviders` not strictly ascending by key bytes; a profile with a further field | Same |
 | `evidenceProfile` whose exact type is not a supported specialisation of `Evidence Profile` | Same |
 | A commitment authority whose fields are not exactly `actor` and `mandateCommitment`, or whose `mandateCommitment` is not 64 characters `0-9a-f` | The operation is rejected from the document state, without reading the evidence timeline |
+| An attestation with a further field, or not in its canonical construction | Not reproducible by the proof, so no proof can be made with it; other verifiers must check the exact field set |
 | An entry of one of the two types that is not well formed, or that does not name this document and the operation | The entry is skipped |
 | A grant whose predicate ends in an error, gives a non-Boolean result or is statically inadmissible | That grant does not match; the other grants are tried |
 | Exhausted gas in a predicate, unless an earlier grant already passed; a fault of the mandate itself, a grant without target included | "The mandate does not admit": the operation is rejected and the document continues. A deliberate difference from mandates named in clear |

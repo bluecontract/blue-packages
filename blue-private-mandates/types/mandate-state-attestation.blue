@@ -1,0 +1,105 @@
+{
+  "name": "Mandate State Attestation",
+  "description": "Statement of a mandate processor about one state of a mandate, for proofs under an evidence profile of this package. The mandate processor signs the BlueId of this document: Ed25519 over UTF8(\"blue.private-mandates.mandate-state-attestation\\n\" + BlueId). The signature is outside the signed content. The field set is closed and is checked by the protocol verifier.",
+  "specification": {
+    "blueId": "9vviNtykATEEqndJyR2caPUfe36JiqaBSMqRNVH7KZY4"
+  },
+  "mandate": {
+    "description": "Reference to the mandate before initialization (its initial BlueId), as the initialized marker of the state gives it.",
+    "schema": {
+      "required": true
+    }
+  },
+  "state": {
+    "description": "Reference to the attested mandate state S: the root document of the processor's snapshot.",
+    "schema": {
+      "required": true
+    }
+  },
+  "documents": {
+    "description": "References to the further documents of the snapshot (embedded documents), strictly ascending by BlueId text; absent when there is none.",
+    "type": "List",
+    "schema": {
+      "uniqueItems": true
+    }
+  },
+  "authorityPackage": {
+    "description": "BlueId of the Mandates package the mandate is established under, as text.",
+    "type": "Text",
+    "schema": {
+      "required": true,
+      "minLength": 43,
+      "maxLength": 44
+    }
+  },
+  "mandateProgram": {
+    "description": "Identity of the program of the state.",
+    "type": "Text",
+    "schema": {
+      "required": true,
+      "minLength": 1
+    }
+  },
+  "approvedProgram": {
+    "description": "Identity of the approved program; absent when no program is approved. The mandate is approved when it equals mandateProgram.",
+    "type": "Text",
+    "schema": {
+      "minLength": 1
+    }
+  },
+  "position": {
+    "description": "The history position: one row per timeline the state depends on, strictly ascending by the BlueId text of the timeline. A row has the field timeline (reference to the Signed Timeline) and, unless no entry of that timeline is included, lastEntry (reference to the last included Timeline Entry). Rows have no other field and no type.",
+    "type": "List",
+    "schema": {
+      "required": true
+    }
+  },
+  "timerRegistrations": {
+    "description": "Digest of the pending timer registrations; absent when none is pending.",
+    "type": "Text",
+    "schema": {
+      "minLength": 1
+    }
+  },
+  "lastTimerFiring": {
+    "description": "Order key of the latest timer firing already applied in the state; absent when none.",
+    "type": "Coordination/Order Key"
+  },
+  "nextTimerFiring": {
+    "description": "Order key of the earliest pending timer firing; absent when none.",
+    "type": "Coordination/Order Key"
+  },
+  "certifiedNodes": {
+    "description": "The certified validation nodes of the grants of the state: number of rows and root of the Merkle tree over the rows (key [[\"<BlueId of V>\"],[]], goal certified:value, root flag true), in the construction of MERKLE(FULL(D)).",
+    "schema": {
+      "required": true
+    },
+    "count": {
+      "type": "Integer",
+      "schema": {
+        "required": true,
+        "minimum": 0
+      }
+    },
+    "root": {
+      "description": "64 characters 0-9a-f.",
+      "type": "Text",
+      "schema": {
+        "required": true,
+        "minLength": 64,
+        "maxLength": 64
+      }
+    }
+  },
+  "sequence": {
+    "description": "Number of this attestation in the mandate processor's chain of attestations for this mandate: 0 for the first, then the sequence of the previous attestation plus one.",
+    "type": "Integer",
+    "schema": {
+      "required": true,
+      "minimum": 0
+    }
+  },
+  "previous": {
+    "description": "Reference to the mandate processor's preceding attestation for this mandate (its BlueId); absent only in the first attestation (sequence 0)."
+  }
+}

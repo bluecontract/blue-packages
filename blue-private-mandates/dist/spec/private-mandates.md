@@ -43,6 +43,7 @@ channel is declared. Installing this data package grants no native support.
 | Type | Kind | Purpose |
 |---|---|---|
 | Mandate Commitment Authority | `Mandates/Authority` | Authority claim that carries M and names no mandate |
+| Mandate State Attestation | document signed by the mandate processor | What the mandate processor states about one state of a mandate (§4.2) |
 | RISC Zero Succinct Receipt Profile | `Coordination/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
 
 ## 3. The authority claim
@@ -67,7 +68,7 @@ message:
 | Field | Content |
 |---|---|
 | `actor` | Inherited from `Mandates/Authority`: the represented holder |
-| `mandateCommitment` | M = SHA-256(salt ‖ BlueId of the mandate before initialization), as 64 lower-case hexadecimal characters (*provisional*: field name and text encoding). The byte encoding of the two inputs is fixed by the proving program of the channel's profile |
+| `mandateCommitment` | M = SHA-256(salt ‖ BlueId of the mandate before initialization), as 64 lower-case hexadecimal characters (*provisional*: field name and text encoding). The salt is at least 16 bytes; with a shorter salt no proof can be made. The byte encoding of the two inputs is fixed by the proving program of the channel's profile |
 
 The claim has exactly these two fields and its type. It has no `mandate` field.
 
@@ -121,12 +122,23 @@ of the mandate; that the actor of E is the actor of the mandate's
 order of grant keys, document validation before request validation, each predicate
 with its own fresh gas ledger, the first grant that passes admits).
 
+**Conditions before any verdict.** A verdict, admitting or denying, exists only for
+a state that is shown to be the mandate's state strictly before E. The signature of
+the mandate processor, the position and its provider evidence, and the timer
+comparisons of §4.2 are therefore checked before anything is decided from the
+mandate. If one of them fails no proof can be made, whatever the mandate holds. In
+particular a fault of the mandate (case 3 below) gives "does not admit" only when
+the attested position covers the channel timelines of the attested state.
+
 **How the grants decide.** The grants of the scope are taken in the order of their
-keys. A grant *applies* to E when its target names the channel and the operation of
+keys, compared as sequences of UTF-16 code units. The Mandates specification does
+not state an order; this is the order the first program and the Mandates processor
+use. A grant *applies* to E when its target names the channel and the operation of
 E and, if it pins an initial document, that document is the target document. For
 each grant that applies, the document validation is evaluated first and the request
 validation only when the document validation passed; a grant passes when every
-validation it has passes. Every grant that applies is evaluated, also after the
+validation it has passes. A grant that has a request `validation` does not pass
+when E carries no request payload. Every grant that applies is evaluated, also after the
 decision is made. The verdict is taken from the outcomes in key order: the first
 grant that passes admits E; if none passes the mandate does not admit E.
 
@@ -136,22 +148,31 @@ these cases; none of them is a missing proof:
 1. *A grant that cannot match.* A predicate that ends in an execution error or meets
    an invalid operand makes that grant not match. So does a completed result that
    is not the Boolean true, as in Mandates today, and so does a predicate that is
-   statically inadmissible. The other grants are tried.
+   statically inadmissible. A validation node that is not an object, a Text or a
+   list for example, likewise makes its grant not match. The other grants are tried.
 2. *Exhausted gas.* A predicate that exhausts its gas ledger ends the decision with
    "the mandate does not admit E", unless a grant earlier in key order has already
    passed. This is the one case in which the verdict depends on the order of the
    grants: a gas-exhausting grant before an admitting grant denies, the same grant
    after it does not change the admission.
 3. *A fault of the mandate.* The signed state is not an Operation Mandate; it belongs
-   to another Mandates package than the profile's program was built with; it lacks
-   its approval, its participants or its scope; or a grant of its scope has no
-   target. The verdict is "the mandate does not admit E", whatever the other grants
+   to another Mandates package than the profile's program was built with; it has no
+   approved program, or its approved program is not the program of the state; it
+   lacks its participants or its scope; or a grant of its scope has no target. The verdict is "the mandate does not admit E", whatever the other grants
    are.
 
 In every such case the proof carries a denying verdict or, in case 1, the verdict
 the other grants give. E is decided at its own time and the target document
 continues with the next input. Repairing the mandate needs an update of the mandate,
 which applies to later operations.
+
+**A validation node that is not well formed.** A validation node that fails strict
+certification (it violates its schema or the compatibility of its types) and for
+which the mandate processor signed no certified row (§4.2) gives no proof for E: the
+proof would have to certify the node itself and cannot. An honest mandate processor
+does not approve a mandate with such a node. When the mandate processor did sign a
+row for such a node, it is at fault, and the outcome is whatever the evaluation of
+that grant gives under the rules above.
 
 **A grant that cannot be evaluated.** A grant that applies to E and whose evaluation
 needs content that cannot be supplied to the proving program is different: it is
@@ -302,86 +323,131 @@ Worked example for D = the one-character text `D` and the three rows, in order,
 The audit path of leaf 2 is [node(leaf 0, leaf 1)]; that of leaf 0 is [leaf 1, leaf 2].
 
 **Scope.** This profile excludes mandates with Time anywhere in the dependency graph
-that affects authorisation.
+that affects authorisation. For a mandate inside this scope the three timer fields
+of the attestation (§4.2) are absent. The proof does not enforce the exclusion; it
+only applies the two timer comparisons of §4.2 to what the mandate processor
+attests.
 
 ### 4.2 What the mandate processor signs, and what stays trusted to it
 
-The proof shows that the mandate processor, whose key is `mandateProcessorKey` of
-the channel, signed one message about the mandate state S. The message is ten lines
-joined by LF, with no LF after the last, signed with Ed25519 over its UTF-8 bytes.
-(*Provisional*: the layout and its domain texts are those of the first program.)
+The mandate processor states one thing per mandate state: a document of the exact
+type `Mandate State Attestation` of this package. It signs the BlueId of that
+document with the key that is `mandateProcessorKey` of the channel:
 
-| Line | Content |
-|---|---|
-| 1 | The text `blue.research.arbiter-state/3` |
-| 2 | Identity of the signed snapshot, whose root document is S |
-| 3 | BlueId of S |
-| 4 | Initial BlueId of the mandate, as the `initialized` marker of S gives it |
-| 5 | Digest of the head: the mandate program, the approved program and the Mandates package; its document is S |
-| 6 | Digest of the position N: rows (timeline BlueId, BlueId of the last entry or none), strictly ascending by timeline |
-| 7 | Digest of the pending timer registrations |
-| 8 | Latest timer firing already applied in S: `none`, or timestamp `:` source `:` event |
-| 9 | Earliest pending timer firing, in the same form |
-| 10 | Digest of the mandate facts (below) |
+    signed bytes = UTF8( "blue.private-mandates.mandate-state-attestation" ) LF UTF8( BlueId of the attestation )
+    signature    = Ed25519( signed bytes )
 
-The public output carries a salted commitment to this message: SHA-256 over the
-salt bytes followed by the message bytes. The encodings of the digests of lines 2,
-5, 6 and 7 are fixed by the program of `programImageId`.
+Pure Ed25519 of RFC 8032, LF the byte 0x0A, no byte after the BlueId. The signature
+is outside the signed content: the attestation has no signature field. There is no
+other serialisation: the canonical form and the hash are the BlueId of the Language.
+The public output of a proof carries a salted commitment to what was signed:
+SHA-256 over the salt bytes followed by the signed bytes. (*Provisional*: the domain
+text, the type name and the field names.)
 
-**Mandate facts.** Beside the state, the mandate processor signs facts about the
+The proving program is not given the attestation. It builds the document from the
+values it uses and has checked, computes its BlueId and verifies the signature. A
+value the proof uses can therefore not differ from the signed one, and a document
+with any further field has another BlueId and cannot be reproduced.
+
+| Field | Content | What it binds in the proof |
+|---|---|---|
+| `mandate` | Reference: the initial BlueId of the mandate | Read from the `initialized` marker of S, never from the prover; also the preimage of M |
+| `state` | Reference: S, the root document of the mandate processor's snapshot | The state the proof opens and evaluates |
+| `documents` | List of references to the further documents of the snapshot (embedded documents), strictly ascending by BlueId text; absent when there is none | Position completeness: the channel timelines of S and of each listed document must be rows of `position` |
+| `authorityPackage` | Text: BlueId of the Mandates package the mandate is established under | Must be the Mandates package the profile's program was built with, else "does not admit" |
+| `mandateProgram` | Text: identity of the program of the state | Compared with `approvedProgram` |
+| `approvedProgram` | Text: identity of the approved program; absent when none is approved | The mandate is approved exactly when it is present and equals `mandateProgram`, else "does not admit" |
+| `position` | List of rows, strictly ascending by the BlueId text of the timeline. A row has `timeline` (reference to the Signed Timeline) and, unless no entry of that timeline is included, `lastEntry` (reference to the last included Timeline Entry); no other field and no type | The history position N, checked against provider evidence and E (below) |
+| `timerRegistrations` | Text: digest of the pending timer registrations; absent when none is pending | Carried only |
+| `lastTimerFiring` | `Coordination/Order Key` of the latest timer firing already applied in S; absent when none | Must precede K, else no proof |
+| `nextTimerFiring` | `Coordination/Order Key` of the earliest pending timer firing; absent when none | K must precede it, else no proof: an operation is decided only on a state in which no timer is due before it |
+| `certifiedNodes` | `count` (Integer) and `root` (64 characters `0-9a-f`) of the tree of certified rows (below) | A certified row is used only with an audit path to `root` in a tree of `count` leaves |
+| `sequence` | Integer: 0 for the first attestation of this mandate by this processor, then the previous one plus one | Carried only (the chain, below) |
+| `previous` | Reference: the BlueId of the mandate processor's preceding attestation of the same mandate; absent only in the first | Carried only |
+
+A value that does not exist is an absent field, never an empty list. The content
+of the two program identities is not interpreted by the proof (*provisional*: how a
+program is identified).
+
+**The field set is closed and is checked by the verifier.** The Language schema of
+the type requires the fields marked required in the type and fixes lengths, but
+like the other types of this package it does not close the field set. The proof
+closes it by construction, as said above. Anyone else who checks an attestation
+MUST check that it has exactly these fields and the exact type.
+
+Not in the attestation, on purpose: the provider list (it is the profile's, and the
+public output carries its digest); the mandate processor key (the public output
+carries it and the processor compares it with the channel's); D, E and the salt (an
+attestation is about S alone and serves every operation decided on that state).
+
+**Certified rows.** Beside the state, the mandate processor attests facts about the
 validation nodes of the grants. For each grant in the scope of S, for each
 validation node V of that grant (its `validation` and its
-`target.documentValidation`) the set holds one row
+`target.documentValidation`) for which strict certification succeeds, there is one
+row
 
     key = [["<BlueId of V>"],[]]     goal = certified:value     root flag = true
 
 and it means: strict certification of V succeeds. Every node reachable from V is
 present and hashes to its BlueId, every type definition among them is valid, and V
-passes its schema. The rows are ordered by key, and line 10 is
+passes its schema. The mandate processor signs exactly rows of this goal; a row of
+any other goal is refused by the proof. The rows are distinct and ordered by key as
+byte strings, and `certifiedNodes` is the row count and the root of the Merkle tree
+over them in the construction of `MERKLE(FULL(D))` (§4.1): the same leaf and node
+hashes and the same MTH, with the count and `hex(MTH)` as the two fields instead of
+the outer digest. With no row the count is 0 and the root is `hex SHA-256("")`.
 
-    hex SHA-256( "blue.research.validation-facts/1" LF "mandate" LF S LF count LF
-                 ( key TAB "certified:value" TAB "1" LF )  for each row in order )
+A mandate processor MUST include a row only for a node for which it performed this
+certification and it succeeded. The proof relies on a row only for a validation
+node that it reaches itself from S, through scope, grant and target; a row about any
+other node has no effect. Without a row for a node the proof certifies that node
+itself. Pattern matching and predicate evaluation are always done in the proof,
+from S. This is asserted by the mandate processor, not proved.
 
-with S the BlueId of S as text. A mandate processor MUST sign a row only for a node
-for which it performed this certification and it succeeded. The proof relies on a
-row only for a validation node that it reaches itself from S, through scope, grant
-and target; a row about any other node has no effect. Without a row for a node the
-proof certifies that node itself. Pattern matching and predicate evaluation are
-always done in the proof, from S.
-
-This is asserted by the mandate processor, not proved. A mandate processor that
-signs a row for a node that is not well formed is at fault.
-
-**Position completeness.** The proof shows that the signed position N covers every
-timeline S depends on through a channel. For every document of the signed snapshot,
-every contract of that document whose type is, by ancestry, a Coordination
+**Position completeness.** The proof shows that `position` covers every timeline S
+depends on through a channel. For S and for every document of `documents`, every
+contract of that document whose type is, by ancestry, a Coordination
 `Timeline Channel` or `Public Timeline Channel` names a timeline, and each such
-timeline must be a row of N. For every row the proof shows that the row's last
-entry is the last entry of that timeline before K: by a provider guarantee whose
-last entry is the row's and which is complete to after the timestamp of K, or by the
-provider-signed successor entry after K, or, on E's own timeline only, by E itself
-whose previous entry is the row's. The provider of every row's timeline, that of
-E's own timeline included, must have its key in `allowedProviders`. If a timeline is
-not covered, or a provider is not in the list, no proof is made.
+timeline must be a row of `position`. The position has at least one row. For every
+row the proof shows, by exactly one kind of evidence, that the row's last entry is
+on that timeline, is before K, and is the last entry of that timeline before K: by
+a provider guarantee whose last entry is the row's and which is complete to after
+the timestamp of K, or by the provider-signed successor entry after K, or, on E's
+own timeline and only there, by E itself whose previous entry is the row's. The
+provider of every row's timeline, that of E's own timeline included, must have its
+key in `allowedProviders`. If a timeline is not covered, or a provider is not in the
+list, no proof is made.
+
+**The chain.** `sequence` and `previous` link the attestations of one mandate by one
+mandate processor into a hash chain. There is no timeline of the mandate processor.
+The proof checks nothing about the chain beyond that both fields are inside the
+signed document: it needs one attestation, does not follow the chain, and does not
+check that `previous` is absent exactly when `sequence` is 0. The chain is for
+audit. Two different attestations signed by one key for one `mandate` with the same
+`previous`, or with the same `sequence`, prove equivocation by the mandate
+processor, from the two signatures alone and without the mandate's content. A chain
+with every link present shows the states the mandate processor claims, in order. A
+missing link is the mandate processor's to explain; the chain does not prove that
+every attestation was published.
 
 **What stays trusted to the mandate processor.** The proof does not replay the
 mandate's history. Not shown by the proof, and asserted by the signature alone:
 
 - that S is the state that results from processing exactly the entries up to the
   last entry of each row, and each row's last entry itself;
-- the list of documents of the snapshot beside S (embedded documents): their channel
-  timelines are required once they are listed, but nothing shows the list complete;
-- dependencies that are not a channel contract of a listed document: documents S
-  refers to without embedding them, sources reached through another channel type,
-  and anything a contract reads when it runs;
-- the timers (lines 7 to 9); this profile excludes mandates with timers;
-- the head (line 5) and the mandate facts (line 10).
+- `documents`: the channel timelines of a listed document are required, but nothing
+  shows the list complete;
+- dependencies that are not a channel contract of S or of a listed document:
+  documents S refers to without embedding them, sources reached through another
+  channel type, and anything a contract reads when it runs;
+- the three timer fields;
+- `authorityPackage`, the two program identities and the certified rows.
 
 ## 5. When a proof matches
 
 The public output of a proof is a closed list: the BlueId of D, the BlueId of E, M,
 the mandate processor key, the provider set digest, a salted commitment to the
-mandate processor's signed statement, the digest of the validation facts about D
+bytes the mandate processor signed (§4.2), the digest of the validation facts about D
 that were reused, and the verdict.
 
 A well-formed `Coordination/Proof Entry` (Coordination section 14.5; the processor,
@@ -459,8 +525,10 @@ operation with this claim is rejected from the document state.
 
 - The names listed as provisional, and the text encodings of M, of the image
   identifier and of the digests.
-- The final format of the mandate processor's signed message and of its commitment;
-  §4.2 states the layout of the first program, whose domain texts are research names.
+- How a program is identified in `mandateProgram` and `approvedProgram`; the domain
+  text of the signature; whether position rows are typed.
+- Whether the proof checks that `previous` is absent exactly when `sequence` is 0.
+- Whether the timer fields stay, or the proof refuses every mandate with timers.
 - Binding each row's last entry to the mandate's own checkpoint, which would remove
   one item from what stays trusted to the mandate processor.
 - Mandates with timers; a second prover; the duty to reject an operation whose M
