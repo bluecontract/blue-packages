@@ -1,0 +1,31 @@
+{
+  "blueId": "2k7MQ291qEdAa6sRWnxXq8ZJw5K9tJ5ZcdUSFcY6bHdw",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh"
+    ],
+    "displayLabel": "Cancellation Settlement Functions",
+    "limitations": [
+      "Amounts due describe settlement obligations. Pending, failed and unknown payment outcomes do not confirm money movement.",
+      "A void releases authorization. A refund returns confirmed captured funds. Payment capabilities depend on the guarantor."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Reconciliation waits for a native Payment Instruction ledger.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "reconcileCancellationPayment requires the completed field and cancellationPlan reads it.",
+        "id": "capturedMinor",
+        "meaning": "Cumulative confirmed captures in the immutable Payment Instruction currency.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Cancellation Settlement Functions\n\nReusable helpers for reconciling the whole original Payment Instruction with the Order's reservation groups and immutable snapshot. `cancellationPlan` checks that the instruction amount equals the quote total in the same currency and that each group's proposal and decision are consistent. Its retained target includes each unresolved group's pending or confirmed price, each fulfilled group's price and the charge recorded by each eligible cancellation decision. It correlates native decisions by their exact BlueIds. Missing, changed or inconsistent inputs can fail validation.\n\nThe plan tracks basis, retained target, cumulative confirmed captured and refunded money, remaining authorization and net paid in the single quote currency. It derives the remaining refund, charge and authorization release due. `reconcileCancellationPayment` requires the linked initialized Order and snapshot, the instruction ledger and a ready source. It can request a refund for confirmed net payment above the retained target. Additional capture or release of the secured balance also requires fully resolved groups. An outstanding request marked pending or unknown blocks a new payment action; matching deterministic request IDs coordinate retries. Before capture the existing payment setup and capture gate must permit the request. The provider determines the operations it actually supports.\n\n`observeCancellationSettlement` validates the instruction type and exact Order origin, compares its observed amounts and decisions with its own recomputation, and copies matching state into the configured path. `saveCancellationSettlement` writes only changed state and emits a settlement-change event with the decision BlueIds and status. It leaves the Order decision and payment ledger as separate records."
+}

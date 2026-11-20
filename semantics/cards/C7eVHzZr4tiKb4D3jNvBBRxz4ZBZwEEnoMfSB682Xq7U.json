@@ -1,0 +1,122 @@
+{
+  "blueId": "C7eVHzZr4tiKb4D3jNvBBRxz4ZBZwEEnoMfSB682Xq7U",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "2k7MQ291qEdAa6sRWnxXq8ZJw5K9tJ5ZcdUSFcY6bHdw"
+    ],
+    "displayLabel": "Cancellation Payment Clause",
+    "limitations": [
+      "The clause delegates money movements to the existing Payment Instruction and guarantor.",
+      "This clause carries no guarantee that the selected rail supports partial capture or release."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "No settlement status has been established for this observation.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "reconcileCancellationPayment records its status and observeCancellationSettlement copies verified state.",
+        "id": "status",
+        "meaning": "Observed settlement progress for the selected Payment Instruction and decision set.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/status",
+        "type": "string"
+      },
+      {
+        "absent": "The settlement currency is unavailable.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "cancellationPlan uses immutable Payment Instruction terms and validates the quote currency.",
+        "id": "settlementCurrency",
+        "meaning": "Currency of the instruction and the settlement amounts.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "This observation has no captured-amount evidence.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "cancellationPlan reads the Payment Instruction ledger completed amount.",
+        "id": "capturedMinor",
+        "meaning": "Cumulative confirmed captured funds, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/capturedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no confirmed refund amount.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "cancellationPlan reads the Payment Instruction ledger reversed amount.",
+        "id": "refundedMinor",
+        "meaning": "Cumulative confirmed refunded funds, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/refundedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no remaining authorization amount.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "cancellationPlan reads the Payment Instruction ledger secured amount.",
+        "id": "authorizedMinor",
+        "meaning": "Remaining secured authorization, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/authorizedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no confirmed net paid amount.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "cancellationPlan records the net from completed less reversed.",
+        "id": "netPaidMinor",
+        "meaning": "Confirmed captured funds less confirmed refunds, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/netPaidMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no measured outstanding refund.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "cancellationPlan compares the net paid funds and the retained target.",
+        "id": "refundDueMinor",
+        "meaning": "Confirmed net paid above the retained target, still due back, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/refundDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No correlated payment request identifier is available.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/cancellationSettlement",
+        "evidence": "reconcileCancellationPayment preserves and updates lastRequestId.",
+        "id": "lastRequestId",
+        "meaning": "Identifier of the last payment request correlated by the settlement functions. An empty value records no identifier.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/lastRequestId",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Cancellation Payment Clause\n\nAttaches to the original Payment Instruction. It follows the linked Order at `order` (default `/sources/order`) and records the settlement at `state` (default `/cancellationSettlement`). Its automatic observation runs when the embedded Order changes, when the connection or activation is updated, or when a matching payment event, request or outcome arrives. It waits for the linked Order's origin and snapshot, source readiness and the Payment Instruction ledger.\n\nThe settlement helper validates the immutable instruction and checks the groups' native cancellation decisions. It uses confirmed net paid amounts and the retained target to decide whether a refund is due. With all groups resolved it may request an additional capture of the retained charge or release the remaining hold, subject to payment setup, the configured capture gate and the provider. Pending or unknown requests block new money actions until their outcomes can be reconciled. The clause correlates payment requests by deterministic IDs so that replay does not issue an independent request for the same ledger and decision set.\n\nThe status and amounts reflect this Payment Instruction. A requested refund, capture or void is awaiting its guarantor outcome. A void releases authorization, while a refund returns captured funds. Confirmed balance fields come from the Payment Instruction ledger. The payment rail can reject an otherwise valid request."
+}

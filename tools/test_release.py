@@ -170,9 +170,20 @@ class ReleaseTests(unittest.TestCase):
 
     def test_current_catalogue_and_generated_views_are_consistent(self):
         rows = release.selections(release.ROOT)
-        self.assertEqual(41, len(rows))
+        self.assertEqual(42, len(rows))
         self.assertEqual(1, sum(row['name'] == 'blue-execution-profile' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'clause-reseller' for row in rows))
+        cancellation, = [row for row in rows if row['name'] == 'reseller-cancellation-timing']
+        self.assertEqual('CancellationTiming', cancellation['namespace'])
+        publication, _ = release.check_archive(release.ROOT, cancellation)
+        self.assertEqual({
+            'Cancellation Clause': 'BZvBqmrQhazjLMqP4SWtdsKXFJK9dyLQBtg8UJ6u9YtW',
+            'Cancellation Payment Clause': 'C7eVHzZr4tiKb4D3jNvBBRxz4ZBZwEEnoMfSB682Xq7U',
+            'Cancellation Settlement Clause': 'F7z5KC3ZbS4WmvZaE7Cti66BifXfyptbGw4PRbXj9GF5',
+            'Cancellation Settlement Functions': '2k7MQ291qEdAa6sRWnxXq8ZJw5K9tJ5ZcdUSFcY6bHdw',
+            'Order Functions': '4rhicZVvoCGjzYDfEAE5tYNWWAGW1FC2gMkWpPL9dmYY',
+        }, {item['name']: item['blueId'] for item in publication['exports']})
+        self.assertEqual({'Language', 'Reseller'}, set(publication['imports']))
         self.assertEqual(1, sum(row['name'] == 'blue-definition-read' for row in rows))
         self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments', 'blue-offers', 'myos-business'} <= {row['name'] for row in rows})
         self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))

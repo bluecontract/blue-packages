@@ -1,0 +1,3183 @@
+{
+  "description": "Whole-PI reconciliation of immutable cancellation decisions from its bound Order. All covered groups contribute to the retained amount; unresolved groups prevent additional capture or authorization release.",
+  "functions": {
+    "cancellationPlan": {
+      "args": {
+        "groups": {},
+        "payment": {},
+        "snapshot": {},
+        "terms": {}
+      },
+      "do": [
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$and": [
+                  {
+                    "$eq": [
+                      {
+                        "$var": {
+                          "name": "snapshot",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/quoteBlueId"
+                          }
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$var": {
+                            "name": "snapshot",
+                            "path": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "/quote"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      {
+                        "$var": {
+                          "name": "snapshot",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/quote/currency"
+                          }
+                        }
+                      },
+                      {
+                        "$var": {
+                          "name": "terms",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/currency"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      {
+                        "$var": {
+                          "name": "snapshot",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/quote/totalMinor"
+                          }
+                        }
+                      },
+                      {
+                        "$var": {
+                          "name": "terms",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/amountMinor"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "$eq": [
+                      {
+                        "$size": {
+                          "$var": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "groups"
+                          }
+                        }
+                      },
+                      {
+                        "$size": {
+                          "$var": {
+                            "name": "snapshot",
+                            "path": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "/groups"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "message": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "CANCELLATION_PAYMENT_ORDER_MISMATCH"
+            }
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "type": {
+                "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+              },
+              "value": 0
+            },
+            "name": "target"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "type": {
+                "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+              },
+              "value": 0
+            },
+            "name": "basis"
+          }
+        },
+        {
+          "$let": {
+            "expr": {},
+            "name": "decisions"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "type": {
+                "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+              },
+              "value": true
+            },
+            "name": "resolved"
+          }
+        },
+        {
+          "$forEach": {
+            "do": [
+              {
+                "$let": {
+                  "expr": {
+                    "$get": {
+                      "key": {
+                        "$var": {
+                          "name": "spec",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/id"
+                          }
+                        }
+                      },
+                      "object": {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "groups"
+                        }
+                      }
+                    }
+                  },
+                  "name": "group"
+                }
+              },
+              {
+                "$let": {
+                  "expr": {
+                    "$var": {
+                      "name": "group",
+                      "path": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/proposal/amountMinor"
+                      }
+                    }
+                  },
+                  "name": "amount"
+                }
+              },
+              {
+                "$failIf": {
+                  "cond": {
+                    "$not": {
+                      "$and": [
+                        {
+                          "$isKind": {
+                            "kind": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "integer"
+                            },
+                            "val": {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "amount"
+                              }
+                            }
+                          }
+                        },
+                        {
+                          "$gte": [
+                            {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "amount"
+                              }
+                            },
+                            {
+                              "type": {
+                                "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                              },
+                              "value": 0
+                            }
+                          ]
+                        },
+                        {
+                          "$eq": [
+                            {
+                              "$var": {
+                                "name": "group",
+                                "path": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "/proposalBlueId"
+                                }
+                              }
+                            },
+                            {
+                              "$nodeBlueId": {
+                                "$var": {
+                                  "name": "group",
+                                  "path": {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "/proposal"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "$eq": [
+                            {
+                              "$var": {
+                                "name": "group",
+                                "path": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "/originalLineIndices"
+                                }
+                              }
+                            },
+                            {
+                              "$var": {
+                                "name": "spec",
+                                "path": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "/lineIndices"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "message": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "CANCELLATION_PAYMENT_GROUP_MISMATCH"
+                  }
+                }
+              },
+              {
+                "$set": {
+                  "expr": {
+                    "$add": [
+                      {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "basis"
+                        }
+                      },
+                      {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "amount"
+                        }
+                      }
+                    ]
+                  },
+                  "name": "basis"
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$exists": {
+                      "$var": {
+                        "name": "group",
+                        "path": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "/decisionBlueId"
+                        }
+                      }
+                    }
+                  },
+                  "else": [
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$includes": {
+                              "list": [
+                                {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "pending_supplier"
+                                },
+                                {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "pending_customer"
+                                },
+                                {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "confirmed"
+                                },
+                                {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "fulfilled"
+                                }
+                              ],
+                              "val": {
+                                "$var": {
+                                  "name": "group",
+                                  "path": {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "/status"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "message": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "CANCELLATION_PAYMENT_DECISION_REQUIRED"
+                        }
+                      }
+                    },
+                    {
+                      "$set": {
+                        "expr": {
+                          "$add": [
+                            {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "target"
+                              }
+                            },
+                            {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "amount"
+                              }
+                            }
+                          ]
+                        },
+                        "name": "target"
+                      }
+                    },
+                    {
+                      "$if": {
+                        "cond": {
+                          "$includes": {
+                            "list": [
+                              {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "pending_supplier"
+                              },
+                              {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "pending_customer"
+                              }
+                            ],
+                            "val": {
+                              "$var": {
+                                "name": "group",
+                                "path": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "/status"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "then": [
+                          {
+                            "$set": {
+                              "expr": {
+                                "type": {
+                                  "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                                },
+                                "value": false
+                              },
+                              "name": "resolved"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "then": [
+                    {
+                      "$let": {
+                        "expr": {
+                          "$var": {
+                            "name": "group",
+                            "path": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "/decision"
+                            }
+                          }
+                        },
+                        "name": "decision"
+                      }
+                    },
+                    {
+                      "$failIf": {
+                        "cond": {
+                          "$not": {
+                            "$and": [
+                              {
+                                "$includes": {
+                                  "list": [
+                                    {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "cancelled"
+                                    },
+                                    {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "declined"
+                                    },
+                                    {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "expired"
+                                    },
+                                    {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "no_show"
+                                    }
+                                  ],
+                                  "val": {
+                                    "$var": {
+                                      "name": "group",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/status"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$nodeBlueId": {
+                                      "$var": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "decision"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$var": {
+                                      "name": "group",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/decisionBlueId"
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$var": {
+                                      "name": "decision",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/groupId"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$var": {
+                                      "name": "spec",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/id"
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$var": {
+                                      "name": "decision",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/proposalBlueId"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$var": {
+                                      "name": "group",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/proposalBlueId"
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$var": {
+                                      "name": "decision",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/currency"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$var": {
+                                      "name": "terms",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/currency"
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$var": {
+                                      "name": "decision",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/basisMinor"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$var": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "amount"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$isKind": {
+                                  "kind": {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "integer"
+                                  },
+                                  "val": {
+                                    "$var": {
+                                      "name": "decision",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/chargeMinor"
+                                      }
+                                    }
+                                  }
+                                }
+                              },
+                              {
+                                "$gte": [
+                                  {
+                                    "$var": {
+                                      "name": "decision",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/chargeMinor"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": {
+                                      "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                                    },
+                                    "value": 0
+                                  }
+                                ]
+                              },
+                              {
+                                "$lte": [
+                                  {
+                                    "$var": {
+                                      "name": "decision",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/chargeMinor"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$var": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "amount"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$add": [
+                                      {
+                                        "$var": {
+                                          "name": "decision",
+                                          "path": {
+                                            "type": {
+                                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                            },
+                                            "value": "/chargeMinor"
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "$var": {
+                                          "name": "decision",
+                                          "path": {
+                                            "type": {
+                                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                            },
+                                            "value": "/releasedMinor"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "$var": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "amount"
+                                    }
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        },
+                        "message": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "CANCELLATION_PAYMENT_INVALID_DECISION"
+                        }
+                      }
+                    },
+                    {
+                      "$set": {
+                        "expr": {
+                          "$objectSet": {
+                            "key": {
+                              "$var": {
+                                "name": "spec",
+                                "path": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "/id"
+                                }
+                              }
+                            },
+                            "object": {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "decisions"
+                              }
+                            },
+                            "val": {
+                              "$var": {
+                                "name": "group",
+                                "path": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "/decisionBlueId"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "name": "decisions"
+                      }
+                    },
+                    {
+                      "$set": {
+                        "expr": {
+                          "$add": [
+                            {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "target"
+                              }
+                            },
+                            {
+                              "$var": {
+                                "name": "decision",
+                                "path": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "/chargeMinor"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "name": "target"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "in": {
+              "$var": {
+                "name": "snapshot",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/groups"
+                }
+              }
+            },
+            "item": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "spec"
+            }
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$ne": [
+                {
+                  "$var": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "basis"
+                  }
+                },
+                {
+                  "$var": {
+                    "name": "terms",
+                    "path": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/amountMinor"
+                    }
+                  }
+                }
+              ]
+            },
+            "message": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "CANCELLATION_PAYMENT_COVERAGE_MISMATCH"
+            }
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "$subtract": [
+                {
+                  "$var": {
+                    "name": "payment",
+                    "path": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/completed"
+                    }
+                  }
+                },
+                {
+                  "$var": {
+                    "name": "payment",
+                    "path": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/reversed"
+                    }
+                  }
+                }
+              ]
+            },
+            "name": "net"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "$choose": {
+                "cond": {
+                  "$gt": [
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "target"
+                      }
+                    },
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "net"
+                      }
+                    }
+                  ]
+                },
+                "else": {
+                  "type": {
+                    "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                  },
+                  "value": 0
+                },
+                "then": {
+                  "$subtract": [
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "target"
+                      }
+                    },
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "net"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "name": "chargeDue"
+          }
+        },
+        {
+          "$return": {
+            "additionalChargeDueMinor": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "chargeDue"
+              }
+            },
+            "allGroupsResolved": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "resolved"
+              }
+            },
+            "authorizationReleaseDueMinor": {
+              "$choose": {
+                "cond": {
+                  "$gt": [
+                    {
+                      "$var": {
+                        "name": "payment",
+                        "path": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "/secured"
+                        }
+                      }
+                    },
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "chargeDue"
+                      }
+                    }
+                  ]
+                },
+                "else": {
+                  "type": {
+                    "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                  },
+                  "value": 0
+                },
+                "then": {
+                  "$subtract": [
+                    {
+                      "$var": {
+                        "name": "payment",
+                        "path": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "/secured"
+                        }
+                      }
+                    },
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "chargeDue"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "authorizedMinor": {
+              "$var": {
+                "name": "payment",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/secured"
+                }
+              }
+            },
+            "basisMinor": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "basis"
+              }
+            },
+            "capturedMinor": {
+              "$var": {
+                "name": "payment",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/completed"
+                }
+              }
+            },
+            "currency": {
+              "$var": {
+                "name": "terms",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/currency"
+                }
+              }
+            },
+            "decisionBlueIds": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "decisions"
+              }
+            },
+            "netPaidMinor": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "net"
+              }
+            },
+            "refundDueMinor": {
+              "$choose": {
+                "cond": {
+                  "$gt": [
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "net"
+                      }
+                    },
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "target"
+                      }
+                    }
+                  ]
+                },
+                "else": {
+                  "type": {
+                    "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                  },
+                  "value": 0
+                },
+                "then": {
+                  "$subtract": [
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "net"
+                      }
+                    },
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "target"
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "refundedMinor": {
+              "$var": {
+                "name": "payment",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/reversed"
+                }
+              }
+            },
+            "targetMinor": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "target"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "observeCancellationSettlement": {
+      "args": {},
+      "do": [
+        {
+          "$let": {
+            "expr": {
+              "$document": {
+                "$const": {
+                  "name": "bindings",
+                  "path": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "/instruction"
+                  }
+                }
+              }
+            },
+            "name": "instruction"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "$document": {
+                "$const": {
+                  "name": "bindings",
+                  "path": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "/settlement"
+                  }
+                }
+              }
+            },
+            "name": "state"
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$not": {
+                "$exists": {
+                  "$var": {
+                    "name": "state",
+                    "path": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/orderOrigin"
+                    }
+                  }
+                }
+              }
+            },
+            "then": [
+              {
+                "$return": {
+                  "outcome": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "duplicate"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$failIf": {
+            "cond": {
+              "$not": {
+                "$and": [
+                  {
+                    "$is": {
+                      "node": {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "instruction"
+                        }
+                      },
+                      "pattern": {
+                        "type": {
+                          "blueId": "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh"
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "$eq": [
+                      {
+                        "$var": {
+                          "name": "state",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/orderOrigin"
+                          }
+                        }
+                      },
+                      {
+                        "$nodeBlueId": {
+                          "$document": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/contracts/initialized/document"
+                          }
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "message": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "CANCELLATION_SETTLEMENT_SOURCE_MISMATCH"
+            }
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "$call": {
+                "args": {
+                  "groups": {
+                    "$document": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/reservations"
+                    }
+                  },
+                  "payment": {
+                    "$var": {
+                      "name": "instruction",
+                      "path": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/payment"
+                      }
+                    }
+                  },
+                  "snapshot": {
+                    "$document": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/orderSnapshot"
+                    }
+                  },
+                  "terms": {
+                    "$var": {
+                      "name": "instruction",
+                      "path": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/paymentTerms"
+                      }
+                    }
+                  }
+                },
+                "function": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "cancellationPlan"
+                }
+              }
+            },
+            "name": "expected"
+          }
+        },
+        {
+          "$forEach": {
+            "do": [
+              {
+                "$if": {
+                  "cond": {
+                    "$ne": [
+                      {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "expectedValue"
+                        }
+                      },
+                      {
+                        "$get": {
+                          "key": {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "field"
+                            }
+                          },
+                          "object": {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "state"
+                            }
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "then": [
+                    {
+                      "$return": {
+                        "outcome": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "duplicate"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "in": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "expected"
+              }
+            },
+            "item": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "expectedValue"
+            },
+            "key": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "field"
+            }
+          }
+        },
+        {
+          "$return": {
+            "$call": {
+              "args": {
+                "state": {
+                  "$var": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "state"
+                  }
+                }
+              },
+              "function": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "saveCancellationSettlement"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "reconcileCancellationPayment": {
+      "args": {},
+      "do": [
+        {
+          "$let": {
+            "expr": {
+              "$const": {
+                "name": "bindings",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/order"
+                }
+              }
+            },
+            "name": "orderPath"
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$not": {
+                "$and": [
+                  {
+                    "$exists": {
+                      "$document": {
+                        "$concat": [
+                          {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "orderPath"
+                            }
+                          },
+                          {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/contracts/initialized/document"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "$exists": {
+                      "$document": {
+                        "$concat": [
+                          {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "orderPath"
+                            }
+                          },
+                          {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/orderSnapshot"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "$exists": {
+                      "$document": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/payment/completed"
+                      }
+                    }
+                  },
+                  {
+                    "$ne": [
+                      {
+                        "$document": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "/sourceLinks/ready"
+                        }
+                      },
+                      {
+                        "type": {
+                          "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                        },
+                        "value": false
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "then": [
+              {
+                "$return": {
+                  "outcome": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "duplicate"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "$document": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "/payment"
+              }
+            },
+            "name": "payment"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "$document": {
+                "$const": {
+                  "name": "bindings",
+                  "path": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "/state"
+                  }
+                }
+              }
+            },
+            "name": "previousState"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "$merge": [
+                {
+                  "$call": {
+                    "args": {
+                      "groups": {
+                        "$document": {
+                          "$concat": [
+                            {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "orderPath"
+                              }
+                            },
+                            {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "/reservations"
+                            }
+                          ]
+                        }
+                      },
+                      "payment": {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "payment"
+                        }
+                      },
+                      "snapshot": {
+                        "$document": {
+                          "$concat": [
+                            {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "orderPath"
+                              }
+                            },
+                            {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "/orderSnapshot"
+                            }
+                          ]
+                        }
+                      },
+                      "terms": {
+                        "$document": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "/paymentTerms"
+                        }
+                      }
+                    },
+                    "function": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "cancellationPlan"
+                    }
+                  }
+                },
+                {
+                  "lastRequestId": {
+                    "$pointerGet": {
+                      "default": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": ""
+                      },
+                      "object": {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "previousState"
+                        }
+                      },
+                      "path": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/lastRequestId"
+                      }
+                    }
+                  },
+                  "orderOrigin": {
+                    "$nodeBlueId": {
+                      "$document": {
+                        "$concat": [
+                          {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "orderPath"
+                            }
+                          },
+                          {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/contracts/initialized/document"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "status": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "not_applicable"
+                  }
+                }
+              ]
+            },
+            "name": "state"
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$eq": [
+                {
+                  "$size": {
+                    "$var": {
+                      "name": "state",
+                      "path": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/decisionBlueIds"
+                      }
+                    }
+                  }
+                },
+                {
+                  "type": {
+                    "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                  },
+                  "value": 0
+                }
+              ]
+            },
+            "then": [
+              {
+                "$return": {
+                  "$call": {
+                    "args": {
+                      "state": {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "state"
+                        }
+                      }
+                    },
+                    "function": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "saveCancellationSettlement"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "settled"
+            },
+            "name": "status"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "type": {
+                "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+              },
+              "value": false
+            },
+            "name": "unresolved"
+          }
+        },
+        {
+          "$forEach": {
+            "do": [
+              {
+                "$if": {
+                  "cond": {
+                    "$includes": {
+                      "list": [
+                        {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "pending"
+                        },
+                        {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "unknown"
+                        }
+                      ],
+                      "val": {
+                        "$var": {
+                          "name": "request",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/status"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "$set": {
+                        "expr": {
+                          "type": {
+                            "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                          },
+                          "value": true
+                        },
+                        "name": "unresolved"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "in": {
+              "$var": {
+                "name": "payment",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/requests"
+                }
+              }
+            },
+            "item": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "request"
+            },
+            "key": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "paymentRequestKey"
+            }
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": ""
+            },
+            "name": "action"
+          }
+        },
+        {
+          "$let": {
+            "expr": {
+              "type": {
+                "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+              },
+              "value": 0
+            },
+            "name": "amount"
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "unresolved"
+              }
+            },
+            "else": [
+              {
+                "$if": {
+                  "cond": {
+                    "$gt": [
+                      {
+                        "$var": {
+                          "name": "state",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/refundDueMinor"
+                          }
+                        }
+                      },
+                      {
+                        "type": {
+                          "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                        },
+                        "value": 0
+                      }
+                    ]
+                  },
+                  "else": [
+                    {
+                      "$if": {
+                        "cond": {
+                          "$not": {
+                            "$var": {
+                              "name": "state",
+                              "path": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "/allGroupsResolved"
+                              }
+                            }
+                          }
+                        },
+                        "else": [
+                          {
+                            "$if": {
+                              "cond": {
+                                "$gt": [
+                                  {
+                                    "$var": {
+                                      "name": "state",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/additionalChargeDueMinor"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": {
+                                      "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                                    },
+                                    "value": 0
+                                  }
+                                ]
+                              },
+                              "else": [
+                                {
+                                  "$if": {
+                                    "cond": {
+                                      "$gt": [
+                                        {
+                                          "$var": {
+                                            "name": "payment",
+                                            "path": {
+                                              "type": {
+                                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                              },
+                                              "value": "/secured"
+                                            }
+                                          }
+                                        },
+                                        {
+                                          "type": {
+                                            "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+                                          },
+                                          "value": 0
+                                        }
+                                      ]
+                                    },
+                                    "then": [
+                                      {
+                                        "$set": {
+                                          "expr": {
+                                            "type": {
+                                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                            },
+                                            "value": "void"
+                                          },
+                                          "name": "action"
+                                        }
+                                      },
+                                      {
+                                        "$set": {
+                                          "expr": {
+                                            "$var": {
+                                              "name": "payment",
+                                              "path": {
+                                                "type": {
+                                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                                },
+                                                "value": "/secured"
+                                              }
+                                            }
+                                          },
+                                          "name": "amount"
+                                        }
+                                      }
+                                    ]
+                                  }
+                                }
+                              ],
+                              "then": [
+                                {
+                                  "$set": {
+                                    "expr": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "capture"
+                                    },
+                                    "name": "action"
+                                  }
+                                },
+                                {
+                                  "$set": {
+                                    "expr": {
+                                      "$var": {
+                                        "name": "state",
+                                        "path": {
+                                          "type": {
+                                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                          },
+                                          "value": "/additionalChargeDueMinor"
+                                        }
+                                      }
+                                    },
+                                    "name": "amount"
+                                  }
+                                }
+                              ]
+                            }
+                          }
+                        ],
+                        "then": [
+                          {
+                            "$set": {
+                              "expr": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "waiting_order"
+                              },
+                              "name": "status"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "then": [
+                    {
+                      "$set": {
+                        "expr": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "refund"
+                        },
+                        "name": "action"
+                      }
+                    },
+                    {
+                      "$set": {
+                        "expr": {
+                          "$var": {
+                            "name": "state",
+                            "path": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "/refundDueMinor"
+                            }
+                          }
+                        },
+                        "name": "amount"
+                      }
+                    }
+                  ]
+                }
+              }
+            ],
+            "then": [
+              {
+                "$set": {
+                  "expr": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "waiting_payment"
+                  },
+                  "name": "status"
+                }
+              },
+              {
+                "$let": {
+                  "expr": {
+                    "$get": {
+                      "key": {
+                        "$var": {
+                          "name": "state",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/lastRequestId"
+                          }
+                        }
+                      },
+                      "object": {
+                        "$var": {
+                          "name": "payment",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/requests"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "name": "outstanding"
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$includes": {
+                      "list": [
+                        {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "pending"
+                        },
+                        {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "unknown"
+                        }
+                      ],
+                      "val": {
+                        "$var": {
+                          "name": "outstanding",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/status"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "$set": {
+                        "expr": {
+                          "$choose": {
+                            "cond": {
+                              "$eq": [
+                                {
+                                  "$var": {
+                                    "name": "outstanding",
+                                    "path": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "/status"
+                                    }
+                                  }
+                                },
+                                {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "unknown"
+                                }
+                              ]
+                            },
+                            "else": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "requested"
+                            },
+                            "then": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "unknown"
+                            }
+                          }
+                        },
+                        "name": "status"
+                      }
+                    },
+                    {
+                      "$set": {
+                        "expr": {
+                          "$merge": [
+                            {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "state"
+                              }
+                            },
+                            {
+                              "action": {
+                                "$var": {
+                                  "name": "outstanding",
+                                  "path": {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "/intent/action"
+                                  }
+                                }
+                              },
+                              "requestedMinor": {
+                                "$var": {
+                                  "name": "outstanding",
+                                  "path": {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "/intent/amountMinor"
+                                  }
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        "name": "state"
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$if": {
+            "cond": {
+              "$ne": [
+                {
+                  "$var": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "action"
+                  }
+                },
+                {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": ""
+                }
+              ]
+            },
+            "then": [
+              {
+                "$let": {
+                  "expr": {
+                    "$concat": [
+                      {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "cancellation-"
+                      },
+                      {
+                        "$nodeBlueId": [
+                          {
+                            "$const": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "clauseKey"
+                            }
+                          },
+                          {
+                            "$var": {
+                              "name": "state",
+                              "path": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "/decisionBlueIds"
+                              }
+                            }
+                          },
+                          {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "action"
+                            }
+                          },
+                          {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "amount"
+                            }
+                          },
+                          {
+                            "$var": {
+                              "name": "payment",
+                              "path": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "/completed"
+                              }
+                            }
+                          },
+                          {
+                            "$var": {
+                              "name": "payment",
+                              "path": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "/reversed"
+                              }
+                            }
+                          },
+                          {
+                            "$var": {
+                              "name": "payment",
+                              "path": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "/secured"
+                              }
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "name": "requestId"
+                }
+              },
+              {
+                "$let": {
+                  "expr": {
+                    "$get": {
+                      "key": {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "requestId"
+                        }
+                      },
+                      "object": {
+                        "$var": {
+                          "name": "payment",
+                          "path": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "/requests"
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "name": "previous"
+                }
+              },
+              {
+                "$let": {
+                  "expr": {
+                    "$pointerGet": {
+                      "default": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": ""
+                      },
+                      "object": {
+                        "$document": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "/paymentTerms"
+                        }
+                      },
+                      "path": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/captureGate"
+                      }
+                    }
+                  },
+                  "name": "gate"
+                }
+              },
+              {
+                "$set": {
+                  "expr": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "requested"
+                  },
+                  "name": "status"
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$or": [
+                      {
+                        "$ne": [
+                          {
+                            "$document": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "/activation/active"
+                            }
+                          },
+                          {
+                            "type": {
+                              "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                            },
+                            "value": true
+                          }
+                        ]
+                      },
+                      {
+                        "$ne": [
+                          {
+                            "$var": {
+                              "name": "payment",
+                              "path": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "/accepted"
+                              }
+                            }
+                          },
+                          {
+                            "type": {
+                              "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                            },
+                            "value": true
+                          }
+                        ]
+                      },
+                      {
+                        "$eq": [
+                          {
+                            "$var": {
+                              "name": "payment",
+                              "path": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "/transactionId"
+                              }
+                            }
+                          },
+                          {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": ""
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "then": [
+                    {
+                      "$set": {
+                        "expr": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "waiting_payment_setup"
+                        },
+                        "name": "status"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$or": [
+                      {
+                        "$eq": [
+                          {
+                            "$get": {
+                              "key": {
+                                "$var": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "action"
+                                }
+                              },
+                              "object": {
+                                "$var": {
+                                  "name": "payment",
+                                  "path": {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "/locks"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          {
+                            "type": {
+                              "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                            },
+                            "value": true
+                          }
+                        ]
+                      },
+                      {
+                        "$and": [
+                          {
+                            "$eq": [
+                              {
+                                "$var": {
+                                  "type": {
+                                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                  },
+                                  "value": "action"
+                                }
+                              },
+                              {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "capture"
+                              }
+                            ]
+                          },
+                          {
+                            "$or": [
+                              {
+                                "$eq": [
+                                  {
+                                    "$var": {
+                                      "name": "payment",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/closed"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": {
+                                      "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                                    },
+                                    "value": true
+                                  }
+                                ]
+                              },
+                              {
+                                "$lt": [
+                                  {
+                                    "$var": {
+                                      "name": "payment",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/secured"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "$var": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "amount"
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$gt": [
+                                  {
+                                    "$add": [
+                                      {
+                                        "$var": {
+                                          "type": {
+                                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                          },
+                                          "value": "amount"
+                                        }
+                                      },
+                                      {
+                                        "$var": {
+                                          "name": "payment",
+                                          "path": {
+                                            "type": {
+                                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                            },
+                                            "value": "/completed"
+                                          }
+                                        }
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "$var": {
+                                      "name": "payment",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/targetMinor"
+                                      }
+                                    }
+                                  }
+                                ]
+                              },
+                              {
+                                "$eq": [
+                                  {
+                                    "$var": {
+                                      "name": "payment",
+                                      "path": {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": "/payeeChannel"
+                                      }
+                                    }
+                                  },
+                                  {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": ""
+                                  }
+                                ]
+                              },
+                              {
+                                "$and": [
+                                  {
+                                    "$document": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "/paymentTerms/recipientApprovalRequired"
+                                    }
+                                  },
+                                  {
+                                    "$ne": [
+                                      {
+                                        "$var": {
+                                          "name": "payment",
+                                          "path": {
+                                            "type": {
+                                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                            },
+                                            "value": "/recipientApproved"
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "type": {
+                                          "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                                        },
+                                        "value": true
+                                      }
+                                    ]
+                                  }
+                                ]
+                              },
+                              {
+                                "$and": [
+                                  {
+                                    "$ne": [
+                                      {
+                                        "$var": {
+                                          "type": {
+                                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                          },
+                                          "value": "gate"
+                                        }
+                                      },
+                                      {
+                                        "type": {
+                                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                        },
+                                        "value": ""
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "$ne": [
+                                      {
+                                        "$document": {
+                                          "$var": {
+                                            "type": {
+                                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                            },
+                                            "value": "gate"
+                                          }
+                                        }
+                                      },
+                                      {
+                                        "type": {
+                                          "blueId": "AwvXD961fmnmqcSQhjMA7r15HpVh39cefb6ZTyUz2Fm2"
+                                        },
+                                        "value": true
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "then": [
+                    {
+                      "$set": {
+                        "expr": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "blocked"
+                        },
+                        "name": "status"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$exists": {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "previous"
+                      }
+                    }
+                  },
+                  "then": [
+                    {
+                      "$set": {
+                        "expr": {
+                          "$choose": {
+                            "cond": {
+                              "$includes": {
+                                "list": [
+                                  {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "failed"
+                                  },
+                                  {
+                                    "type": {
+                                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                    },
+                                    "value": "declined"
+                                  }
+                                ],
+                                "val": {
+                                  "$var": {
+                                    "name": "previous",
+                                    "path": {
+                                      "type": {
+                                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                      },
+                                      "value": "/status"
+                                    }
+                                  }
+                                }
+                              }
+                            },
+                            "else": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "waiting_payment"
+                            },
+                            "then": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "failed"
+                            }
+                          }
+                        },
+                        "name": "status"
+                      }
+                    }
+                  ]
+                }
+              },
+              {
+                "$set": {
+                  "expr": {
+                    "$merge": [
+                      {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "state"
+                        }
+                      },
+                      {
+                        "action": {
+                          "$var": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "action"
+                          }
+                        },
+                        "lastRequestId": {
+                          "$var": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "requestId"
+                          }
+                        },
+                        "requestedMinor": {
+                          "$var": {
+                            "type": {
+                              "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                            },
+                            "value": "amount"
+                          }
+                        }
+                      }
+                    ]
+                  },
+                  "name": "state"
+                }
+              },
+              {
+                "$if": {
+                  "cond": {
+                    "$eq": [
+                      {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "status"
+                        }
+                      },
+                      {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "requested"
+                      }
+                    ]
+                  },
+                  "then": [
+                    {
+                      "$call": {
+                        "args": {
+                          "action": {
+                            "$var": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "action"
+                            }
+                          },
+                          "input": {
+                            "amountMinor": {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "amount"
+                              }
+                            },
+                            "reason": {
+                              "type": {
+                                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                              },
+                              "value": "Order cancellation settlement"
+                            },
+                            "requestId": {
+                              "$var": {
+                                "type": {
+                                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                                },
+                                "value": "requestId"
+                              }
+                            }
+                          }
+                        },
+                        "function": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "request"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$return": {
+            "$call": {
+              "args": {
+                "state": {
+                  "$merge": [
+                    {
+                      "$var": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "state"
+                      }
+                    },
+                    {
+                      "status": {
+                        "$var": {
+                          "type": {
+                            "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                          },
+                          "value": "status"
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "function": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "saveCancellationSettlement"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "saveCancellationSettlement": {
+      "args": {
+        "state": {}
+      },
+      "do": [
+        {
+          "$if": {
+            "cond": {
+              "$eq": [
+                {
+                  "$document": {
+                    "$const": {
+                      "name": "bindings",
+                      "path": {
+                        "type": {
+                          "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                        },
+                        "value": "/state"
+                      }
+                    }
+                  }
+                },
+                {
+                  "$var": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "state"
+                  }
+                }
+              ]
+            },
+            "then": [
+              {
+                "$return": {
+                  "outcome": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "duplicate"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$appendChange": {
+            "op": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "replace"
+            },
+            "path": {
+              "$const": {
+                "name": "bindings",
+                "path": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "/state"
+                }
+              }
+            },
+            "val": {
+              "$var": {
+                "type": {
+                  "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                },
+                "value": "state"
+              }
+            }
+          }
+        },
+        {
+          "$appendEvent": {
+            "$merge": [
+              {
+                "type": {
+                  "blueId": "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+                }
+              },
+              {
+                "clause": {
+                  "$const": {
+                    "type": {
+                      "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                    },
+                    "value": "clauseKey"
+                  }
+                },
+                "decisionBlueIds": {
+                  "$var": {
+                    "name": "state",
+                    "path": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/decisionBlueIds"
+                    }
+                  }
+                },
+                "kind": {
+                  "type": {
+                    "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                  },
+                  "value": "Cancellation Settlement Changed"
+                },
+                "status": {
+                  "$var": {
+                    "name": "state",
+                    "path": {
+                      "type": {
+                        "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+                      },
+                      "value": "/status"
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "$return": {
+            "outcome": {
+              "type": {
+                "blueId": "GX7CFUmSDrE2MzptunLCCdZwnuwwrenRQqEnHL4x3uoC"
+              },
+              "value": "acceptedNew"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "name": "Cancellation Settlement Functions",
+  "type": {
+    "blueId": "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde"
+  }
+}
