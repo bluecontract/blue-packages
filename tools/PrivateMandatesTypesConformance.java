@@ -151,7 +151,17 @@ public final class PrivateMandatesTypesConformance {
           with(profile, "allowedProviders", List.of("01".repeat(32), "01".repeat(32))), SCHEMA);
       for (String field : List.of("programImageId", "allowedProviders", "factsRule"))
         expect(blue, schema, "profile without " + field, with(profile, field, null), SCHEMA);
+      // The profile names exactly one of two facts rules; any third value is rejected by the schema.
+      expect(blue, schema, "profile with the facts rule FULL(D)", with(profile, "factsRule", "FULL(D)"), ADMITTED);
+      expect(blue, schema, "profile with the facts rule MERKLE(FULL(D))",
+          with(profile, "factsRule", "MERKLE(FULL(D))"), ADMITTED);
+      expect(blue, schema, "channel whose profile has the facts rule MERKLE(FULL(D))", with(channel, "evidenceProfile",
+          with(profile, "factsRule", "MERKLE(FULL(D))")), ADMITTED);
       expect(blue, schema, "profile with another facts rule", with(profile, "factsRule", "CANONICAL"), SCHEMA);
+      expect(blue, schema, "profile with the facts rule MERKLE", with(profile, "factsRule", "MERKLE"), SCHEMA);
+      expect(blue, schema, "profile with the facts rule in lower case", with(profile, "factsRule", "merkle(full(d))"), SCHEMA);
+      expect(blue, schema, "profile with both facts rules as a list",
+          with(profile, "factsRule", List.of("FULL(D)", "MERKLE(FULL(D))")), TYPE);
       expect(blue, schema, "profile with a short image id", with(profile, "programImageId", "ab"), SCHEMA);
       expect(blue, schema, "authority without commitment", with(authority, "mandateCommitment", null), SCHEMA);
       expect(blue, schema, "authority without holder", with(authority, "actor", null), SCHEMA);

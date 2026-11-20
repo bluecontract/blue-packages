@@ -94,7 +94,10 @@ T. The agent announces nothing before writing and takes no part in the proof flo
 a processor match a proof to the operation.
 
 An operation whose authority claim is a `Mandate Commitment Authority` is
-evidence-decided in the sense of section 14 of the Coordination specification.
+evidence-decided in the sense of section 14 of the Coordination specification. The
+claim is recognised by its exact type: the type of the claim must be exactly
+`Mandate Commitment Authority` of this package. A claim of a subtype, of a parent
+type or with no type is not evidence-decided, and no proof can be made for it.
 
 **Checked by every processor, outside the proof.** These are the checks a processor
 performs today for a `Mandates/Mandate Authority` without reading the mandate. They
@@ -118,33 +121,55 @@ of the mandate; that the actor of E is the actor of the mandate's
 order of grant keys, document validation before request validation, each predicate
 with its own fresh gas ledger, the first grant that passes admits).
 
-**When the mandate or a predicate is at fault.** The statement always ends in a
-verdict in these cases; none of them is a missing proof:
+**How the grants decide.** The grants of the scope are taken in the order of their
+keys. A grant *applies* to E when its target names the channel and the operation of
+E and, if it pins an initial document, that document is the target document. For
+each grant that applies, the document validation is evaluated first and the request
+validation only when the document validation passed; a grant passes when every
+validation it has passes. Every grant that applies is evaluated, also after the
+decision is made. The verdict is taken from the outcomes in key order: the first
+grant that passes admits E; if none passes the mandate does not admit E.
 
-1. *An error in a grant's predicate.* A predicate that ends in an execution error
-   or meets an invalid operand makes that grant not match. So does a completed
-   result that is not the Boolean true, as in Mandates today. The remaining grants
-   of the scope are tried, so the verdict does not depend on the order of the
-   grants: E is admitted exactly when at least one grant passes.
-2. *Exhausted gas.* A predicate that exhausts its gas ledger ends the whole decision
-   with "the mandate does not admit E". The remaining grants are not tried.
-3. *A fault of the mandate.* The signed state is not an Operation Mandate, it
-   belongs to another Mandates package than the profile's program was built with,
-   or it lacks its approval, its participants or its scope: the verdict is "the
-   mandate does not admit E".
+**When the mandate or a predicate is at fault.** The statement ends in a verdict in
+these cases; none of them is a missing proof:
 
-In every such case the proof carries a denying verdict, E is rejected at its own
-time, and the target document continues with the next input. Repairing the mandate
-needs an update of the mandate, which applies to later operations.
+1. *A grant that cannot match.* A predicate that ends in an execution error or meets
+   an invalid operand makes that grant not match. So does a completed result that
+   is not the Boolean true, as in Mandates today, and so does a predicate that is
+   statically inadmissible. The other grants are tried.
+2. *Exhausted gas.* A predicate that exhausts its gas ledger ends the decision with
+   "the mandate does not admit E", unless a grant earlier in key order has already
+   passed. This is the one case in which the verdict depends on the order of the
+   grants: a gas-exhausting grant before an admitting grant denies, the same grant
+   after it does not change the admission.
+3. *A fault of the mandate.* The signed state is not an Operation Mandate; it belongs
+   to another Mandates package than the profile's program was built with; it lacks
+   its approval, its participants or its scope; or a grant of its scope has no
+   target. The verdict is "the mandate does not admit E", whatever the other grants
+   are.
+
+In every such case the proof carries a denying verdict or, in case 1, the verdict
+the other grants give. E is decided at its own time and the target document
+continues with the next input. Repairing the mandate needs an update of the mandate,
+which applies to later operations.
+
+**A grant that cannot be evaluated.** A grant that applies to E and whose evaluation
+needs content that cannot be supplied to the proving program is different: it is
+not a fault the statement can establish, because the statement cannot tell content
+that does not exist from content that is withheld. No proof can then be made for E,
+whatever the order of the grants and also when another grant would admit. So
+withholding content can never choose a verdict: for one S, D and E at most one
+verdict is provable. The party ends the wait with a Rejection Entry (Coordination
+section 14.5); repairing needs an update of the mandate.
 
 This is a deliberate difference from mandates named in clear. For a
 `Mandates/Mandate Authority` the Mandates specification says only that an error
 never authorizes, and a processor that evaluates the predicate or reads the mandate
 itself may give no verdict and stop processing the target document. Here the
 represented party answers for its own mandate: the other participants cannot read
-it, so a faulty mandate must not stop the document for everyone. Content that the
-prover cannot obtain and a local interruption of proving or of verification are not
-faults of the mandate: they give no proof or a retry, never a verdict.
+it, so a faulty mandate must not stop the document for everyone. A local
+interruption of proving is not a fault of the mandate: it gives no proof, never a
+verdict.
 
 ## 4. Evidence profiles
 
@@ -171,14 +196,24 @@ that channel is rejected from the document state.
 |---|---|
 | `programImageId` | Image identifier of the proving program, 64 lower-case hexadecimal characters. It fixes the proved statement, the format of the public output, and the runtime and package bindings, gas limit and error semantics the program was built with |
 | `allowedProviders` | The profile's allowed timeline provider set: a list of `Coordination/Ed25519 Public Key`, strictly ascending when compared as 32-byte values |
-| `factsRule` | The facts definition. The only value is `FULL(D)` |
+| `factsRule` | How the proof commits to the validation facts about D it reuses: `FULL(D)` or `MERKLE(FULL(D))`. A profile names exactly one, and it must be the rule the program of `programImageId` was built with |
 
 The value has exactly these three fields. (*Provisional*: the field names and the
 type name.)
 
 The type itself fixes what is not data: the receipt kind (a succinct RISC Zero
 receipt, in one canonical encoding with no other bytes), the verifier, the
-comparison rules of §5, the provider set digest function and the facts algorithm.
+comparison rules of §5, the provider set digest function and the facts algorithms.
+
+**The receipt.** `receipt` of a Proof Entry decodes to exactly one canonical
+encoding of a succinct receipt. A byte string that is not that encoding is skipped,
+also when a verifier would accept it: trailing or altered bytes, another receipt
+kind, and a receipt whose `control_inclusion_proof.index` has a bit set above the
+length of its path. The verifier reads one bit of that index per digest of the path
+and ignores the bits above, three bytes in the receipts of the first program, so
+such a receipt verifies like the original; it is skipped all the same. Any failure
+or fault while a receipt is decoded or verified, a panic of the verifier included,
+is a skip of that entry and never a retry (§5.1).
 
 **Allowed provider set.** The set belongs to the profile, not to a mandate. The
 proving program checks that every provider key the mandate processor signed belongs
@@ -196,20 +231,151 @@ schema enforces the three required fields, at most three fields with a value, th
 length of each key and of `programImageId`, distinct list elements and the value of
 `factsRule`. As for the authority claim (§3) it admits a further field that carries
 only a type. The processor additionally requires that the fields are exactly these
-three, that `programImageId` and every key are 64 characters `0-9a-f`, and that
-the list is strictly ascending by key bytes. A
+three, that `programImageId` and every key are 64 characters `0-9a-f`, that the
+list is strictly ascending by key bytes, and that `factsRule` is one of the two
+values. A
 profile that fails any of these is malformed; under section 14 of the Coordination
 specification the channel then lacks its profile, and every operation with
 a `Mandate Commitment Authority` on it is rejected from the document state.
 
-**Facts rule.** FULL(D) is the least set of rows (recipe key, goal, root) closed
-under the step of `validate`, starting from the definition row of every non-core
-type and specification reachable from D and from the definition row of D itself. It
-depends on D alone. A processor accepts two digests: that of the empty set and that
-of FULL(D), which it computes itself from D.
+**The fact set.** FULL(D) is the least set of rows (recipe key, goal, root flag)
+closed under the step of `validate`, starting from the definition row of every
+non-core type and specification reachable from D and from the definition row of D
+itself. It depends on D alone. The goal of a row is `definition` or `value`. A
+recipe key is a JSON text; neither it nor a goal contains a tab or a line feed.
+The rows are ordered by recipe key, then goal, then root flag (false before true),
+keys and goals compared as byte strings; a set has no two equal rows.
+
+Both facts rules commit to this same set. They differ only in the digest that the
+public output carries. Below `D` is the BlueId of D as text, `count` the number of
+rows in decimal, `flag` the character `1` for a true root flag and `0` for false,
+`TAB` the byte 0x09, `LF` the byte 0x0A, and `hex` lower-case hexadecimal.
+(*Provisional*: the domain texts, which are those of the first program.)
+
+`FULL(D)` — one hash over all rows in order:
+
+    digest = hex SHA-256( "blue.research.validation-facts/1" LF "target" LF D LF count LF
+                          ( key TAB goal TAB flag LF )  for each row in order )
+
+`MERKLE(FULL(D))` — a Merkle tree over the rows in the same order:
+
+    leaf(row)   = SHA-256( 0x00 || key || TAB || goal || TAB || flag )
+    node(l, r)  = SHA-256( 0x01 || l || r )
+    MTH({})     = SHA-256( "" )
+    MTH({d})    = leaf(d)
+    MTH(d[0:n]) = node( MTH(d[0:k]), MTH(d[k:n]) ),  k the largest power of two smaller than n
+    digest      = hex SHA-256( "blue.research.validation-facts-tree/1" LF "target" LF D LF
+                               count LF hex(MTH) LF )
+
+This is the Merkle Tree Hash of RFC 9162 section 2.1 with the leaf content above.
+The row count is inside the digest. Under this rule a proof is given only the rows
+it uses. Each comes with its index and its audit path, and the program uses a row
+only when the path gives the root for that index in a tree of `count` leaves
+(RFC 9162 section 2.1.3.2); otherwise no proof is made.
+
+**The empty set.** A proof may reuse no facts and validate what it reads itself. It
+then carries the digest of the empty set under the profile's rule: for `FULL(D)`
+the first formula with `count` 0 and no row; for `MERKLE(FULL(D))` the last formula
+with `count` 0 and MTH({}).
+
+**What a processor accepts.** Exactly two digests, both under the rule the profile
+names: that of the empty set, and that of FULL(D), which it computes itself from its
+own records of D (under the Merkle rule it builds the tree and compares count and
+root through the digest). Any other digest is a mismatch and the entry is skipped.
+This includes a proof made under the other rule: a profile names one rule, and a
+proof made under the other never matches.
+
+Worked example for D = the one-character text `D` and the three rows, in order,
+(`[["A"],[]]`, `definition`, false), (`[["A"],[]]`, `value`, true),
+(`[["B"],[]]`, `definition`, true):
+
+    leaf 0 = 54719cff97ae9a8ce6528246b84deb21c543d785171c4f951722f01253d1b204
+    leaf 1 = 3b174bcda93ca72fe37d88515041263eab7dd8afbd08af397e481a393d627d38
+    leaf 2 = 870819661e900fe1f0e0b1cd64b1cb514078b1a59ec4cf023a6bc7bb7cc5faad
+    node(leaf 0, leaf 1) = 30454d725d79c97d0297fab76e5ab0cbb25528c263d99d632326d339c5347e6f
+    MTH    = ce0af5187a4b1be1f76521a68712900f2c1bfde5d2de49484c12fb0e27cb8b17
+    MERKLE(FULL(D)) digest = 23edefcd70cd8dd859d44786601a93b7c8c6b4bce2dbbe53056db84e38ce8829
+    FULL(D) digest         = b85228f7a7f16ff78440f3cad17208781fc01dc5baee9109352927c96cfdc4ce
+    empty set, MERKLE(FULL(D)) = 5fc080ad098dbbf7389835369c2e4a0d9fb667dac5f7d6aaa35d5e19d21d1789
+    empty set, FULL(D)         = ee8f53183e62b992d9ce00caaa933ce3351898099888df5ca250d10a3011fe7a
+
+The audit path of leaf 2 is [node(leaf 0, leaf 1)]; that of leaf 0 is [leaf 1, leaf 2].
 
 **Scope.** This profile excludes mandates with Time anywhere in the dependency graph
 that affects authorisation.
+
+### 4.2 What the mandate processor signs, and what stays trusted to it
+
+The proof shows that the mandate processor, whose key is `mandateProcessorKey` of
+the channel, signed one message about the mandate state S. The message is ten lines
+joined by LF, with no LF after the last, signed with Ed25519 over its UTF-8 bytes.
+(*Provisional*: the layout and its domain texts are those of the first program.)
+
+| Line | Content |
+|---|---|
+| 1 | The text `blue.research.arbiter-state/3` |
+| 2 | Identity of the signed snapshot, whose root document is S |
+| 3 | BlueId of S |
+| 4 | Initial BlueId of the mandate, as the `initialized` marker of S gives it |
+| 5 | Digest of the head: the mandate program, the approved program and the Mandates package; its document is S |
+| 6 | Digest of the position N: rows (timeline BlueId, BlueId of the last entry or none), strictly ascending by timeline |
+| 7 | Digest of the pending timer registrations |
+| 8 | Latest timer firing already applied in S: `none`, or timestamp `:` source `:` event |
+| 9 | Earliest pending timer firing, in the same form |
+| 10 | Digest of the mandate facts (below) |
+
+The public output carries a salted commitment to this message: SHA-256 over the
+salt bytes followed by the message bytes. The encodings of the digests of lines 2,
+5, 6 and 7 are fixed by the program of `programImageId`.
+
+**Mandate facts.** Beside the state, the mandate processor signs facts about the
+validation nodes of the grants. For each grant in the scope of S, for each
+validation node V of that grant (its `validation` and its
+`target.documentValidation`) the set holds one row
+
+    key = [["<BlueId of V>"],[]]     goal = certified:value     root flag = true
+
+and it means: strict certification of V succeeds. Every node reachable from V is
+present and hashes to its BlueId, every type definition among them is valid, and V
+passes its schema. The rows are ordered by key, and line 10 is
+
+    hex SHA-256( "blue.research.validation-facts/1" LF "mandate" LF S LF count LF
+                 ( key TAB "certified:value" TAB "1" LF )  for each row in order )
+
+with S the BlueId of S as text. A mandate processor MUST sign a row only for a node
+for which it performed this certification and it succeeded. The proof relies on a
+row only for a validation node that it reaches itself from S, through scope, grant
+and target; a row about any other node has no effect. Without a row for a node the
+proof certifies that node itself. Pattern matching and predicate evaluation are
+always done in the proof, from S.
+
+This is asserted by the mandate processor, not proved. A mandate processor that
+signs a row for a node that is not well formed is at fault.
+
+**Position completeness.** The proof shows that the signed position N covers every
+timeline S depends on through a channel. For every document of the signed snapshot,
+every contract of that document whose type is, by ancestry, a Coordination
+`Timeline Channel` or `Public Timeline Channel` names a timeline, and each such
+timeline must be a row of N. For every row the proof shows that the row's last
+entry is the last entry of that timeline before K: by a provider guarantee whose
+last entry is the row's and which is complete to after the timestamp of K, or by the
+provider-signed successor entry after K, or, on E's own timeline only, by E itself
+whose previous entry is the row's. The provider of every row's timeline, that of
+E's own timeline included, must have its key in `allowedProviders`. If a timeline is
+not covered, or a provider is not in the list, no proof is made.
+
+**What stays trusted to the mandate processor.** The proof does not replay the
+mandate's history. Not shown by the proof, and asserted by the signature alone:
+
+- that S is the state that results from processing exactly the entries up to the
+  last entry of each row, and each row's last entry itself;
+- the list of documents of the snapshot beside S (embedded documents): their channel
+  timelines are required once they are listed, but nothing shows the list complete;
+- dependencies that are not a channel contract of a listed document: documents S
+  refers to without embedding them, sources reached through another channel type,
+  and anything a contract reads when it runs;
+- the timers (lines 7 to 9); this profile excludes mandates with timers;
+- the head (line 5) and the mandate facts (line 10).
 
 ## 5. When a proof matches
 
@@ -239,11 +405,12 @@ processor is processing.
 | 4 | The BlueId of D in the public output | The processor's own state D before E |
 | 5 | The mandate processor key in the public output | `mandateProcessorKey` of the channel |
 | 6 | The provider set digest in the public output | The digest derived from `allowedProviders` of the profile (§4.1) |
-| 7 | The validation-facts digest in the public output | The digest of the empty set, or of FULL(D) computed by the processor from D |
+| 7 | The validation-facts digest in the public output | The digest of the empty set or of FULL(D) computed by the processor from D, each under the `factsRule` of the profile (§4.1) |
 
 - A proof that verifies but fails any comparison is skipped as mismatching. It is
   never counted as a denial.
-- A verification that did not complete locally is retried. It is no result.
+- A receipt that cannot be decoded or does not verify is skipped (§5.1). It is never
+  retried.
 - The values a processor compares with MUST come from its own accepted state before
   K, the authenticated operation and the authenticated history of T.
 - One profile means one classification of one entry on every host.
@@ -253,11 +420,38 @@ applies the target document's own rules to E; with a denying verdict it rejects 
 and the document continues. A denying verdict includes the cases of §3 in which
 the mandate or a predicate is at fault.
 
+### 5.1 Result classes of the receiver
+
+The part of a host that checks one receipt under this profile (the receiver) ends in
+exactly one of four classes:
+
+| Class | Meaning | When |
+|---|---|---|
+| MATCH, admitting | A matching proof whose verdict admits | All comparisons hold |
+| MATCH, denying | A matching proof whose verdict denies | All comparisons hold |
+| SKIP | The entry is skipped; never a denial | The bytes are not the canonical encoding of a succinct receipt; the receipt is of another program; it does not verify, or decoding or verifying it failed or faulted; the public output is not the closed output of the program; any of comparisons 2 to 7 differs |
+| RETRY | No result; nothing is finalised | The receiver could not do its work for a reason of its own |
+
+RETRY only ever reflects the receiver's own environment or a bug of the processor
+that called it: a file it cannot read, own records of D that are missing or altered
+so that FULL(D) cannot be computed, an own value that is malformed, a profile that
+is malformed (a processor must reject from the document state before it reads T and
+must never ask for such a check), a fault of the receiver outside decoding and
+verification, or a receiver that was stopped from outside. RETRY never has its cause
+in the bytes of the receipt, in the proof or in the content of a document: with
+correct own data no receipt, whatever its bytes, gives RETRY. A processor that gets
+RETRY does not pass over the entry (Coordination section 14.6).
+
+Whether a byte string is SKIP or MATCH depends on the code of the receiver, not only
+on the profile's data: the canonical-encoding rule of §4.1 is such code. All
+processors of a document MUST therefore run the same pinned receiver build for a
+profile.
+
 ## 6. Compatibility
 
 Documents that use `Mandates/Mandate Authority` keep their rules, and every earlier
-publication is unchanged and remains selectable. This package and its protocol are unused unless a document declares
-a channel with a profile of this package or an operation carries a
+publication is unchanged and remains selectable. This package and its protocol are
+unused unless a document declares a channel with a profile of this package or an operation carries a
 `Mandate Commitment Authority`. On a channel without the three evidence fields an
 operation with this claim is rejected from the document state.
 
@@ -265,7 +459,10 @@ operation with this claim is rejected from the document state.
 
 - The names listed as provisional, and the text encodings of M, of the image
   identifier and of the digests.
-- The format of the mandate processor's signed statement and of its commitment.
+- The final format of the mandate processor's signed message and of its commitment;
+  §4.2 states the layout of the first program, whose domain texts are research names.
+- Binding each row's last entry to the mandate's own checkpoint, which would remove
+  one item from what stays trusted to the mandate processor.
 - Mandates with timers; a second prover; the duty to reject an operation whose M
   matches no mandate.
-- A pinned receiver build for the rules that are code and not profile data.
+- How the one receiver build that §5.1 requires is named, pinned and distributed.

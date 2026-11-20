@@ -17,7 +17,8 @@ with four exported types:
 
 `blue-private-mandates` `0.1.0-preview.1` stays a separate package. It requires this
 Coordination edition and the Mandates publication built on it, and adds
-`RISC Zero Succinct Receipt Profile` (a `Coordination/Evidence Profile`) and
+`RISC Zero Succinct Receipt Profile` (a `Coordination/Evidence Profile`; its
+`factsRule` is `FULL(D)` or `MERKLE(FULL(D))`) and
 `Mandate Commitment Authority` (a `Mandates/Authority` with the salted mandate
 commitment and no `mandate` reference). The normative rules are the two `spec/` files.
 
@@ -30,9 +31,9 @@ commitment and no `mandate` reference). The normative rules are the two `spec/` 
 | Mandates protocol | | `GxCcpduSLDenAhsiDD2RLMTR1BjSDVFVchj3WNAzs6Yz` |
 | Time package | 0.2.0-gas10m.1.finalgas.1.evidence.1 | `E5DJ6N9ZiTWxdY4cyT7G9R1iMxJezuytic5Q5b8hAjte` |
 | Time protocol | | `4E6oq67afbGES738jLoac61UQD2wCWtWuXMNLaV3DS5m` |
-| Private Mandates package | 0.1.0-preview.1 | `JAnCD8voGYUbuVeEhpqXy2EQmG6Fv7tcpNyJBn6zAzom` |
-| Private Mandates protocol | | `7cjcv1LWupas8oYCQmiXscAufweTjwmaxzCEXdUME1r4` |
-| Private Mandates rules | | `DU9dGxnvPg5nVW4MjEooZm1HcZTMQKausGGFeCHPXHqh` |
+| Private Mandates package | 0.1.0-preview.1 | `WnxS6HtCaR8gSXv2iMZLQcMZcAvGNLuwKv4J14WHxcd` |
+| Private Mandates protocol | | `5QxEHeuURJgR8JmenYvCKpS5LZGMoTp2YZwGx8ZnqAW6` |
+| Private Mandates rules | | `EpB7Vs65aUeM1kHCUqbG9tHYcvVzLE22ApYVo9RsNvN4` |
 
 `PACKAGES.json` is the authority for every current package identity and checksum.
 
@@ -121,8 +122,10 @@ tool records these outcomes with their exact failure kinds.
 | `evidenceProfile` whose exact type is not a supported specialisation of `Evidence Profile` | Same |
 | A commitment authority whose fields are not exactly `actor` and `mandateCommitment`, or whose `mandateCommitment` is not 64 characters `0-9a-f` | The operation is rejected from the document state, without reading the evidence timeline |
 | An entry of one of the two types that is not well formed, or that does not name this document and the operation | The entry is skipped |
-| A grant whose predicate ends in an error or gives a non-Boolean result | That grant does not match; the other grants are tried |
-| Exhausted gas in a predicate; a fault of the mandate itself | "The mandate does not admit": the operation is rejected and the document continues. A deliberate difference from mandates named in clear |
+| A grant whose predicate ends in an error, gives a non-Boolean result or is statically inadmissible | That grant does not match; the other grants are tried |
+| Exhausted gas in a predicate, unless an earlier grant already passed; a fault of the mandate itself, a grant without target included | "The mandate does not admit": the operation is rejected and the document continues. A deliberate difference from mandates named in clear |
+| A grant that applies and needs content that cannot be supplied | No proof can be made in either grant order; the party ends the wait with a Rejection Entry |
+| A receipt that is not the one canonical encoding, or that fails or faults while decoded or verified | The entry is skipped, never retried; all processors run the same pinned receiver build |
 
 Semantic cards for the new type identities are not part of this change; they are
 produced by the workflow described in [semantic cards](semantic-cards.md).
@@ -169,4 +172,5 @@ Changing any of them gives new exact identities. Field names: `evidenceProfile`,
 `Evidence Profile`, `RISC Zero Succinct Receipt Profile`, `Mandate Commitment
 Authority`. Encodings: the proof as canonical base64 text; the commitment, image
 identifier and digests as 64 lower-case hexadecimal characters; the facts rule as
-the single value `FULL(D)`.
+one of the two values `FULL(D)` and `MERKLE(FULL(D))`; the layout and domain texts
+of the mandate processor's signed message and of the facts digests.
