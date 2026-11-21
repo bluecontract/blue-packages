@@ -21,6 +21,12 @@ constants, and retention of customized functions or changed/missing anchors. Jav
 covers native definition reads and the original admission and Reseller flows
 at the published gas limit.
 
+With Java 21 and the qualified Core classpath (including Core test support) in
+`BLUE_JAVA_CLASSPATH`, run
+`python3 tools/check_operation_inputs.py --case reseller-catalog-capacity`
+to measure full document initialization and catalog publication at the
+10,000,000 gas limit, including the 250-item boundary and authored rejections.
+
 `python3 tools/release.py assets --output build/release` prepares the selected
 archives, their catalogue and checksums. It does not overwrite existing output
 or publish anything. The release workflow prepares artifacts for pull requests
