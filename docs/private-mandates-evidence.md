@@ -17,8 +17,8 @@ with four exported types:
 
 `blue-private-mandates` `0.1.0-preview.1` stays a separate package. It requires this
 Coordination edition and the Mandates publication built on it, and adds
-`RISC Zero Succinct Receipt Profile` (a `Coordination/Evidence Profile`; its
-`factsRule` is `FULL(D)` or `MERKLE(FULL(D))`) and
+`RISC Zero Succinct Receipt Profile` (a `Coordination/Evidence Profile` with
+`programImageId` and `allowedProviders`) and
 `Mandate Commitment Authority` (a `Mandates/Authority` with the salted mandate
 commitment and no `mandate` reference), and `Mandate State Attestation`, the
 document a mandate processor signs about one state of a mandate: its BlueId is
@@ -26,16 +26,16 @@ signed, and the attestations of one mandate form a hash chain. The normative rul
 
 | Item | Version | BlueId |
 | --- | --- | --- |
-| Coordination package | 0.2.0-access-events.1.evidence.1 | `EfD9Evsy8Uk37sgVW5FoZ7ZHYETETeyDZwKtuCa827vC` |
-| Coordination protocol | | `5TH6F74QEEVgL6X2dr6TyqLGkHFCHUff56Z5iTw5Phmc` |
-| Coordination rules | | `9MdKsAApwjLjFXTw75necZ5XPuY4o5M7SX2bF5zNrwij` |
-| Mandates package | 0.3.0-preview.1.evidence.1 | `844HpnaEGPgJDkaMBL62MMRRSqF1pByLKEKaRA1HAbp1` |
-| Mandates protocol | | `GxCcpduSLDenAhsiDD2RLMTR1BjSDVFVchj3WNAzs6Yz` |
-| Time package | 0.2.0-gas10m.1.finalgas.1.evidence.1 | `E5DJ6N9ZiTWxdY4cyT7G9R1iMxJezuytic5Q5b8hAjte` |
-| Time protocol | | `4E6oq67afbGES738jLoac61UQD2wCWtWuXMNLaV3DS5m` |
-| Private Mandates package | 0.1.0-preview.1 | `3orRzica6GfzXFKPcHcJqvJo7TgcaCa2SCkUfw9yYWY9` |
-| Private Mandates protocol | | `8QtZE7yb2p9mSBxywTWauBiK8iUGCE7CULFxMtuKRCEo` |
-| Private Mandates rules | | `9vviNtykATEEqndJyR2caPUfe36JiqaBSMqRNVH7KZY4` |
+| Coordination package | 0.2.0-access-events.1.evidence.1 | `HHsCUAybKPWQJesQCSrpk6dpppjiii7tyz9vaWavMdP5` |
+| Coordination protocol | | `8cBDKW7dphys1HcAXNf1TvyV7LdQKLJFtzGUxeZjpC4g` |
+| Coordination rules | | `E5LkB8PUaXZfquidh7Aa1uGsMMzWiFPTkUYfgSwzioQQ` |
+| Mandates package | 0.3.0-preview.1.evidence.1 | `CGJTGJvfh4TTFeawShQyeTXa3xzwNxz3UnQmSnwJEtTC` |
+| Mandates protocol | | `F7H269vnLY74dQYpWDGDrcvpygfHYkKKo2rQCwyGkDX9` |
+| Time package | 0.2.0-gas10m.1.finalgas.1.evidence.1 | `D2Ba2jxJtTcYUx9FtsAuGnzveCC2zgSPi4pSHuaokdV4` |
+| Time protocol | | `FJxfMecvMa9Atvtu8b2AMdZuTVevpYrg8hxzPBxduiYa` |
+| Private Mandates package | 0.1.0-preview.1 | `jxPtm8ogiWCxZoaaXyDFePCfcDg8K28aFJAefxc7j66` |
+| Private Mandates protocol | | `AW2NifBohD9bUeXPWZ5ZHXKd4MMG8AW3iSuVdhYA4L5L` |
+| Private Mandates rules | | `2z7WGTqMLPFM824TAahP5cBhbE6REtrNVAJJt5ov5QQf` |
 
 `PACKAGES.json` is the authority for every current package identity and checksum.
 
@@ -78,9 +78,9 @@ processes a document that declares no such channel as sections 1–13 state.
 ## What the schemas enforce and what the processor decides
 
 Enforced by the Language schema: on the channel, the three required fields and the
-key length; on a value whose exact type is the RISC Zero profile, the three required
-fields, at most three fields with a value, lengths, distinct provider keys and the
-facts rule value; on the commitment authority, the two required fields, at most two
+key length; on a value whose exact type is the RISC Zero profile, the two required
+fields, at most two fields with a value, lengths and distinct provider keys; on the
+commitment authority, the two required fields, at most two
 fields with a value (so a `mandate` with a value is rejected) and the commitment
 length.
 
@@ -103,7 +103,10 @@ nothing. The processor checks the field set and form and skips an entry that is 
 well formed; a skipped entry never causes a wait or a halt of its own.
 
 `document` and `operationEntry` name the document and the operation entry by
-content BlueId and are declared as an `Operation Request` declares `document`: free
+content BlueId. In a `Rejection Entry` they are its content. In a `Proof Entry`
+they are an advisory hint with no force: every Proof Entry is classified by the
+public output of its proof, and a proof is never skipped because the hint names
+something else. They are declared as an `Operation Request` declares `document`: free
 fields with no type. Naming is decided by the BlueId of the field node, never by the
 wire form: a reference and the same content written in full are the same entry.
 An evidence timeline serves exactly one document (two channels of that document may
@@ -124,7 +127,9 @@ tool records these outcomes with their exact failure kinds.
 | `evidenceProfile` whose exact type is not a supported specialisation of `Evidence Profile` | Same |
 | A commitment authority whose fields are not exactly `actor` and `mandateCommitment`, or whose `mandateCommitment` is not 64 characters `0-9a-f` | The operation is rejected from the document state, without reading the evidence timeline |
 | An attestation with a further field, or not in its canonical construction | Not reproducible by the proof, so no proof can be made with it; other verifiers must check the exact field set |
-| An entry of one of the two types that is not well formed, or that does not name this document and the operation | The entry is skipped |
+| An entry of one of the two types that is not well formed; a Rejection Entry that does not name this document and the operation | The entry is skipped |
+| A Proof Entry whose `document` or `operationEntry` names something else | Classified by its public output like every other; the hint changes nothing |
+| A proof whose `targetState` is not the BlueId of the processor's own state before the operation | Skipped as mismatching. The proof does not show that the state is valid and the receiver does not check it: it is a premise |
 | A grant whose predicate ends in an error, gives a non-Boolean result or is statically inadmissible | That grant does not match; the other grants are tried |
 | Exhausted gas in a predicate, unless an earlier grant already passed; a fault of the mandate itself, a grant without target included | "The mandate does not admit": the operation is rejected and the document continues. A deliberate difference from mandates named in clear |
 | A grant that applies and needs content that cannot be supplied | No proof can be made in either grant order; the party ends the wait with a Rejection Entry |
@@ -171,9 +176,9 @@ capability and proof verification are qualified in Core.
 
 Changing any of them gives new exact identities. Field names: `evidenceProfile`,
 `receipt`, `document`, `operationEntry`, `mandateCommitment`, `programImageId`,
-`allowedProviders`, `factsRule`. Type names: `Proof Entry`, `Rejection Entry`,
+`allowedProviders`; the keys of the public output. Type names: `Proof Entry`, `Rejection Entry`,
 `Evidence Profile`, `RISC Zero Succinct Receipt Profile`, `Mandate Commitment
 Authority`. Encodings: the proof as canonical base64 text; the commitment, image
-identifier and digests as 64 lower-case hexadecimal characters; the facts rule as
-one of the two values `FULL(D)` and `MERKLE(FULL(D))`; the layout and domain texts
-of the mandate processor's signed message and of the facts digests.
+identifier and digests as 64 lower-case hexadecimal characters; the layout and
+domain text of the mandate processor's signed message; the rule by which the
+proving program re-derives a reused validation result from the target state.

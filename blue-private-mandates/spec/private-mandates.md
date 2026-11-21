@@ -38,6 +38,33 @@ Coordination protocol and the required Mandates protocol. A host that does
 not support the profile type a channel declares MUST refuse the document where the
 channel is declared. Installing this data package grants no native support.
 
+**What this version supports.**
+
+1. *Mandate types.* This version supports mandates of type
+   `Mandates/Operation Mandate` and of its subtypes, recognised by ancestry: the
+   type chain of the mandate state contains `Operation Mandate` of the required
+   Mandates publication. A mandate composed from clauses
+   (`MandateClauses/Mandate with Clauses`) is such a subtype and is supported. A
+   state of any other type is a fault of the mandate (§3).
+2. *One edition for both documents.* The mandate and the target document are on
+   the same edition: the Coordination edition and the Mandates publication this
+   package requires. A mandate established under another Mandates package is a
+   fault of the mandate (§3). A proof for a mandate of another edition is not
+   defined in this version.
+3. *One edition, one proving program, one profile.* One edition has exactly one
+   proving program and one profile type. The program is built with the exact
+   identities of that edition, and its image identifier is the `programImageId` of
+   the profile (§4.1). Every type identity of this package,
+   `Mandate Commitment Authority` included, therefore changes with each
+   Coordination or Mandates edition. A document pins its proving program for its
+   whole life through the profile of its channel: `evidenceProfile` is fixed for
+   the life of the document (Coordination section 14.3).
+4. *A channel without evidence.* An operation whose authority claim is a
+   `Mandate Commitment Authority` and which is performed on a channel without
+   evidence (a plain `Timeline Channel`, or a channel that lacks any of the three
+   well-formed evidence fields) is rejected from the document state, without
+   reading any evidence timeline, and the document continues with the next input.
+
 ## 2. Exported types
 
 | Type | Kind | Purpose |
@@ -91,8 +118,9 @@ timeline past such an entry. It is the fault of that timeline's writer.
 `mandateCommitment` is well formed only as 64 characters `0-9a-f`. The schema fixes
 the length; the processor checks the characters. An operation whose claim carries a
 malformed `mandateCommitment` is rejected from the document state, without reading
-T. The agent announces nothing before writing and takes no part in the proof flow. M tells the prover which mandate is meant and lets
-a processor match a proof to the operation.
+T. The agent announces nothing before writing and takes no part in the proof flow.
+M tells the prover which mandate is meant and lets a processor match a proof to
+the operation.
 
 An operation whose authority claim is a `Mandate Commitment Authority` is
 evidence-decided in the sense of section 14 of the Coordination specification. The
@@ -155,11 +183,12 @@ these cases; none of them is a missing proof:
    passed. This is the one case in which the verdict depends on the order of the
    grants: a gas-exhausting grant before an admitting grant denies, the same grant
    after it does not change the admission.
-3. *A fault of the mandate.* The signed state is not an Operation Mandate; it belongs
-   to another Mandates package than the profile's program was built with; it has no
-   approved program, or its approved program is not the program of the state; it
-   lacks its participants or its scope; or a grant of its scope has no target. The verdict is "the mandate does not admit E", whatever the other grants
-   are.
+3. *A fault of the mandate.* The signed state is not, by ancestry, an Operation
+   Mandate (§1); it belongs to another Mandates package than the profile's program
+   was built with; it has no approved program, or its approved program is not the
+   program of the state; it lacks its participants or its scope; or a grant of its
+   scope has no target. The verdict is "the mandate does not admit E", whatever the
+   other grants are.
 
 In every such case the proof carries a denying verdict or, in case 1, the verdict
 the other grants give. E is decided at its own time and the target document
@@ -217,14 +246,14 @@ that channel is rejected from the document state.
 |---|---|
 | `programImageId` | Image identifier of the proving program, 64 lower-case hexadecimal characters. It fixes the proved statement, the format of the public output, and the runtime and package bindings, gas limit and error semantics the program was built with |
 | `allowedProviders` | The profile's allowed timeline provider set: a list of `Coordination/Ed25519 Public Key`, strictly ascending when compared as 32-byte values |
-| `factsRule` | How the proof commits to the validation facts about D it reuses: `FULL(D)` or `MERKLE(FULL(D))`. A profile names exactly one, and it must be the rule the program of `programImageId` was built with |
 
-The value has exactly these three fields. (*Provisional*: the field names and the
-type name.)
+The value has exactly these two fields. (*Provisional*: the field names and the
+type name.) `programImageId` is data supplied by the document that declares the
+profile; this specification names no image identifier.
 
 The type itself fixes what is not data: the receipt kind (a succinct RISC Zero
 receipt, in one canonical encoding with no other bytes), the verifier, the
-comparison rules of §5, the provider set digest function and the facts algorithms.
+comparison rules of §5 and the provider set digest function.
 
 **The receipt.** `receipt` of a Proof Entry decodes to exactly one canonical
 encoding of a succinct receipt. A byte string that is not that encoding is skipped,
@@ -248,79 +277,90 @@ For the empty list this is the SHA-256 of the empty byte string. A mandate with 
 source at a provider outside the set can never get a matching proof.
 
 **Well-formed profile.** For a value whose exact type is this profile, the Language
-schema enforces the three required fields, at most three fields with a value, the
-length of each key and of `programImageId`, distinct list elements and the value of
-`factsRule`. As for the authority claim (§3) it admits a further field that carries
-only a type. The processor additionally requires that the fields are exactly these
-three, that `programImageId` and every key are 64 characters `0-9a-f`, that the
-list is strictly ascending by key bytes, and that `factsRule` is one of the two
-values. A
+schema enforces the two required fields, at most two fields with a value, the
+length of each key and of `programImageId` and distinct list elements. As for the
+authority claim (§3) it admits a further field that carries only a type. The
+processor additionally requires that the fields are exactly these two, that
+`programImageId` and every key are 64 characters `0-9a-f` and that the list is
+strictly ascending by key bytes. A
 profile that fails any of these is malformed; under section 14 of the Coordination
 specification the channel then lacks its profile, and every operation with
 a `Mandate Commitment Authority` on it is rejected from the document state.
 
-**The fact set.** FULL(D) is the least set of rows (recipe key, goal, root flag)
-closed under the step of `validate`, starting from the definition row of every
-non-core type and specification reachable from D and from the definition row of D
-itself. It depends on D alone. The goal of a row is `definition` or `value`. A
-recipe key is a JSON text; neither it nor a goal contains a tab or a line feed.
-The rows are ordered by recipe key, then goal, then root flag (false before true),
-keys and goals compared as byte strings; a set has no two equal rows.
+**The target state is a premise.** The proving program does not validate the
+target state, and neither does the receiver. The validity of D is a premise of
+every proof:
 
-Both facts rules commit to this same set. They differ only in the digest that the
-public output carries. Below `D` is the BlueId of D as text, `count` the number of
-rows in decimal, `flag` the character `1` for a true root flag and `0` for false,
-`TAB` the byte 0x09, `LF` the byte 0x0A, and `hex` lower-case hexadecimal.
-(*Provisional*: the domain texts, which are those of the first program.)
+> A proof is meaningful only for a target state that the receiving processor has
+> itself produced or admitted under an edition that certifies every document state
+> completely: Language strict admission with goal `value`, including every
+> reachable type and specification. A processor MUST NOT accept a proof for any
+> other state.
 
-`FULL(D)` — one hash over all rows in order:
+A conforming processor satisfies this by comparison 4 of §5 and by nothing else:
+it compares the BlueId of D in the public output with the BlueId of its own state
+D before E. A host MUST NOT apply this profile to a document it processes under an
+edition that does not certify every state completely. A proof states its verdict
+relative to the premise: someone who holds only a proof and the BlueId of D learns
+the verdict for the case that D is valid, and nothing about whether it is.
 
-    digest = hex SHA-256( "blue.research.validation-facts/1" LF "target" LF D LF count LF
-                          ( key TAB goal TAB flag LF )  for each row in order )
+**Reused validation results about D.** The program may validate every node of D it
+reads itself. It may instead be given validation results about D, to save work. A
+validation result is a row (recipe key, goal, root flag). The recipe key is the
+JSON text `[[part BlueIds],[required type BlueIds]]` and names the node obtained
+by merging the parts under the listed type requirements. The goal is `definition`
+or `value`. The row means: Language validation of that node for that goal, at a
+root position (flag true) or a nested position (flag false), succeeds for the node
+and for everything below it.
 
-`MERKLE(FULL(D))` — a Merkle tree over the rows in the same order:
+The program accepts such a row only if it re-derives the row itself from the
+target state, starting from the one assumed row "the target state is valid". A row
+the program cannot re-derive is refused and no proof is made. A derivation is a
+start row followed by any number of steps:
 
-    leaf(row)   = SHA-256( 0x00 || key || TAB || goal || TAB || flag )
-    node(l, r)  = SHA-256( 0x01 || l || r )
-    MTH({})     = SHA-256( "" )
-    MTH({d})    = leaf(d)
-    MTH(d[0:n]) = node( MTH(d[0:k]), MTH(d[k:n]) ),  k the largest power of two smaller than n
-    digest      = hex SHA-256( "blue.research.validation-facts-tree/1" LF "target" LF D LF
-                               count LF hex(MTH) LF )
+- *Start row.* Either (`[[D],[]]`, `definition`, true), where D is the BlueId the
+  public output carries as the target state; or (`[[X],[]]`, `definition`, true),
+  where X is reached from D by hops through the exact content, each hop read from
+  the record bound by the BlueId of the current node. A hop goes to the node under
+  one key of the current node's content, any key except `name`, `description`,
+  `value`, `mergePolicy` and `items`, or to one item of its `items`. The last hop
+  must go through a type key (`type`, `itemType`, `keyType`, `valueType`) to a type
+  that is not a core type of the Language, or through `specification`; X is the
+  BlueId found there.
+- *Steps.* Each step starts from the head h of the current row, which is the node
+  Language validation builds for the row's recipe, and gives the next row:
 
-This is the Merkle Tree Hash of RFC 9162 section 2.1 with the leaf content above.
-The row count is inside the digest. Under this rule a proof is given only the rows
-it uses. Each comes with its index and its audit path, and the program uses a row
-only when the path gives the root for that index in a tree of `count` leaves
-(RFC 9162 section 2.1.3.2); otherwise no proof is made.
+| Step | Condition | Next row |
+|---|---|---|
+| Field k | h has the field k | (the recipe of that field under h, the same goal, false) |
+| Contracts | h has `contracts` | (the recipe of h's `contracts`, the same goal, false) |
+| Item n | h has the item n; under goal `definition` the item is not a hole | (the recipe of that item under h, the same goal, true) |
+| Key k | h has the field k, and h is a Dictionary or declares a key type | (`[[S],[T]]`, `value`, true): T is the key type of h, the core type Text when h declares none, and S is the BlueId of the scalar of T's core domain (Text, Integer, Double or Boolean) whose value is k read in that domain. A k that is not the canonical text of a value of that domain gives no row |
 
-**The empty set.** A proof may reuse no facts and validate what it reads itself. It
-then carries the digest of the empty set under the profile's rule: for `FULL(D)`
-the first formula with `count` 0 and no row; for `MERKLE(FULL(D))` the last formula
-with `count` 0 and MTH({}).
+- A row with goal `value` whose head is neither at a root position nor concrete
+  has no rows below it.
 
-**What a processor accepts.** Exactly two digests, both under the rule the profile
-names: that of the empty set, and that of FULL(D), which it computes itself from its
-own records of D (under the Merkle rule it builds the tree and compares count and
-root through the digest). Any other digest is a mismatch and the entry is skipped.
-This includes a proof made under the other rule: a profile names one rule, and a
-proof made under the other never matches.
+These are the start rows and the step of Language validation itself: strict
+admission of D with goal `definition` succeeds only if validation succeeds on
+every row reached this way. Every row that can be derived is therefore true
+whenever D is valid, and the premise above is the only thing assumed. A derivation
+reads the records bound by BlueId from the target state and the heads and child
+recipes computed from them. It reads nothing of the mandate or of E and no
+validation result supplied by anyone. A row whose key is built from the mandate,
+from E or from a node merged with a mandate pattern cannot be derived, and is
+refused whatever its form.
 
-Worked example for D = the one-character text `D` and the three rows, in order,
-(`[["A"],[]]`, `definition`, false), (`[["A"],[]]`, `value`, true),
-(`[["B"],[]]`, `definition`, true):
+The prover gives no digest of these rows and the public output carries none (§5).
+Validation results about the mandate are a separate input: the certified rows the
+mandate processor signs (§4.2). They are not derived and are unchanged by this
+rule.
 
-    leaf 0 = 54719cff97ae9a8ce6528246b84deb21c543d785171c4f951722f01253d1b204
-    leaf 1 = 3b174bcda93ca72fe37d88515041263eab7dd8afbd08af397e481a393d627d38
-    leaf 2 = 870819661e900fe1f0e0b1cd64b1cb514078b1a59ec4cf023a6bc7bb7cc5faad
-    node(leaf 0, leaf 1) = 30454d725d79c97d0297fab76e5ab0cbb25528c263d99d632326d339c5347e6f
-    MTH    = ce0af5187a4b1be1f76521a68712900f2c1bfde5d2de49484c12fb0e27cb8b17
-    MERKLE(FULL(D)) digest = 23edefcd70cd8dd859d44786601a93b7c8c6b4bce2dbbe53056db84e38ce8829
-    FULL(D) digest         = b85228f7a7f16ff78440f3cad17208781fc01dc5baee9109352927c96cfdc4ce
-    empty set, MERKLE(FULL(D)) = 5fc080ad098dbbf7389835369c2e4a0d9fb667dac5f7d6aaa35d5e19d21d1789
-    empty set, FULL(D)         = ee8f53183e62b992d9ce00caaa933ce3351898099888df5ca250d10a3011fe7a
-
-The audit path of leaf 2 is [node(leaf 0, leaf 1)]; that of leaf 0 is [leaf 1, leaf 2].
+(*Provisional*: the derivation rule is that of a research program, for which no
+proof has been made and no image identifier is pinned. That every derivable row
+follows from the validity of D is argued from the validation algorithm and is not
+proved; that the processor's validation and the program's validation accept the
+same nodes is not established. The encoding in which a prover hands a derivation
+to the program is private input and is fixed by the program.)
 
 **Scope.** This profile excludes mandates with Time anywhere in the dependency graph
 that affects authorisation. For a mandate inside this scope the three timer fields
@@ -367,7 +407,10 @@ with any further field has another BlueId and cannot be reproduced.
 
 A value that does not exist is an absent field, never an empty list. The content
 of the two program identities is not interpreted by the proof (*provisional*: how a
-program is identified).
+program is identified, §7). No proof can be made from values the document cannot
+hold: a `mandateProgram` or an `approvedProgram` that is an empty text, an
+`authorityPackage` that is not the text of a BlueId, or a `documents` list that
+names S itself.
 
 **The field set is closed and is checked by the verifier.** The Language schema of
 the type requires the fields marked required in the type and fixes lengths, but
@@ -392,10 +435,36 @@ and it means: strict certification of V succeeds. Every node reachable from V is
 present and hashes to its BlueId, every type definition among them is valid, and V
 passes its schema. The mandate processor signs exactly rows of this goal; a row of
 any other goal is refused by the proof. The rows are distinct and ordered by key as
-byte strings, and `certifiedNodes` is the row count and the root of the Merkle tree
-over them in the construction of `MERKLE(FULL(D))` (§4.1): the same leaf and node
-hashes and the same MTH, with the count and `hex(MTH)` as the two fields instead of
-the outer digest. With no row the count is 0 and the root is `hex SHA-256("")`.
+byte strings; a key contains no tab and no line feed. `certifiedNodes` is the row
+count and the root of the Merkle tree over the rows in that order. Below `TAB` is
+the byte 0x09, `flag` the character `1` (the root flag of a certified row is
+true), and `hex` lower-case hexadecimal:
+
+    leaf(row)   = SHA-256( 0x00 || key || TAB || goal || TAB || flag )
+    node(l, r)  = SHA-256( 0x01 || l || r )
+    MTH({})     = SHA-256( "" )
+    MTH({d})    = leaf(d)
+    MTH(d[0:n]) = node( MTH(d[0:k]), MTH(d[k:n]) ),  k the largest power of two smaller than n
+    count       = n          root = hex( MTH(d[0:n]) )
+
+This is the Merkle Tree Hash of RFC 9162 section 2.1 with the leaf content above.
+With no row the count is 0 and the root is `hex SHA-256("")`. A proof is given only
+the rows it uses. Each comes with its index and its audit path, and the program
+uses a row only when the path gives `root` for that index in a tree of `count`
+leaves (RFC 9162 section 2.1.3.2); otherwise no proof is made.
+
+Worked example with the three rows whose keys are `[["A"],[]]`, `[["B"],[]]` and
+`[["C"],[]]` (`A`, `B`, `C` stand in for BlueIds), each with goal
+`certified:value`:
+
+    leaf 0 = e4b0a83e3f8f90f9e7f277bc81bcfd9162996ea3f8464f5bb66f56c798d0ffa2
+    leaf 1 = edd172232e33ad3931647a39b4ff3a8e11bc3fae24de8a4788733099a62b3935
+    leaf 2 = e742b75585d6b048b806948423a2878e04765af3014ee7070d961c3d5b5a9b8a
+    node(leaf 0, leaf 1) = fecc5a5ee3e078f4da2c2f4a69eb98203e02da3836e50d15634c84ecdc48a9cc
+    count  = 3
+    root   = 4945afc7018775e7694c57bea07d2dc8e92790e6447c59fb45f0e34e5d26d219
+
+The audit path of leaf 2 is [node(leaf 0, leaf 1)]; that of leaf 0 is [leaf 1, leaf 2].
 
 A mandate processor MUST include a row only for a node for which it performed this
 certification and it succeeded. The proof relies on a row only for a validation
@@ -445,33 +514,45 @@ mandate's history. Not shown by the proof, and asserted by the signature alone:
 
 ## 5. When a proof matches
 
-The public output of a proof is a closed list: the BlueId of D, the BlueId of E, M,
-the mandate processor key, the provider set digest, a salted commitment to the
-bytes the mandate processor signed (§4.2), the digest of the validation facts about D
-that were reused, and the verdict.
+The public output of a proof is closed: one JSON object with exactly these seven
+keys, in this order, as UTF-8 text with no white space and no other byte.
+(*Provisional*: the key names and the encoding.)
+
+| Key | Content |
+|---|---|
+| `targetState` | The BlueId of D |
+| `entry` | The BlueId of E |
+| `mandateCommitment` | M, as in the authority claim (§3) |
+| `mandateProcessorKey` | The key whose signature on the attestation the proof verified, 64 lower-case hexadecimal characters |
+| `providerSetDigest` | The provider set digest (§4.1) |
+| `statementCommitment` | The salted commitment to the bytes the mandate processor signed (§4.2) |
+| `verdict` | The Boolean true when the mandate admits E, false when it does not |
+
+The public output carries nothing about the validation of D: no digest of
+validation results and no statement that D is valid (§4.1).
+
+**What the receiver does.** The receiver verifies the receipt against the
+`programImageId` of the channel's profile and compares the public output with the
+processor's own values, as the table below lists. It does nothing else. It reads
+no record of D, of E or of the mandate, computes nothing from the content of a
+document, and needs of D only its BlueId.
 
 A well-formed `Coordination/Proof Entry` (Coordination section 14.5; the processor,
-not the schema, decides well-formedness) is a matching proof for E only if all hold.
-The entry's `document` and `operationEntry` references are a routing hint and are
-not among the comparisons: a processor may skip an entry whose hint does not name
-this document and E without verifying it, and an entry whose hint disagrees with
-the proof's own public output is skipped (Coordination sections 14.5 and 14.6).
-Under this profile the hint disagrees with the public output when `operationEntry`
-does not name the entry whose BlueId the public output carries, or when the proof
-satisfies comparisons 2 and 4 for this document while `document` does not name this
-document's initial BlueId. The public output carries the BlueId of D, not the
-document's initial BlueId, so `document` is compared with the document the
-processor is processing.
+not the schema, decides well-formedness) is a matching proof for E only if all
+comparisons hold. The entry's `document` and `operationEntry` are an advisory hint
+with no force (Coordination section 14.5). They are not among the comparisons, the
+receiver does not read them, and a proof is never skipped or classified
+differently because of what they hold: each Proof Entry is classified by its
+public output alone.
 
 | # | Comparison | Against |
 |---|---|---|
 | 1 | The receipt has the profile's kind and verifies for `programImageId` | The channel's profile |
-| 2 | The BlueId of E in the public output | The operation the processor is deciding |
-| 3 | M in the public output | `mandateCommitment` of E's authority claim |
-| 4 | The BlueId of D in the public output | The processor's own state D before E |
-| 5 | The mandate processor key in the public output | `mandateProcessorKey` of the channel |
-| 6 | The provider set digest in the public output | The digest derived from `allowedProviders` of the profile (§4.1) |
-| 7 | The validation-facts digest in the public output | The digest of the empty set or of FULL(D) computed by the processor from D, each under the `factsRule` of the profile (§4.1) |
+| 2 | `entry` of the public output | The BlueId of the operation the processor is deciding |
+| 3 | `mandateCommitment` of the public output | `mandateCommitment` of E's authority claim |
+| 4 | `targetState` of the public output | The BlueId of the processor's own state D before E (the premise of §4.1) |
+| 5 | `mandateProcessorKey` of the public output | `mandateProcessorKey` of the channel |
+| 6 | `providerSetDigest` of the public output | The digest derived from `allowedProviders` of the profile (§4.1) |
 
 - A proof that verifies but fails any comparison is skipped as mismatching. It is
   never counted as a denial.
@@ -495,12 +576,11 @@ exactly one of four classes:
 |---|---|---|
 | MATCH, admitting | A matching proof whose verdict admits | All comparisons hold |
 | MATCH, denying | A matching proof whose verdict denies | All comparisons hold |
-| SKIP | The entry is skipped; never a denial | The bytes are not the canonical encoding of a succinct receipt; the receipt is of another program; it does not verify, or decoding or verifying it failed or faulted; the public output is not the closed output of the program; any of comparisons 2 to 7 differs |
+| SKIP | The entry is skipped; never a denial | The bytes are not the canonical encoding of a succinct receipt; the receipt is of another program; it does not verify, or decoding or verifying it failed or faulted; the public output is not the closed output of the program; any of comparisons 2 to 6 differs |
 | RETRY | No result; nothing is finalised | The receiver could not do its work for a reason of its own |
 
 RETRY only ever reflects the receiver's own environment or a bug of the processor
-that called it: a file it cannot read, own records of D that are missing or altered
-so that FULL(D) cannot be computed, an own value that is malformed, a profile that
+that called it: a file it cannot read, an own value that is malformed, a profile that
 is malformed (a processor must reject from the document state before it reads T and
 must never ask for such a check), a fault of the receiver outside decoding and
 verification, or a receiver that was stopped from outside. RETRY never has its cause
@@ -519,14 +599,28 @@ Documents that use `Mandates/Mandate Authority` keep their rules, and every earl
 publication is unchanged and remains selectable. This package and its protocol are
 unused unless a document declares a channel with a profile of this package or an operation carries a
 `Mandate Commitment Authority`. On a channel without the three evidence fields an
-operation with this claim is rejected from the document state.
+operation with this claim is rejected from the document state and the document
+continues (§1).
 
 ## 7. Not decided in this preview
 
 - The names listed as provisional, and the text encodings of M, of the image
   identifier and of the digests.
-- How a program is identified in `mandateProgram` and `approvedProgram`; the domain
-  text of the signature; whether position rows are typed.
+- The key names and the encoding of the public output (§5).
+- The derivation rule for reused validation results about D (§4.1): it is that of
+  a research program; its soundness is argued and not proved; agreement between
+  the processor's validation and the program's validation is not established.
+- The image identifier of a program built for this text. None exists yet; a
+  profile's `programImageId` is supplied by the document.
+- How a program is identified in `mandateProgram` and `approvedProgram`. The two
+  fields are texts that the proof only compares. The Mandates specification
+  defines no program node with a content BlueId that this text could name, so the
+  identity is not defined here as a BlueId.
+- The domain text of the signature; whether position rows are typed.
+- Whether the proof checks the key shape of a certified row.
+- The audit procedure that uses the chain of attestations: what the delegating
+  party keeps, for how long, and how an auditor obtains it.
+- A proof for a mandate on another edition than the target document (§1).
 - Whether the proof checks that `previous` is absent exactly when `sequence` is 0.
 - Whether the timer fields stay, or the proof refuses every mandate with timers.
 - Binding each row's last entry to the mandate's own checkpoint, which would remove

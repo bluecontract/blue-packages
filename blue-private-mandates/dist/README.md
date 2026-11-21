@@ -14,9 +14,15 @@ built on it (0.3.0-preview.1.evidence.1).
   state of a mandate (its BlueId is signed; attestations of one mandate form a
   hash chain through `sequence` and `previous`).
 - `RISC Zero Succinct Receipt Profile`: the first
-  `Coordination/Evidence Profile`, with `programImageId`,
-  `allowedProviders` and `factsRule`. The provider set digest is derived from
-  the list and is not a field.
+  `Coordination/Evidence Profile`, with `programImageId` and
+  `allowedProviders`. The provider set digest is derived from the list and is
+  not a field.
+
+The validity of the target document state is a premise of every proof: the proof
+does not show it and the receiver does not check it. A processor accepts a proof
+only for a state it produced or admitted itself. This version supports mandates
+of type `Mandates/Operation Mandate` and its subtypes, on the same edition as the
+target document; see §1 and §4.1 of the specification.
 
 A faulty mandate never stops the document. A grant whose predicate ends in an
 error does not match and the other grants are tried; exhausted gas or a fault of

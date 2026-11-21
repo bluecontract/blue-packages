@@ -1087,8 +1087,10 @@ Timeline Access document, handled like those of the document's other timelines.
 
 ### 14.5 Entries on the evidence timeline
 
-Both kinds are the `message` of an ordinary `Timeline Entry` on T. Both name the
-document and the operation in the same way, by content BlueId:
+Both kinds are the `message` of an ordinary `Timeline Entry` on T. Both carry the
+fields `document` and `operationEntry`, which name a document and an operation by
+content BlueId. In a Rejection Entry the two fields are the content of the entry.
+In a Proof Entry they are an advisory hint with no force (below):
 
 | Field | Content |
 |---|---|
@@ -1124,12 +1126,16 @@ A well-formed Proof Entry has exactly these three fields, each present: `receipt
 is a non-empty text in that canonical base64 form and its decoded bytes are the
 profile's one admitted encoding; the message has no other field.
 
-In a Proof Entry `document` and `operationEntry` are a routing hint only. Whether a
-proof is accepted for E is decided only by the proof's public output, as the
-declared profile defines; the hint is never evidence. A processor MAY skip, without
-verifying the proof, a Proof Entry that does not name this document and E. A Proof
-Entry whose hint disagrees with its own public output is skipped. A processor that
-verifies every proof and one that uses the hint therefore skip the same entries.
+**The hint is advisory.** In a Proof Entry `document` and `operationEntry` are a
+lookup aid and have no force. Every decision about a Proof Entry rests only on the
+public output of its proof, as the declared profile defines. A processor MUST
+classify each well-formed Proof Entry by the public output of its proof and MUST
+NOT skip, or classify differently, a proof because `document` or `operationEntry`
+names another document or another operation, or names nothing. What the two fields
+hold is not compared with anything. A processor MAY use them to find entries or to
+choose the order of its own work; the outcome MUST be the one it reaches by
+classifying every well-formed Proof Entry of T in chain order from its public
+output alone.
 
 **Rejection Entry.** "E is not to be processed in this document", with no proof.
 
@@ -1139,8 +1145,8 @@ of its writer. It counts because it is on the participant's timeline.
 
 **Well-formedness is checked by the processor.** For every message on T that
 carries one of the two types, the processor itself checks the field set and the
-form of `receipt` stated above, and whether the entry names this document and E.
-The check uses the entry alone (and, for the receipt encoding, the declared
+form of `receipt` stated above and, for a Rejection Entry, whether the entry names
+this document and E. The check uses the entry alone (and, for the receipt encoding, the declared
 profile), so every processor decides it alike. An entry that is not well formed —
 another field, a missing field, a `receipt` that is not a text, is empty or is not
 canonical base64, or decoded bytes that are not the profile's one admitted encoding
@@ -1153,7 +1159,9 @@ operation entry, since it made the proof or the rejection for them. The readers 
 T are the participants of the one document T serves (section 14.3 rule 7): they
 hold the document and receive the operation entry as an input of the document. In
 an entry that names this document and E, both references therefore resolve for
-every reader, possibly after a wait for the operation entry.
+every reader, possibly after a wait for the operation entry. This holds for the
+hint of a Proof Entry as for a Rejection Entry: the hint decides nothing, but
+Language still opens a reference written in it (known limit, below).
 
 **Known limit.** The open schemas do not cover what Language itself requires of any
 Blue content, and the skip rule applies only to an entry that was admitted:
@@ -1190,10 +1198,10 @@ deterministic.
 if both hold:
 
 1. T's provider attributes the entry to the channel's `actor`;
-2. the entry is a well-formed Proof Entry that names this document and E, that the
-   declared profile classifies as a matching proof for E and whose `document` and
-   `operationEntry` agree with its own public output, or a well-formed Rejection
-   Entry that names this document and E (section 14.5).
+2. the entry is a well-formed Proof Entry that the declared profile classifies,
+   from the public output of its proof, as a matching proof for E, whatever its
+   `document` and `operationEntry` hold, or a well-formed Rejection Entry that
+   names this document and E (section 14.5).
 
 Everything else on T is skipped. A skipped entry is the same as no entry.
 
@@ -1203,9 +1211,8 @@ Everything else on T is skipped. A skipped entry is the same as no entry.
 | An entry of one of the two types that is not well formed (section 14.5) | Skipped |
 | An entry that carries neither type | Skipped |
 | A well-formed Proof Entry whose verification completes with "invalid" | Skipped |
-| A well-formed Proof Entry that does not name this document and E | Skipped; the proof need not be verified |
 | A proof that verifies but that the profile classifies as mismatching | Skipped as mismatching; never a denial |
-| A proof that verifies but whose public output disagrees with the entry's own `document` or `operationEntry` | Skipped |
+| A well-formed Proof Entry whose `document` or `operationEntry` names another document or operation, or nothing | Classified by the public output of its proof like every other Proof Entry; the hint changes nothing |
 | A well-formed Rejection Entry that does not name this document and E | Skipped |
 | A matching proof for E | Considered; carries its verdict |
 | A well-formed Rejection Entry that names this document and E | Considered; E is rejected in this document only |
