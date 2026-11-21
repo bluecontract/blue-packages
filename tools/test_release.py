@@ -102,6 +102,7 @@ class ReleaseTests(unittest.TestCase):
 
     def test_release_includes_retained_data_without_active_mount_and_checks_usage(self):
         from unittest.mock import patch
+        import check_payment_family
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             row = self.fixture(root)
@@ -119,37 +120,56 @@ class ReleaseTests(unittest.TestCase):
             retained_path.write_bytes(retained_data)
             pin = dict(path='retained/transport.bluepkg', packageBlueId='retained-id',
                        archiveSha256=release.digest(retained_data))
-            source = dict(retainedArchives=[pin])
-            (root / 'PACKAGE-SOURCES.json').write_text(json.dumps(source))
+            source = dict(status='unpublished-candidate', packages=['example'], retainedArchives=[pin])
+            source_path = root / 'PACKAGE-SOURCES.json'
+            source_path.write_text(json.dumps(source))
             current_manifest = dict(original, imports={'Transport': {'packageBlueId': 'retained-id'}},
                                     semanticPackages={'retained-id': {}})
             data = archive_bytes(current_manifest)
             (root / row['path']).write_bytes(data)
             (root / 'example/dist/package.json').write_bytes(release.wire(current_manifest))
-            row = dict(row, directory='example', archiveSha256=release.digest(data))
+            row = dict(row, directory='example', namespace='Example', archiveSha256=release.digest(data))
             config = dict(imports={'Transport': {'path': '../retained/transport.bluepkg'}})
             config_path = root / 'example/blue-package.yaml'
             config_path.write_text(json.dumps(config))
             lock = dict(imports={'Transport': dict(pin, path='../retained/transport.bluepkg')})
             (root / 'example/blue-package.lock.json').write_text(json.dumps(lock))
             (root / 'PACKAGES.json').write_text(json.dumps(dict(packages=[row])))
+            (root / 'PAYMENT-FAMILY-PACKAGES.json').write_text(json.dumps(dict(
+                status=source['status'], packages=[row],
+                mounts={'Example': {'blueId': row['packageBlueId']}, 'Transport': {'blueId': 'current-transport-id'}},
+            )))
             for name in ('blue-language', 'blue-bex', 'blue-contracts', 'blue-time'):
                 (root / name).mkdir()
                 (root / name / 'SHA256SUMS').write_text('')
             # Catalogue generation is independent; exercise real archive/lock/release validation.
-            with patch.object(release, 'selections', return_value=[row]):
+            with patch.object(release, 'selections', return_value=[row]), \
+                    patch('check_payment_protocol.check') as check_protocol:
                 catalogue, payloads = release.check(root)
                 self.assertEqual(['shared', 'retained-data'], [r['selection'] for r in catalogue['packages']])
                 self.assertEqual({row['path'], pin['path']}, set(payloads))
+                check_payment_family.check(root)
+                check_protocol.assert_called_once_with(root)
+
                 config['executionRequires'] = ['Transport']
                 config_path.write_text(json.dumps(config))
-                with self.assertRaisesRegex(ValueError, 'cannot be an execution requirement'):
-                    release.check(root)
+                for check in (release.check, check_payment_family.check):
+                    with self.subTest(check=check.__module__), self.assertRaisesRegex(
+                            ValueError, 'cannot be an execution requirement'):
+                        check(root)
+
                 config.pop('executionRequires')
                 config['imports']['Transport']['path'] = '../undeclared.bluepkg'
                 config_path.write_text(json.dumps(config))
-                with self.assertRaisesRegex(ValueError, 'Retained source import differs'):
-                    release.check(root)
+                for check in (release.check, check_payment_family.check):
+                    with self.subTest(check=check.__module__), self.assertRaisesRegex(
+                            ValueError, 'Retained source import differs'):
+                        check(root)
+
+                source_path.write_text(json.dumps(dict(source, retainedArchives=[])))
+                with self.assertRaisesRegex(ValueError, 'Dependency outside current catalogue'):
+                    check_payment_family.check(root)
+                check_protocol.assert_called_once_with(root)
 
     def test_retained_pin_rejects_lock_drift_and_path_escape(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -170,9 +190,20 @@ class ReleaseTests(unittest.TestCase):
 
     def test_current_catalogue_and_generated_views_are_consistent(self):
         rows = release.selections(release.ROOT)
-        self.assertEqual(41, len(rows))
+        self.assertEqual(42, len(rows))
         self.assertEqual(1, sum(row['name'] == 'blue-execution-profile' for row in rows))
         self.assertEqual(1, sum(row['name'] == 'clause-reseller' for row in rows))
+        cancellation, = [row for row in rows if row['name'] == 'reseller-cancellation-timing']
+        self.assertEqual('CancellationTiming', cancellation['namespace'])
+        publication, _ = release.check_archive(release.ROOT, cancellation)
+        self.assertEqual({
+            'Cancellation Clause': 'BZvBqmrQhazjLMqP4SWtdsKXFJK9dyLQBtg8UJ6u9YtW',
+            'Cancellation Payment Clause': 'C7eVHzZr4tiKb4D3jNvBBRxz4ZBZwEEnoMfSB682Xq7U',
+            'Cancellation Settlement Clause': 'F7z5KC3ZbS4WmvZaE7Cti66BifXfyptbGw4PRbXj9GF5',
+            'Cancellation Settlement Functions': '2k7MQ291qEdAa6sRWnxXq8ZJw5K9tJ5ZcdUSFcY6bHdw',
+            'Order Functions': '4rhicZVvoCGjzYDfEAE5tYNWWAGW1FC2gMkWpPL9dmYY',
+        }, {item['name']: item['blueId'] for item in publication['exports']})
+        self.assertEqual({'Language', 'Reseller'}, set(publication['imports']))
         self.assertEqual(1, sum(row['name'] == 'blue-definition-read' for row in rows))
         self.assertTrue({'blue-dispatch', 'clause-inspection', 'clause-attachments', 'blue-offers', 'myos-business'} <= {row['name'] for row in rows})
         self.assertEqual(1, sum(row['name'] == 'blue-mandates' for row in rows))

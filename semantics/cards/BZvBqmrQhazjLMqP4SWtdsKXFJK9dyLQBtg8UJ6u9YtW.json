@@ -1,0 +1,84 @@
+{
+  "blueId": "BZvBqmrQhazjLMqP4SWtdsKXFJK9dyLQBtg8UJ6u9YtW",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "4rhicZVvoCGjzYDfEAE5tYNWWAGW1FC2gMkWpPL9dmYY",
+      "9uaNLT6DfnQ8EXeozaJQZgCy84P3m8E1fkb3YekMUieb"
+    ],
+    "displayLabel": "Cancellation Clause",
+    "limitations": [
+      "The timing policy needs a host that supplies a valid activation receipt when the activation condition is used.",
+      "A decision and its released amount do not establish the refund or authorization outcome."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "No recorded status for this group.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "cancelGroupWithTiming saves status cancelled at the configured reservation state.",
+        "id": "status",
+        "meaning": "Current status of this reservation group.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "No cancellation timestamp is recorded for this group.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "The decision uses the runtime timestamp binding.",
+        "id": "decisionTimestamp",
+        "meaning": "Unix microseconds of the native cancellation entry.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/timestampMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No cancellation charge decision is recorded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "The decision stores the computed charge after the timing and state guards.",
+        "id": "chargeMinor",
+        "meaning": "Late charge decided for this group in minor units of the accompanying currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/chargeMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "The decision currency is unavailable.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "The decision copies the quote currency from the configured snapshot.",
+        "id": "decisionCurrency",
+        "meaning": "Currency of the proposal basis, late charge and released amount.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "No released amount is recorded for this decision.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "The decision subtracts its charge from the current proposal amount.",
+        "id": "releasedMinor",
+        "meaning": "Proposal amount above the charge, in the decision currency’s minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/decision/releasedMinor",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Cancellation Clause\n\nConnects a reseller Order to whole-reservation-group cancellation. The host assigns the parties and operations. The buyer cancellation action invokes `cancelGroupWithTiming`. It needs a request key, group ID, the exact current proposal BlueId and a reason. A keyed retry with the same actor, action and input returns `duplicate` without a new decision. Changed inputs reusing the key are rejected.\n\nThe `snapshot`, `state`, `requests` and `payments` paths default to `/orderSnapshot`, `/reservations`, `/reservationRequests` and `/payments`. The action reads accepted cancellation terms from the snapshot. An optional `/cancellationTiming/policy` supplies an inclusive maximum time since first Order activation, an inclusive minimum time remaining before confirmed service, or both. When both are configured, the free window is their intersection. Elapsed-time-only offers can have no scheduled start. A configured clock must have its own valid source. Without an explicit timing policy, the action uses the existing date-based calculation.\n\nA successful cancellation records the exact proposal, decision BlueId, currency, basis, late charge and amount released under the policy. Monetary amounts use minor units of the quote currency. The other actions expose the inherited supplier cancellation, supplier no-show, decline, expiration and payment observation functions. The host controls which actors may invoke them. Cancellation records the outcome for the group and leaves payment evidence to the relevant Payment Instruction."
+}

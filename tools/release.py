@@ -105,7 +105,7 @@ def check_archive(root, row, *, retained=False):
                 protocolBlueId=manifest['protocol']), data
 
 
-def retained_archives(root):
+def retained_archives(root, *, current_ids=()):
     """Validate explicitly pinned archive inputs, never active namespace mounts."""
     source = root / 'PACKAGE-SOURCES.json'
     pins = json.loads(source.read_text()).get('retainedArchives', []) if source.exists() else []
@@ -122,6 +122,7 @@ def retained_archives(root):
         row, data = check_archive(root, dict(pin, name=pin['path'], selection='retained-data'), retained=True)
         result[path] = (row, data)
         identities.add(pin['packageBlueId'])
+    require(identities.isdisjoint(current_ids), 'Retained archive duplicates active publication')
     return result
 
 
@@ -140,26 +141,31 @@ def retained_import(root, folder, prefix, declaration, config, retained):
     return row
 
 
-def check(root=ROOT):
+def check_dependency_closure(root, row, current_imports, retained):
+    """Check each exact import against the current selection or a data-only pin."""
     import yaml
+    folder = root / row['directory']
+    config = yaml.safe_load((folder / 'blue-package.yaml').read_text())
+    lock = json.loads((folder / 'blue-package.lock.json').read_text())
+    for prefix, identity in row['imports'].items():
+        pin = retained_import(root, folder, prefix, lock['imports'][prefix], config, retained)
+        if current_imports.get(prefix) != identity:
+            require(pin is not None and pin['packageBlueId'] == identity,
+                    'Dependency outside current catalogue: ' + row['name'] + '/' + prefix)
+            source_pin = retained_import(root, folder, prefix, config['imports'][prefix], config, retained)
+            require(source_pin == pin, 'Retained source import differs: ' + prefix)
+
+
+def check(root=ROOT):
     rows, payloads = [], {}
     current = selections(root)
-    retained = retained_archives(root)
     selected_ids = {r['packageBlueId'] for r in current}
-    require(not selected_ids.intersection(row['packageBlueId'] for row, _ in retained.values()),
-            'Retained archive duplicates active publication')
+    retained = retained_archives(root, current_ids=selected_ids)
     for selection in current:
         row, data = check_archive(root, selection)
-        folder = root / selection['directory']
-        config = yaml.safe_load((folder / 'blue-package.yaml').read_text())
-        lock = json.loads((folder / 'blue-package.lock.json').read_text())
-        for prefix, identity in row['imports'].items():
-            pin = retained_import(root, folder, prefix, lock['imports'][prefix], config, retained)
-            if identity not in selected_ids:
-                require(pin is not None and pin['packageBlueId'] == identity,
-                        'Dependency outside current catalogue: ' + row['name'])
-                source_pin = retained_import(root, folder, prefix, config['imports'][prefix], config, retained)
-                require(source_pin == pin, 'Retained source import differs: ' + prefix)
+        current_imports = {prefix: identity for prefix, identity in row['imports'].items()
+                           if identity in selected_ids}
+        check_dependency_closure(root, row, current_imports, retained)
         rows.append(row)
         payloads[row['path']] = data
     indexed = {row['path'].removesuffix('/dist/package.bluepkg'): row for row in rows}

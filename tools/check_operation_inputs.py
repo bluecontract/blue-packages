@@ -36,6 +36,7 @@ CASES = {
     'source-binding-routing': ('SourceBindingConformance', 'routing'),
     'document-provision': ('ProvisionInputConformance',),
     'bootstrap-preparation': ('BootstrapPreparationConformance',),
+    'reseller-catalog-capacity': ('CatalogCapacityConformance',),
     'refresh-definition': ('RefreshDefinitionConformance',),
     'admission-consent-declarations': ('AdmissionConsentDeclarationConformance',),
     'admission-provision': ('AdmissionProvisionConformance',),
