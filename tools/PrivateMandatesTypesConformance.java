@@ -4,13 +4,31 @@ import java.util.*;
 
 /** Native Language conformance for the Coordination evidence types and the private-mandates schemas; Core qualifies execution. */
 public final class PrivateMandatesTypesConformance {
-  /** Identities of the edition before this one; its retained archives must still carry them. */
-  static final Map<String, String> PRIOR = Map.of(
-      "Coordination", "4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA",
-      "Coordination/Timeline Channel", "GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy",
-      "Mandates", "4kaMxybWTTeTpkzUtoYVUPk8dUo3HxKM5MG5joxN6LFL",
-      "Mandates/Authority", "AypmNprcDHuFc293hkDJFJ91GKtwbH7mDiCii8hmUBjP",
-      "Mandates/Mandate Authority", "2YnsAG44Sg9Q9XrzUe9Yz5PNXkHuxDcpvv4Wv4QNysTe");
+  /**
+   * Identities of the default (Access Events) edition. The evidence packages are additive: the
+   * Coordination and Mandates publications they require must still carry exactly these, so a document
+   * with an evidence channel consumes the same signed timelines as every other document.
+   */
+  static final Map<String, String> DEFAULT = Map.ofEntries(
+      Map.entry("Coordination", "4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA"),
+      Map.entry("Coordination/Timeline Channel", "GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy"),
+      Map.entry("Coordination/Public Timeline Channel", "BvtgU3qxEP7vTPD7vTwC1qTdvWSBwwxsaA4j6xkyqbJt"),
+      Map.entry("Coordination/Signed Timeline", "EzfsjTUabtmb2KAMy7LHDrM9ffQzbx7JvXsGVSr6wh73"),
+      Map.entry("Coordination/Timeline Entry", "G4dok8HLuBFPutTwD4h71y3y6ph7esA6qJGtDvoYAxKV"),
+      Map.entry("Coordination/Timeline Provider", "AT9pX83cgt2mw9EPutC3dHKeWU8Ruj4TXB2cbTkBRxS7"),
+      Map.entry("Coordination/Provider Descriptor", "kqnzQTYbwKbwvRTR4GT8P1WTfCY7EW6GKizMGT6VwNs"),
+      Map.entry("Coordination/Provider Attestation", "2Ap8D4xbzPNtCTe4jcFAJR4rLbef4ZzoPuPKiYqiqcwy"),
+      Map.entry("Coordination/Timeline Completeness Guarantee", "2j2ZNTZnv3w6GC3XxoUG7pe35gVHJLaKqiHQjdHXAcHH"),
+      Map.entry("Coordination/Timeline Attestation", "CSm4Ph8vD14hyE1Yhb2fNpNiBqGPEJ6tTcVvrVRFaGyk"),
+      Map.entry("Coordination/Timeline Range Evidence", "Hh9pViBbBJw3zP7a19oJDwG9pZVCoGNqF6MYHmRfpjXo"),
+      Map.entry("Coordination/Timeline Successor Evidence", "HKipW4hQAiDPfDX6oMH25LERWurv9vDnTbywQ2siDvcz"),
+      Map.entry("Coordination/Ed25519 Public Key", "4QJmKi3QsZcU5MmoScSdruB5fayT8ykSNdZ3C3jKJx9e"),
+      Map.entry("Coordination/Order Key", "FenCaravyQuwz4aT1LfX6i8nkbWPEhcFZ4fYbg2GijgJ"),
+      Map.entry("Mandates", "4kaMxybWTTeTpkzUtoYVUPk8dUo3HxKM5MG5joxN6LFL"),
+      Map.entry("Mandates/Authority", "AypmNprcDHuFc293hkDJFJ91GKtwbH7mDiCii8hmUBjP"),
+      Map.entry("Mandates/Mandate Authority", "2YnsAG44Sg9Q9XrzUe9Yz5PNXkHuxDcpvv4Wv4QNysTe"));
+  /** BlueIds of content no mounted package holds (the withdrawn rebuilt Coordination and Mandates candidates). */
+  static final String UNHELD = "HHsCUAybKPWQJesQCSrpk6dpppjiii7tyz9vaWavMdP5", UNHELD_MANDATE = "CGJTGJvfh4TTFeawShQyeTXa3xzwNxz3UnQmSnwJEtTC";
   static final String HEX = "ab".repeat(32);
 
   @SuppressWarnings("unchecked")
@@ -54,43 +72,38 @@ public final class PrivateMandatesTypesConformance {
     Path root = Path.of(args[0]);
     var open = new TreeMap<String, BluePackage>();
     for (var mount : Map.of("Language", "blue-language", "BEX", "blue-bex", "Contracts", "blue-contracts",
-        "Coordination", "blue-coordination", "Mandates", "blue-mandates",
-        "PrivateMandates", "blue-private-mandates").entrySet())
+        "Coordination", "blue-coordination", "CoordinationEvidence", "blue-coordination-evidence",
+        "Mandates", "blue-mandates", "PrivateMandates", "blue-private-mandates").entrySet())
       open.put(mount.getKey(), BluePackage.open(root.resolve(mount.getValue() + "/dist/package.bluepkg")));
     var coordination = open.get("Coordination");
+    var evidence = open.get("CoordinationEvidence");
     var mandates = open.get("Mandates");
     var privateMandates = open.get("PrivateMandates");
-    // The previous edition stays available as retained archives with its exact identities.
-    var priorCoordination = BluePackage.open(root.resolve("retained/pre-evidence-20261119/blue-coordination/package.bluepkg"));
-    var priorMandates = BluePackage.open(root.resolve("retained/pre-evidence-20261119/blue-mandates/package.bluepkg"));
-    require(PRIOR.get("Coordination").equals(priorCoordination.blueId()), "Retained Coordination publication changed");
-    require(PRIOR.get("Coordination/Timeline Channel").equals(priorCoordination.exportId("Timeline Channel")),
-        "Retained Timeline Channel identity changed");
-    require(PRIOR.get("Mandates").equals(priorMandates.blueId()), "Retained Mandates publication changed");
-    require(PRIOR.get("Mandates/Authority").equals(priorMandates.exportId("Authority"))
-        && PRIOR.get("Mandates/Mandate Authority").equals(priorMandates.exportId("Mandate Authority")),
-        "Retained Mandates authority identities changed");
-    // A new edition has new identities; it never reuses those of the previous one.
-    require(!PRIOR.get("Coordination").equals(coordination.blueId())
-        && !PRIOR.get("Coordination/Timeline Channel").equals(coordination.exportId("Timeline Channel"))
-        && !PRIOR.get("Mandates").equals(mandates.blueId()), "The new edition must not reuse earlier identities");
-    for (String name : priorCoordination.exports().keySet())
-      require(coordination.exports().containsKey(name), "The new edition must keep every earlier Coordination export: " + name);
-    for (String name : List.of("Timeline Channel with Evidence", "Evidence Profile", "Proof Entry", "Rejection Entry"))
-      require(coordination.exports().containsKey(name) && !priorCoordination.exports().containsKey(name),
-          "Evidence type must be new in this Coordination edition: " + name);
+    // The required publications are the default edition's, with their exact identities.
+    for (var row : DEFAULT.entrySet()) {
+      String[] name = row.getKey().split("/", 2);
+      var publication = open.get(name[0]);
+      String actual = name.length == 1 ? publication.blueId() : publication.exportId(name[1]);
+      require(row.getValue().equals(actual), "Default-edition identity changed: " + row.getKey() + " is " + actual);
+    }
+    // The evidence package adds exactly its four types and redefines nothing of Coordination.
+    require(evidence.exports().keySet().equals(Set.of("Timeline Channel with Evidence", "Evidence Profile", "Proof Entry",
+        "Rejection Entry")), "Evidence package exports changed: " + evidence.exports().keySet());
+    for (String name : evidence.exports().keySet())
+      require(!coordination.exports().containsKey(name), "Evidence type must not be a Coordination export: " + name);
     for (String name : privateMandates.exports().keySet())
-      require(!mandates.exports().containsKey(name), "Extension must not redefine a Mandates export: " + name);
+      require(!mandates.exports().containsKey(name) && !evidence.exports().containsKey(name),
+          "Extension must not redefine a required export: " + name);
 
     var bundle = PackageBundle.builder();
     open.forEach(bundle::mount);
     try (Blue blue = Blue.builder().packages(bundle.build()).build()) {
-      descends(blue, "Timeline Channel with Evidence", coordination.exportId("Timeline Channel with Evidence"),
+      descends(blue, "Timeline Channel with Evidence", evidence.exportId("Timeline Channel with Evidence"),
           coordination.exportId("Timeline Channel"));
       descends(blue, "Mandate Commitment Authority", privateMandates.exportId("Mandate Commitment Authority"),
           mandates.exportId("Authority"));
       descends(blue, "RISC Zero Succinct Receipt Profile",
-          privateMandates.exportId("RISC Zero Succinct Receipt Profile"), coordination.exportId("Evidence Profile"));
+          privateMandates.exportId("RISC Zero Succinct Receipt Profile"), evidence.exportId("Evidence Profile"));
       require(!NativeRuntime.ancestry(privateMandates.exportId("Mandate Commitment Authority"), new NativeRuntime(blue))
           .contains(mandates.exportId("Mandate Authority")), "The commitment claim must not be a Mandate Authority");
 
@@ -103,7 +116,7 @@ public final class PrivateMandatesTypesConformance {
       Map<String, Object> proofs = with(timeline, "url", "https://provider.example/timelines/proofs");
       Map<String, Object> profile = Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile",
           "programImageId", HEX, "allowedProviders", List.of("01".repeat(32), "02".repeat(32)));
-      Map<String, Object> channel = Map.of("type", "Coordination/Timeline Channel with Evidence",
+      Map<String, Object> channel = Map.of("type", "CoordinationEvidence/Timeline Channel with Evidence",
           "actor", actor, "timeline", timeline, "evidenceTimeline", proofs,
           "mandateProcessorKey", "ef".repeat(32), "evidenceProfile", profile);
       Map<String, Object> authority = Map.of("type", "PrivateMandates/Mandate Commitment Authority",
@@ -111,14 +124,14 @@ public final class PrivateMandatesTypesConformance {
       // References by content BlueId. These two targets are content the mounted packages provide.
       Map<String, Object> document = Map.of("blueId", coordination.exportId("Timeline Channel"));
       Map<String, Object> operationEntry = Map.of("blueId", coordination.exportId("Timeline Entry"));
-      Map<String, Object> proof = Map.of("type", "Coordination/Proof Entry", "receipt", "AAECAw==",
+      Map<String, Object> proof = Map.of("type", "CoordinationEvidence/Proof Entry", "receipt", "AAECAw==",
           "document", document, "operationEntry", operationEntry);
-      Map<String, Object> rejection = Map.of("type", "Coordination/Rejection Entry",
+      Map<String, Object> rejection = Map.of("type", "CoordinationEvidence/Rejection Entry",
           "document", document, "operationEntry", operationEntry);
 
       final String ADMITTED = "Admitted", SCHEMA = "Invalid/SchemaViolation", TYPE = "Invalid/TypeCompatibilityViolation",
           INCOMPLETE = "Incomplete/ProviderUnavailable";
-      Map<String, Object> unavailable = Map.of("blueId", PRIOR.get("Coordination"));
+      Map<String, Object> unavailable = Map.of("blueId", UNHELD);
       Map<String, Object> typeOnlyMandate = Map.of("type", "Mandates/Operation Mandate");
 
       var ids = new TreeMap<String, Object>();
@@ -139,7 +152,7 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, schema, "channel with an integer profile", with(channel, "evidenceProfile", 7), TYPE);
       expect(blue, schema, "channel with a list profile", with(channel, "evidenceProfile", List.of(profile)), SCHEMA);
       expect(blue, schema, "channel with a bare base profile",
-          with(channel, "evidenceProfile", Map.of("type", "Coordination/Evidence Profile")), SCHEMA);
+          with(channel, "evidenceProfile", Map.of("type", "CoordinationEvidence/Evidence Profile")), SCHEMA);
       expect(blue, schema, "channel with a type-only specialisation as profile", with(channel, "evidenceProfile",
           Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile")), SCHEMA);
       expect(blue, schema, "profile with an empty provider list", with(profile, "allowedProviders", List.of()), ADMITTED);
@@ -179,7 +192,7 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, profileNative, "untyped object with arbitrary content",
           with(channel, "evidenceProfile", Map.of("anything", "x")), ADMITTED);
       expect(blue, profileNative, "base Evidence Profile with a field", with(channel, "evidenceProfile",
-          Map.of("type", "Coordination/Evidence Profile", "anything", "x")), ADMITTED);
+          Map.of("type", "CoordinationEvidence/Evidence Profile", "anything", "x")), ADMITTED);
       expect(blue, profileNative, "a Signed Timeline", with(channel, "evidenceProfile", timeline), ADMITTED);
       expect(blue, profileNative, "a Timeline Provider", with(channel, "evidenceProfile", provider), ADMITTED);
       expect(blue, profileNative, "a plain Timeline Channel", with(channel, "evidenceProfile",
@@ -201,7 +214,7 @@ public final class PrivateMandatesTypesConformance {
           with(operationTimelineEntry, "onBehalfOf", with(authority, "mandate", typeOnlyMandate)), ADMITTED);
       // Not a schema rejection: an unavailable reference target leaves admission incomplete.
       expect(blue, authorityNative, "mandate as a reference whose content is unavailable",
-          with(authority, "mandate", Map.of("blueId", PRIOR.get("Mandates"))), INCOMPLETE);
+          with(authority, "mandate", Map.of("blueId", UNHELD_MANDATE)), INCOMPLETE);
 
       // 4. Proof Entry and Rejection Entry have open schemas: every malformed entry below is admitted as
       // Blue content. The processor skips it.
@@ -217,15 +230,15 @@ public final class PrivateMandatesTypesConformance {
           with(proof, "receipt", "not base64 !!"), ADMITTED);
       expect(blue, skipped, "proof entry with a text document", with(proof, "document", "someDocumentId"), ADMITTED);
       expect(blue, skipped, "proof entry with an integer operationEntry", with(proof, "operationEntry", 7), ADMITTED);
-      expect(blue, skipped, "proof entry with only its type", Map.of("type", "Coordination/Proof Entry"), ADMITTED);
+      expect(blue, skipped, "proof entry with only its type", Map.of("type", "CoordinationEvidence/Proof Entry"), ADMITTED);
       expect(blue, skipped, "proof entry with only an unknown field",
-          Map.of("type", "Coordination/Proof Entry", "note", "x"), ADMITTED);
+          Map.of("type", "CoordinationEvidence/Proof Entry", "note", "x"), ADMITTED);
       expect(blue, skipped, "rejection with an extra field", with(rejection, "reason", "x"), ADMITTED);
       expect(blue, skipped, "rejection without document", with(rejection, "document", null), ADMITTED);
       expect(blue, skipped, "rejection without operationEntry", with(rejection, "operationEntry", null), ADMITTED);
-      expect(blue, skipped, "rejection with only its type", Map.of("type", "Coordination/Rejection Entry"), ADMITTED);
+      expect(blue, skipped, "rejection with only its type", Map.of("type", "CoordinationEvidence/Rejection Entry"), ADMITTED);
       expect(blue, skipped, "rejection with the earlier text fields",
-          Map.of("type", "Coordination/Rejection Entry", "documentId", "x", "operationEntry", "y"), ADMITTED);
+          Map.of("type", "CoordinationEvidence/Rejection Entry", "documentId", "x", "operationEntry", "y"), ADMITTED);
       expect(blue, skipped, "rejection with an object that names nothing as document",
           with(rejection, "document", Map.of("id", "x")), ADMITTED);
 
@@ -345,11 +358,13 @@ public final class PrivateMandatesTypesConformance {
 
       var result = new TreeMap<String, Object>();
       result.put("coordinationPackage", coordination.blueId());
+      result.put("coordinationEvidencePackage", evidence.blueId());
       result.put("mandatesPackage", mandates.blueId());
       result.put("privateMandatesPackage", privateMandates.blueId());
       var typeIds = new TreeMap<String, Object>();
-      for (String name : List.of("Timeline Channel", "Timeline Channel with Evidence", "Evidence Profile", "Proof Entry", "Rejection Entry"))
+      for (String name : List.of("Timeline Channel", "Signed Timeline", "Timeline Entry"))
         typeIds.put("Coordination/" + name, coordination.exportId(name));
+      for (String name : evidence.exports().keySet()) typeIds.put("CoordinationEvidence/" + name, evidence.exportId(name));
       for (String name : privateMandates.exports().keySet()) typeIds.put("PrivateMandates/" + name, privateMandates.exportId(name));
       result.put("typeBlueIds", typeIds);
       result.put("sampleBlueIds", ids);
@@ -362,7 +377,7 @@ public final class PrivateMandatesTypesConformance {
       result.put("leftToNativeRules", nativeRules);
       result.put("attestationSchemaDecisions", attestationCases);
       result.put("attestationAdmittedBySchemaLeftToVerifier", attestationVerifier);
-      result.put("scope", "Language schema, inheritance and retained prior identities; not native execution qualification");
+      result.put("scope", "Language schema, inheritance and unchanged default-edition identities; not native execution qualification");
       System.out.println(WireData.write(result));
     }
   }

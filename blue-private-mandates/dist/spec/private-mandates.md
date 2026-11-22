@@ -2,19 +2,21 @@
 
 Protocol name: `Private Mandates / proof-decided operation authority/1`
 Package namespace: `PrivateMandates`
-Release status: Core Java integration preview, 19 November 2026
+Release status: Core Java integration preview, 22 November 2026
 
-This package extends Mandates and the timeline channels with evidence of
-Coordination (section 14 of the Coordination specification). It requires the exact
-Coordination edition that defines those channels and the Mandates publication built
-on it. It is additive: `Mandates/Mandate Authority`, which names its mandate in
+This package extends Mandates and the timeline channels with evidence of the
+Coordination Evidence package (`blue-coordination-evidence`; "the Coordination
+Evidence specification" below). It requires that exact package, the exact
+Coordination publication that package requires and the Mandates publication built
+on that Coordination publication. It changes no type of any of them and defines no
+transport type. It is additive: `Mandates/Mandate Authority`, which names its mandate in
 clear, stays supported and keeps its rules. Names and grammar details marked *provisional* are
 working choices of this preview; changing one produces new exact identities.
 
 Terms: E is an operation entry of the agent and K its full Coordination input key.
 D is the state of the target document strictly before E. M is the salted mandate
 commitment carried by E. T is the evidence timeline named by the channel E is
-performed on (`Coordination/Timeline Channel with Evidence`).
+performed on (`CoordinationEvidence/Timeline Channel with Evidence`).
 
 ## 1. Scope and layer boundary
 
@@ -30,11 +32,11 @@ the mandate, and a zero-knowledge proof published on T states the verdict:
 
 Every processor verifies the proof and reaches the same decision without the
 mandate. The rules for reading T (considered entries, first entry, waiting, halting)
-are those of section 14 of the Coordination specification. This specification
+are those of the Coordination Evidence specification. This specification
 defines the authority claim, the evidence profile, and when a proof matches.
 
 A processor MUST explicitly support this exact package and protocol, the required
-Coordination protocol and the required Mandates protocol. A host that does
+Coordination Evidence protocol and the required Mandates protocol. A host that does
 not support the profile type a channel declares MUST refuse the document where the
 channel is declared. Installing this data package grants no native support.
 
@@ -47,8 +49,8 @@ channel is declared. Installing this data package grants no native support.
    (`MandateClauses/Mandate with Clauses`) is such a subtype and is supported. A
    state of any other type is a fault of the mandate (§3).
 2. *One edition for both documents.* The mandate and the target document are on
-   the same edition: the Coordination edition and the Mandates publication this
-   package requires. A mandate established under another Mandates package is a
+   the same edition: the Coordination publication, the Coordination Evidence
+   package and the Mandates publication this package requires. A mandate established under another Mandates package is a
    fault of the mandate (§3). A proof for a mandate of another edition is not
    defined in this version.
 3. *One edition, one proving program, one profile.* One edition has exactly one
@@ -56,9 +58,10 @@ channel is declared. Installing this data package grants no native support.
    identities of that edition, and its image identifier is the `programImageId` of
    the profile (§4.1). Every type identity of this package,
    `Mandate Commitment Authority` included, therefore changes with each
-   Coordination or Mandates edition. A document pins its proving program for its
+   Coordination or Mandates edition, and the profile type also with each edition
+   of the Coordination Evidence package. A document pins its proving program for its
    whole life through the profile of its channel: `evidenceProfile` is fixed for
-   the life of the document (Coordination section 14.3).
+   the life of the document (Coordination Evidence section 3).
 4. *A channel without evidence.* An operation whose authority claim is a
    `Mandate Commitment Authority` and which is performed on a channel without
    evidence (a plain `Timeline Channel`, or a channel that lacks any of the three
@@ -71,7 +74,7 @@ channel is declared. Installing this data package grants no native support.
 |---|---|---|
 | Mandate Commitment Authority | `Mandates/Authority` | Authority claim that carries M and names no mandate |
 | Mandate State Attestation | document signed by the mandate processor | What the mandate processor states about one state of a mandate (§4.2) |
-| RISC Zero Succinct Receipt Profile | `Coordination/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
+| RISC Zero Succinct Receipt Profile | `CoordinationEvidence/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
 
 ## 3. The authority claim
 
@@ -123,7 +126,7 @@ M tells the prover which mandate is meant and lets a processor match a proof to
 the operation.
 
 An operation whose authority claim is a `Mandate Commitment Authority` is
-evidence-decided in the sense of section 14 of the Coordination specification. The
+evidence-decided in the sense of the Coordination Evidence specification. The
 claim is recognised by its exact type: the type of the claim must be exactly
 `Mandate Commitment Authority` of this package. A claim of a subtype, of a parent
 type or with no type is not evidence-decided, and no proof can be made for it.
@@ -135,7 +138,7 @@ has today for `Mandate Authority`:
 
 1. the claim's `actor` is the actor of the target channel the operation selects;
 2. that target channel exists and is a concrete `Coordination/Timeline Channel`
-   (which includes `Timeline Channel with Evidence`);
+   (which includes `CoordinationEvidence/Timeline Channel with Evidence`);
 3. the target document contains a Timeline Channel with the actor and timeline of E
    (the delegate participant);
 4. the target document's actor policy admits E as a delegated action.
@@ -210,7 +213,7 @@ that does not exist from content that is withheld. No proof can then be made for
 whatever the order of the grants and also when another grant would admit. So
 withholding content can never choose a verdict: for one S, D and E at most one
 verdict is provable. The party ends the wait with a Rejection Entry (Coordination
-section 14.5); repairing needs an update of the mandate.
+Evidence section 5); repairing needs an update of the mandate.
 
 This is a deliberate difference from mandates named in clear. For a
 `Mandates/Mandate Authority` the Mandates specification says only that an error
@@ -229,14 +232,15 @@ deterministically only when they use the same profile, so a channel declares a
 profile value and never a name such as "latest". The profile is identified by a
 hash of its content: the BlueId of the declared value (*provisional*).
 
-`Coordination/Evidence Profile` is the base type and has no fields. A
+`CoordinationEvidence/Evidence Profile` is the base type and has no fields. A
 channel's `evidenceProfile` MUST be a value of a supported specialisation.
 
 The Language schema of the channel does not enforce this. Typing of the
 `evidenceProfile` field is structural: the schema admits a value with no type and
-values of unrelated types. What protects is the native rule of Coordination section
-14.3, which a processor MUST implement: the exact type of the value must be a
-supported specialisation of `Coordination/Evidence Profile`; anything else counts
+values of unrelated types. What protects is the native rule of Coordination
+Evidence section 3, which a processor MUST implement: the exact type of the value
+must be a supported specialisation of `CoordinationEvidence/Evidence Profile`;
+anything else counts
 as a missing field, and every operation with a `Mandate Commitment Authority` on
 that channel is rejected from the document state.
 
@@ -283,7 +287,7 @@ authority claim (§3) it admits a further field that carries only a type. The
 processor additionally requires that the fields are exactly these two, that
 `programImageId` and every key are 64 characters `0-9a-f` and that the list is
 strictly ascending by key bytes. A
-profile that fails any of these is malformed; under section 14 of the Coordination
+profile that fails any of these is malformed; under the Coordination Evidence
 specification the channel then lacks its profile, and every operation with
 a `Mandate Commitment Authority` on it is rejected from the document state.
 
@@ -537,10 +541,10 @@ processor's own values, as the table below lists. It does nothing else. It reads
 no record of D, of E or of the mandate, computes nothing from the content of a
 document, and needs of D only its BlueId.
 
-A well-formed `Coordination/Proof Entry` (Coordination section 14.5; the processor,
+A well-formed `CoordinationEvidence/Proof Entry` (Coordination Evidence section 5; the processor,
 not the schema, decides well-formedness) is a matching proof for E only if all
 comparisons hold. The entry's `document` and `operationEntry` are an advisory hint
-with no force (Coordination section 14.5). They are not among the comparisons, the
+with no force (Coordination Evidence section 5). They are not among the comparisons, the
 receiver does not read them, and a proof is never skipped or classified
 differently because of what they hold: each Proof Entry is classified by its
 public output alone.
@@ -586,7 +590,7 @@ must never ask for such a check), a fault of the receiver outside decoding and
 verification, or a receiver that was stopped from outside. RETRY never has its cause
 in the bytes of the receipt, in the proof or in the content of a document: with
 correct own data no receipt, whatever its bytes, gives RETRY. A processor that gets
-RETRY does not pass over the entry (Coordination section 14.6).
+RETRY does not pass over the entry (Coordination Evidence section 6).
 
 Whether a byte string is SKIP or MATCH depends on the code of the receiver, not only
 on the profile's data: the canonical-encoding rule of §4.1 is such code. All

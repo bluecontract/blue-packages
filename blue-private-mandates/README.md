@@ -2,9 +2,10 @@
 
 `blue-private-mandates` **0.1.0-preview.1** lets the participants of a document
 decide an agent's operation from a proof instead of reading the mandate. It
-requires the exact `blue-coordination` edition that defines timeline channels with
-evidence (0.2.0-access-events.1.evidence.1) and the `blue-mandates` publication
-built on it (0.3.0-preview.1.evidence.1).
+requires the exact `blue-coordination-evidence` package (0.1.0-preview.1), which
+defines timeline channels with evidence on the unchanged `blue-coordination`
+0.2.0-access-events.1, and the unchanged `blue-mandates` 0.3.0-preview.1. No
+transport type and no Mandates type has a new identity.
 
 - [Specification](spec/private-mandates.md): the authority claim, evidence
   profiles and when a proof matches.
@@ -14,7 +15,7 @@ built on it (0.3.0-preview.1.evidence.1).
   state of a mandate (its BlueId is signed; attestations of one mandate form a
   hash chain through `sequence` and `previous`).
 - `RISC Zero Succinct Receipt Profile`: the first
-  `Coordination/Evidence Profile`, with `programImageId` and
+  `CoordinationEvidence/Evidence Profile`, with `programImageId` and
   `allowedProviders`. The provider set digest is derived from the list and is
   not a field.
 

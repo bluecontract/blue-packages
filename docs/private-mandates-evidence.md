@@ -1,13 +1,16 @@
-# Coordination edition with evidence channels, and private mandates
+# Evidence channels and private mandates as additive packages
 
 This is an unpublished candidate. It lets the participants of a document decide an
 agent's operation from a proof on an evidence timeline instead of reading the mandate.
 
 ## What changed
 
-There is one developed Coordination. Its new edition `0.2.0-access-events.1.evidence.1`
-descends from `0.2.0-access-events.1` and adds section 14 to `spec/coordination.md`
-with four exported types:
+Two packages are added on top of the unchanged current publications. Nothing else
+changes: no existing source, archive, identity, lock or catalogue row.
+
+`blue-coordination-evidence` `0.1.0-preview.1` (namespace `CoordinationEvidence`)
+requires the exact `blue-coordination` `0.2.0-access-events.1` and exports four types
+under its own rules, `spec/coordination-evidence.md`:
 
 - `Timeline Channel with Evidence`: a `Coordination/Timeline Channel` with
   `evidenceTimeline`, `mandateProcessorKey` and `evidenceProfile`;
@@ -15,65 +18,82 @@ with four exported types:
 - `Proof Entry` (`receipt`, `document`, `operationEntry`) and `Rejection Entry`
   (`document`, `operationEntry`): the two messages on an evidence timeline.
 
-`blue-private-mandates` `0.1.0-preview.1` stays a separate package. It requires this
-Coordination edition and the Mandates publication built on it, and adds
-`RISC Zero Succinct Receipt Profile` (a `Coordination/Evidence Profile` with
-`programImageId` and `allowedProviders`) and
+`blue-private-mandates` `0.1.0-preview.1` requires that package and the unchanged
+`blue-mandates` `0.3.0-preview.1`, and adds
+`RISC Zero Succinct Receipt Profile` (a `CoordinationEvidence/Evidence Profile` with
+`programImageId` and `allowedProviders`),
 `Mandate Commitment Authority` (a `Mandates/Authority` with the salted mandate
-commitment and no `mandate` reference), and `Mandate State Attestation`, the
+commitment and no `mandate` reference) and `Mandate State Attestation`, the
 document a mandate processor signs about one state of a mandate: its BlueId is
-signed, and the attestations of one mandate form a hash chain. The normative rules are the two `spec/` files.
+signed, and the attestations of one mandate form a hash chain. The normative rules
+are the two `spec/` files.
 
 | Item | Version | BlueId |
 | --- | --- | --- |
-| Coordination package | 0.2.0-access-events.1.evidence.1 | `HHsCUAybKPWQJesQCSrpk6dpppjiii7tyz9vaWavMdP5` |
-| Coordination protocol | | `8cBDKW7dphys1HcAXNf1TvyV7LdQKLJFtzGUxeZjpC4g` |
-| Coordination rules | | `E5LkB8PUaXZfquidh7Aa1uGsMMzWiFPTkUYfgSwzioQQ` |
-| Mandates package | 0.3.0-preview.1.evidence.1 | `CGJTGJvfh4TTFeawShQyeTXa3xzwNxz3UnQmSnwJEtTC` |
-| Mandates protocol | | `F7H269vnLY74dQYpWDGDrcvpygfHYkKKo2rQCwyGkDX9` |
-| Time package | 0.2.0-gas10m.1.finalgas.1.evidence.1 | `D2Ba2jxJtTcYUx9FtsAuGnzveCC2zgSPi4pSHuaokdV4` |
-| Time protocol | | `FJxfMecvMa9Atvtu8b2AMdZuTVevpYrg8hxzPBxduiYa` |
-| Private Mandates package | 0.1.0-preview.1 | `jxPtm8ogiWCxZoaaXyDFePCfcDg8K28aFJAefxc7j66` |
-| Private Mandates protocol | | `AW2NifBohD9bUeXPWZ5ZHXKd4MMG8AW3iSuVdhYA4L5L` |
-| Private Mandates rules | | `2z7WGTqMLPFM824TAahP5cBhbE6REtrNVAJJt5ov5QQf` |
+| Coordination Evidence package | 0.1.0-preview.1 | `JCrrEdnXchnkLGMz1PuX17r9cBnkK2RofEyHrdGKR1Z2` |
+| Coordination Evidence protocol | | `CJkkmN5i1HTgGbwH54e5XThsYA5hcrKq43qXdSnHiuYi` |
+| Coordination Evidence rules | | `E4c7rovuDCZ3rKubUDyabeDhrHXfoiVX2rdZFHCgwa8a` |
+| `Timeline Channel with Evidence` | | `DnuGMT7J1mbijivnyexN9Q1F55ex6TfDoHHSJioRSDiG` |
+| `Evidence Profile` | | `8X7rMPvbrnZVLCFpA6yF32oaYQV7WoffUqZJsrBBy3JC` |
+| `Proof Entry` | | `3dAha8WgTwy5Xe1eJc8Fe6o3ayuEzS8NFpPtzD7gZNP3` |
+| `Rejection Entry` | | `BVqJVckgyJQjARSfcdNo5YJiVWEQeNCxP7thHZXgKDEB` |
+| Private Mandates package | 0.1.0-preview.1 | `9oyTZB46xshwBUJK1Pxz1JcSrFmyoyNUrBFRgstRPLLA` |
+| Private Mandates protocol | | `8kRzfCeFSXnjnyJjYHxZUwfgrkQKbgDv4dno5ioZDB5e` |
+| Private Mandates rules | | `Ez6RSxCVbH5t6WkpJQc4LQPXZjpymE5M7aAraDPyGkK4` |
+| `Mandate Commitment Authority` | | `9gFPX6ntAxc2MWFgs6wish2uzfyNRv5fCuiaCKZwmxUv` |
+| `RISC Zero Succinct Receipt Profile` | | `7HZvQrTRMUE77imwpRUFaYLe5uX3wKfKZ9sS9juLRF9K` |
+| `Mandate State Attestation` | | `B7pPgXr7J5yw1FMwYxiGK2Q628TbgXKWH8mv4MwkLM88` |
+| Coordination package (required, unchanged) | 0.2.0-access-events.1 | `4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA` |
+| Coordination protocol (unchanged) | | `4YRV74QByZidyvspvbhZvx9Mfod16dHNCqCVbkKditGc` |
+| Coordination rules (unchanged) | | `26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG` |
+| Mandates package (required, unchanged) | 0.3.0-preview.1 | `4kaMxybWTTeTpkzUtoYVUPk8dUo3HxKM5MG5joxN6LFL` |
+| Mandates protocol (unchanged) | | `5c8ajquAmaKYGFf4LaZpc89DaNBa2QSDb8A4H7z1zwDk` |
 
 `PACKAGES.json` is the authority for every current package identity and checksum.
 
-## Why every dependant was rebuilt
+## Why the evidence types are a separate package
 
 A Coordination type names the exact rules it is defined by, and the builder requires
-that reference to equal the package's protocol rules. New rules text therefore gives
-every Coordination type a new identity, `Timeline Channel` included, and every
-package that embeds Coordination a new package identity. Coordination and its 31
-dependants carry the version suffix `.evidence.1`; their authored business
-definitions are unchanged. The Mandates and Time rules texts are unchanged; their
-protocol identities are new because they require the new Coordination protocol.
+that reference to equal the package's protocol rules. Adding the evidence rules to
+the Coordination rules text therefore gave every Coordination type a new identity:
+`Signed Timeline`, `Timeline Entry`, the guarantees and the provider descriptors as
+well as `Timeline Channel`, and with them `Mandates/Authority` and every package
+that embeds Coordination. A timeline provider issues timelines with the transport
+types of the edition in use, so a document on such a rebuilt edition rejected the
+timelines the provider issues.
 
-Two authored files pin exact function identities that include a Coordination type,
-and were re-pinned from native package records, not computed:
-`clause-documents/types/admission-step-functions.blue` (`accessRecordsValid`) and,
-through `tools/refresh_reseller_composition.py`, `clause-documents/types/preparation-plan.blue`
-and the Reseller bootstrap composition.
+An earlier candidate on this branch did that (Coordination
+`0.2.0-access-events.1.evidence.1` with 31 rebuilt dependants). It is withdrawn. The
+root catalogue again selects Coordination `0.2.0-access-events.1` and its dependants
+with their exact archives, and the evidence rules are the rules of
+`blue-coordination-evidence`. A document with an evidence channel uses the transport
+types of the unchanged Coordination publication:
 
-## Earlier editions
+| Transport type | BlueId, the same with and without evidence channels |
+| --- | --- |
+| `Coordination/Signed Timeline` | `EzfsjTUabtmb2KAMy7LHDrM9ffQzbx7JvXsGVSr6wh73` |
+| `Coordination/Timeline Entry` | `G4dok8HLuBFPutTwD4h71y3y6ph7esA6qJGtDvoYAxKV` |
+| `Coordination/Timeline Provider` | `AT9pX83cgt2mw9EPutC3dHKeWU8Ruj4TXB2cbTkBRxS7` |
+| `Coordination/Provider Descriptor` | `kqnzQTYbwKbwvRTR4GT8P1WTfCY7EW6GKizMGT6VwNs` |
+| `Coordination/Timeline Completeness Guarantee` | `2j2ZNTZnv3w6GC3XxoUG7pe35gVHJLaKqiHQjdHXAcHH` |
+| `Coordination/Timeline Channel` | `GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy` |
 
-The root catalogue selects one edition, now this one. The 32 archives of the
-previous edition (Coordination and its 31 dependants) are retained byte for byte
-under `retained/pre-evidence-20261119/<package>/package.bluepkg` and pinned in
-`PACKAGE-SOURCES.json` under `retainedArchives`; `tools/release.py check` verifies
-them and release bundles carry them as `retained-data`. Documents on an earlier
-edition keep their runtime. The nine packages that do not embed Coordination are
-unchanged. `blue-coordination-evidence`, an earlier unpublished layered candidate,
-was removed.
+All 54 Coordination exports, and every export of the other existing packages, keep
+their identities. The conformance tool asserts the rows above and others.
 
-## How a host learns that a document needs this edition
+The archives kept under `retained/pre-evidence-20261119/` by the withdrawn candidate
+were byte for byte the archives the root catalogue selects again; that directory and
+its pins are removed. The other retained archives are unchanged.
 
-As for every edition: from the exact type identities the document uses. They name
-the Coordination rules, and the package manifest names the protocol identity the
-host must support natively. No separate capability declaration was added.
-Installing the data grants no native support. A host without this protocol must
-refuse a document that declares `Timeline Channel with Evidence`; a host with it
-processes a document that declares no such channel as sections 1–13 state.
+## How a host learns that a document needs these packages
+
+From the exact type identities the document uses: `Timeline Channel with Evidence`
+names the Coordination Evidence rules, and the package manifests name the protocol
+identities the host must support natively. No separate capability declaration was
+added. Installing the data grants no native support. A host without the Coordination
+Evidence protocol must refuse a document that declares `Timeline Channel with
+Evidence`; a host with it processes a document that declares no such channel as the
+Coordination specification states.
 
 ## What the schemas enforce and what the processor decides
 
@@ -150,13 +170,11 @@ python3 -m unittest discover -s tools -p 'test_release.py'
 python3 tools/check_admission_scope.py   # Python 3.13
 ```
 
-A change of the Coordination rules text needs these steps before the full build:
-update `spec/frozen.json`; build once to read the new rules BlueId and put it in the
-`specification` of every Coordination type; do the same for a package whose own
-rules changed; re-pin `accessRecordsValid` in `admission-step-functions.blue` from
-a Documents build without that export; then alternate
-`build_final_gas.py clause-documents` and `tools/refresh_reseller_composition.py`
-until the pins stop changing. Refresh `blue-time/SHA256SUMS` after the build.
+A change of the rules text of one of the two packages needs these steps before the
+build: update its `spec/frozen.json`; build once to read the new rules BlueId and put
+it in the `specification` of every type of that package; rebuild
+`blue-coordination-evidence` before `blue-private-mandates`. No other package is
+rebuilt.
 
 The native schema check:
 
