@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Refresh exact native Documents references after building its new archive.
+"""Refresh exact canonical function references in the Documents preparation plan.
 
-Domain functions remain unchanged. Identities are read from native package records,
-never computed by this adapter. Build clause-reseller afterwards, then check pins.
+Build clause-documents after updating the pinned functions. Identities are read
+from the native package records.
 """
 import json
 import re
@@ -116,67 +116,7 @@ def refresh(root=ROOT):
     else:
         plan_source = plan_source.replace('constants:\n', 'constants:\n'+generated, 1)
     plan_path.write_text(plan_source)
-    manifest_path = root/'clause-reseller/bootstrap-composition.json'
-    manifest = json.loads(manifest_path.read_text())
-    source_path = root/'clause-reseller/types/customer-orders-bootstrap-clause.blue'
-    source = source_path.read_text()
-    authored = yaml.safe_load(source)
-    copied = authored['actionDefinition']['type']['functions']
-    shared = set(manifest['functions']) | {'rootSourceAccessLost'}
-    # Follow the actual inherited library; preserve explicit domain overrides.
-    pending = list(shared)
-    while pending:
-        name = pending.pop()
-        for called in calls(plain(functions[name])):
-            if called in functions and called not in copied and called not in shared:
-                shared.add(called)
-                pending.append(called)
-    for name in sorted(shared):
-        ref = reference(functions[name])
-        pattern = r'(?m)^      '+re.escape(name)+r':\n        blueId: \S+$'
-        replacement = '      '+name+':\n        blueId: '+ref['blueId']
-        if name in manifest['functions']:
-            source, count = re.subn(pattern, replacement, source)
-            assert count == 1, name
-        else:
-            source = source.replace('    functions:\n', '    functions:\n'+replacement+'\n', 1)
-        manifest['functions'][name] = ref
-    def closure(start, library):
-        reached, pending = set(), list(start)
-        while pending:
-            name = pending.pop()
-            if name in reached:
-                continue
-            reached.add(name)
-            pending.extend(calls(plain(library[name])))
-        return reached
-    # The copied planner must carry the same guard metadata. Its plan delegates
-    # directly, so it cannot undo the generic selector's custom-library path.
-    selection = ''.join('    '+line+'\n' for line in yaml.safe_dump(
-        {'refreshCanonicalFunctions': selected}, sort_keys=False).splitlines())
-    if 'refreshFunctionNames' in authored['hookDefinition'].get('constants', {}):
-        source, count = re.subn(r'(?m)^    refreshFunctionNames:\n(?:    - .*\n)+', selection, source)
-    else:
-        source, count = re.subn(r'(?ms)^    refreshCanonicalFunctions:\n.*?(?=^    [A-Za-z]|^  functions:)', selection, source)
-    assert count == 1
-    planning = effective(exports['Preparation Plan'])
-    needed = closure(['plan', 'validateConfiguration', 'validateTransition'], planning)
-    hook = yaml.safe_load(source)['hookDefinition']['functions']
-    for name in sorted(needed):
-        target = 'basePreparationPlan' if name == 'plan' else name
-        ref = reference(planning[name])
-        pattern = r'(?m)^    '+re.escape(target)+r':\n      blueId: \S+$'
-        replacement = '    '+target+':\n      blueId: '+ref['blueId']
-        if target in hook:
-            source, count = re.subn(pattern, replacement, source)
-            assert count == 1, target
-        else:
-            source, count = re.subn(r'(?m)^  functions:\n', lambda match: match.group()+replacement+'\n', source)
-            assert count == 1
-    manifest['sourceDefinition'] = exports['Document Preparation Functions']
-    manifest['sourcePackageId'] = metadata['packageBlueId']
-    source_path.write_text(source)
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True)+'\n')
+
 
 if __name__ == '__main__':
     refresh()

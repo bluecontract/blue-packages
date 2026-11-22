@@ -7,15 +7,33 @@ import java.util.*;
 
 /** Native inactive selection boundary. Financial/history qualification is a separate scenario. */
 public final class CommissionHistoryConformance {
+  static final String HISTORICAL_RESELLER = "retained/reseller-preview.9/clause-reseller/package.bluepkg";
   static Object originalProviderSlots;
   static Map<String,Object> m(Object... x) { return BootstrapPreparationConformance.m(x); }
   static Map<String,Object> o(Object x) { return BootstrapPreparationConformance.obj(x); }
   static Contracts.Result ok(Contracts.Result x) { return BootstrapPreparationConformance.applied(x); }
   static void check(boolean b, String message) { BootstrapPreparationConformance.require(b, message); }
+
+  static CompositionPackages historicalPackages(Path root) throws Exception {
+    var selection = o(CompositionPackages.yaml(root.resolve("PACKAGES.json")));
+    var inventory = o(CompositionPackages.yaml(root.resolve("PACKAGE-SOURCES.json")));
+    var pin = CompositionPackages.list(inventory.get("retainedArchives")).stream().map(CommissionHistoryConformance::o)
+        .filter(archive -> HISTORICAL_RESELLER.equals(archive.get("path"))).findFirst().orElseThrow();
+    o(selection.get("mounts")).put("Reseller", m("path", pin.get("path"), "blueId", pin.get("packageBlueId"),
+        "archiveSha256", pin.get("archiveSha256")));
+    var selectionFile = Files.createTempFile("reseller-preview9-qualification-", ".json");
+    try {
+      Files.writeString(selectionFile, WireData.write(selection));
+      return CompositionPackages.published(root, selectionFile);
+    } finally {
+      Files.delete(selectionFile);
+    }
+  }
+
   public static void main(String[] args) throws Exception {
     var root = Path.of(args[0]);
     if (args.length > 2) originalProviderSlots = WireData.json(Files.readString(Path.of(args[2])));
-    var packages = CompositionPackages.published(root, root.resolve("PACKAGES.json"));
+    var packages = historicalPackages(root);
     if (args.length > 1 && args[1].equals("access")) {
       BootstrapPreparationConformance.bootstrapAccessGuards(packages);
       return;
@@ -88,7 +106,7 @@ public final class CommissionHistoryConformance {
     var root = new Exact.Ref(host.blueId());
     String step = "/contracts/provideOrder/steps/0";
     var functions = new LinkedHashMap<>(o(values.bexData(values.select(root, step + "/definition/functions"))));
-    // Qualify the shipped Reseller action library, not a test-only copy of its hook.
+    // Use the action library from the retained stored-quote edition.
     var shipped = values.source(m("type", "Reseller/Customer Orders Bootstrap Clause"), "definition");
     functions.putAll(o(values.bexData(values.select(shipped, "/actionDefinition/functions"))));
     // ContractRun: definition functions first, generated step-local functions last.

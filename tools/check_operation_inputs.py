@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 import os
+import secrets
 from pathlib import Path
 import subprocess
 import tempfile
@@ -37,11 +38,13 @@ CASES = {
     'document-provision': ('ProvisionInputConformance',),
     'bootstrap-preparation': ('BootstrapPreparationConformance',),
     'reseller-catalog-capacity': ('CatalogCapacityConformance',),
+    'reseller-catalog-order-attachment': ('blue.core.CatalogOrderAttachmentConformance',),
+    'reseller-catalog-order-independent': ('blue.core.CatalogOrderIndependentConformance',),
+    'reseller-catalog-order-converged-source': ('blue.core.CatalogOrderIndependentConformance', 'converged-source'),
     'refresh-definition': ('RefreshDefinitionConformance',),
     'admission-consent-declarations': ('AdmissionConsentDeclarationConformance',),
     'admission-provision': ('AdmissionProvisionConformance',),
     'admission-planner': ('ProvidedOrderAdmissionConformance',),
-    'reseller-bootstrap-pins': ('ResellerBootstrapFunctionPinsConformance',),
     'admission-definition': ('AdmissionDefinitionConformance',),
     'static-identity-predicate': ('StaticIdentityPredicateConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
@@ -70,7 +73,9 @@ def main():
     javac = str(Path(java_home) / 'bin/javac') if java_home else 'javac'
     report_dir = args.report_dir.resolve()
     report_dir.mkdir(parents=True, exist_ok=True)
-    selected = args.case or list(CASES)
+    # The independent checkout uses Core's PostgreSQL test host and is opt-in.
+    independent_cases = {'reseller-catalog-order-independent', 'reseller-catalog-order-converged-source'}
+    selected = args.case or [case for case in CASES if case not in independent_cases]
     untracked = subprocess.check_output(['git', 'ls-files', '--others', '--exclude-standard', '-z'], cwd=ROOT).split(b'\0')
     report = {
         'edition': 'access-events',
@@ -94,6 +99,9 @@ def main():
         sources.add('OperationCatalogConformance')
     if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
         sources.add('CurrentOperationScenarios')
+    if independent_cases.intersection(selected):
+        sources.update({'CatalogOrderIndependentGuarantor', 'CatalogOrderIndependentMandates',
+                        'CatalogOrderIndependentPrecheckout'})
     with tempfile.TemporaryDirectory(prefix='operation-input-qualification-') as classes:
         subprocess.run([javac, '-cp', classpath, '-d', classes,
                         *[str(ROOT / 'tools' / (name + '.java')) for name in sorted(sources)]], check=True)
@@ -101,10 +109,33 @@ def main():
             name, *arguments = CASES[key]
             argv = ([*arguments, str(ROOT)] if name == 'OperationInputConformance'
                     else [str(ROOT), *arguments])
-            command = [java, '-Xmx1500m', '-cp', classes + os.pathsep + classpath, name, *argv]
+            case_workdir = ROOT
+            case_classpath = classes + os.pathsep + classpath
+            java_options = ['-Xmx1500m']
+            environment = None
+            if key in independent_cases:
+                case_workdir = report_dir / 'runtime'
+                case_workdir.mkdir(exist_ok=True)
+                case_classpath += os.pathsep + str(ROOT)
+                java_options = ['-Xmx4500m', '-Dblue.core.selectedRegistrations=true']
+                environment = {name: value for name, value in os.environ.items()
+                               if not name.startswith(('CORE_', 'BLUE_DYNAMODB'))}
+                master_key = Path(classes) / (key + '.key')
+                with os.fdopen(os.open(master_key, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as key_file:
+                    key_file.write(secrets.token_bytes(32))
+                environment.update({
+                    'CORE_ROLE': 'standalone',
+                    'CORE_BIND': '127.0.0.1',
+                    'PORT': '0',
+                    'CORE_DATA': str(Path(classes) / key),
+                    'CORE_MASTER_KEY_FILE': str(master_key),
+                    'CORE_TIMELINE_PROVIDER_ENDPOINT': 'https://paid-reseller.example.test/provider',
+                    'CORE_PAYMENT_GUARANTOR_ACCOUNT_ID': 'guarantor',
+                })
+            command = [java, *java_options, '-cp', case_classpath, name, *argv]
             start = time.monotonic()
             with (report_dir / (key + '.log')).open('w') as log:
-                result = subprocess.run(command, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT)
+                result = subprocess.run(command, cwd=case_workdir, env=environment, stdout=log, stderr=subprocess.STDOUT)
             row = {'id': key, 'command': command, 'status': 'PASS' if result.returncode == 0 else 'FAIL',
                    'exitCode': result.returncode, 'seconds': round(time.monotonic() - start, 3),
                    'log': str(report_dir / (key + '.log'))}

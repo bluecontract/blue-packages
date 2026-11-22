@@ -39,6 +39,19 @@ class ResellerCompositionTest(unittest.TestCase):
         self.assertEqual(1, replacements)
         self.assertEqual(expected, reseller['actionDefinition']['type']['functions']['sharedPrepareOrder'])
 
+    def test_current_clause_exports_retire_stored_quote_checkout(self):
+        package = ROOT / 'clause-reseller'
+        manifest = yaml.safe_load((package / 'blue-package.yaml').read_text())
+        exports = {definition['name']: definition['path'] for definition in manifest['exports']}
+        self.assertNotIn('Customer Orders Bootstrap Clause', exports)
+        fulfilment = yaml.safe_load((package / exports['Fulfilment Terms Clause']).read_text())
+        self.assertNotIn('place', fulfilment['actions'])
+        self.assertIn('approveAvailability', fulfilment['actions'])
+        order_functions = yaml.safe_load((package / exports['Order Functions']).read_text())
+        self.assertNotIn('placeOrder', order_functions['functions'])
+        catalogue = yaml.safe_load((package / exports['Catalog Clause']).read_text())
+        self.assertIn('quote', catalogue['actions'])
+
     def test_examples_request_independent_bootstrap_without_customer_approval(self):
         examples = list((ROOT / 'examples/reseller').glob('*-preview.blue'))
         self.assertEqual(3, len(examples))

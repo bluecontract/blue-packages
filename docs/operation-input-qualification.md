@@ -153,14 +153,12 @@ preserves the exact obligation identity without duplicate effects.
 
 `admission-planner` independently qualifies the general admission planner,
 exact function references, malformed-reference rejection and native output parity
-for canonical and custom definitions. `reseller-bootstrap-pins` checks the full
-copied action-function library against the current Documents definition and
-package provenance, preserving domain overrides and excluding proof-only pins.
+for canonical and custom definitions.
 
 ```sh
 python3 tools/check_operation_inputs.py --case refresh-definition \
   --case admission-provision --case admission-planner \
-  --case reseller-bootstrap-pins --report-dir reports/admission-cleanup
+  --report-dir reports/admission-cleanup
 ```
 
 The undeployed exception allowing a document with newly admitted parties to
