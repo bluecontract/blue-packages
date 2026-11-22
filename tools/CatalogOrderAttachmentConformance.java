@@ -17,6 +17,7 @@ import blue.packages.QualificationRuntime;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,7 +31,6 @@ public final class CatalogOrderAttachmentConformance {
   private static final String PAYMENT = ORDER + "/payment";
   private static final long AMOUNT = 3895;
   private static final long COMMISSION = 390;
-  private static final long PROPOSED_START = 1894679200000000L;
   private static final Duration WAIT = Duration.ofSeconds(90);
   private static final String OWNER = "merchant";
   private static final String ENDPOINT = "https://catalog-order.example.test/provider";
@@ -75,6 +75,7 @@ public final class CatalogOrderAttachmentConformance {
     private final Blue language;
     private final Contracts processor;
     private final Map<String, String> readers = new LinkedHashMap<>();
+    private final long proposedStart = Instant.now().plus(Duration.ofDays(7)).getEpochSecond() * 1_000_000;
 
     Scenario(Tenant tenant, TimelineProvider provider, Blue language, Contracts processor, ReaderKeys keys)
         throws Exception {
@@ -135,7 +136,7 @@ public final class CatalogOrderAttachmentConformance {
                   "lines", List.of(map("itemId", "dolphin-cruise-child", "quantity", 1),
                       map("itemId", "dolphin-cruise-under-4", "quantity", 1)),
                   "groups", List.of(map("id", "visit", "lineIndices", List.of(0, 1),
-                      "proposedStartMicros", PROPOSED_START)))));
+                      "proposedStartMicros", proposedStart)))));
       require(obj(read(agreement, "/orders")).isEmpty(), "Preparation leaves /orders empty");
       var orderEntry = onlyPreparation(agreement, "/process_orders");
       var order = bootstrap("order", prepared(agreement, orderEntry),
@@ -191,7 +192,7 @@ public final class CatalogOrderAttachmentConformance {
       call(order, "confirmReservation",
           map("key", "confirmation-1", "groupId", "visit",
               "expectedProposalBlueId", read(order, "/reservations/visit/proposalBlueId")));
-      equal(PROPOSED_START, number(read(agreement, ORDER + "/reservations/visit/confirmedStartMicros")),
+      equal(proposedStart, number(read(agreement, ORDER + "/reservations/visit/confirmedStartMicros")),
           "Independent supplier confirms the proposed date");
 
       call(instruction, "pay",
@@ -218,7 +219,7 @@ public final class CatalogOrderAttachmentConformance {
       equal("usable", read(agreement, entryPath + "/status"), "Order remains usable");
       equal(orderOrigin, identityAt(agreement, ORDER + "/contracts/initialized/document"), "Same Order origin");
       equal(true, read(agreement, ORDER + "/activation/approved/seller"), "Supplier approval retained");
-      equal(PROPOSED_START, number(read(agreement, ORDER + "/reservations/visit/confirmedStartMicros")),
+      equal(proposedStart, number(read(agreement, ORDER + "/reservations/visit/confirmedStartMicros")),
           "Supplier confirmation retained");
       equal(instructionOrigin, identityAt(agreement, PAYMENT + "/contracts/initialized/document"), "Same PI origin");
       equal(AMOUNT, number(read(agreement, PAYMENT + "/payment/completed")), "Completed receipt retained");
