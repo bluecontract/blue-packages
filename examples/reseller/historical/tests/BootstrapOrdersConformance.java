@@ -7,7 +7,7 @@ import blue.language.next.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Native isolated clause qualification. Authenticated Core bootstrap remains a separate hosted proof. */
+/** Native component qualification of the retained preview.9 stored-quote checkout. */
 public final class BootstrapOrdersConformance {
   static Map<String,Object> m(Object... pairs) {
     var out=new LinkedHashMap<String,Object>();
@@ -68,8 +68,8 @@ public final class BootstrapOrdersConformance {
   }
   static void scenario(CompositionPackages packages,Path root,Path reports,String name,boolean fulfilment,List<String> required) throws Exception {
     var fixture=obj(WireData.json(Files.readString(root.resolve("clause-reseller/tests/fixtures/"+name+"/catalogue.json"))));
-    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
-      var p=runtime.processor(packages.language());
+    try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      var p=runtime.processor(blue);
       var current=applied(p.initialize(source(fixture,fulfilment,required)));
       require(Boolean.TRUE.equals(p.read(current.document(),"/activation/active")),"Parent active");
       var quoteRequest=obj(copy(obj(fixture.get("quote")).get("intent")));
@@ -117,8 +117,8 @@ public final class BootstrapOrdersConformance {
   }
   static void fixedSuppliedParty(CompositionPackages packages,Path root) throws Exception {
     var fixture=obj(WireData.json(Files.readString(root.resolve("clause-reseller/tests/fixtures/01-cruise/catalogue.json"))));
-    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
-      var p=runtime.processor(packages.language());
+    try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      var p=runtime.processor(blue);
       var source=source(fixture,false,List.of());
       var parties=obj(obj(obj(obj(source.get("orderTemplate")).get("clauses")).get("activation")).get("parameters"));
       obj(parties.get("parties")).put("guarantor",m("type","Parties/Party","myosAccountId","guarantor-account"));
@@ -135,8 +135,8 @@ public final class BootstrapOrdersConformance {
     }
   }
   static void suppliedRoleGuards(CompositionPackages packages) throws Exception {
-    try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
-      var values=runtime.processor(packages.language()).execution().values();
+    try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
+      var values=runtime.processor(blue).execution().values();
       var definition=values.source(m("type","Reseller/Customer Orders Bootstrap Clause"),"definition");
       var all=obj(values.bexData(values.select(definition,"/actionDefinition/type/functions")));
       var code=m("do",List.of(m("$return",m("$call",m("function","suppliedCustomerOrderRoles","args",m())))));
@@ -202,6 +202,8 @@ public final class BootstrapOrdersConformance {
     var code=m("do",List.of(m("$return",m("$call",m("function","domainValidateCandidate","args",m(
         "frozenTerms",m("$binding","call/request/frozen"),"candidate",m("$binding","call/request/candidate")))))));
     var bex=new Bex(BexProfile.current());var program=bex.compile(code,library,null);
+    // Plain orders retain an empty snapshot. The seller pin belongs to fulfilment snapshots.
+    boolean hasFrozenSeller = obj(frozen.get("orderSnapshot")).containsKey("seller");
     for(String variant:List.of("exact","changed-current-customer","changed-origin-customer","missing-origin-customer","changed-quote","changed-price","changed-fulfilment","changed-current-seller","changed-origin-seller")) {
       var candidate=obj(copy(prepared));var initial=obj(copy(prepared));
       var initialCustomer=obj(obj(obj(obj(initial.get("clauses")).get("activation")).get("parameters")).get("parties"));
@@ -210,13 +212,19 @@ public final class BootstrapOrdersConformance {
       initialCustomer.put("customer",m("myosAccountId","customer-account"));
       candidate.put("contracts",m("initialized",m("document",initial)));
       candidate.put("activation",m("parties",m("customer",m("myosAccountId","customer-account"),"seller",m("myosAccountId","seller-account"))));
-      String reason="CUSTOMER_ORDER_COMMERCIAL_TERMS_CHANGED";
+      String reason = variant.equals("exact") ? null : "CUSTOMER_ORDER_COMMERCIAL_TERMS_CHANGED";
       switch(variant) {
         case "changed-current-customer" -> {obj(obj(candidate.get("activation")).get("parties")).put("customer",m("myosAccountId","foreign"));reason="CUSTOMER_ORDER_IDENTITY_CHANGED";}
         case "changed-origin-customer" -> {obj(initialCustomer.get("customer")).put("myosAccountId","foreign");reason="CUSTOMER_ORDER_BOOTSTRAP_IDENTITY_CHANGED";}
         case "missing-origin-customer" -> {obj(initialCustomer.get("customer")).remove("myosAccountId");reason="CUSTOMER_ORDER_BOOTSTRAP_IDENTITY_CHANGED";}
-        case "changed-current-seller" -> {if(!frozen.containsKey("orderSnapshot"))continue;obj(obj(candidate.get("activation")).get("parties")).put("seller",m("myosAccountId","foreign"));reason="CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED";}
-        case "changed-origin-seller" -> {if(!frozen.containsKey("orderSnapshot"))continue;obj(initialCustomer.get("seller")).put("myosAccountId","foreign");reason="CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED";}
+        case "changed-current-seller" -> {
+          obj(obj(candidate.get("activation")).get("parties")).put("seller", m("myosAccountId", "foreign"));
+          reason = hasFrozenSeller ? "CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED" : null;
+        }
+        case "changed-origin-seller" -> {
+          obj(initialCustomer.get("seller")).put("myosAccountId", "foreign");
+          reason = hasFrozenSeller ? "CUSTOMER_ORDER_FULFILMENT_IDENTITY_CHANGED" : null;
+        }
         case "changed-quote" -> candidate.put("quote",m("totalMinor",1));
         case "changed-price" -> candidate.put("amountMinor",1);
         case "changed-fulfilment" -> {candidate.put("orderSnapshot",m("changed",true));reason="CUSTOMER_ORDER_FULFILMENT_CHANGED";}
@@ -226,67 +234,28 @@ public final class BootstrapOrdersConformance {
           (actual,gas)->NativeRuntime.identity(values.source(Values.blueValue(actual))));
       boolean rejected=false;
       try {bex.execute(program,context,1_000_000);} catch(BexError failure) {
-        require(failure.getMessage().contains(reason),variant+": "+failure.getMessage());rejected=true;
+        require(reason != null && failure.getMessage().contains(reason), variant + ": " + failure.getMessage());
+        rejected = true;
       }
-      require(rejected!=variant.equals("exact"),"Frozen native domain guard "+variant);
+      require(rejected == (reason != null), "Frozen native domain guard " + variant);
     }
-  }
-  static void refreshPlanProjection(Path root) throws Exception {
-    var clause=obj(WireData.parse(Files.readString(root.resolve("clause-reseller/types/customer-orders-bootstrap-clause.blue")),"yaml"));
-    var hook=obj(clause.get("hookDefinition"));
-    for(String key:List.of("orders","hostedOrders")) {
-      var functions=m("plan",copy(obj(hook.get("functions")).get("plan")));var constants=obj(copy(hook.get("constants")));constants.put("clauseKey",key);
-      var full=m();for(Object raw:(List<?>)constants.get("refreshFunctionNames")){String name=(String)raw;full.put(name,m("args",m(),"do",List.of(m("$return",name+"-selected-body"))));}
-      full.put("unrelatedBootstrap",m("args",m(),"do",List.of(m("$return",false))));
-      var definition=m("functions",full,"constants",m("retained","exact"));
-      var contracts=m();for(String prefix:List.of("refreshProcesses_","refreshEmbeddedProcesses_"))contracts.put(prefix+key,m("kind","handler","contract",m("channel",prefix+"channel","steps",List.of(m("definition",m("whole","library"),"do",List.of())))));
-      contracts.put("prepare",m("untouched",true));var base=m("contracts",contracts,"states",m("untouched",true));
-      functions.put("basePreparationPlan",m("args",m(),"do",List.of(m("$return",m("$literal",base)))));
-      var document=m("clauseRuntime",m("work",m("candidate",m(key,m("type",m("actionDefinition",m("type",definition)))))));
-      var bex=new Bex(BexProfile.current());var program=bex.compile(m("do",List.of(m("$return",m("$call",m("function","plan","args",m()))))),m("constants",constants,"functions",functions),null);
-      var result=bex.execute(program,new BexContext(document,m(),m(),Values.UNDEFINED,m(),m(),"/",null,null,null),1_000_000);
-      var selected=obj(copy(full));selected.remove("unrelatedBootstrap");var expected=obj(copy(base));
-      for(String prefix:List.of("refreshProcesses_","refreshEmbeddedProcesses_")){
-        var contract=obj(obj(obj(expected.get("contracts")).get(prefix+key)).get("contract"));
-        obj(((List<?>)contract.get("steps")).getFirst()).put("definition",m("constants",m("retained","exact"),"functions",selected));
-      }
-      equal(expected,result.value(),"Only two refresh definitions change; selected function bodies and constants remain exact");
-      require(result.changeset().isEmpty()&&result.events().isEmpty(),"Planning produces no document effects");
-    }
-    System.out.println("PASS refresh plan projection: exact two-handler replacement, constants and selected bodies, two clause keys");
   }
   public static void main(String[] args) throws Exception {
-    Path root=Path.of(args[0]),reports=Path.of(args[1]);Files.createDirectories(reports);
-    refreshPlanProjection(root);
-    if(args.length>2 && args[2].equals("refresh"))return;
-    var selection=obj(WireData.json(Files.readString(root.resolve("PACKAGES.json"))));
-    Path archive=root.resolve("clause-reseller/dist/package.bluepkg");var reseller=BluePackage.open(archive);
-    String sha="sha256:"+HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(archive)));
-    obj(selection.get("mounts")).put("Reseller",m("path","clause-reseller/dist/package.bluepkg","blueId",reseller.blueId(),"archiveSha256",sha));
-    Path selectionFile=reports.resolve("selection.json");Files.writeString(selectionFile,WireData.write(selection));
-    var packages=CompositionPackages.published(root,selectionFile);
-    if(args.length>2 && args[2].equals("refresh-initialize")) {
-      var fixture=obj(WireData.json(Files.readString(root.resolve("clause-reseller/tests/fixtures/01-cruise/catalogue.json"))));
-      try(var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
-        var p=runtime.processor(packages.language());var initial=applied(p.initialize(source(fixture,true,List.of())));
-        var values=p.execution().values();var expected=Set.of("sharedRefresh","processStatePath","namedSourcesReady","processOrigin","rosterCovers","checkedDomainNextActions","domainNextActions");
-        for(String handler:List.of("refreshProcesses_orders","refreshEmbeddedProcesses_orders")) {
-          var definition=values.select(new Exact.Ref(initial.document().blueId()),"/contracts/"+handler+"/steps/0/definition/functions");
-          equal(obj(values.bexData(definition)).keySet(),expected,"Actual native plan selects complete refresh closure");
-        }
-        require(Boolean.TRUE.equals(p.read(initial.document(),"/activation/active")),"Parent remains active");
-        System.out.println("PASS real authored hook initialization and both refresh definitions, gas="+initial.gas());
-      }
-      return;
-    }
-    if(args.length>2 && args[2].equals("known")){scenario(packages,root,reports,"01-cruise",true,List.of());return;}
+    Path root = Path.of(args[0]);
+    Path reports = Path.of(args[1]);
+    Files.createDirectories(reports);
+    var packages = CommissionHistoryConformance.historicalPackages(root);
     suppliedRoleGuards(packages);
-    fixedSuppliedParty(packages,root);
-    if(args.length>2 && args[2].equals("fixed"))return;
+    fixedSuppliedParty(packages, root);
     BootstrapPreparationConformance.bootstrapPartyGuards(packages);
     BootstrapPreparationConformance.bootstrapAccessGuards(packages);
-    for(String example:List.of("01-cruise","02-massage","03-watersports"))scenario(packages,root,reports,example,true,List.of());
-    scenario(packages,root,reports,"01-cruise",false,List.of());
-    scenario(packages,root,reports,"01-cruise",true,List.of("seller"));
+    for (String example : List.of("01-cruise", "02-massage", "03-watersports")) {
+      scenario(packages, root, reports, example, true, List.of());
+    }
+    scenario(packages, root, reports, "01-cruise", false, List.of());
+    scenario(packages, root, reports, "01-cruise", true, List.of("seller"));
+    for (String variant : List.of("resolved", "inactive", "same-seller", "collision")) {
+      DeferredCustomerConformance.run(packages, root, reports.resolve("deferred-" + variant), variant);
+    }
   }
 }

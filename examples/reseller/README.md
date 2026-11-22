@@ -2,12 +2,9 @@
 
 `adventures-in-paradise-preview.blue` is one configured agreement between Adventures in Paradise and Manatee Bay Inn. Its document contains the parties, business terms, catalog, order and payout templates, and clause bindings. Executable order, negotiation, commission and payout behavior lives in the exported `clause-reseller/types/` definitions.
 
-These examples qualify the maintained catalog-priced `Customer Orders Clause`
-from main. They are not alternate versions of MyOS hosted checkout. The current
-hosted reseller flow uses `Customer Orders Bootstrap Clause`; see
-[Hosted reseller checkout](../../clause-reseller/README.md#hosted-reseller-checkout)
-for that boundary and its native component tests. Neither this example nor a
-package build proves a completed Stripe payment.
+These examples use the catalog-priced `Customer Orders Clause`. Package checks
+exercise native checkout and payment preparation. A completed Stripe payment
+requires separate hosted qualification.
 
 ## Clause configuration
 
@@ -24,11 +21,11 @@ There is no `createQuote` operation or `/quotes` collection in these three agree
 
 In preview.4, `values.customerEmail` retains its exact 1–320 character text under `/customerEmail` in the prepared Order, without an account pin. The customer Party stays supplied at bootstrap. Business authorizes and retains the checkout-to-actual-account association, then uses the ordinary bootstrap participant mapping, such as `{channelName: customer, email: guest@example.test}`. The email is contact/correlation metadata, not verified identity. Provision checks the actual initialized/current customer and requires an account distinct from seller and partner. The existing `values.customer` branch still freezes `/customerAccountId` and requires that account at provision. Earlier exact package editions retain their original behavior.
 
-Handle `Documents/Document Provision Requested` for the orders clause, bootstrap the exact `requirementRef` using the seller, partner and customer account mappings, then call `provideOrder` as partner with `key`, `inResponseTo`, `requirementRef` and `document: {blueId: ...}`. Native Documents validates the mapped parties and their representatives against the fresh transports before linking the independently hosted Order. An identical preparation or provision is idempotent; conflicting reuse is rejected. The retained `newOrder` operation is a preparation alias, no longer an embedded factory.
+Handle `Documents/Document Provision Requested` for the orders clause, bootstrap the exact `requirementRef` using the seller, partner and customer account mappings, then call `provideOrder` as partner with `key`, `inResponseTo`, `requirementRef` and `document: {blueId: ...}`. Native Documents validates the mapped parties and their representatives against the fresh transports before linking the independently hosted Order. An identical preparation or provision is idempotent; conflicting reuse is rejected.
 
 The Adventures in Paradise example has two catalog lines in one order: two child tickets at USD 49 and one free infant ticket. Its frozen quote totals USD 93.10 after a USD 4.90 discount. `massage-preview.blue` and `watersports-preview.blue` configure the same clauses for the other review examples.
 
-`bootstrap-preparation.case.json` checks direct multi-line pricing, invalid selections and stale revisions, absence of stored quotes, cold-restore retries and rejection of forged amounts/access. The older `preview-booking`, `preview-card` and `preview-multi-item-order` cases describe the former embedded factory and are not qualification for this independent bootstrap edition. Hosted bootstrap, representative channels and PI provision are qualified separately in the Core integration branch.
+`bootstrap-preparation.case.json` checks direct multi-line pricing, invalid selections and stale revisions, absence of stored quotes, cold-restore retries and rejection of forged amounts/access. The older embedded factory cases live under [historical fixtures](historical). Hosted bootstrap, representative channels and PI provision are qualified separately in the Core integration branch.
 
 ## Card Payment Instruction
 
@@ -44,6 +41,6 @@ The integration must handle `Documents/Document Provision Requested`, retrieve t
 
 ## Local verification and preview
 
-Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `preview-booking.case.json` covers conditional booking requirements and the free variant; `preview-card.case.json` covers card preparation/provision and a renamed fulfilment clause; `preview-clauses.case.json` covers bilateral approval and invalid commercial terms.
+Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `bootstrap-preparation.case.json` covers current catalog-priced preparation. `preview-clauses.case.json` covers bilateral approval and invalid commercial terms.
 
 The local generated document, clause definitions, semantic cards, Overview and Terms are in `reports/reseller-20261103/business-preview/index.html`. These are local review artifacts, not a deployed agreement or proof of real card processing. The separate broader settlement qualification remains incomplete.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run reseller fixtures on native Contracts using the current exact package set."""
+"""Run reseller fixtures on native Contracts using an exact package set."""
 import argparse
 import hashlib
 import json
@@ -14,16 +14,27 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', type=Path, default=ROOT / 'examples/reseller/catalog.blue')
     parser.add_argument('--scenarios', type=Path, default=ROOT / 'examples/reseller/tests/catalog.case.json')
+    parser.add_argument('--reseller-archive', type=Path,
+                        help='Replay examples against an exact retained Reseller archive')
     parser.add_argument('--output', type=Path, default=ROOT / 'reports/reseller-20261103/catalog')
     args = parser.parse_args()
     classpath = os.environ.get('BLUE_JAVA_CLASSPATH')
     if not classpath:
         parser.error('Set BLUE_JAVA_CLASSPATH to the native Language/BEX/Contracts classes, dependencies and resources')
+    catalog = json.loads((ROOT / 'PACKAGES.json').read_text())
+    if args.reseller_archive is not None:
+        retained = json.loads((ROOT / 'PACKAGE-SOURCES.json').read_text())['retainedArchives']
+        archive = args.reseller_archive.resolve()
+        pin = next((candidate for candidate in retained if ROOT / candidate['path'] == archive), None)
+        if pin is None:
+            parser.error('--reseller-archive must be pinned in PACKAGE-SOURCES.json')
+        catalog['mounts']['Reseller'] = {
+            'path': pin['path'], 'blueId': pin['packageBlueId'], 'archiveSha256': pin['archiveSha256']
+        }
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     classes = output / 'classes'
     classes.mkdir(exist_ok=True)
-    catalog = json.loads((ROOT / 'PACKAGES.json').read_text())
     namespaces = {'Language', 'BEX', 'Contracts', 'Clauses', 'Connections', 'Money', 'Commerce',
                   'Activation', 'Agreements', 'Orders', 'Parties', 'Documents', 'Reseller', 'Amendments',
                   'PaymentInstruction', 'Payment', 'Features', 'Ledger', 'ManualPayments', 'MyOS', 'Events'}
