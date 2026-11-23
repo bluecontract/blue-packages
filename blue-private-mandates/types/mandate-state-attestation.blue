@@ -1,23 +1,23 @@
 {
   "name": "Mandate State Attestation",
-  "description": "Statement of a mandate processor about one state of a mandate, for proofs under an evidence profile of this package. The mandate processor signs the BlueId of this document: Ed25519 over UTF8(\"blue.private-mandates.mandate-state-attestation\\n\" + BlueId). The signature is outside the signed content. The field set is closed and is checked by the protocol verifier.",
+  "description": "Statement of a mandate processor about one state of a mandate, for statements under the Signed Statement Profile. The mandate processor signs the BlueId of this document: Ed25519 over UTF8(\"blue.private-mandates.mandate-state-attestation\\n\" + BlueId). The signature is outside the signed content. No verifying processor reads it: it is used by the signer and by a later inquiry. The field set is closed and is checked by whoever uses it. A mandate, a state, a listed document and a last entry are named by their final ids, plain or member ids; a timeline, a timer source, a timer entry, the preceding attestation and the package are plain ids.",
   "specification": {
-    "blueId": "ATvszg5CCxLJT25Ke8525i63LUuf6Hux6mzVLc7LNycb"
+    "blueId": "d6DE97S9R3TBnX6ySJPN7bXnTmGMVwWTmWS8oiGgDMS"
   },
   "mandate": {
-    "description": "Reference to the mandate before initialization (its initial BlueId), as the initialized marker of the state gives it. The id may be plain or the id of a member of a cyclic set.",
+    "description": "Reference to the mandate before initialization, by its final id: a plain id, or a member id when the mandate is a member of a cyclic set.",
     "schema": {
       "required": true
     }
   },
   "state": {
-    "description": "Reference to the attested mandate state S: the root document of the processor's snapshot. The id may be plain or the id of a member of a cyclic set.",
+    "description": "Reference to the attested mandate state S, the root document of the processor's snapshot, by its final id (plain or member id).",
     "schema": {
       "required": true
     }
   },
   "documents": {
-    "description": "References to the further documents of the snapshot (embedded documents), strictly ascending by BlueId text; absent when there is none. A reference may name a plain id or the id of a member of a cyclic set (plain id, #, canonical index).",
+    "description": "References to the further documents of the snapshot (embedded documents), by their final ids (plain or member ids), strictly ascending when the id texts are compared as ASCII byte strings; absent when there is none.",
     "type": "List",
     "schema": {
       "uniqueItems": true
@@ -28,6 +28,7 @@
     "type": "Text",
     "schema": {
       "required": true,
+      "minLength": 32,
       "maxLength": 44
     }
   },
@@ -47,46 +48,68 @@
     }
   },
   "position": {
-    "description": "The history position: one row per timeline the state depends on, strictly ascending by the BlueId text of the timeline. A row has the field timeline (reference to the Signed Timeline) and, unless no entry of that timeline is included, lastEntry (reference to the last included Timeline Entry). Rows have no other field and no type.",
+    "description": "The history position: one row per timeline the state depends on, at least one, strictly ascending when the BlueId texts of the timelines are compared as ASCII byte strings. A row has the field timeline (reference to the Signed Timeline) and, unless no entry of that timeline is included, lastEntry (reference to the last included Timeline Entry, by its final id, plain or member id). Rows have no other field and no type.",
     "type": "List",
     "schema": {
-      "required": true
-    }
-  },
-  "timerRegistrations": {
-    "description": "Digest of the pending timer registrations; absent when none is pending.",
-    "type": "Text",
-    "schema": {
-      "minLength": 1
+      "required": true,
+      "minItems": 1
     }
   },
   "lastTimerFiring": {
-    "description": "Order key of the latest timer firing already applied in the state; absent when none.",
-    "type": "Coordination/Order Key"
-  },
-  "nextTimerFiring": {
-    "description": "Order key of the earliest pending timer firing; absent when none.",
-    "type": "Coordination/Order Key"
-  },
-  "certifiedNodes": {
-    "description": "The certified validation nodes of the grants of the state: number of rows and root of the Merkle tree over the rows (key [[\"<BlueId of V>\"],[]], goal certified:value, root flag true), in the Merkle construction of section 4.2 of the specification.",
-    "schema": {
-      "required": true
-    },
-    "count": {
+    "description": "Order key of the latest timer firing already applied in the state: timestamp, Timer Source id, Timer Entry id; absent when none has been applied.",
+    "timestamp": {
+      "description": "Timestamp of the Timer Entry.",
       "type": "Integer",
       "schema": {
         "required": true,
         "minimum": 0
       }
     },
-    "root": {
-      "description": "64 characters 0-9a-f.",
+    "source": {
+      "description": "BlueId of the Timer Source, as text: a plain id.",
       "type": "Text",
       "schema": {
         "required": true,
-        "minLength": 64,
-        "maxLength": 64
+        "minLength": 32,
+        "maxLength": 44
+      }
+    },
+    "entry": {
+      "description": "BlueId of the Timer Entry, as text: a plain id.",
+      "type": "Text",
+      "schema": {
+        "required": true,
+        "minLength": 32,
+        "maxLength": 44
+      }
+    }
+  },
+  "nextTimerFiring": {
+    "description": "Order key of the earliest pending timer firing: timestamp, Timer Source id, Timer Entry id; absent when none is pending.",
+    "timestamp": {
+      "description": "Timestamp of the Timer Entry.",
+      "type": "Integer",
+      "schema": {
+        "required": true,
+        "minimum": 0
+      }
+    },
+    "source": {
+      "description": "BlueId of the Timer Source, as text: a plain id.",
+      "type": "Text",
+      "schema": {
+        "required": true,
+        "minLength": 32,
+        "maxLength": 44
+      }
+    },
+    "entry": {
+      "description": "BlueId of the Timer Entry, as text: a plain id.",
+      "type": "Text",
+      "schema": {
+        "required": true,
+        "minLength": 32,
+        "maxLength": 44
       }
     }
   },

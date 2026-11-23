@@ -12,7 +12,7 @@ per-node selection and the separate Core implementation qualification. Adding
 this schema changes neither existing native publications nor deployed defaults.
 
 `blue-coordination-evidence` and `blue-private-mandates` add evidence channels,
-proof profiles and a mandate commitment authority on top of the exact current
+a signed statement profile and a mandate commitment authority on top of the exact current
 Coordination and Mandates publications. They are [additive](docs/private-mandates-evidence.md):
 no existing publication changes, and native support is a separate Core qualification.
 

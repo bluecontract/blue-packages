@@ -1,86 +1,179 @@
-# Private mandates: operations decided by a proof instead of a readable mandate
+# Private mandates: operations decided by a signed statement instead of a readable mandate
 
-Protocol name: `Private Mandates / proof-decided operation authority/1`
+Protocol name: `Private Mandates / statement-decided operation authority/1`
 Package namespace: `PrivateMandates`
-Release status: Core Java integration preview, 23 November 2026
+Release status: Core Java integration preview, 26 November 2026
 
 This package extends Mandates and the timeline channels with evidence of the
 Coordination Evidence package (`blue-coordination-evidence`; "the Coordination
 Evidence specification" below). It requires that exact package, the exact
 Coordination publication that package requires and the Mandates publication built
 on that Coordination publication. It changes no type of any of them and defines no
-transport type. It is additive: `Mandates/Mandate Authority`, which names its mandate in
-clear, stays supported and keeps its rules. The type names, the field names and the
-encodings of this text are fixed; changing one produces new exact identities. What
-is not decided is listed in §7.
+transport type. It is additive: `Mandates/Mandate Authority`, which names its
+mandate in clear, stays supported and keeps its rules. The type names, the field
+names and the encodings of this text are fixed; changing one produces new exact
+identities. What is not decided is listed in §11.
 
-Terms: E is an operation entry of the agent and K its full Coordination input key.
+Terms. E is an operation entry of the agent and K its full Coordination input key.
 D is the state of the target document strictly before E. M is the salted mandate
 commitment carried by E. T is the evidence timeline named by the channel E is
-performed on (`CoordinationEvidence/Timeline Channel with Evidence`).
+performed on (`CoordinationEvidence/Timeline Channel with Evidence`). S is a
+mandate state that an attestation names. The *mandate processor* is the processor
+that processes the mandate and signs attestations. The *signer* is the document
+processor of the represented party that signs statements.
 
-## 1. Scope and layer boundary
+Conventions. A *hex* value is written with the characters `0-9a-f` only, two
+characters per byte, the first byte first. A *plain id* is the text of a BlueId
+that has no `#` (LANG-ID-ENCODING). A text is a plain id exactly when all of these
+hold: it has 32 to 44 characters; every character is in the alphabet
+`123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz`; read as a base-58
+number with that alphabet, most significant digit first, and with one zero byte for
+each leading `1`, it gives exactly 32 bytes; and writing those 32 bytes back the
+same way gives the same text. `||` joins byte strings with nothing between them. LF
+is the byte 0x0A. All texts named here are ASCII and are compared byte for byte.
+
+**Final ids.** A *final id* is the text under which the Language identifies a node
+as final content. It has one of two forms (LANG-ID-ENCODING, Language section 12):
+
+- a plain id; or
+- a *member id*, the id of a member of a finalized cyclic set: the plain id of
+  the set's master, the character `#`, and the member's canonical index. The index
+  is written in decimal with the digits `0-9`, with no sign and no other
+  character; it is `0` or begins with a digit `1-9`, so it has no leading zero.
+  This text admits an index of at most 9 digits. The Language sets no bound on
+  the index; the bound is set here so that every text of §6 has a maximum
+  length, and a cyclic set never comes near it, since its proof carries every
+  member.
+
+So a final id is 32 to 44 characters when plain, and 34 to 54 characters as a
+member id. A text with two `#`, with nothing after `#`, with `#01`, `#-1` or
+`#+1`, or with a part before `#` that is not a plain id, is not a final id.
+
+**Which id names a node.** A node is named by the final id under which it was
+established as final content, and by no other text:
+
+- if the node was established as a member of a finalized cyclic set, its id is its
+  member id `MASTER#index`;
+- otherwise its id is its plain id.
+
+The ordinary BlueId that hashing a member's detached body would give is never used
+to name the member: the Language does not put that identity in the place of the
+member id (its section 12.4). A member and its set's master are different
+identities, and ids are compared as texts, so `MASTER#0` and `MASTER` never match.
+
+A party knows which case it is in from how it holds the node. It holds a member
+under its member id, together with the owning-set proof that the Language requires
+to open it, and every reference to it in other content is written with the member
+id. It holds any other node under its plain id. For the four nodes this text
+compares or hashes by id:
+
+| Node | The id used is |
+|---|---|
+| E, the operation entry | The id under which the authenticated chain of E's timeline names that entry |
+| D, the target state before E | The id under which the processor's own processing names the state it accepted before E |
+| The mandate before initialization | The id the mandate state S records as its initial identity |
+| S, the attested mandate state | The id under which the mandate processor's snapshot names its root document |
+
+The Language does not say whether a processed document state or a timeline entry
+can be a member of a cyclic set. This text does not exclude it: where one is, the
+rule above applies. Where a field of this text can only ever hold a plain id, the
+text says "plain id"; the table in §5 lists both kinds.
+
+**Order.** Every input of a document has an order key, a triple (timestamp, source
+id, entry id). For an ordinary entry the source id is the BlueId text of its
+timeline and the entry id the BlueId text of the entry. For a timer firing the
+source id is the BlueId text of its Timer Source and the entry id the BlueId text
+of its Timer Entry. Two triples are compared by their first parts as integers; if
+those are equal, by their second parts as ASCII byte strings; if those are equal
+too, by their third parts as ASCII byte strings. This is the one order Coordination
+and Time define for the inputs of a document (Coordination section 2.4, Time
+section 6). K is the order key of E.
+
+## 1. Scope, roles and trust
 
 In Mandates an operation names the mandate and every processor reads it. Here the
-processors cannot read the mandate. The agent's operation carries a commitment to
-the mandate, and a zero-knowledge proof published on T states the verdict:
+other processors cannot read the mandate. The agent's operation carries a
+commitment to the mandate, and a statement on T, signed by the represented party's
+own document processor, says whether the mandate admits the operation.
 
-> S is the mandate state signed by the mandate processor for the mandate with
-> commitment M. S is the state strictly before E. The actor of E is the mandate's
-> authorized actor and the owner of the target channel is the mandate's holder.
-> Evaluated in the canonical grant order, S admits (or does not admit) E on state D
-> of the target document.
+- The **mandate processor** attests mandate states: it signs a
+  `Mandate State Attestation` (§5). It knows nothing of the target document or of
+  the operation.
+- The **signer**, the document processor of the represented party, holds the
+  mandate. It evaluates E against an attested mandate state and writes the result
+  on T as a statement signed with its own key (§6, §7).
+- **Every other processor** decides E from that entry by the rules of the
+  Coordination Evidence specification: it takes the first considered entry for E
+  on T, makes the comparisons of §8 with its own values, and then applies E,
+  rejects it or waits.
 
-Every processor verifies the proof and reaches the same decision without the
-mandate. The rules for reading T (considered entries, first entry, waiting, halting)
-are those of the Coordination Evidence specification. This specification
-defines the authority claim, the evidence profile, and when a proof matches.
+**What is trusted, stated plainly.** A statement is a signed assertion and nothing
+more. No processor other than the signer checks the evaluation, and nothing in a
+statement shows that the verdict is the one the mandate gives.
 
-A processor MUST explicitly support this exact package and protocol, the required
-Coordination Evidence protocol and the required Mandates protocol. A host that does
-not support the profile type a channel declares MUST refuse the document where the
-channel is declared. Installing this data package grants no native support.
+- The mandate processor answers for the state: that S is the mandate's state at
+  the attested position.
+- The signer answers for the evaluation: that the conditions of §7 held and that
+  the verdict is the one §7 defines for S, D and E.
+- The signatures exist so that each of the two can be held to what it stated when
+  the mandate is later disclosed in an inquiry. `statementCommitment` ties a
+  statement to the exact bytes the mandate processor signed, so the responsibility
+  can be split between the two afterwards (§7).
+- The other participants accept the signer by accepting the document: the profile
+  of the represented party's channel names the signer's key, and the channel's
+  fields change only through the document's own program, which they accepted
+  (Coordination Evidence section 3).
+
+This package makes no claim of cryptographic soundness of the evaluation. A signer
+that signs a wrong verdict, or a mandate processor that attests a wrong state, is
+found out only by an inquiry that reads the mandate.
 
 **What this version supports.**
 
-1. *Mandate types.* This version supports mandates of type
-   `Mandates/Operation Mandate` and of its subtypes, recognised by ancestry: the
-   type chain of the mandate state contains `Operation Mandate` of the required
-   Mandates publication. A mandate composed from clauses
-   (`MandateClauses/Mandate with Clauses`) is such a subtype and is supported. A
-   state of any other type is a fault of the mandate (§3).
-2. *One edition for both documents.* The mandate and the target document are on
+1. *Mandate types.* Mandates of type `Mandates/Operation Mandate` and of its
+   subtypes, recognised by ancestry: the type chain of the mandate state contains
+   `Operation Mandate` of the required Mandates publication. A mandate composed
+   from clauses (`MandateClauses/Mandate with Clauses`) is such a subtype. A state
+   of any other type is a fault of the mandate (§7).
+2. *Timers.* Mandates with timers are supported (§5, §7).
+3. *One edition for both documents.* The mandate and the target document are on
    the same edition: the Coordination publication, the Coordination Evidence
-   package and the Mandates publication this package requires. A mandate established under another Mandates package is a
-   fault of the mandate (§3). A proof for a mandate of another edition is not
-   defined in this version.
-3. *One edition, one proving program, one profile.* One edition has exactly one
-   proving program and one profile type. The program is built with the exact
-   identities of that edition, and its image identifier is the `programImageId` of
-   the profile (§4.1). Every type identity of this package,
-   `Mandate Commitment Authority` included, therefore changes with each
-   Coordination or Mandates edition, and the profile type also with each edition
-   of the Coordination Evidence package. A document pins its proving program for its
-   whole life through the profile of its channel: `evidenceProfile` is fixed for
-   the life of the document (Coordination Evidence section 3).
-4. *A channel without evidence.* An operation whose authority claim is a
+   package and the Mandates publication this package requires. A mandate
+   established under another Mandates package is a fault of the mandate (§7).
+4. *Identities follow the edition.* Every type identity of this package changes
+   with each edition of Coordination, of Coordination Evidence or of Mandates it
+   is built on. An operation is decided under the profile of its channel as it is
+   in the state on which the operation is evaluated (Coordination Evidence
+   section 3).
+5. *A channel without evidence.* An operation whose authority claim is a
    `Mandate Commitment Authority` and which is performed on a channel without
-   evidence (a plain `Timeline Channel`, or a channel that lacks any of the three
-   well-formed evidence fields) is rejected from the document state, without
-   reading any evidence timeline, and the document continues with the next input.
+   evidence, that is a channel whose type is not, by ancestry, a
+   `Timeline Channel with Evidence`, such as a plain `Timeline Channel`, or an
+   evidence channel whose fields are not well formed, is rejected from the
+   document state, without reading any evidence timeline, and the document
+   continues with the next input (Coordination Evidence section 6).
+6. *Cyclic sets.* A mandate, a mandate state, a target state and an operation
+   entry may be members of cyclic sets; each is named by its final id (Conventions).
+
+A processor MUST explicitly support this exact package and protocol, the required
+Coordination Evidence protocol and the required Mandates protocol. Installing this
+data package grants no native support.
 
 ## 2. Exported types
 
 | Type | Kind | Purpose |
 |---|---|---|
 | Mandate Commitment Authority | `Mandates/Authority` | Authority claim that carries M and names no mandate |
-| Mandate State Attestation | document signed by the mandate processor | What the mandate processor states about one state of a mandate (§4.2) |
-| RISC Zero Succinct Receipt Profile | `CoordinationEvidence/Evidence Profile` | First profile: a succinct RISC Zero receipt of one pinned proving program |
+| Mandate State Attestation | document signed by the mandate processor | What the mandate processor states about one state of a mandate (§5) |
+| Signed Statement Profile | `CoordinationEvidence/Evidence Profile` | Profile under which the evidence is a statement signed with the key the profile names (§4) |
+
+The statement itself is not a Blue type. It is the byte string of §6, carried in
+the `receipt` of a `CoordinationEvidence/Proof Entry`.
 
 ## 3. The authority claim
 
 The agent writes E with a `Mandate Commitment Authority` as its authority claim, in
-the place where `Mandates/Mandate Authority` stands today:
+the place where `Mandates/Mandate Authority` stands in Mandates:
 
 ```yaml
 type: Coordination/Timeline Entry
@@ -99,31 +192,72 @@ message:
 | Field | Content |
 |---|---|
 | `actor` | Inherited from `Mandates/Authority`: the represented holder |
-| `mandateCommitment` | M, the salted mandate commitment, as 64 lower-case hexadecimal characters (below) |
+| `mandateCommitment` | M, the salted mandate commitment, 64 hex characters (below) |
+
+The claim has exactly these two fields and its type. It has no `mandate` field and
+never carries or points to a mandate.
 
 **The commitment, byte for byte.**
 
     M = hex( SHA-256( salt || id ) )
 
-`salt` is the salt as raw bytes, at least 16 of them; with a shorter salt no proof
-can be made. `id` is the BlueId of the mandate before initialization, written as
-the text of that BlueId in ASCII: its base58 characters and, when the mandate is a
-member of a cyclic set (§4.2), the character `#` and the index that follow them. The hash input is the
-salt bytes followed directly by those characters: no separator, no length prefix
-and no terminator. `hex` writes the 32 bytes of the hash as 64 characters `0-9a-f`.
-The claim and the public output of a proof (§5) carry M as this same text and it
-is compared as text.
+`salt` is exactly 32 bytes (below). `id` is the final id of the mandate before
+initialization, written as its text in ASCII: a plain id, or a member id with its
+`#` and index when the mandate is a member of a cyclic set. The hash input is the 32
+salt bytes followed directly by the characters of the id: no separator, no length
+prefix and no terminator. `hex` writes the 32 bytes of the hash as 64 hex
+characters. The claim and a statement (§6) carry M as this same text, and it is
+compared as text.
 
-The claim has exactly these two fields and its type. It has no `mandate` field.
+**The salt.** The salt is exactly 32 bytes and the signer holds it. The same salt
+is used in `statementCommitment` (§7). The signer signs nothing for an E whose
+salt it does not hold or whose salt is not 32 bytes. This is all that is required.
+One salt per mandate satisfies it.
+
+What this baseline gives: the mandate's BlueId cannot be confirmed by guessing,
+because M does not show it to anyone without the salt, and the protocol does not
+disclose the mandate's content. What it does not give: with one salt per mandate
+every operation under that mandate carries the same M, and every statement made
+from one attestation carries the same `statementCommitment`. An observer
+therefore sees which operations use one mandate, and between which of them its
+attested state changed.
+
+*Optional extension: a salt per operation.* A salt that is unique for each
+operation removes that linkage: no two operations then carry the same M or the
+same `statementCommitment`. Such a salt is drawn at random, or derived from a
+secret kept per mandate and a value that differs for every operation; it must be
+unpredictable to anyone who does not hold the secret it comes from. A repeated
+salt links the operations that share it, as above. This is an extension and not a
+requirement because no verifying processor can check anything about the salt, and
+because confidentiality as a whole holds only as far as the agent keeps it (§9):
+the package does not make its correctness depend on it.
+
+No verifying processor can check the length or the uniqueness of a salt: a
+verifying processor never sees a salt. What is required of the salt binds
+whoever computes M, and the signer.
+
+Who computes M is not prescribed. How a value of M reaches the agent is a matter
+of the deployment; the following notes are not normative. With one salt per
+mandate the agent simply holds one value of M for each mandate. With a salt per
+operation there are two arrangements:
+
+- (a) The represented party's processor derives the salt and issues ready values
+  of M to the agent, each for one use. The agent then holds neither a salt nor
+  the secret. Recommended where the agent writes through the same operator.
+- (b) The agent and the represented party's processor share a secret that is set
+  up when the mandate is approved, and each derives the salt of an operation from
+  it.
 
 **The field set is checked by the processor.** The Language schema limits the claim
 to two fields with a value, but it does not close the field set: it admits a further
 field that carries only a type, such as `mandate: {type: Mandates/Operation
 Mandate}`, and a further field written as a reference that resolves. A processor
 therefore checks the field set itself, from the entry alone: a claim whose fields
-are not exactly `actor` and `mandateCommitment`, beside its type, is malformed, and
-the operation is rejected at once from the document state, without reading T. A
-claim never carries or points to a mandate.
+are not exactly `actor` and `mandateCommitment`, beside its type, is malformed.
+`mandateCommitment` is well formed only as 64 hex characters; the schema fixes the
+length and the processor checks the characters. An operation whose claim is
+malformed in one of these ways is rejected at once from the document state, without
+reading T.
 
 A claim that the schema does reject, for example one with a third field that has a
 value or with a `mandateCommitment` of another length, is a different case. The
@@ -132,23 +266,19 @@ existing Coordination behaviour for any inadmissible entry and is not changed he
 there is no operation to decide, and a reader cannot import the agent's operation
 timeline past such an entry. It is the fault of that timeline's writer.
 
-`mandateCommitment` is well formed only as 64 characters `0-9a-f`. The schema fixes
-the length; the processor checks the characters. An operation whose claim carries a
-malformed `mandateCommitment` is rejected from the document state, without reading
-T. The agent announces nothing before writing and takes no part in the proof flow.
-M tells the prover which mandate is meant and lets a processor match a proof to
-the operation.
-
-An operation whose authority claim is a `Mandate Commitment Authority` is
+**Which claims are decided from T.** An operation whose authority claim has
+exactly the type `Mandate Commitment Authority` of this package is
 evidence-decided in the sense of the Coordination Evidence specification. The
-claim is recognised by its exact type: the type of the claim must be exactly
-`Mandate Commitment Authority` of this package. A claim of a subtype, of a parent
-type or with no type is not evidence-decided, and no proof can be made for it.
+exact type decides, not ancestry. A claim whose type extends
+`Mandate Commitment Authority` and a claim of the parent type `Mandates/Authority`
+alone are not claims of this package. Such an operation is never decided from T. It fails closed, as the Mandates specification requires
+of an authority wrapper that is not supported (its section 1): E is rejected from
+the document state, without reading T, and the document continues. A claim of
+`Mandates/Mandate Authority` keeps the rules of Mandates.
 
-**Checked by every processor, outside the proof.** These are the checks a processor
-performs today for a `Mandates/Mandate Authority` without reading the mandate. They
-are unchanged, they come before T is read, and a failure has the same outcome as it
-has today for `Mandate Authority`:
+**Checked by every processor, before T is read.** These are the checks a processor
+performs for a `Mandates/Mandate Authority` without reading the mandate. They are
+unchanged, and a failure has the same outcome as it has for `Mandate Authority`:
 
 1. the claim's `actor` is the actor of the target channel the operation selects;
 2. that target channel exists and is a concrete `Coordination/Timeline Channel`
@@ -158,642 +288,640 @@ has today for `Mandate Authority`:
 4. the target document's actor policy admits E as a delegated action.
 
 Ordinary operation validation and protection against executing E twice also remain
-with the processor. Every check that today needs the mandate is in the proof.
+with the processor. Everything that needs the mandate is the signer's (§7).
 
-A rejection under one of these four checks, for a claim that is malformed, or for
-a channel without usable evidence fields is decided from the document state without
-consulting T. It carries neither `AUTHORITY_EVIDENCE_DENIED` nor
-`AUTHORITY_EVIDENCE_REJECTED`; those two reasons belong to an operation that T
-decided (Coordination Evidence section 6).
+An outcome under one of these four checks, a rejection for a claim that is
+malformed or is not of the exact type, and a rejection for a channel that is not
+an evidence channel or whose fields are not well formed are decided from the
+document state without consulting T.
+None of them carries `AUTHORITY_EVIDENCE_DENIED` or `AUTHORITY_EVIDENCE_REJECTED`;
+those two reasons belong to an operation that T decided (Coordination Evidence
+section 6).
 
-**Checked inside the proof,** because only the mandate shows it: status and approval
-of the mandate; that the actor of E is the actor of the mandate's
-`authorizedActorChannel` and the owner of the target channel is the actor of its
-`authorityHolderChannel`; the grants, evaluated exactly as Mandates defines (in the
-order of grant keys, document validation before request validation, each predicate
-with its own fresh gas ledger, the first grant that passes admits).
+The agent announces nothing before writing and takes no part in what follows. M
+tells the signer which mandate is meant and lets a processor match a statement to
+the operation.
 
-**Conditions before any verdict.** A verdict, admitting or denying, exists only for
-a state that is shown to be the mandate's state strictly before E. The signature of
-the mandate processor, the position and its provider evidence, and the timer
-comparisons of §4.2 are therefore checked before anything is decided from the
-mandate. If one of them fails no proof can be made, whatever the mandate holds. In
-particular a fault of the mandate (case 3 below) gives "does not admit" only when
-the attested position covers the channel timelines of the attested state.
+## 4. The profile
 
-**How the grants decide.** The grants of the scope are taken in the order of their
-keys, compared as sequences of UTF-16 code units. The Mandates specification does
-not state an order; this is the order the first program and the Mandates processor
-use. A grant *applies* to E when its target names the channel and the operation of
-E and, if it pins an initial document, that document is the target document. For
-each grant that applies, the document validation is evaluated first and the request
-validation only when the document validation passed; a grant passes when every
-validation it has passes. A grant that has a request `validation` does not pass
-when E carries no request payload. Every grant that applies is evaluated, also after the
-decision is made. The verdict is taken from the outcomes in key order: the first
-grant that passes admits E; if none passes the mandate does not admit E.
-
-**When the mandate or a predicate is at fault.** The statement ends in a verdict in
-these cases; none of them is a missing proof:
-
-1. *A grant that cannot match.* A predicate that ends in an execution error or meets
-   an invalid operand makes that grant not match. So does a completed result that
-   is not the Boolean true, as in Mandates today, and so does a predicate that is
-   statically inadmissible. A validation node that is not an object, a Text or a
-   list for example, likewise makes its grant not match. The other grants are tried.
-2. *Exhausted gas.* A predicate that exhausts its gas ledger ends the decision with
-   "the mandate does not admit E", unless a grant earlier in key order has already
-   passed. This is the one case in which the verdict depends on the order of the
-   grants: a gas-exhausting grant before an admitting grant denies, the same grant
-   after it does not change the admission.
-3. *A fault of the mandate.* The signed state is not, by ancestry, an Operation
-   Mandate (§1); it belongs to another Mandates package than the profile's program
-   was built with; it has no approved program, or its approved program is not the
-   program of the state; it lacks its participants or its scope; or a grant of its
-   scope has no target. The verdict is "the mandate does not admit E", whatever the
-   other grants are.
-
-In every such case the proof carries a denying verdict or, in case 1, the verdict
-the other grants give. E is decided at its own time and the target document
-continues with the next input. Repairing the mandate needs an update of the mandate,
-which applies to later operations.
-
-**A validation node that is not well formed.** A validation node of the mandate
-that is not well formed under the Language fails strict certification: it violates
-its schema, its types are not compatible, a type it uses is on its own inheritance
-chain (a type inheritance cycle, which the Language rejects: LANG-TYPE-CYCLE), or
-its content is invalid in another way the Language defines. When the mandate
-processor signed no certified row for such a node (§4.2), no proof can be made for
-E: the proof would have to certify the node itself and cannot. This refusal is
-final. It does not depend on the prover's resources or on content it might still
-obtain, and the represented party's side ends the wait with a Rejection Entry
-(Coordination Evidence section 5). An honest mandate processor does not approve a
-mandate with such a node. When the mandate processor did sign a row for such a
-node, it is at fault, and the outcome is whatever the evaluation of that grant
-gives under the rules above. A cyclic identity of the Language (its section 12) is
-not a type inheritance cycle and is no fault: a node that is, or reaches, a member
-of a cyclic set is well formed.
-
-**A grant that cannot be evaluated.** A grant that applies to E and whose evaluation
-needs content that cannot be supplied to the proving program is different: it is
-not a fault the statement can establish, because the statement cannot tell content
-that does not exist from content that is withheld. No proof can then be made for E,
-whatever the order of the grants and also when another grant would admit. So
-withholding content can never choose a verdict: for one S, D and E at most one
-verdict is provable. The party ends the wait with a Rejection Entry (Coordination
-Evidence section 5); repairing needs an update of the mandate.
-
-This is a deliberate difference from mandates named in clear. For a
-`Mandates/Mandate Authority` the Mandates specification says only that an error
-never authorizes, and a processor that evaluates the predicate or reads the mandate
-itself may give no verdict and stop processing the target document. Here the
-represented party answers for its own mandate: the other participants cannot read
-it, so a faulty mandate must not stop the document for everyone. A local
-interruption of proving is not a fault of the mandate: it gives no proof, never a
-verdict.
-
-**Resources.** The Language sets no ceiling on the size, depth or count of valid
-content (LANG-LIMIT), and these rules set none either: no rule here makes a
-document, a mandate, an operation or a proof invalid because of its size or the
-work it needs. The work of proving is the represented party's. Its side MAY write
-a Rejection Entry for an operation whose proof would exceed its own proving budget.
-The other participants need not know that budget; for them the entry is a
-considered rejection like any other. A budget never produces a verdict, and a
-processor never classifies a proof by the work that making or verifying it took.
-
-## 4. Evidence profiles
-
-A profile is one immutable value. Its exact type identifies the part a host must
-implement natively; its content carries the data. Processors compare proofs
-deterministically only when they use the same profile, so a channel declares a
-profile value and never a name such as "latest". The profile is identified by a
-hash of its content: the BlueId of the declared value.
-
-`CoordinationEvidence/Evidence Profile` is the base type and has no fields. A
-channel's `evidenceProfile` MUST be a value of a supported specialisation.
-
-The Language schema of the channel does not enforce this. Typing of the
-`evidenceProfile` field is structural: the schema admits a value with no type and
-values of unrelated types. What protects is the native rule of Coordination
-Evidence section 3, which a processor MUST implement: the exact type of the value
-must be a supported specialisation of `CoordinationEvidence/Evidence Profile`;
-anything else counts
-as a missing field, and every operation with a `Mandate Commitment Authority` on
-that channel is rejected from the document state.
-
-### 4.1 RISC Zero Succinct Receipt Profile
+`Signed Statement Profile` is a `CoordinationEvidence/Evidence Profile`.
 
 | Field | Content |
 |---|---|
-| `programImageId` | Image identifier of the proving program, 64 lower-case hexadecimal characters. It fixes the proved statement, the format of the public output, and the runtime and package bindings, gas limit and error semantics the program was built with |
-| `allowedProviders` | The profile's allowed timeline provider set: a list of `Coordination/Ed25519 Public Key`, each a well-formed key, strictly ascending when compared as 32-byte values |
-| `receiverReleaseSha256` | SHA-256 of the manifest of the receiver release whose builds perform the pinned verification of §5.1 for this profile, 64 lower-case hexadecimal characters |
+| `statementSignerKey` | The Ed25519 public key under which statements for this channel are verified: a `Coordination/Ed25519 Public Key` that is a well-formed key as section 3 of the Coordination Evidence specification defines it |
 
-The value has exactly these three fields. `programImageId` and
-`receiverReleaseSha256` are data supplied by the document that declares the
-profile; this specification names no image identifier and no release.
+The value has exactly this one field. The well-formed key rule is that of the
+Coordination Evidence specification and is used here by reference: its four
+conditions and its eight refused encodings apply to `statementSignerKey` as they
+apply to the channel's `mandateProcessorKey`.
 
-The type itself fixes what is not data: the receipt kind (a succinct RISC Zero
-receipt, in one canonical encoding with no other bytes), the comparison rules of §5
-and the provider set digest function. The code that decodes and verifies a receipt
-is fixed by `receiverReleaseSha256`.
+The profile has no list of providers. A processor that verifies a statement
+compares nothing with such a list, so a list would bind nothing. Which timeline
+providers the mandate's history rests on is checked by the signer and is part of
+what the signer answers for (§7).
 
-**The receiver release is part of the profile.** A receiver release is a set of
-builds of the pinned verification, one per platform. All builds of one release are
-made from the same sources and the same verifier version, and MUST return the same
-result for the same input (§5.1). A release is described by its manifest, and
-`receiverReleaseSha256` is the SHA-256 of the bytes of that manifest.
+`statementSignerKey` and the channel's `mandateProcessorKey` name two roles. The
+rules do not require the two keys to differ. The two kinds of signature can never
+be taken for one another, because their signed bytes begin with different domain
+texts (§5, §6).
 
-The manifest is UTF-8 text with one line per build of the release and no other
-byte:
+**When a host supports the profile** is decided as section 3 of the Coordination
+Evidence specification states, from the exact type alone:
 
-    <SHA-256 of the bytes of the build, 64 characters 0-9a-f> SP SP <platform name> LF
+1. The exact type of the channel's `evidenceProfile` is not
+   `Signed Statement Profile` of this package: this text does not apply. A type
+   that extends `Signed Statement Profile` is another exact type and is not this
+   profile.
+2. It is, and the host does not implement this protocol: the host refuses the
+   document where the channel is declared. A refusal finalises nothing.
+3. It is, and the host implements this protocol: the host checks the content. The
+   value is well formed only if its fields are exactly `statementSignerKey` and
+   that key is a well-formed key. The Language schema enforces the required
+   field, at most one field with a value and the length of the key; it admits a
+   further field that carries only a type, so the processor checks the exact
+   field set and the rest of the key rule itself. A value that is not well formed
+   makes the channel's fields not well formed, with the consequence the
+   Coordination Evidence specification states: every operation with a
+   `Mandate Commitment Authority` on that channel is rejected from the document
+   state, without reading T, and the document continues.
 
-SP is the byte 0x20 and LF the byte 0x0A; the two spaces are exactly two. The
-platform name is the Rust target triple the build is made for, for example
-`aarch64-apple-darwin` or `x86_64-unknown-linux-gnu`. The lines are sorted by
-platform name, compared as byte strings, and a platform name occurs once. The last
-line ends with LF like every other. This is the text format of `sha256sum`. A
-manifest lists the builds of one release only.
+Support depends on nothing but the exact type: no installed file, no
+configuration and no platform.
 
-Example of a manifest with two builds (the hashes stand in for real ones):
-
-    1111111111111111111111111111111111111111111111111111111111111111  aarch64-apple-darwin
-    2222222222222222222222222222222222222222222222222222222222222222  x86_64-unknown-linux-gnu
-
-A processor installs the manifest and one build that the manifest lists. Where the
-channel is declared it checks both of these:
-
-1. the SHA-256 of the bytes of its manifest equals `receiverReleaseSha256`;
-2. the SHA-256 of the bytes of its installed build is the hash on a line of that
-   manifest.
-
-A processor for which either fails, or that has no manifest or no build, does not
-implement the declared profile and MUST refuse the document where the channel is
-declared, exactly as a host refuses a profile type it does not implement
-(Coordination Evidence section 1). It MUST NOT verify a receipt for that channel
-with a build that the manifest does not list.
-
-**The receipt.** `receipt` of a Proof Entry decodes to exactly one canonical
-encoding of a succinct receipt. A byte string that is not that encoding is skipped,
-also when a verifier would accept it: trailing or altered bytes, another receipt
-kind, and a receipt whose `control_inclusion_proof.index` has a bit set above the
-length of its path. The verifier reads one bit of that index per digest of the path
-and ignores the bits above, three bytes in the receipts of the first program, so
-such a receipt verifies like the original; it is skipped all the same. Any failure
-or fault while a receipt is decoded or verified, a panic of the verifier included,
-makes the bytes not a proof: the entry is skipped and never retried (§5.1).
-
-**Allowed provider set.** The set belongs to the profile, not to a mandate. The
-proving program checks that every provider key the mandate processor signed belongs
-to a list given by the prover and publishes the digest of that list. The profile
-carries the list; the digest is derived and is not a field:
-
-> provider set digest = SHA-256(key_1 ‖ key_2 ‖ … ‖ key_n), over the raw 32-byte
-> keys in list order, written as 64 lower-case hexadecimal characters.
-
-For the empty list this is the SHA-256 of the empty byte string. A mandate with a
-source at a provider outside the set can never get a matching proof.
-
-**Well-formed profile.** For a value whose exact type is this profile, the Language
-schema enforces the three required fields, at most three fields with a value, the
-length of each key, of `programImageId` and of `receiverReleaseSha256`, and distinct
-list elements. As for the authority claim (§3) it admits a further field that
-carries only a type. The processor additionally requires that the fields are
-exactly these three, that `programImageId` and `receiverReleaseSha256` are 64
-characters `0-9a-f`, that every key of `allowedProviders` is a well-formed key as
-Coordination Evidence section 3 defines (64 characters `0-9a-f`; a point of
-edwards25519; canonical encoding; not of small order), and that the list is
-strictly ascending by key bytes. Every listed key must be well formed, whether or
-not any proof uses it. A
-profile that fails any of these is malformed; under the Coordination Evidence
-specification the channel then lacks its profile, and every operation with
-a `Mandate Commitment Authority` on it is rejected from the document state.
-
-**Two premises.** A proof states its verdict under two premises. Neither the
-proving program nor the pinned verification checks them:
-
-1. *D is valid.* The target state D, the record whose BlueId is `targetState` of
-   the public output, passes Language strict certification with goal `definition`
-   (LANG-CERTIFY): the exact graph reachable from D is present and addressed
-   correctly, every type that is not a core type and every specification reached
-   from D is a valid definition, and D itself is.
-2. *E is a valid entry.* The record whose BlueId is `entry` of the public output is
-   a valid `Coordination/Timeline Entry` on its timeline, written by its actor. The
-   verdict is for the operation that this record describes. The program opens the
-   record by its BlueId and reads the fields the statement uses. It does not
-   validate E, does not check that E is a Timeline Entry and verifies no signature
-   over E.
-
-> A proof is meaningful only for a target state that the receiving processor has
-> itself produced or admitted under an edition that certifies every document state
-> completely, and for an operation entry that the same processor has itself
-> admitted as an entry of its timeline. A processor MUST NOT accept a proof for any
-> other state or any other entry.
-
-A conforming processor satisfies this by comparisons 2 and 4 of §5 and by nothing
-else: it compares `entry` with the BlueId of the operation it is deciding, which it
-admitted itself, and `targetState` with the BlueId of its own state D before E. A
-host MUST NOT apply this profile to a document it processes under an edition that
-does not certify every state completely. An edition that certifies every state
-with goal `value` satisfies premise 1, because certification with goal `value`
-first establishes the definition. The premise names `definition` because that is
-all the derivation below relies on.
-
-A proof states its verdict relative to the premises: someone who holds only a
-proof and the two BlueIds learns the verdict for the case that D is valid and E is
-such an entry, and nothing about whether they are.
-
-**Reused validation results about D.** The program may validate every node of D it
-reads itself. It may instead be given validation results about D, to save work. A
-validation result is a row (recipe key, goal, root flag). The recipe key is the
-JSON text `[[part BlueIds],[required type BlueIds]]` and names the node obtained
-by merging the parts under the listed type requirements. The goal is `definition`
-or `value`. The row means: Language validation of that node for that goal, at a
-root position (flag true) or a nested position (flag false), succeeds for the node
-and for everything below it.
-
-The program accepts such a row only if it re-derives the row itself from the
-target state, starting from the one assumed row "the target state is valid"
-(premise 1: strict certification of D with goal `definition`). A row
-the program cannot re-derive is refused and no proof is made. A derivation is a
-start row followed by any number of steps:
-
-- *Start row.* Either (`[[D],[]]`, `definition`, true), where D is the BlueId the
-  public output carries as the target state; or (`[[X],[]]`, `definition`, true),
-  where X is reached from D by hops through the exact content, each hop read from
-  the record bound by the BlueId of the current node. A hop goes to the node under
-  one key of the current node's content, any key except `name`, `description`,
-  `value`, `mergePolicy` and `items`, or to one item of its `items`. The last hop
-  must go through a type key (`type`, `itemType`, `keyType`, `valueType`) to a type
-  that is not a core type of the Language, or through `specification`; X is the
-  BlueId found there.
-- *Steps.* Each step starts from the head h of the current row, which is the node
-  Language validation builds for the row's recipe, and gives the next row:
-
-| Step | Condition | Next row |
-|---|---|---|
-| Field k | h has the field k | (the recipe of that field under h, the same goal, false) |
-| Contracts | h has `contracts` | (the recipe of h's `contracts`, the same goal, false) |
-| Item n | h has the item n; under goal `definition` the item is not a hole | (the recipe of that item under h, the same goal, true) |
-| Key k | h has the field k, and h is a Dictionary or declares a key type | (`[[S],[T]]`, `value`, true): T is the key type of h, the core type Text when h declares none, and S is the BlueId of the scalar of T's core domain (Text, Integer, Double or Boolean) whose value is k read in that domain, exactly as the Language reads a dictionary key of that key type. A k that the Language does not accept as a key of that domain gives no row |
-
-- A row with goal `value` whose head is neither at a root position nor concrete
-  has no rows below it.
-
-These are the start rows and the step of Language validation itself: strict
-admission of D with goal `definition` succeeds only if validation succeeds on
-every row reached this way. Every row that can be derived is therefore true
-whenever D is valid, and the premise above is the only thing assumed. A derivation
-reads the records bound by BlueId from the target state and the heads and child
-recipes computed from them. It reads nothing of the mandate or of E and no
-validation result supplied by anyone. A row whose key is built from the mandate,
-from E or from a node merged with a mandate pattern cannot be derived, and is
-refused whatever its form.
-
-The prover gives no digest of these rows and the public output carries none (§5).
-Validation results about the mandate are a separate input: the certified rows the
-mandate processor signs (§4.2). They are not derived and are unchanged by this
-rule.
-
-The rule is fixed as stated. The encoding in which a prover hands a derivation to
-the program is private input and is fixed by the program. Two things about it are
-not established and are listed in §7: that every derivable row follows from the
-validity of D is argued from the validation algorithm and is not proved, and that
-the processor's validation and the program's validation accept the same nodes is
-shown by differential runs only.
-
-**Scope.** This profile excludes mandates with Time anywhere in the dependency graph
-that affects authorisation. For a mandate inside this scope the three timer fields
-of the attestation (§4.2) are absent. The proof does not enforce the exclusion; it
-only applies the two timer comparisons of §4.2 to what the mandate processor
-attests.
-
-### 4.2 What the mandate processor signs, and what stays trusted to it
+## 5. The attestation
 
 The mandate processor states one thing per mandate state: a document of the exact
-type `Mandate State Attestation` of this package. It signs the BlueId of that
-document with the key that is `mandateProcessorKey` of the channel:
+type `Mandate State Attestation` of this package. No verifying processor ever
+reads an attestation. It is an object between the mandate processor and the
+signer, and for a later inquiry.
 
-    signed bytes = UTF8( "blue.private-mandates.mandate-state-attestation" ) LF UTF8( BlueId of the attestation )
-    signature    = Ed25519( signed bytes )
+| Field | Content | Use |
+|---|---|---|
+| `mandate` | Reference: the final id of the mandate before initialization | The preimage of M (§3) |
+| `state` | Reference: S, the root document of the mandate processor's snapshot, by its final id | The state the signer evaluates |
+| `documents` | List of references to the further documents of the snapshot (embedded documents), by their final ids, strictly ascending when the id texts are compared as ASCII byte strings; absent when there is none | Position completeness (below) |
+| `authorityPackage` | Text: the BlueId of the Mandates package the mandate is established under, a plain id | Must be the Mandates package this package requires, else the mandate is at fault (§7) |
+| `mandateProgram` | Text, not empty: identity of the program of the state | Compared with `approvedProgram` |
+| `approvedProgram` | Text, not empty: identity of the approved program; absent when none is approved | The mandate is approved exactly when it is present and equals `mandateProgram` as a text |
+| `position` | List of rows, at least one, strictly ascending when the BlueId texts of the timelines are compared as ASCII byte strings. A row has `timeline` (reference to the Signed Timeline, a plain id) and, unless no entry of that timeline is included, `lastEntry` (reference to the last included Timeline Entry, by its final id); no other field and no type | The history position, checked by the signer against K (§7) |
+| `lastTimerFiring` | The order key of the latest timer firing already applied in S; absent when none has been applied | Must be strictly before K (§7) |
+| `nextTimerFiring` | The order key of the earliest pending timer firing; absent when none is pending | K must be strictly before it (§7) |
+| `sequence` | Integer: 0 for the first attestation of this mandate by this processor, then the previous one plus one | The chain (below) |
+| `previous` | Reference: the BlueId of the mandate processor's preceding attestation of the same mandate, a plain id; absent only in the first | The chain |
 
-Pure Ed25519 of RFC 8032, LF the byte 0x0A, no byte after the BlueId. The BlueId is
-written as its text in ASCII. The signature is outside the signed content: the
+A timer bound, `lastTimerFiring` or `nextTimerFiring`, has exactly three fields
+when it is present:
+
+| Field | Content |
+|---|---|
+| `timestamp` | Integer, at least 0: the timestamp of the Timer Entry |
+| `source` | Text: the BlueId of the Timer Source, a plain id |
+| `entry` | Text: the BlueId of the Timer Entry, a plain id |
+
+The three are the order key of the firing (Order, above). The two ids are texts
+and not references: a timer firing is not an entry of a Signed Timeline, and the
+attestation only has to place it in the order.
+
+**Plain ids and member ids in the attestation and the statement.**
+
+| Position | Forms | Why |
+|---|---|---|
+| `mandate`; the id inside M (§3) | Plain or member id | A mandate can be created together with documents that refer to each other |
+| `state`; the references of `documents` | Plain or member id | A state or an embedded document may be a member; the Language does not exclude it |
+| `lastEntry` of a position row | Plain or member id | It names a Timeline Entry like E; an entry that can be E for one operation is the last entry for the next |
+| `targetState` and `entry` of a statement (§6) | Plain or member id | D is a document state and E a Timeline Entry |
+| `timeline` of a position row | Plain only | A `Signed Timeline` holds a provider, a URL and a flag and no reference to other content, so it cannot be part of a cycle |
+| `source` and `entry` of a timer bound | Plain only | A Timer Source holds two texts and no reference. A Timer Entry is made by the processor after everything it refers to exists, and nothing can refer to it before |
+| `previous` | Plain only | An attestation refers only to content that exists before it, so the chain has no cycle |
+| The BlueId of an attestation in its signed bytes | Plain only | The same reason |
+| `authorityPackage`; `profile` of a statement | Plain only | The identity of a package and of a type of a package are ordinary identities |
+
+Where the table says "plain only", a text of the other form is not well formed in
+that position. Lists are ordered by comparing the id texts as ASCII byte strings,
+whatever their form: `X#10` comes before `X#9`.
+
+A value that does not exist is an absent field, never an empty list. The content
+of the two program identities is not interpreted; they are compared as texts (how
+a program is identified is not decided, §11).
+
+**The field set is closed and is checked by whoever uses an attestation.** The
+Language schema requires the fields marked required in the type and fixes lengths,
+but it does not close the field set. The signer, and anyone else who checks an
+attestation, MUST check that it has exactly these fields and the exact type, that
+every id has a form the table above allows, and that `documents` and `position`
+are in the stated order.
+
+**What the mandate processor signs.** It signs the BlueId of the attestation with
+the key that is `mandateProcessorKey` of the channel:
+
+    attestation signed bytes = UTF8( "blue.private-mandates.mandate-state-attestation" ) || LF || UTF8( BlueId of the attestation )
+    signature                = Ed25519( attestation signed bytes )
+
+Pure Ed25519 of RFC 8032. The BlueId of an attestation is a plain id, written as
+its text in ASCII, and no byte follows it. The signature is outside the signed content: the
 attestation has no signature field. There is no other serialisation: the canonical
 form and the hash are the BlueId of the Language.
 
-The public output of a proof carries a salted commitment to what was signed:
-
-    statementCommitment = hex( SHA-256( salt || signed bytes ) )
-
-with the same salt bytes as in M (§3), followed directly by the signed bytes above,
-with no separator; `hex` as in §3.
-
-**Which signatures the statement accepts.** The key must be a well-formed key
-(Coordination Evidence section 3). A signature is 64 bytes, R followed by S, over
-the message M' (the signed bytes), under the key A. The statement accepts it only
-if all hold:
+**Which signatures are accepted.** This one rule holds for the signature of an
+attestation and for the signature of a statement (§6). The key must be a
+well-formed key (Coordination Evidence section 3). A signature is 64 bytes, R
+followed by S, over a message under the key A. It is accepted only if all hold:
 
 1. S, read as a little-endian integer, is below the group order L;
 2. R decodes to a point of edwards25519 and is not of small order;
 3. the encoding of [S]B − [k]A is equal, byte for byte, to the 32 bytes of R, where
-   B is the base point and k = SHA-512(R ‖ A ‖ M') read as a little-endian integer
-   and reduced modulo L.
+   B is the base point and k = SHA-512(R || A || message) read as a little-endian
+   integer and reduced modulo L.
 
 This is the equation without the cofactor, compared on encodings. A signature made
-by a signer that follows RFC 8032 always passes. The statement applies the same
-rule to every provider signature it verifies (position completeness, below). With
-a signature that fails, no proof can be made.
+by a signer that follows RFC 8032 passes.
 
-The proving program is not given the attestation. It builds the document from the
-values it uses and has checked, computes its BlueId and verifies the signature. A
-value the proof uses can therefore not differ from the signed one, and a document
-with any further field has another BlueId and cannot be reproduced.
-
-| Field | Content | What it binds in the proof |
-|---|---|---|
-| `mandate` | Reference: the initial BlueId of the mandate | Read from the `initialized` marker of S, never from the prover; also the preimage of M |
-| `state` | Reference: S, the root document of the mandate processor's snapshot | The state the proof opens and evaluates |
-| `documents` | List of references to the further documents of the snapshot (embedded documents), strictly ascending by BlueId text; absent when there is none | Position completeness: the channel timelines of S and of each listed document must be rows of `position` |
-| `authorityPackage` | Text: BlueId of the Mandates package the mandate is established under | Must be the Mandates package the profile's program was built with, else "does not admit" |
-| `mandateProgram` | Text: identity of the program of the state | Compared with `approvedProgram` |
-| `approvedProgram` | Text: identity of the approved program; absent when none is approved | The mandate is approved exactly when it is present and equals `mandateProgram`, else "does not admit" |
-| `position` | List of rows, strictly ascending by the BlueId text of the timeline. A row has `timeline` (reference to the Signed Timeline) and, unless no entry of that timeline is included, `lastEntry` (reference to the last included Timeline Entry); no other field and no type | The history position N, checked against provider evidence and E (below) |
-| `timerRegistrations` | Text: digest of the pending timer registrations; absent when none is pending | Carried only |
-| `lastTimerFiring` | `Coordination/Order Key` of the latest timer firing already applied in S; absent when none | Must precede K, else no proof |
-| `nextTimerFiring` | `Coordination/Order Key` of the earliest pending timer firing; absent when none | K must precede it, else no proof: an operation is decided only on a state in which no timer is due before it |
-| `certifiedNodes` | `count` (Integer) and `root` (64 characters `0-9a-f`) of the tree of certified rows (below) | A certified row is used only with an audit path to `root` in a tree of `count` leaves |
-| `sequence` | Integer: 0 for the first attestation of this mandate by this processor, then the previous one plus one | Carried only (the chain, below) |
-| `previous` | Reference: the BlueId of the mandate processor's preceding attestation of the same mandate; absent only in the first | Carried only |
-
-A value that does not exist is an absent field, never an empty list. The content
-of the two program identities is not interpreted by the proof (how a program is
-identified is not decided, §7). No proof can be made from values the document cannot
-hold: a `mandateProgram` or an `approvedProgram` that is an empty text, an
-`authorityPackage` that is not the text of a BlueId, or a `documents` list that
-names S itself.
-
-**Plain ids and member ids.** A final BlueId has one of two forms: a plain id (the
-base58 text of 32 bytes, 32 to 44 characters), or the id of a member of a cyclic
-set, which is a plain id, the character `#` and the canonical index of the member
-(Language section 12). Where a document can stand, either form is allowed:
-
-| Position | Forms |
-|---|---|
-| `targetState` and `entry` of the public output (§5) | Either. The public output carries the id as its text, with `#` and the index when it has them |
-| `mandate` and `state` of the attestation; the references of `documents` | Either |
-| `timeline` and `lastEntry` of a position row; the timelines and entries inside `lastTimerFiring` and `nextTimerFiring`; `previous`; `authorityPackage` | Plain only. With another form in one of these no proof can be made |
-
-**The field set is closed and is checked by the verifier.** The Language schema of
-the type requires the fields marked required in the type and fixes lengths, but
-like the other types of this package it does not close the field set. The proof
-closes it by construction, as said above. Anyone else who checks an attestation
-MUST check that it has exactly these fields and the exact type.
-
-Not in the attestation, on purpose: the provider list (it is the profile's, and the
-public output carries its digest); the mandate processor key (the public output
-carries it and the processor compares it with the channel's); D, E and the salt (an
+**Not in the attestation, on purpose:** the mandate processor key (the statement
+carries it and a processor compares it with the channel's); D, E and the salt (an
 attestation is about S alone and serves every operation decided on that state).
 
-**Certified rows.** Beside the state, the mandate processor attests facts about the
-validation nodes of the grants. For each grant in the scope of S, for each
-validation node V of that grant (its `validation` and its
-`target.documentValidation`) for which strict certification succeeds, there is one
-row
-
-    key = [["<BlueId of V>"],[]]     goal = certified:value     root flag = true
-
-and it means: strict certification of V succeeds. Every node reachable from V is
-present and hashes to its BlueId, every type definition among them is valid, and V
-passes its schema. The mandate processor signs exactly rows of this goal; a row of
-any other goal is refused by the proof. The rows are distinct and ordered by key as
-byte strings; a key contains no tab and no line feed. `certifiedNodes` is the row
-count and the root of the Merkle tree over the rows in that order. Below `TAB` is
-the byte 0x09, `flag` the character `1` (the root flag of a certified row is
-true), and `hex` lower-case hexadecimal:
-
-    leaf(row)   = SHA-256( 0x00 || key || TAB || goal || TAB || flag )
-    node(l, r)  = SHA-256( 0x01 || l || r )
-    MTH({})     = SHA-256( "" )
-    MTH({d})    = leaf(d)
-    MTH(d[0:n]) = node( MTH(d[0:k]), MTH(d[k:n]) ),  k the largest power of two smaller than n
-    count       = n          root = hex( MTH(d[0:n]) )
-
-This is the Merkle Tree Hash of RFC 9162 section 2.1 with the leaf content above.
-With no row the count is 0 and the root is `hex SHA-256("")`. A proof is given only
-the rows it uses. Each comes with its index and its audit path, and the program
-uses a row only when the path gives `root` for that index in a tree of `count`
-leaves (RFC 9162 section 2.1.3.2); otherwise no proof is made.
-
-Worked example with the three rows whose keys are `[["A"],[]]`, `[["B"],[]]` and
-`[["C"],[]]` (`A`, `B`, `C` stand in for BlueIds), each with goal
-`certified:value`:
-
-    leaf 0 = e4b0a83e3f8f90f9e7f277bc81bcfd9162996ea3f8464f5bb66f56c798d0ffa2
-    leaf 1 = edd172232e33ad3931647a39b4ff3a8e11bc3fae24de8a4788733099a62b3935
-    leaf 2 = e742b75585d6b048b806948423a2878e04765af3014ee7070d961c3d5b5a9b8a
-    node(leaf 0, leaf 1) = fecc5a5ee3e078f4da2c2f4a69eb98203e02da3836e50d15634c84ecdc48a9cc
-    count  = 3
-    root   = 4945afc7018775e7694c57bea07d2dc8e92790e6447c59fb45f0e34e5d26d219
-
-The audit path of leaf 2 is [node(leaf 0, leaf 1)]; that of leaf 0 is [leaf 1, leaf 2].
-
-A mandate processor MUST include a row only for a node for which it performed this
-certification and it succeeded. The proof relies on a row only for a validation
-node that it reaches itself from S, through scope, grant and target; a row about any
-other node has no effect. Without a row for a node the proof certifies that node
-itself. Pattern matching and predicate evaluation are always done in the proof,
-from S. This is asserted by the mandate processor, not proved.
-
-**Position completeness.** The proof shows that `position` covers every timeline S
-depends on through a channel. For S and for every document of `documents`, every
-contract of that document whose type is, by ancestry, a Coordination
-`Timeline Channel` or `Public Timeline Channel` names a timeline, and each such
-timeline must be a row of `position`. The position has at least one row. For every
-row the proof shows, by exactly one kind of evidence, that the row's last entry is
-on that timeline, is before K, and is the last entry of that timeline before K: by
-a provider guarantee whose last entry is the row's and which is complete to after
-the timestamp of K, or by the provider-signed successor entry after K, or, on E's
-own timeline and only there, by E itself whose previous entry is the row's. The
-provider of every row's timeline, that of E's own timeline included, must have its
-key in `allowedProviders`. If a timeline is not covered, or a provider is not in the
-list, no proof is made.
+**Position completeness.** `position` covers every timeline S depends on through a
+channel. For S and for every document of `documents`, every contract of that
+document whose type is, by ancestry, a Coordination `Timeline Channel` or
+`Public Timeline Channel` names a timeline, and each such timeline is a row of
+`position`.
 
 **The chain.** `sequence` and `previous` link the attestations of one mandate by one
 mandate processor into a hash chain. There is no timeline of the mandate processor.
-The proof checks nothing about the chain beyond that both fields are inside the
-signed document: it needs one attestation, does not follow the chain, and does not
-check that `previous` is absent exactly when `sequence` is 0. The chain is for
-audit. Two different attestations signed by one key for one `mandate` with the same
-`previous`, or with the same `sequence`, prove equivocation by the mandate
+The signer needs one attestation and does not follow the chain. The chain is for
+an inquiry. Two different attestations signed by one key for one `mandate` with
+the same `previous`, or with the same `sequence`, show equivocation by the mandate
 processor, from the two signatures alone and without the mandate's content. A chain
 with every link present shows the states the mandate processor claims, in order. A
-missing link is the mandate processor's to explain; the chain does not prove that
-every attestation was published.
+missing link is the mandate processor's to explain; the chain does not show that
+every attestation was handed over.
 
-**What stays trusted to the mandate processor.** The proof does not replay the
-mandate's history. Not shown by the proof, and asserted by the signature alone:
+**What stays trusted to the mandate processor.** Asserted by its signature alone:
 
 - that S is the state that results from processing exactly the entries up to the
   last entry of each row, and each row's last entry itself;
-- `documents`: the channel timelines of a listed document are required, but nothing
-  shows the list complete;
+- `documents`: nothing shows the list complete;
 - dependencies that are not a channel contract of S or of a listed document:
   documents S refers to without embedding them, sources reached through another
   channel type, and anything a contract reads when it runs;
-- the three timer fields;
-- `authorityPackage`, the two program identities and the certified rows.
+- the two timer bounds;
+- `authorityPackage` and the two program identities.
 
-## 5. When a proof matches
+## 6. The statement
 
-The public output of a proof is closed: one JSON object with exactly these seven
-keys, in this order, as UTF-8 text with no white space and no other byte.
+### 6.1 Content
 
-| Key | Content |
-|---|---|
-| `targetState` | The BlueId of D, plain or a member id (§4.2) |
-| `entry` | The BlueId of E, plain or a member id (§4.2) |
-| `mandateCommitment` | M, as in the authority claim (§3) |
-| `mandateProcessorKey` | The key whose signature on the attestation the proof verified, 64 lower-case hexadecimal characters |
-| `providerSetDigest` | The provider set digest (§4.1) |
-| `statementCommitment` | The salted commitment to the bytes the mandate processor signed (§4.2), 64 lower-case hexadecimal characters |
-| `verdict` | The Boolean true when the mandate admits E, false when it does not |
+A statement has seven values:
 
-The public output carries nothing about the validation of D: no digest of
-validation results and no statement that D is valid (§4.1).
-
-The public output carries nothing about E beyond its BlueId either (premise 2 of
-§4.1).
-
-**Deciding one Proof Entry has two parts.**
-
-(a) *Pinned verification.* A build of the receiver release that
-`receiverReleaseSha256` of the profile names (§4.1) is given two things: the bytes of the receipt and the `programImageId` of
-the channel's profile. It answers with exactly one of three results (§5.1): the
-receipt is verified, together with its public output; the bytes are not a proof;
-or it did not finish. It is given nothing else and reads nothing else: no record
-of D, of E or of the mandate, and none of the processor's values.
-
-(b) *The processor's comparisons.* The processor compares the public output that
-(a) returned with its own values, as the table below lists. These five comparisons
-are defined by this text alone. They are not part of the pinned build, and every
-implementation writes them itself. They compute nothing from the content of a
-document: of D and of E they need only the BlueIds.
-
-A well-formed `CoordinationEvidence/Proof Entry` (Coordination Evidence section 5;
-the processor, not the schema, decides well-formedness) is a matching proof for E
-only if (a) returns "verified" and all comparisons of (b) hold. The entry's
-`document` and `operationEntry`, when present, are an advisory hint with no force
-(Coordination Evidence section 5). They are not among the comparisons, neither
-part reads them, and a proof is never skipped or classified differently because of
-what they hold or because they are absent: each Proof Entry is classified by its
-public output alone.
-
-| # | Comparison | Against |
+| Key | Content | Form |
 |---|---|---|
-| 1 | Part (a): the receipt is the canonical encoding of the profile's kind and verifies for `programImageId` | The channel's profile; decided by the pinned build |
-| 2 | `entry` of the public output | The BlueId of the operation the processor is deciding (premise 2 of §4.1) |
-| 3 | `mandateCommitment` of the public output | `mandateCommitment` of E's authority claim |
-| 4 | `targetState` of the public output | The BlueId of the processor's own state D before E (premise 1 of §4.1) |
-| 5 | `mandateProcessorKey` of the public output | `mandateProcessorKey` of the channel |
-| 6 | `providerSetDigest` of the public output | The digest derived from `allowedProviders` of the profile (§4.1) |
+| `profile` | The BlueId of the type `Signed Statement Profile` of this package: the exact type of the channel's `evidenceProfile` | Plain id |
+| `targetState` | The final id of D | Plain id or member id |
+| `entry` | The final id of E | Plain id or member id |
+| `mandateCommitment` | M, exactly the text of `mandateCommitment` in E's authority claim | 64 hex characters |
+| `mandateProcessorKey` | The key under which the signer verified the attestation, exactly the text of `mandateProcessorKey` of the channel | 64 hex characters, and nothing more is required of it here |
+| `statementCommitment` | The salted commitment to the bytes the mandate processor signed (§7) | 64 hex characters |
+| `verdict` | Whether the mandate admits E | `true` or `false` |
 
-- Comparisons 2 to 6 are part (b). The texts are compared as texts.
-- A proof that verifies but fails any comparison is skipped as mismatching. It is
-  never counted as a denial.
-- Bytes that are not a proof are skipped (§5.1). They are never retried.
-- The values a processor compares with MUST come from its own accepted state before
-  K, the authenticated operation and the authenticated history of T.
+`mandateProcessorKey` inside a statement is checked for its form only: 64 hex
+characters. It is not checked there as a well-formed key. Comparison 5 of §8
+requires it to equal the channel's value, and T is read only for a channel whose
+key is well formed (Coordination Evidence section 6).
 
-A matching proof carries its verdict. With an admitting verdict the processor
-applies the target document's own rules to E; with a denying verdict it rejects E
-and the document continues, with the reason `AUTHORITY_EVIDENCE_DENIED`
-(Coordination Evidence section 6). A denying verdict includes the cases of §3 in
-which the mandate or a predicate is at fault.
+`targetState` and `entry` are final ids. A processor compares them with the final
+id of its own state D before E and of the operation entry E, as "Which id names a
+node" in the Conventions defines them: the member id when the node is a member of
+a cyclic set and the plain id otherwise, never the id of a detached body. A
+statement names nothing else: no grant, no status, no reason and nothing of the
+mandate.
 
-**The statement commitment is recorded.** A processor records the
-`statementCommitment` of the deciding proof together with its decision, admitting
-or denying. It compares the value with nothing. It is kept for audit: whoever
-holds the salt and an attestation can check that the deciding proof used that
-attestation. A processor is not required to detect a later proof for the same E
-that carries another value, and such a proof changes nothing: later entries for
-the same E are ignored (Coordination Evidence section 6).
+### 6.2 Bytes
 
-### 5.1 The pinned verification and its results
+The statement is the following ASCII text, with no white space, no byte before `{`
+and no byte after `}`. The seven keys are in this order. Each value is written as
+the form above says, between the quotation marks where the layout has them:
 
-The pinned verification (part (a) of §5) ends in exactly one of three results:
+    statement = '{"profile":"'             P
+                '","targetState":"'        D
+                '","entry":"'              E
+                '","mandateCommitment":"'  M
+                '","mandateProcessorKey":"' K
+                '","statementCommitment":"' C
+                '","verdict":'             V
+                '}'
+
+P is a plain id; D and E are final ids, each a plain id or a member id; M, K and C
+are 64 hex characters each; V is the four characters `true` or the five characters
+`false`. (In this layout K stands for the
+key text, not for the order key of E.) The layout is fixed text, not "any JSON
+with this meaning": another key order, a space, an escape sequence, an upper-case
+hex digit or a further key is not a statement. None of the values can hold a
+character that JSON would escape, and none can hold a quotation mark (the `#` and
+the digits of a member id are neither), so a byte string matches the layout in at
+most one way.
+
+The fixed text of the layout is 126 bytes. A statement is therefore 418 to 475
+bytes long: 126, plus 32 to 44 for P, plus 32 to 54 for each of D and E, plus 64
+for each of M, K and C, plus 4 or 5 for V.
+
+The signer signs the statement under a domain text:
+
+    statement signed bytes = UTF8( "blue.private-mandates.statement" ) || LF || statement
+    signature              = Ed25519( statement signed bytes )          64 bytes, R followed by S
+
+Pure Ed25519 of RFC 8032, accepted by the rule of §5. The domain text differs from
+that of an attestation and from every domain text of Coordination, and the
+statement carries the BlueId of the profile type, so a signature made for a
+statement can not be presented as a signature over another kind of message, nor
+under another edition of this profile.
+
+The `receipt` of the Proof Entry carries the statement and the signature:
+
+    receipt bytes = statement || signature
+    receipt       = canonical base64 of the receipt bytes (Coordination Evidence section 5)
+
+The signature is the last 64 bytes; everything before it is the statement. There
+is no length field, no separator and no other byte. The receipt bytes are
+therefore 482 to 539 bytes long, and the `receipt` text, their canonical base64,
+is 644 to 720 characters long. Bytes of any other length are not a statement (§8).
+This layout is the evidence encoding of the profile in the sense of the
+Coordination Evidence specification, and the seven values are the stated values
+of the evidence.
+
+### 6.3 Worked example
+
+The ids below are made up and stand in for real ones; P is not the BlueId of the
+profile type of this package. The signer key is the public key of test 1 of RFC
+8032 section 7.1 (secret key `9d61b19d…7f60`), and the mandate processor key that
+of test 2.
+
+    statementSignerKey  = d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a
+    P                   = HhcFVPYPc2TvhvwwVmNAF6qUVBsU7Eex2APjDBUbNHHn
+    D                   = HK1RiEymW5yYZy6Y6cquarWa3ncst4EhanHeVvVB1cso
+    E                   = HJTyj4yKfEkbZRULXBUmD1mbzibnTeERNVuYfyRXenur
+    salt                = 000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f
+    mandate (initial)   = rab1F73xd7pR5QjhCv1TFAtHpnq3hZPupgT6BTBZ54s
+    attestation         = Fo3G5ADUwEeC5UgbC3UTH6WtxxrBQPknAaFQf6HuFUg7
+    M                   = 7dbabc5e4f68a135a0d7044a4bf56f4c6203a9636ac67fb9b5727240fc29279d
+    K                   = 3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c
+    C                   = c72990a40f78bc73e769a7bd0bd0cddb35371d9ec227f4ca1c5843f4b115066c
+    V                   = true
+
+M is `hex( SHA-256( salt || mandate ) )` and C is
+`hex( SHA-256( salt || attestation signed bytes ) )` for these values.
+
+The statement (454 bytes, one line):
+
+    {"profile":"HhcFVPYPc2TvhvwwVmNAF6qUVBsU7Eex2APjDBUbNHHn","targetState":"HK1RiEymW5yYZy6Y6cquarWa3ncst4EhanHeVvVB1cso","entry":"HJTyj4yKfEkbZRULXBUmD1mbzibnTeERNVuYfyRXenur","mandateCommitment":"7dbabc5e4f68a135a0d7044a4bf56f4c6203a9636ac67fb9b5727240fc29279d","mandateProcessorKey":"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c","statementCommitment":"c72990a40f78bc73e769a7bd0bd0cddb35371d9ec227f4ca1c5843f4b115066c","verdict":true}
+
+    SHA-256( statement )     = 09d972fe4d477a0d72653db45cfc2a3336c26af6bcde5845f177d8871336139d
+    signature                = fd82a8b474211718415fc7a5cbebc8ebdf5d232372ef0b75c42c24902fe1bd39018ba7c36e4e2ff727fb87ec599336e8ec816107d3fc60f2184987d30c24750d
+    receipt bytes            = 518 bytes
+    SHA-256( receipt bytes ) = 850a143a3982f75cfc5364dac214ea163a985540fb45b541b9a563a73a1f66f3
+
+The `receipt` text (one line):
+
+    eyJwcm9maWxlIjoiSGhjRlZQWVBjMlR2aHZ3d1ZtTkFGNnFVVkJzVTdFZXgyQVBqREJVYk5ISG4iLCJ0YXJnZXRTdGF0ZSI6IkhLMVJpRXltVzV5WVp5Nlk2Y3F1YXJXYTNuY3N0NEVoYW5IZVZ2VkIxY3NvIiwiZW50cnkiOiJISlR5ajR5S2ZFa2JaUlVMWEJVbUQxbWJ6aWJuVGVFUk5WdVlmeVJYZW51ciIsIm1hbmRhdGVDb21taXRtZW50IjoiN2RiYWJjNWU0ZjY4YTEzNWEwZDcwNDRhNGJmNTZmNGM2MjAzYTk2MzZhYzY3ZmI5YjU3MjcyNDBmYzI5Mjc5ZCIsIm1hbmRhdGVQcm9jZXNzb3JLZXkiOiIzZDQwMTdjM2U4NDM4OTVhOTJiNzBhYTc0ZDFiN2ViYzljOTgyY2NmMmVjNDk2OGNjMGNkNTVmMTJhZjQ2NjBjIiwic3RhdGVtZW50Q29tbWl0bWVudCI6ImM3Mjk5MGE0MGY3OGJjNzNlNzY5YTdiZDBiZDBjZGRiMzUzNzFkOWVjMjI3ZjRjYTFjNTg0M2Y0YjExNTA2NmMiLCJ2ZXJkaWN0Ijp0cnVlff2CqLR0IRcYQV/HpcvryOvfXSMjcu8LdcQsJJAv4b05AYunw25OL/cn+4fsWZM26OyBYQfT/GDyGEmH0wwkdQ0=
+
+A second example, with a target state that is a member of a cyclic set. All values
+are as above except D and V:
+
+    D                   = HK1RiEymW5yYZy6Y6cquarWa3ncst4EhanHeVvVB1cso#3
+    V                   = false
+
+The statement (457 bytes, one line):
+
+    {"profile":"HhcFVPYPc2TvhvwwVmNAF6qUVBsU7Eex2APjDBUbNHHn","targetState":"HK1RiEymW5yYZy6Y6cquarWa3ncst4EhanHeVvVB1cso#3","entry":"HJTyj4yKfEkbZRULXBUmD1mbzibnTeERNVuYfyRXenur","mandateCommitment":"7dbabc5e4f68a135a0d7044a4bf56f4c6203a9636ac67fb9b5727240fc29279d","mandateProcessorKey":"3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c","statementCommitment":"c72990a40f78bc73e769a7bd0bd0cddb35371d9ec227f4ca1c5843f4b115066c","verdict":false}
+
+    SHA-256( statement )     = 959489acc15492b311758414fe5dae7c7566f0d430c804e894f0814e2cff9af7
+    signature                = 2cda6711c5ddaa70526bed2e050a76f8d6d26e866e183d5a39539ceda766d04794fa5e7cc0e366a044aeabcf700839795924478a0632d347a9148a5959be1b0e
+    receipt bytes            = 521 bytes
+    SHA-256( receipt bytes ) = d0326e32e859ed47492dabc634caebf975b8368baff52a9f691f4a47bf63b325
+
+## 7. What the signer does before it signs
+
+The signer signs a statement for E only when every condition below holds. The
+conditions are its duty. No other processor repeats them, and a statement that
+exists asserts all of them.
+
+**Conditions.** In this order:
+
+1. *The attestation.* The signer holds a document of the exact type
+   `Mandate State Attestation` with exactly the fields §5 lists, and a signature
+   over its attestation signed bytes that the rule of §5 accepts under the
+   channel's `mandateProcessorKey` as in force in the document strictly before K.
+2. *The commitment.* The signer holds the salt, it is 32 bytes, and M of E's
+   authority claim equals `hex( SHA-256( salt || id ) )` for the attestation's
+   `mandate`, byte for byte as §3 defines.
+3. *The position.* The attested state S is the mandate's state strictly before K.
+   The signer establishes, from timelines it has itself verified under
+   Coordination, that `position` is complete (§5, "Position completeness") and
+   that for every row the row's last entry is the last entry of that timeline
+   strictly before K; a row without `lastEntry` states that the timeline has no
+   entry before K. For each row this is established by one of the means
+   Coordination defines for completeness (its section 5): a provider's
+   completeness guarantee whose last entry is the row's and which is complete to
+   after K, or authenticated successor evidence, the provider-signed entry that
+   follows the row's last entry and is after K; or, when a timeline of the
+   position is E's own timeline, E itself, being the entry whose previous entry
+   is the row's. Which providers the signer relies on is its own decision and
+   part of what it answers for.
+4. *Timers.* The attestation covers E only if both timer comparisons hold, each
+   on the full order key and not on the timestamp alone: `lastTimerFiring`, when
+   present, is strictly before K; and K is strictly before `nextTimerFiring`,
+   when present. An operation whose key is at or after the next firing in that
+   order is not covered by this attestation and needs an attestation of the
+   state after that firing. This is the position rule a processor applies to a
+   mandate named in clear, whose state is resolved from its history strictly
+   before the full order key of the action (Mandates section 6), so both forms
+   give the same result for the same operation.
+5. *The target.* D is the signer's own state of the target document strictly
+   before E, and E is an entry the signer itself admitted on its timeline. The
+   signer is a processor of the target document, so it knows both itself.
+
+If one of the five fails, the signer signs nothing, whatever the mandate holds.
+
+**The verdict.** When the five hold, the verdict follows from S, D and E by the
+authorisation rules of Mandates, as stated here. It is the same verdict a
+processor reaches for a mandate named in clear, except where "Differences" below
+says otherwise.
+
+*Terms.* The grants are those of the scope of S. A grant *applies* to E when its
+target names the channel and the operation of E and, if it pins an initial
+document, that document is the target document. A grant has a document validation
+(`target.documentValidation`), a request validation (`validation`), both or
+neither. Each validation is a predicate, evaluated as Mandates defines (its
+section 6), with its own fresh gas ledger. A grant *passes* when every validation
+it has passes. A grant that has a request validation does not pass when E carries
+no request payload.
+
+*The order in which the outcomes apply:*
+
+1. A mandate that is not Active, or a fault of the mandate, gives `false`. No
+   grant is looked at. A fault of the mandate is one of: S is not, by ancestry, an
+   Operation Mandate; `authorityPackage` is not the Mandates package this package
+   requires; the mandate is not approved (§5); S lacks its participants or its
+   scope; a grant of its scope has no target.
+2. That the actor of E is not the actor of the mandate's `authorizedActorChannel`,
+   or that the owner of the target channel is not the actor of its
+   `authorityHolderChannel`, gives `false`. No grant is looked at.
+3. Otherwise every grant that applies to E is evaluated, in the order of the grant
+   keys compared as sequences of UTF-16 code units: the document validation first,
+   the request validation only when the document validation passed. Every grant
+   that applies is evaluated, also after one has passed. A grant does not pass,
+   and the other grants are still tried, when one of its predicates ends in an
+   execution error, meets an invalid operand, completes with a result that is not
+   the Boolean true, or is statically inadmissible, or when a validation node is
+   not an object.
+4. If, for any grant that applies, an evaluation that step 3 calls for cannot be
+   completed, there is no verdict and the signer signs nothing, whatever the other
+   grants give. This covers a validation node that is not well formed under the
+   Language when its evaluation is reached (it violates its schema, its types are
+   not compatible, a type it uses is on its own inheritance chain, which the
+   Language rejects as LANG-TYPE-CYCLE, or its content is invalid in another way
+   the Language defines), and content the evaluation needs and the signer does
+   not hold. A node whose evaluation is never reached, because of step 1 or 2 or
+   because the document validation of its grant did not pass, does not remove the
+   verdict.
+5. Otherwise the verdict is `true` when some grant passes and no grant before the
+   first passing grant, in key order, exhausted its gas ledger. It is `false` in
+   every other case: no grant passes, or a grant that exhausted its gas comes
+   before the first grant that passes.
+
+For one S, D and E these rules give at most one verdict.
+
+*Differences from a mandate named in clear, on purpose.* For a
+`Mandates/Mandate Authority` the Mandates specification says that an error never
+authorizes, and a processor that evaluates the predicate or reads the mandate
+itself may give no verdict and stop processing the target document. Here a
+faulty mandate gives `false` (steps 1, 2, 3 and 5), E is rejected and the target
+document continues: the represented party answers for its own mandate, the other
+participants cannot read it, and a faulty mandate must not stop the document for
+everyone. Repairing the mandate needs an update of the mandate, which applies to
+later operations.
+
+**The statement commitment.** The signer computes
+
+    statementCommitment = hex( SHA-256( salt || attestation signed bytes ) )
+
+with the salt of M and the attestation signed bytes of §5: exactly the bytes the
+mandate processor signed, nothing more and nothing less, directly after the 32
+salt bytes. The value binds the statement to those bytes without showing the
+attestation to anyone. Whoever is later given the salt, the attestation and its
+signature can check three things separately: that the mandate processor signed
+that attestation, that this statement was made from it, and, with the mandate,
+whether the verdict follows. A wrong state is then the mandate processor's; a
+wrong evaluation of a rightly attested state is the signer's.
+
+**What the signer keeps.** For every statement it signs, the signer keeps what an
+inquiry needs: the salt or the means to derive it again, the attestation, and the
+mandate processor's signature over it. For how long, and who may obtain them, is
+left to the agreement with the operator and is not a rule of this text. With one
+salt per mandate the signer keeps that one salt. Where salts are derived from a
+secret kept per mandate, disclosing that secret together with the mandate is
+enough to reconstruct the salt of every operation under it.
+
+**When the signer signs nothing.** Then no statement exists for E. The represented
+party's side ends the wait with a Rejection Entry (Coordination Evidence section
+5). It MAY also write a Rejection Entry where it could sign a denying statement: a
+Rejection Entry and a statement with `verdict` `false` have the same effect on E
+and differ only in the recorded reason (§8).
+
+**Resources.** The Language sets no ceiling on the size, depth or count of valid
+content (LANG-LIMIT), and these rules set none either. The work of evaluating is
+the signer's. Its side MAY write a Rejection Entry for an operation whose
+evaluation would exceed its own budget; the other participants need not know that
+budget.
+
+## 8. How a processor decides a Proof Entry
+
+The rules of the Coordination Evidence specification for T apply unchanged:
+attribution to the channel's actor, well-formed entries, the first considered
+entry in T's chain, waiting. This section defines what that specification leaves
+to the profile: verification, and when verified evidence matches E.
+
+**Verification is a function of the bytes and the key.** It uses no external
+program, no installed file and nothing that differs between hosts. Its inputs are
+the decoded bytes of `receipt` and the `statementSignerKey` of the channel's
+profile as in force in the document strictly before K. That key is a well-formed
+key: T is not read for a channel whose profile is not well formed, because the
+operation is rejected from the document state before (§4). Verification ends in exactly one of three results, which are the
+three results the Coordination Evidence specification names (verified, not
+evidence, unfinished):
 
 | Result | Meaning | When |
 |---|---|---|
-| VERIFIED, with the public output | The bytes are a proof of the profile's program | The bytes are the one canonical encoding of a succinct receipt (§4.1), the receipt verifies for `programImageId`, and its public output is the closed output of §5 |
-| NOT A PROOF | The bytes are no such proof | Anything else that the bytes themselves decide: not the canonical encoding; a receipt of another program; a receipt that does not verify; decoding or verifying failed or faulted, a panic of the verifier included; a public output that is not the closed output |
-| UNFINISHED | No result | The build could not do its work for a reason of its own |
+| STATEMENT, with the seven values | The bytes are a statement signed with the profile's key | All of: the bytes are 482 to 539 bytes long; the bytes before the last 64 are exactly a statement in the layout of §6.2, with P a plain id, D and E final ids (a plain id, or a member id with an index of at most 9 digits and no leading zero), M, K and C 64 hex characters each and V `true` or `false`; the last 64 bytes are a signature over the statement signed bytes of §6.2 that the rule of §5 accepts under `statementSignerKey` |
+| NOT A STATEMENT | The bytes are no such statement | Everything else that the bytes and the key decide: another length, another layout, a value in another form, a signature that the rule does not accept |
+| FAULT | No result | A cause outside the bytes of the entry and of the profile: the processor was stopped, ran out of memory, or could not read its own data |
 
-The processor turns the result into the treatment of the entry:
+NOT A STATEMENT is final for that entry: the entry is skipped, is the same as no
+entry, and is never retried. FAULT is never a decision: the processor finalises
+nothing, retries, and does not pass over the entry to a later one.
 
-| Pinned verification | Comparisons 2 to 6 | The entry |
+Every outcome that depends on the bytes of the entry or of the profile is
+STATEMENT or NOT A STATEMENT, and is the same on every host. An implementation
+MUST NOT let an error that a library raises on particular bytes become a FAULT:
+an exception, a refusal or a panic of a base58 decoder, a hex decoder, a point
+decoder or a signature routine on some input is NOT A STATEMENT for that input.
+An implementation MUST NOT take a library's own notion of a valid key or a valid
+signature in place of the rules named above where the two differ. An
+implementation MAY refuse a `receipt` text longer than 720 characters, or decoded
+bytes longer than 539 bytes, without looking further; the result is NOT A
+STATEMENT, as it would be after looking.
+
+**The comparisons.** With the result STATEMENT the processor compares five values
+of the statement with its own values, each as a text, byte for byte:
+
+| # | Value of the statement | Against |
 |---|---|---|
-| VERIFIED | All hold | A matching proof; it carries the verdict of its public output, admitting or denying |
-| VERIFIED | Any differs | Skipped as mismatching; never a denial |
-| NOT A PROOF | Not made | Skipped; never a denial and never retried |
-| UNFINISHED | Not made | Nothing is finalised. The processor retries and does not pass over the entry (Coordination Evidence section 6) |
+| 1 | `profile` | The BlueId of the exact type of the channel's `evidenceProfile`, which is `Signed Statement Profile` of this package |
+| 2 | `entry` | The final id of the operation entry the processor is deciding |
+| 3 | `mandateCommitment` | The text of `mandateCommitment` in E's authority claim |
+| 4 | `targetState` | The final id of the processor's own state D before E |
+| 5 | `mandateProcessorKey` | The text of `mandateProcessorKey` of the channel |
 
-UNFINISHED only ever reflects the environment of the build or a bug of the
-processor that called it: a file it cannot read, a malformed `programImageId` (a
-processor must reject from the document state before it reads T and must never ask
-for such a check), a fault outside decoding and verification, or a build that was
-stopped from outside. It never has its cause in the bytes of the receipt, in the
-proof or in the content of a document: for the builds of one release, the same
-receipt bytes and the same image identifier never give UNFINISHED on one host and
-a result on another because of what the bytes are.
+`statementCommitment` and `verdict` are compared with nothing. The values a
+processor compares with MUST come from its own accepted state before K, the
+authenticated operation and the authenticated history of T. The entry's
+`document` and `operationEntry`, when present, are an advisory hint with no force
+and are not read.
 
-**What must be the same on every host.** Whether a byte string is VERIFIED or NOT A
-PROOF depends on code and not only on the profile's data: the canonical-encoding
-rule of §4.1 is such code, and so is the verifier. All processors of a document
-MUST therefore use a build of the same pinned release for part (a), the release
-whose manifest hash the profile carries (§4.1). The builds of one release differ
-only in the platform they run on and give the same result for the same input.
-Part (b) needs no pinned build: it is five comparisons of
-texts that this specification defines completely. One profile then means one
-classification of one entry on every host.
+| Verification | Comparisons | The entry |
+|---|---|---|
+| STATEMENT | All five hold | Matching evidence for E; it carries the `verdict` of the statement |
+| STATEMENT | Any differs | Skipped as mismatching; never a denial |
+| NOT A STATEMENT | Not made | Skipped; never a denial and never retried |
+| FAULT | Not made | Nothing is finalised; the processor retries and does not pass over the entry |
 
-## 6. Compatibility
+Matching evidence with `verdict` `true` lets E proceed to the target document's
+own rules. Matching evidence with `verdict` `false` rejects E with the reason
+`AUTHORITY_EVIDENCE_DENIED`; a considered Rejection Entry rejects E with the
+reason `AUTHORITY_EVIDENCE_REJECTED`; with no considered entry the processor waits
+(Coordination Evidence section 6).
+
+**Which outcome applies when several could** is stated in section 6 of the
+Coordination Evidence specification: a host that does not implement the profile
+refuses; then an outcome from the document state (§3 here); then T. For a Proof
+Entry under this profile the checks on T are, in this order and stopping at the
+first that fails: attribution to the channel's actor; the field set of the entry;
+the canonical base64 form of `receipt`; verification; the five comparisons.
+
+**What is recorded, and where.** A processor records the `statementCommitment` of
+the deciding statement together with its decision, admitting or denying, and
+records the reason of a rejection. Neither value is part of the document: a
+processor MUST NOT write the reason or the `statementCommitment` into the document
+state (Coordination Evidence section 6), so neither can change the BlueId of any
+state, and with it the `targetState` of any later statement. Later entries for the
+same E are ignored, whatever they carry.
+
+## 9. Confidentiality and known limits
+
+**A shared timeline discloses the mandate, without an error by anyone.** In
+Coordination a timeline can carry entries for many documents, and fetching it
+must not omit the others (Coordination section 2.1). A read enumerates every
+entry and MUST NOT filter by document (Coordination section 6). A reader is
+granted whole timelines: each key listed in a `Timeline Access` may read every
+listed timeline, with entries, referenced content and completeness (Coordination
+section 7.1). So if a timeline that a channel of the mandate binds is also bound
+by a channel of the target document D, or of any document with other
+participants, those participants read every entry written for the mandate on it:
+the payloads of the Operation Requests in clear, the mandate's document id, and
+the names of its channels and operations. This needs no mistake and no bad
+intent. It matters in practice, because an agent often operates on the mandate
+first, to obtain authority, and then uses it.
+
+**Advice to the deployment.** If the mandate is to stay unknown to the
+participants of D, use separate timelines for it: no timeline that a channel of
+the mandate binds should be one that a participant outside the mandate is
+granted, in particular not one that a channel of D binds. This holds for the
+agent's timeline and for the holder's alike: the agent writes its operations on
+the mandate on one timeline and E on another, and the holder approves and
+terminates the mandate on a timeline that D does not bind. Mandates permits
+this: the mandate's agent timeline and the target's agent timeline need not be
+identical, only the actor is the same (Mandates section 2). This is advice and
+not a rule. No processor and no signer checks it, a statement is made and decided
+in the same way whether the timelines are separate or shared, and whoever binds
+the same timeline on both sides does so at their own risk.
+
+Known limits:
+
+- **The represented party can stop the document.** With no considered entry for E
+  a processor waits, and no later input of the document is processed before E,
+  also not an input of another participant. A represented party that writes
+  nothing on T therefore stops the document for everyone at the first operation of
+  its own agent, and an admitted agent can cause this with any M. There is no
+  deadline.
+- **The represented party has the last look.** While the document waits, later
+  entries of the other participants are readable on their timelines. The party
+  then chooses between a statement and a Rejection Entry, without a limit of time.
+- **Two statements.** A signer can sign a `true` and a `false` statement for one
+  E. The first considered entry on T decides and the other is ignored; no
+  processor is required to notice. The two signatures together are evidence
+  against the signer.
+- **What an observer learns.** `AUTHORITY_EVIDENCE_DENIED` tells that the signer
+  held an attested state for M and stated that it does not admit E. A statement
+  and a Rejection Entry may also differ in how soon after E they appear. With one
+  salt per mandate, operations under one mandate are linkable (§3).
+- **A mandate bounds what the agent can do, not what it can say.** The agent holds
+  its own timeline and can write anything on it. Whatever the agent knows, the
+  mandate's BlueId or the mandate's content if it was given it, the agent can
+  publish there, by error or on purpose: for example with a claim that names the
+  mandate in clear, or with an M computed without a proper salt. No rule of this
+  protocol and no check at a processor prevents that. Confidentiality towards the
+  other participants therefore holds only as far as the agent keeps it. What
+  limits the damage is how little the agent is given: it can be handed ready
+  values of M (§3) and then needs neither the salt nor the BlueId. And a BlueId
+  alone discloses nothing about the content when the mandate carries a random
+  field.
+- **Cyclic sets: what remains.** A member of a cyclic set is named by its member
+  id everywhere this text allows one. Two things remain. A member whose index has
+  more than 9 digits cannot be named in a statement or an attestation, so no
+  statement can be made for it. And this text takes from the Language that a
+  member is opened only with its owning-set proof: a signer or a mandate processor
+  that does not hold the proof of a member it must read cannot proceed, and the
+  represented party's side can then only reject the operation.
+- **An entry on T that readers cannot read** blocks the reading of T, as the
+  Coordination Evidence specification states in its section 5.
+
+## 10. Compatibility
 
 Documents that use `Mandates/Mandate Authority` keep their rules, and every earlier
 publication is unchanged and remains selectable. This package and its protocol are
-unused unless a document declares a channel with a profile of this package or an operation carries a
-`Mandate Commitment Authority`. On a channel without the three evidence fields an
-operation with this claim is rejected from the document state and the document
-continues (§1).
+unused unless a document declares a channel whose `evidenceProfile` has the exact
+type `Signed Statement Profile`, or an operation carries a
+`Mandate Commitment Authority`. On a channel that is not an evidence channel, or
+whose fields are not well formed, an operation with this claim is rejected from
+the document state and the document continues (§1).
 
-## 7. Not decided in this preview
+## 11. Not decided in this preview
 
-- The derivation rule for reused validation results about D (§4.1) is fixed, but
-  its soundness is argued and not proved, and agreement between the processor's
-  validation and the program's validation is shown by differential runs only.
-- Whether the premise about D (§4.1) needs a statement for a host that admits a
-  state from earlier admissions instead of certifying it afresh.
-- The image identifier and the receiver release of a program built for this text.
-  A profile's `programImageId` and `receiverReleaseSha256` are supplied by the
-  document.
-- How a receiver release and its manifest are distributed to hosts, and how it is
-  shown that the builds of one release come from the same sources and give the
-  same result (a reproducible build procedure). The rules require the property
-  and do not say how it is established.
 - How a program is identified in `mandateProgram` and `approvedProgram`. The two
-  fields are texts that the proof only compares. The Mandates specification
-  defines no program node with a content BlueId that this text could name, so the
-  identity is not defined here as a BlueId.
-- Whether position rows are typed.
-- Whether the proof checks the key shape of a certified row.
-- The audit procedure that uses the chain of attestations: what the delegating
-  party keeps, for how long, and how an auditor obtains it.
-- A proof for a mandate on another edition than the target document (§1).
-- Whether the proof checks that `previous` is absent exactly when `sequence` is 0.
-- Whether the timer fields stay, or the proof refuses every mandate with timers.
-- Binding each row's last entry to the mandate's own checkpoint, which would remove
-  one item from what stays trusted to the mandate processor.
-- Mandates with timers; a second prover; the duty to reject an operation whose M
-  matches no mandate.
-- The byte-exact grammar of the receipt encoding beyond the rule of §4.1.
+  fields are texts that are only compared. The Mandates specification defines no
+  program node with a content BlueId that this text could name.
+- Whether a deployment uses one salt per mandate or the optional salt per
+  operation, which arrangement it then uses, and the derivation function where
+  salts are derived (§3). All are left to the deployment.
+- A deadline, or another rule that ends the wait for an operation the represented
+  party does not decide (§9).
+- Whether a processor should record a second statement for the same E that carries
+  another verdict or another `statementCommitment`.
+- Whether the reason of a rejection is visible to the document's contracts
+  (Coordination Evidence section 8). This text only requires that it is not part
+  of the document state.
+- Whether a processed document state or a timeline entry can be a member of a
+  cyclic set. The Language does not say; this text allows it and names such a node
+  by its member id (Conventions).
+- The two timer bounds are asserted by the mandate processor alone (§5). Nothing
+  here lets the signer check them against the mandate's timer registrations.
+- An authority claim with no type at all. Coordination refuses such an entry at
+  timeline import as content it cannot read, and the document then stops at it as
+  at any range it cannot read; no rule of this text applies to it. Whether such
+  an entry should be skipped instead is open, for a change of the import rules
+  and of this text together.
+- Whether position rows are typed; whether `previous` must be absent exactly when
+  `sequence` is 0; binding each row's last entry to the mandate's own checkpoint,
+  which would remove one item from what stays trusted to the mandate processor.
+- The retention period of what the signer keeps, and the procedure of an inquiry.
+- A second signer that can write when the first is unavailable; the duty to reject
+  an operation whose M matches no mandate.

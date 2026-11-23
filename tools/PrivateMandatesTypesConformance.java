@@ -79,6 +79,9 @@ public final class PrivateMandatesTypesConformance {
     var evidence = open.get("CoordinationEvidence");
     var mandates = open.get("Mandates");
     var privateMandates = open.get("PrivateMandates");
+    // Private Mandates has one profile, the signed statement, and no other evidence form.
+    require(privateMandates.exports().keySet().equals(Set.of("Mandate Commitment Authority", "Mandate State Attestation",
+        "Signed Statement Profile")), "Private Mandates exports changed: " + privateMandates.exports().keySet());
     // The required publications are the default edition's, with their exact identities.
     for (var row : DEFAULT.entrySet()) {
       String[] name = row.getKey().split("/", 2);
@@ -102,8 +105,8 @@ public final class PrivateMandatesTypesConformance {
           coordination.exportId("Timeline Channel"));
       descends(blue, "Mandate Commitment Authority", privateMandates.exportId("Mandate Commitment Authority"),
           mandates.exportId("Authority"));
-      descends(blue, "RISC Zero Succinct Receipt Profile",
-          privateMandates.exportId("RISC Zero Succinct Receipt Profile"), evidence.exportId("Evidence Profile"));
+      descends(blue, "Signed Statement Profile", privateMandates.exportId("Signed Statement Profile"),
+          evidence.exportId("Evidence Profile"));
       require(!NativeRuntime.ancestry(privateMandates.exportId("Mandate Commitment Authority"), new NativeRuntime(blue))
           .contains(mandates.exportId("Mandate Authority")), "The commitment claim must not be a Mandate Authority");
 
@@ -114,8 +117,7 @@ public final class PrivateMandatesTypesConformance {
       Map<String, Object> timeline = Map.of("type", "Coordination/Signed Timeline", "provider", provider,
           "publicRead", false, "url", "https://provider.example/timelines/operations");
       Map<String, Object> proofs = with(timeline, "url", "https://provider.example/timelines/proofs");
-      Map<String, Object> profile = Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile",
-          "programImageId", HEX, "allowedProviders", List.of("01".repeat(32), "02".repeat(32)), "receiverReleaseSha256", "cd".repeat(32));
+      Map<String, Object> profile = Map.of("type", "PrivateMandates/Signed Statement Profile", "statementSignerKey", "cd".repeat(32));
       Map<String, Object> channel = Map.of("type", "CoordinationEvidence/Timeline Channel with Evidence",
           "actor", actor, "timeline", timeline, "evidenceTimeline", proofs,
           "mandateProcessorKey", "ef".repeat(32), "evidenceProfile", profile);
@@ -154,23 +156,14 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, schema, "channel with a bare base profile",
           with(channel, "evidenceProfile", Map.of("type", "CoordinationEvidence/Evidence Profile")), SCHEMA);
       expect(blue, schema, "channel with a type-only specialisation as profile", with(channel, "evidenceProfile",
-          Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile")), SCHEMA);
-      expect(blue, schema, "profile with an empty provider list", with(profile, "allowedProviders", List.of()), ADMITTED);
-      expect(blue, schema, "profile with only a digest",
-          with(with(profile, "allowedProviders", null), "providerSetDigest", HEX), SCHEMA);
-      expect(blue, schema, "profile with an extra valued field", with(profile, "providerSetDigest", HEX), SCHEMA);
-      expect(blue, schema, "profile with a short provider key", with(profile, "allowedProviders", List.of("01")), SCHEMA);
-      expect(blue, schema, "profile with a repeated provider key",
-          with(profile, "allowedProviders", List.of("01".repeat(32), "01".repeat(32))), SCHEMA);
-      for (String field : List.of("programImageId", "allowedProviders", "receiverReleaseSha256"))
-        expect(blue, schema, "profile without " + field, with(profile, field, null), SCHEMA);
-      expect(blue, schema, "profile with a short receiver release hash", with(profile, "receiverReleaseSha256", "cd"), SCHEMA);
-      expect(blue, schema, "profile with an integer receiver release hash", with(profile, "receiverReleaseSha256", 7), TYPE);
-      // The profile has no facts rule: validity of the target state is a premise. A valued factsRule is a fourth field.
-      expect(blue, schema, "profile with a factsRule", with(profile, "factsRule", "MERKLE(FULL(D))"), SCHEMA);
-      expect(blue, schema, "channel whose profile has a factsRule", with(channel, "evidenceProfile",
-          with(profile, "factsRule", "MERKLE(FULL(D))")), SCHEMA);
-      expect(blue, schema, "profile with a short image id", with(profile, "programImageId", "ab"), SCHEMA);
+          Map.of("type", "PrivateMandates/Signed Statement Profile")), SCHEMA);
+      // The profile: one required key of fixed length, at most one field with a value.
+      expect(blue, schema, "profile without statementSignerKey", with(profile, "statementSignerKey", null), SCHEMA);
+      expect(blue, schema, "profile with a short key", with(profile, "statementSignerKey", "ef"), SCHEMA);
+      expect(blue, schema, "profile with an integer key", with(profile, "statementSignerKey", 7), TYPE);
+      expect(blue, schema, "profile with a provider list (a second valued field)",
+          with(profile, "allowedProviders", List.of("01".repeat(32))), SCHEMA);
+      expect(blue, schema, "profile with a further valued field", with(profile, "note", "x"), SCHEMA);
       expect(blue, schema, "authority without commitment", with(authority, "mandateCommitment", null), SCHEMA);
       expect(blue, schema, "authority without holder", with(authority, "actor", null), SCHEMA);
       expect(blue, schema, "authority with a short commitment", with(authority, "mandateCommitment", "ab"), SCHEMA);
@@ -287,8 +280,7 @@ public final class PrivateMandatesTypesConformance {
       var nativeRules = new TreeMap<String, Object>();
       expect(blue, nativeRules, "channel key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32)), ADMITTED);
-      expect(blue, nativeRules, "image id not lower-case hex", with(profile, "programImageId", "AB".repeat(32)), ADMITTED);
-      expect(blue, nativeRules, "receiver release hash not lower-case hex", with(profile, "receiverReleaseSha256", "CD".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "signer key not lower-case hex", with(profile, "statementSignerKey", "CD".repeat(32)), ADMITTED);
       // Key well-formedness beyond the length is a native rule: a small-order key, a non-canonical encoding
       // and bytes that are no curve point are all admitted by the schema.
       final String IDENTITY = "01" + "00".repeat(31), ORDER8 = "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
@@ -297,10 +289,8 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, nativeRules, "channel key of small order (order 8)", with(channel, "mandateProcessorKey", ORDER8), ADMITTED);
       expect(blue, nativeRules, "channel key not canonically encoded (y = p)", with(channel, "mandateProcessorKey", Y_IS_P), ADMITTED);
       expect(blue, nativeRules, "channel key that is no curve point (y = 2)", with(channel, "mandateProcessorKey", NO_POINT), ADMITTED);
-      expect(blue, nativeRules, "provider key of small order",
-          with(profile, "allowedProviders", List.of(IDENTITY, "02".repeat(32))), ADMITTED);
-      expect(blue, nativeRules, "provider list not ascending",
-          with(profile, "allowedProviders", List.of("02".repeat(32), "01".repeat(32))), ADMITTED);
+      expect(blue, nativeRules, "signer key of small order", with(profile, "statementSignerKey", IDENTITY), ADMITTED);
+      expect(blue, nativeRules, "signer key that is no curve point (y = 2)", with(profile, "statementSignerKey", NO_POINT), ADMITTED);
       expect(blue, nativeRules, "profile with a further field carrying only a type",
           with(profile, "note", Map.of("type", "Text")), ADMITTED);
 
@@ -315,50 +305,64 @@ public final class PrivateMandatesTypesConformance {
           "mandate", actor, "state", provider,
           "authorityPackage", mandates.blueId(), "mandateProgram", "sha256:" + HEX, "approvedProgram", "sha256:" + HEX,
           "position", List.of(Map.of("timeline", ref1), Map.of("timeline", ref2, "lastEntry", ref2)),
-          "certifiedNodes", Map.of("count", 1, "root", HEX), "sequence", 0));
+          "sequence", 0));
       ids.put("attestation", admitted(blue, "attestation", attestation));
       expect(blue, attestationCases, "well-formed attestation whose references resolve", attestation, ADMITTED);
       expect(blue, attestationCases, "with documents, a later sequence and previous", with(with(with(attestation,
           "documents", List.of(ref1)), "sequence", 3), "previous", ref2), ADMITTED);
-      Map<String, Object> orderKey = Map.of("type", "Coordination/Order Key", "timestamp", 199, "timeline", timeline,
-          "entry", ref2);
+      Map<String, Object> firing = Map.of("timestamp", 900, "source", "1".repeat(32), "entry", "z".repeat(43));
       // A reference to a type definition resolves but is not a value, so it does not satisfy a required field.
       expect(blue, attestationCases, "mandate that is a reference to a type definition",
           with(attestation, "mandate", Map.of("blueId", mandates.exportId("Mandate"))), SCHEMA);
-      expect(blue, attestationCases, "with timer fields", with(with(with(attestation, "timerRegistrations", "sha256:" + HEX),
-          "lastTimerFiring", orderKey), "nextTimerFiring", with(orderKey, "timestamp", 900)), ADMITTED);
-      for (String field : List.of("mandate", "state", "authorityPackage", "mandateProgram", "position", "certifiedNodes", "sequence"))
+      // The two timer bounds name a firing by its order key: timestamp, Timer Source id, Timer Entry id.
+      expect(blue, attestationCases, "with a next timer bound", with(attestation, "nextTimerFiring", firing), ADMITTED);
+      expect(blue, attestationCases, "with both timer bounds", with(with(attestation, "nextTimerFiring", firing),
+          "lastTimerFiring", with(firing, "timestamp", 100)), ADMITTED);
+      for (String part : List.of("timestamp", "source", "entry"))
+        expect(blue, attestationCases, "timer bound without " + part, with(attestation, "nextTimerFiring", with(firing, part, null)), SCHEMA);
+      expect(blue, attestationCases, "timer bound with a negative timestamp",
+          with(attestation, "nextTimerFiring", with(firing, "timestamp", -1)), SCHEMA);
+      expect(blue, attestationCases, "timer bound with a short source id",
+          with(attestation, "nextTimerFiring", with(firing, "source", "abc")), SCHEMA);
+      expect(blue, attestationCases, "timer bound with an entry id of 45 characters",
+          with(attestation, "nextTimerFiring", with(firing, "entry", "z".repeat(45))), SCHEMA);
+      expect(blue, attestationCases, "timer bound whose timestamp is a text",
+          with(attestation, "nextTimerFiring", with(firing, "timestamp", "soon")), TYPE);
+      expect(blue, attestationCases, "timer bound that is a text", with(attestation, "nextTimerFiring", "soon"), TYPE);
+      for (String field : List.of("mandate", "state", "authorityPackage", "mandateProgram", "position", "sequence"))
         expect(blue, attestationCases, "without " + field, with(attestation, field, null), SCHEMA);
       expect(blue, attestationCases, "without approvedProgram (none approved)", with(attestation, "approvedProgram", null), ADMITTED);
-      expect(blue, attestationCases, "certifiedNodes without count",
-          with(attestation, "certifiedNodes", Map.of("root", HEX)), SCHEMA);
-      expect(blue, attestationCases, "certifiedNodes without root",
-          with(attestation, "certifiedNodes", Map.of("count", 1)), SCHEMA);
-      expect(blue, attestationCases, "certifiedNodes with a short root",
-          with(attestation, "certifiedNodes", Map.of("count", 1, "root", "ab")), SCHEMA);
       expect(blue, attestationCases, "negative sequence", with(attestation, "sequence", -1), SCHEMA);
       expect(blue, attestationCases, "sequence that is not a number", with(attestation, "sequence", "first"), TYPE);
-      // A BlueId is the base58 text of 32 bytes: 32 to 44 characters. The schema sets no lower bound.
+      // A BlueId is the base58 text of 32 bytes: 32 to 44 characters.
       expect(blue, attestationCases, "authorityPackage of 42 characters",
           with(attestation, "authorityPackage", "1tVm6cThRU3drxZ9G9xTDz3kpTJep4CpNQxUj9CFwL"), ADMITTED);
       expect(blue, attestationCases, "authorityPackage of 32 characters", with(attestation, "authorityPackage", "1".repeat(32)), ADMITTED);
       expect(blue, attestationCases, "authorityPackage of 45 characters", with(attestation, "authorityPackage", "z".repeat(45)), SCHEMA);
+      expect(blue, attestationCases, "authorityPackage of 31 characters", with(attestation, "authorityPackage", "1".repeat(31)), SCHEMA);
+      expect(blue, attestationCases, "empty position", with(attestation, "position", List.of()), SCHEMA);
       expect(blue, attestationCases, "position that is not a list", with(attestation, "position", "x"), TYPE);
-      expect(blue, attestationCases, "timer firing that is not an Order Key", with(attestation, "nextTimerFiring", "soon"), TYPE);
-      // The worked example of the signer's interface, with this package's type: its references name content that
-      // this tool does not hold, so Language admission is incomplete (the known reference behaviour).
-      Map<String, Object> worked = new TreeMap<>(Map.of("type", "PrivateMandates/Mandate State Attestation",
-          "mandate", Map.of("blueId", "ADsp5BkhCg4y6tNPoVhX1VEa7BmVd5SoGrucLBML5cx4"),
-          "state", Map.of("blueId", "GbNz5yeEZBa1kzfzfNnXXcH7vnkKYz6KneFLW6bcYUrN"),
-          "authorityPackage", "844HpnaEGPgJDkaMBL62MMRRSqF1pByLKEKaRA1HAbp1",
-          "mandateProgram", "sha256:7c02b3015a6cf35214a9b4cfe627ddf5c337af09c0fc40e19cca9bc14b847d38",
-          "approvedProgram", "sha256:7c02b3015a6cf35214a9b4cfe627ddf5c337af09c0fc40e19cca9bc14b847d38",
-          "position", List.of(Map.of("timeline", Map.of("blueId", "5Lv86guRteJU9tbzpmNiwqePbirhGaS5mrDNW2GP7bsw")),
-              Map.of("timeline", Map.of("blueId", "J7FkU9G7Vz5gTdeXLwSTzVzPs3J1v5pWtmEsRC9WjRDx"),
-                  "lastEntry", Map.of("blueId", "CngLs8rTqECQQxrtQdZaoFDBFNwV2k6pWax8b3B3YAWp"))),
-          "certifiedNodes", Map.of("count", 1, "root", "66ab853d5dd0a906d83a0fa802b321476156d0e6076b72322976711a81621e57"),
-          "sequence", 0));
-      expect(blue, attestationCases, "worked example, references not held here", worked, INCOMPLETE);
+      // A reference may name a member of a cyclic set: a plain id, '#' and a canonical decimal index. The
+      // Language accepts that form and refuses the others; the content of the made-up ids is not held here.
+      var memberIds = new TreeMap<String, Object>();
+      for (String index : List.of("0", "3", "10", "999999999"))
+        expect(blue, memberIds, "state named by a member id #" + index,
+            with(attestation, "state", Map.of("blueId", UNHELD + "#" + index)), INCOMPLETE);
+      expect(blue, memberIds, "mandate named by a member id", with(attestation, "mandate", Map.of("blueId", UNHELD + "#1")), INCOMPLETE);
+      expect(blue, memberIds, "documents naming a member id",
+          with(attestation, "documents", List.of(Map.of("blueId", UNHELD + "#0"))), INCOMPLETE);
+      expect(blue, memberIds, "last entry named by a member id", with(attestation, "position",
+          List.of(Map.of("timeline", ref1, "lastEntry", Map.of("blueId", UNHELD + "#2")))), INCOMPLETE);
+      for (String bad : List.of("#01", "#-1", "#+1", "#", "#1#2", "#1a", "# 1", "#１"))
+        expect(blue, memberIds, "state named by an id ending in " + bad,
+            with(attestation, "state", Map.of("blueId", UNHELD + bad)), "Invalid/InvalidBlueId");
+      expect(blue, memberIds, "state named by a member id whose master is not a plain id",
+          with(attestation, "state", Map.of("blueId", "not-a-blue-id#0")), "Invalid/InvalidBlueId");
+      // Left to the signer: the bound of 9 digits on the index, and plain-only positions.
+      expect(blue, memberIds, "state named by a member id with an index of 10 digits (signer rule)",
+          with(attestation, "state", Map.of("blueId", UNHELD + "#1234567890")), INCOMPLETE);
+      expect(blue, memberIds, "previous named by a member id (signer rule: plain only)",
+          with(attestation, "previous", Map.of("blueId", UNHELD + "#0")), INCOMPLETE);
 
       // The schema does not close the field set or check the canonical construction: left to the verifier.
       var attestationVerifier = new TreeMap<String, Object>();
@@ -371,9 +375,10 @@ public final class PrivateMandatesTypesConformance {
           with(attestation, "position", List.of(Map.of("timeline", ref2), Map.of("timeline", ref1))), ADMITTED);
       expect(blue, attestationVerifier, "position row with another field",
           with(attestation, "position", List.of(Map.of("timeline", ref1, "note", "x"))), ADMITTED);
-      expect(blue, attestationVerifier, "empty position", with(attestation, "position", List.of()), ADMITTED);
-      expect(blue, attestationVerifier, "root not lower-case hex",
-          with(attestation, "certifiedNodes", Map.of("count", 1, "root", "ZZ".repeat(32))), ADMITTED);
+      expect(blue, attestationVerifier, "timer bound with a further part",
+          with(attestation, "nextTimerFiring", with(firing, "note", "x")), ADMITTED);
+      expect(blue, attestationVerifier, "timer source id with a character outside base58",
+          with(attestation, "nextTimerFiring", with(firing, "source", "0".repeat(32))), ADMITTED);
       expect(blue, attestationVerifier, "mandate that is a text, not a reference", with(attestation, "mandate", "x"), ADMITTED);
 
       require(MISMATCHES.isEmpty(), "Language behaviour differs from the recorded expectation:\n" + String.join("\n", MISMATCHES));
@@ -399,6 +404,7 @@ public final class PrivateMandatesTypesConformance {
       result.put("referenceAdmissionOutcomes", references);
       result.put("leftToNativeRules", nativeRules);
       result.put("attestationSchemaDecisions", attestationCases);
+      result.put("memberIdReferenceOutcomes", memberIds);
       result.put("attestationAdmittedBySchemaLeftToVerifier", attestationVerifier);
       result.put("scope", "Language schema, inheritance and unchanged default-edition identities; not native execution qualification");
       System.out.println(WireData.write(result));
