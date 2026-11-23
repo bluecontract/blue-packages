@@ -22,7 +22,7 @@ under its own rules, `spec/coordination-evidence.md`:
 `blue-private-mandates` `0.1.0-preview.2` requires that package and the unchanged
 `blue-mandates` `0.3.0-preview.1`, and adds
 `RISC Zero Succinct Receipt Profile` (a `CoordinationEvidence/Evidence Profile` with
-`programImageId`, `allowedProviders` and `receiverBuildSha256`),
+`programImageId`, `allowedProviders` and `receiverReleaseSha256`),
 `Mandate Commitment Authority` (a `Mandates/Authority` with the salted mandate
 commitment and no `mandate` reference) and `Mandate State Attestation`, the
 document a mandate processor signs about one state of a mandate: its BlueId is
@@ -38,12 +38,12 @@ are the two `spec/` files.
 | `Evidence Profile` | | `G7gRXeu89Y6VR4oNhj711VK677o3QEhrphakKKtmjFFn` |
 | `Proof Entry` | | `Gk1azozPa6SohYmDVh12hyjnH6bY6m8UjW8bxYPwvoRz` |
 | `Rejection Entry` | | `AjBTUscaHD4CY9TCdjKrXhS2YbFYFenfWsMe21dsNWY` |
-| Private Mandates package | 0.1.0-preview.2 | `3bTieCTjX71JPbmbTWboxACy4zhjrErgfcfrvbsaKSic` |
-| Private Mandates protocol | | `DAg5JFBZSdasakZJDZzWMKGY2jt5vxv2KiZAjWTQgixB` |
-| Private Mandates rules | | `6Qsn4DGUbgvJNQVwmHWmM1pjCoUzokjd9iNC4btUqnd8` |
-| `Mandate Commitment Authority` | | `7eVwY2nEBmN65SYXWmNjcJRu1b9HhKgpccKf68qX2PAT` |
-| `RISC Zero Succinct Receipt Profile` | | `D9JaSp6gRWCoDq35kq7qtkvDGa65MWV9tY7gS8pVejU4` |
-| `Mandate State Attestation` | | `2wHnED3tCQQCX4zfzHZMxHrSGTr36nv3XJCLVmvef7du` |
+| Private Mandates package | 0.1.0-preview.2 | `ErMeenKWWo5h3E1eJZyWuxjNUrk9KRajZ4FaW5wkecet` |
+| Private Mandates protocol | | `7FCEfX6NVAE1B5wxrzExy8jQkGK7rcxrVf5ThRD2i44` |
+| Private Mandates rules | | `ATvszg5CCxLJT25Ke8525i63LUuf6Hux6mzVLc7LNycb` |
+| `Mandate Commitment Authority` | | `GHPvv8vBopbbXKwVxbkpYaswWv76pAVnRvVR6RmBwN3c` |
+| `RISC Zero Succinct Receipt Profile` | | `2YrJCcT5iJhYdRjB6bCrPki5gSXfx2pGjyUGWHDeKBsE` |
+| `Mandate State Attestation` | | `8FvdQEVH9SMpwSdv6oxneucHjhfBxXexsA56gMNuBebe` |
 | Coordination package (required, unchanged) | 0.2.0-access-events.1 | `4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA` |
 | Coordination protocol (unchanged) | | `4YRV74QByZidyvspvbhZvx9Mfod16dHNCqCVbkKditGc` |
 | Coordination rules (unchanged) | | `26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG` |
@@ -144,8 +144,8 @@ tool records these outcomes with their exact failure kinds.
 | Value | Outcome decided natively |
 | --- | --- |
 | `mandateProcessorKey` or a provider key that is not a well-formed key: not 64 characters `0-9a-f`, not a point of edwards25519, not canonically encoded, or one of the eight small-order encodings | The channel lacks that field: operations under a commitment authority on it are rejected from the document state |
-| `programImageId` or `receiverBuildSha256` that is not 64 characters `0-9a-f` | Same |
-| `receiverBuildSha256` that is not the SHA-256 of the build the host has installed for the profile | The host does not implement the declared profile and refuses the document where the channel is declared |
+| `programImageId` or `receiverReleaseSha256` that is not 64 characters `0-9a-f` | Same |
+| `receiverReleaseSha256` that is not the SHA-256 of the release manifest the host has installed, or an installed build that the manifest does not list | The host does not implement the declared profile and refuses the document where the channel is declared |
 | `allowedProviders` not strictly ascending by key bytes; a profile with a further field | Same |
 | `evidenceProfile` whose exact type is not a supported specialisation of `Evidence Profile` | Same |
 | A commitment authority whose fields are not exactly `actor` and `mandateCommitment`, or whose `mandateCommitment` is not 64 characters `0-9a-f` | The operation is rejected from the document state, without reading the evidence timeline |
@@ -159,7 +159,7 @@ tool records these outcomes with their exact failure kinds.
 | A grant whose predicate ends in an error, gives a non-Boolean result or is statically inadmissible | That grant does not match; the other grants are tried |
 | Exhausted gas in a predicate, unless an earlier grant already passed; a fault of the mandate itself, a grant without target included | "The mandate does not admit": the operation is rejected and the document continues. A deliberate difference from mandates named in clear |
 | A grant that applies and needs content that cannot be supplied | No proof can be made in either grant order; the party ends the wait with a Rejection Entry |
-| A receipt that is not the one canonical encoding, or that fails or faults while decoded or verified | Not a proof: the entry is skipped, never retried. All processors use the pinned build whose SHA-256 the profile carries; the five comparisons of the public output are the processor's own |
+| A receipt that is not the one canonical encoding, or that fails or faults while decoded or verified | Not a proof: the entry is skipped, never retried. All processors use a build of the pinned release whose manifest hash the profile carries; the five comparisons of the public output are the processor's own |
 | The `statementCommitment` of the deciding proof | Recorded with the decision; compared with nothing |
 
 Semantic cards for the new type identities are not part of this change; they are
@@ -202,7 +202,7 @@ capability and proof verification are qualified in Core.
 Type names, field names and encodings of the two rules texts are fixed in
 `0.1.0-preview.2`: the entry fields and the proof as canonical base64 text; the
 commitment `M = hex(SHA-256(salt || id text))`; the image identifier, the receiver
-build hash and the digests as 64 lower-case hexadecimal characters; the layout and
+release hash and the digests as 64 lower-case hexadecimal characters; the layout and
 domain text of the mandate processor's signed message; the seven keys of the public
 output; the rule by which the proving program re-derives a reused validation result
 from the target state. Changing one gives new exact identities. Not decided: how a

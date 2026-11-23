@@ -16,14 +16,15 @@ transport type and no Mandates type has a new identity.
   hash chain through `sequence` and `previous`).
 - `RISC Zero Succinct Receipt Profile`: the first
   `CoordinationEvidence/Evidence Profile`, with `programImageId`,
-  `allowedProviders` and `receiverBuildSha256`. The provider set digest is derived
+  `allowedProviders` and `receiverReleaseSha256`. The provider set digest is derived
   from the list and is not a field.
 
 A proof has two premises that neither the proof nor its verification checks: the
 target document state is valid, and the operation entry is a valid entry on its
 timeline. A processor accepts a proof only for a state and an entry it produced or
-admitted itself. Verifying a receipt is done by one pinned build, named in the
-profile by its SHA-256; comparing the public output with the processor's own values
+admitted itself. Verifying a receipt is done by a build of one pinned receiver
+release, named in the profile by the SHA-256 of its manifest (one build per
+platform); comparing the public output with the processor's own values
 is done by the processor. This version supports mandates
 of type `Mandates/Operation Mandate` and its subtypes, on the same edition as the
 target document; see §1 and §4.1 of the specification.

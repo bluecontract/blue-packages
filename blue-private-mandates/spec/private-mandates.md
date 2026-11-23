@@ -107,7 +107,8 @@ message:
 
 `salt` is the salt as raw bytes, at least 16 of them; with a shorter salt no proof
 can be made. `id` is the BlueId of the mandate before initialization, written as
-the text of that BlueId (its base58 characters) in ASCII. The hash input is the
+the text of that BlueId in ASCII: its base58 characters and, when the mandate is a
+member of a cyclic set (§4.2), the character `#` and the index that follow them. The hash input is the
 salt bytes followed directly by those characters: no separator, no length prefix
 and no terminator. `hex` writes the 32 bytes of the hash as 64 characters `0-9a-f`.
 The claim and the public output of a proof (§5) carry M as this same text and it
@@ -286,25 +287,52 @@ that channel is rejected from the document state.
 |---|---|
 | `programImageId` | Image identifier of the proving program, 64 lower-case hexadecimal characters. It fixes the proved statement, the format of the public output, and the runtime and package bindings, gas limit and error semantics the program was built with |
 | `allowedProviders` | The profile's allowed timeline provider set: a list of `Coordination/Ed25519 Public Key`, each a well-formed key, strictly ascending when compared as 32-byte values |
-| `receiverBuildSha256` | SHA-256 of the receiver build that performs the pinned verification of §5.1 for this profile, 64 lower-case hexadecimal characters |
+| `receiverReleaseSha256` | SHA-256 of the manifest of the receiver release whose builds perform the pinned verification of §5.1 for this profile, 64 lower-case hexadecimal characters |
 
 The value has exactly these three fields. `programImageId` and
-`receiverBuildSha256` are data supplied by the document that declares the profile;
-this specification names no image identifier and no build.
+`receiverReleaseSha256` are data supplied by the document that declares the
+profile; this specification names no image identifier and no release.
 
 The type itself fixes what is not data: the receipt kind (a succinct RISC Zero
 receipt, in one canonical encoding with no other bytes), the comparison rules of §5
 and the provider set digest function. The code that decodes and verifies a receipt
-is fixed by `receiverBuildSha256`.
+is fixed by `receiverReleaseSha256`.
 
-**The receiver build is part of the profile.** `receiverBuildSha256` is the SHA-256
-of the bytes of the receiver build: the one artefact that a processor installs to
-perform the pinned verification. A processor supports a declared profile only if
-the build it has installed for that profile has exactly this SHA-256. A processor
-whose installed build differs, or that has none, does not implement the declared
-profile and MUST refuse the document where the channel is declared, exactly as a
-host refuses a profile type it does not implement (Coordination Evidence section
-1). It MUST NOT verify a receipt for that channel with another build.
+**The receiver release is part of the profile.** A receiver release is a set of
+builds of the pinned verification, one per platform. All builds of one release are
+made from the same sources and the same verifier version, and MUST return the same
+result for the same input (§5.1). A release is described by its manifest, and
+`receiverReleaseSha256` is the SHA-256 of the bytes of that manifest.
+
+The manifest is UTF-8 text with one line per build of the release and no other
+byte:
+
+    <SHA-256 of the bytes of the build, 64 characters 0-9a-f> SP SP <platform name> LF
+
+SP is the byte 0x20 and LF the byte 0x0A; the two spaces are exactly two. The
+platform name is the Rust target triple the build is made for, for example
+`aarch64-apple-darwin` or `x86_64-unknown-linux-gnu`. The lines are sorted by
+platform name, compared as byte strings, and a platform name occurs once. The last
+line ends with LF like every other. This is the text format of `sha256sum`. A
+manifest lists the builds of one release only.
+
+Example of a manifest with two builds (the hashes stand in for real ones):
+
+    1111111111111111111111111111111111111111111111111111111111111111  aarch64-apple-darwin
+    2222222222222222222222222222222222222222222222222222222222222222  x86_64-unknown-linux-gnu
+
+A processor installs the manifest and one build that the manifest lists. Where the
+channel is declared it checks both of these:
+
+1. the SHA-256 of the bytes of its manifest equals `receiverReleaseSha256`;
+2. the SHA-256 of the bytes of its installed build is the hash on a line of that
+   manifest.
+
+A processor for which either fails, or that has no manifest or no build, does not
+implement the declared profile and MUST refuse the document where the channel is
+declared, exactly as a host refuses a profile type it does not implement
+(Coordination Evidence section 1). It MUST NOT verify a receipt for that channel
+with a build that the manifest does not list.
 
 **The receipt.** `receipt` of a Proof Entry decodes to exactly one canonical
 encoding of a succinct receipt. A byte string that is not that encoding is skipped,
@@ -329,10 +357,10 @@ source at a provider outside the set can never get a matching proof.
 
 **Well-formed profile.** For a value whose exact type is this profile, the Language
 schema enforces the three required fields, at most three fields with a value, the
-length of each key, of `programImageId` and of `receiverBuildSha256`, and distinct
+length of each key, of `programImageId` and of `receiverReleaseSha256`, and distinct
 list elements. As for the authority claim (§3) it admits a further field that
 carries only a type. The processor additionally requires that the fields are
-exactly these three, that `programImageId` and `receiverBuildSha256` are 64
+exactly these three, that `programImageId` and `receiverReleaseSha256` are 64
 characters `0-9a-f`, that every key of `allowedProviders` is a well-formed key as
 Coordination Evidence section 3 defines (64 characters `0-9a-f`; a point of
 edwards25519; canonical encoding; not of small order), and that the list is
@@ -514,7 +542,7 @@ set, which is a plain id, the character `#` and the canonical index of the membe
 | Position | Forms |
 |---|---|
 | `targetState` and `entry` of the public output (§5) | Either. The public output carries the id as its text, with `#` and the index when it has them |
-| The references of `documents` | Either |
+| `mandate` and `state` of the attestation; the references of `documents` | Either |
 | `timeline` and `lastEntry` of a position row; the timelines and entries inside `lastTimerFiring` and `nextTimerFiring`; `previous`; `authorityPackage` | Plain only. With another form in one of these no proof can be made |
 
 **The field set is closed and is checked by the verifier.** The Language schema of
@@ -640,8 +668,8 @@ The public output carries nothing about E beyond its BlueId either (premise 2 of
 
 **Deciding one Proof Entry has two parts.**
 
-(a) *Pinned verification.* One build, named by `receiverBuildSha256` of the profile
-(§4.1), is given two things: the bytes of the receipt and the `programImageId` of
+(a) *Pinned verification.* A build of the receiver release that
+`receiverReleaseSha256` of the profile names (§4.1) is given two things: the bytes of the receipt and the `programImageId` of
 the channel's profile. It answers with exactly one of three results (§5.1): the
 receipt is verified, together with its public output; the bytes are not a proof;
 or it did not finish. It is given nothing else and reads nothing else: no record
@@ -716,15 +744,17 @@ processor that called it: a file it cannot read, a malformed `programImageId` (a
 processor must reject from the document state before it reads T and must never ask
 for such a check), a fault outside decoding and verification, or a build that was
 stopped from outside. It never has its cause in the bytes of the receipt, in the
-proof or in the content of a document: for one build, the same receipt bytes and
-the same image identifier never give UNFINISHED on one host and a result on
-another because of what the bytes are.
+proof or in the content of a document: for the builds of one release, the same
+receipt bytes and the same image identifier never give UNFINISHED on one host and
+a result on another because of what the bytes are.
 
 **What must be the same on every host.** Whether a byte string is VERIFIED or NOT A
 PROOF depends on code and not only on the profile's data: the canonical-encoding
 rule of §4.1 is such code, and so is the verifier. All processors of a document
-MUST therefore use the same pinned build for part (a), the one whose SHA-256 the
-profile carries (§4.1). Part (b) needs no pinned build: it is five comparisons of
+MUST therefore use a build of the same pinned release for part (a), the release
+whose manifest hash the profile carries (§4.1). The builds of one release differ
+only in the platform they run on and give the same result for the same input.
+Part (b) needs no pinned build: it is five comparisons of
 texts that this specification defines completely. One profile then means one
 classification of one entry on every host.
 
@@ -744,11 +774,13 @@ continues (§1).
   validation and the program's validation is shown by differential runs only.
 - Whether the premise about D (§4.1) needs a statement for a host that admits a
   state from earlier admissions instead of certifying it afresh.
-- The image identifier and the receiver build of a program built for this text.
-  A profile's `programImageId` and `receiverBuildSha256` are supplied by the
+- The image identifier and the receiver release of a program built for this text.
+  A profile's `programImageId` and `receiverReleaseSha256` are supplied by the
   document.
-- How one receiver build is distributed, and how hosts on different platforms
-  obtain a build with one SHA-256 (§4.1).
+- How a receiver release and its manifest are distributed to hosts, and how it is
+  shown that the builds of one release come from the same sources and give the
+  same result (a reproducible build procedure). The rules require the property
+  and do not say how it is established.
 - How a program is identified in `mandateProgram` and `approvedProgram`. The two
   fields are texts that the proof only compares. The Mandates specification
   defines no program node with a content BlueId that this text could name, so the

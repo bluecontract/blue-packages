@@ -115,7 +115,7 @@ public final class PrivateMandatesTypesConformance {
           "publicRead", false, "url", "https://provider.example/timelines/operations");
       Map<String, Object> proofs = with(timeline, "url", "https://provider.example/timelines/proofs");
       Map<String, Object> profile = Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile",
-          "programImageId", HEX, "allowedProviders", List.of("01".repeat(32), "02".repeat(32)), "receiverBuildSha256", "cd".repeat(32));
+          "programImageId", HEX, "allowedProviders", List.of("01".repeat(32), "02".repeat(32)), "receiverReleaseSha256", "cd".repeat(32));
       Map<String, Object> channel = Map.of("type", "CoordinationEvidence/Timeline Channel with Evidence",
           "actor", actor, "timeline", timeline, "evidenceTimeline", proofs,
           "mandateProcessorKey", "ef".repeat(32), "evidenceProfile", profile);
@@ -162,10 +162,10 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, schema, "profile with a short provider key", with(profile, "allowedProviders", List.of("01")), SCHEMA);
       expect(blue, schema, "profile with a repeated provider key",
           with(profile, "allowedProviders", List.of("01".repeat(32), "01".repeat(32))), SCHEMA);
-      for (String field : List.of("programImageId", "allowedProviders", "receiverBuildSha256"))
+      for (String field : List.of("programImageId", "allowedProviders", "receiverReleaseSha256"))
         expect(blue, schema, "profile without " + field, with(profile, field, null), SCHEMA);
-      expect(blue, schema, "profile with a short receiver build hash", with(profile, "receiverBuildSha256", "cd"), SCHEMA);
-      expect(blue, schema, "profile with an integer receiver build hash", with(profile, "receiverBuildSha256", 7), TYPE);
+      expect(blue, schema, "profile with a short receiver release hash", with(profile, "receiverReleaseSha256", "cd"), SCHEMA);
+      expect(blue, schema, "profile with an integer receiver release hash", with(profile, "receiverReleaseSha256", 7), TYPE);
       // The profile has no facts rule: validity of the target state is a premise. A valued factsRule is a fourth field.
       expect(blue, schema, "profile with a factsRule", with(profile, "factsRule", "MERKLE(FULL(D))"), SCHEMA);
       expect(blue, schema, "channel whose profile has a factsRule", with(channel, "evidenceProfile",
@@ -288,7 +288,7 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, nativeRules, "channel key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "image id not lower-case hex", with(profile, "programImageId", "AB".repeat(32)), ADMITTED);
-      expect(blue, nativeRules, "receiver build hash not lower-case hex", with(profile, "receiverBuildSha256", "CD".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "receiver release hash not lower-case hex", with(profile, "receiverReleaseSha256", "CD".repeat(32)), ADMITTED);
       // Key well-formedness beyond the length is a native rule: a small-order key, a non-canonical encoding
       // and bytes that are no curve point are all admitted by the schema.
       final String IDENTITY = "01" + "00".repeat(31), ORDER8 = "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
