@@ -115,7 +115,7 @@ public final class PrivateMandatesTypesConformance {
           "publicRead", false, "url", "https://provider.example/timelines/operations");
       Map<String, Object> proofs = with(timeline, "url", "https://provider.example/timelines/proofs");
       Map<String, Object> profile = Map.of("type", "PrivateMandates/RISC Zero Succinct Receipt Profile",
-          "programImageId", HEX, "allowedProviders", List.of("01".repeat(32), "02".repeat(32)));
+          "programImageId", HEX, "allowedProviders", List.of("01".repeat(32), "02".repeat(32)), "receiverBuildSha256", "cd".repeat(32));
       Map<String, Object> channel = Map.of("type", "CoordinationEvidence/Timeline Channel with Evidence",
           "actor", actor, "timeline", timeline, "evidenceTimeline", proofs,
           "mandateProcessorKey", "ef".repeat(32), "evidenceProfile", profile);
@@ -162,9 +162,11 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, schema, "profile with a short provider key", with(profile, "allowedProviders", List.of("01")), SCHEMA);
       expect(blue, schema, "profile with a repeated provider key",
           with(profile, "allowedProviders", List.of("01".repeat(32), "01".repeat(32))), SCHEMA);
-      for (String field : List.of("programImageId", "allowedProviders"))
+      for (String field : List.of("programImageId", "allowedProviders", "receiverBuildSha256"))
         expect(blue, schema, "profile without " + field, with(profile, field, null), SCHEMA);
-      // The profile has no facts rule: validity of the target state is a premise. A valued factsRule is a third field.
+      expect(blue, schema, "profile with a short receiver build hash", with(profile, "receiverBuildSha256", "cd"), SCHEMA);
+      expect(blue, schema, "profile with an integer receiver build hash", with(profile, "receiverBuildSha256", 7), TYPE);
+      // The profile has no facts rule: validity of the target state is a premise. A valued factsRule is a fourth field.
       expect(blue, schema, "profile with a factsRule", with(profile, "factsRule", "MERKLE(FULL(D))"), SCHEMA);
       expect(blue, schema, "channel whose profile has a factsRule", with(channel, "evidenceProfile",
           with(profile, "factsRule", "MERKLE(FULL(D))")), SCHEMA);
@@ -221,8 +223,6 @@ public final class PrivateMandatesTypesConformance {
       var skipped = new TreeMap<String, Object>();
       expect(blue, skipped, "proof entry with an extra field", with(proof, "note", "x"), ADMITTED);
       expect(blue, skipped, "proof entry without receipt", with(proof, "receipt", null), ADMITTED);
-      expect(blue, skipped, "proof entry without document", with(proof, "document", null), ADMITTED);
-      expect(blue, skipped, "proof entry without operationEntry", with(proof, "operationEntry", null), ADMITTED);
       expect(blue, skipped, "proof entry with an integer receipt", with(proof, "receipt", 7), ADMITTED);
       expect(blue, skipped, "proof entry with an empty receipt", with(proof, "receipt", ""), ADMITTED);
       expect(blue, skipped, "proof entry with a list receipt", with(proof, "receipt", List.of("AAECAw==")), ADMITTED);
@@ -241,6 +241,13 @@ public final class PrivateMandatesTypesConformance {
           Map.of("type", "CoordinationEvidence/Rejection Entry", "documentId", "x", "operationEntry", "y"), ADMITTED);
       expect(blue, skipped, "rejection with an object that names nothing as document",
           with(rejection, "document", Map.of("id", "x")), ADMITTED);
+
+      // Well formed since only receipt is required: a Proof Entry without the optional advisory hint.
+      var hintless = new TreeMap<String, Object>();
+      expect(blue, hintless, "proof entry without document", with(proof, "document", null), ADMITTED);
+      expect(blue, hintless, "proof entry without operationEntry", with(proof, "operationEntry", null), ADMITTED);
+      expect(blue, hintless, "proof entry with receipt only",
+          Map.of("type", "CoordinationEvidence/Proof Entry", "receipt", "AAECAw=="), ADMITTED);
 
       // 5. Naming is by BlueId, never by wire form: a reference and the same content written in full
       // give the same entry BlueId, so no rule can ask whether a field "is a reference".
@@ -281,6 +288,17 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, nativeRules, "channel key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "image id not lower-case hex", with(profile, "programImageId", "AB".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "receiver build hash not lower-case hex", with(profile, "receiverBuildSha256", "CD".repeat(32)), ADMITTED);
+      // Key well-formedness beyond the length is a native rule: a small-order key, a non-canonical encoding
+      // and bytes that are no curve point are all admitted by the schema.
+      final String IDENTITY = "01" + "00".repeat(31), ORDER8 = "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
+          Y_IS_P = "ed" + "ff".repeat(30) + "7f", NO_POINT = "02" + "00".repeat(31);
+      expect(blue, nativeRules, "channel key of small order (identity)", with(channel, "mandateProcessorKey", IDENTITY), ADMITTED);
+      expect(blue, nativeRules, "channel key of small order (order 8)", with(channel, "mandateProcessorKey", ORDER8), ADMITTED);
+      expect(blue, nativeRules, "channel key not canonically encoded (y = p)", with(channel, "mandateProcessorKey", Y_IS_P), ADMITTED);
+      expect(blue, nativeRules, "channel key that is no curve point (y = 2)", with(channel, "mandateProcessorKey", NO_POINT), ADMITTED);
+      expect(blue, nativeRules, "provider key of small order",
+          with(profile, "allowedProviders", List.of(IDENTITY, "02".repeat(32))), ADMITTED);
       expect(blue, nativeRules, "provider list not ascending",
           with(profile, "allowedProviders", List.of("02".repeat(32), "01".repeat(32))), ADMITTED);
       expect(blue, nativeRules, "profile with a further field carrying only a type",
@@ -320,7 +338,11 @@ public final class PrivateMandatesTypesConformance {
           with(attestation, "certifiedNodes", Map.of("count", 1, "root", "ab")), SCHEMA);
       expect(blue, attestationCases, "negative sequence", with(attestation, "sequence", -1), SCHEMA);
       expect(blue, attestationCases, "sequence that is not a number", with(attestation, "sequence", "first"), TYPE);
-      expect(blue, attestationCases, "short authorityPackage", with(attestation, "authorityPackage", "abc"), SCHEMA);
+      // A BlueId is the base58 text of 32 bytes: 32 to 44 characters. The schema sets no lower bound.
+      expect(blue, attestationCases, "authorityPackage of 42 characters",
+          with(attestation, "authorityPackage", "1tVm6cThRU3drxZ9G9xTDz3kpTJep4CpNQxUj9CFwL"), ADMITTED);
+      expect(blue, attestationCases, "authorityPackage of 32 characters", with(attestation, "authorityPackage", "1".repeat(32)), ADMITTED);
+      expect(blue, attestationCases, "authorityPackage of 45 characters", with(attestation, "authorityPackage", "z".repeat(45)), SCHEMA);
       expect(blue, attestationCases, "position that is not a list", with(attestation, "position", "x"), TYPE);
       expect(blue, attestationCases, "timer firing that is not an Order Key", with(attestation, "nextTimerFiring", "soon"), TYPE);
       // The worked example of the signer's interface, with this package's type: its references name content that
@@ -372,6 +394,7 @@ public final class PrivateMandatesTypesConformance {
       result.put("profileAdmittedBySchemaExcludedByNativeRule", profileNative);
       result.put("authorityAdmittedBySchemaRejectedByProcessorRule", authorityNative);
       result.put("entriesAdmittedBySchemaSkippedByProcessor", skipped);
+      result.put("proofEntriesWellFormedWithoutHint", hintless);
       result.put("referenceAndInlinedContentSameBlueId", byReference.equals(byContent));
       result.put("referenceAdmissionOutcomes", references);
       result.put("leftToNativeRules", nativeRules);

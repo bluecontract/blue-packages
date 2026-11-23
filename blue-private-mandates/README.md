@@ -1,8 +1,8 @@
 # Blue Private Mandates
 
-`blue-private-mandates` **0.1.0-preview.1** lets the participants of a document
+`blue-private-mandates` **0.1.0-preview.2** lets the participants of a document
 decide an agent's operation from a proof instead of reading the mandate. It
-requires the exact `blue-coordination-evidence` package (0.1.0-preview.1), which
+requires the exact `blue-coordination-evidence` package (0.1.0-preview.2), which
 defines timeline channels with evidence on the unchanged `blue-coordination`
 0.2.0-access-events.1, and the unchanged `blue-mandates` 0.3.0-preview.1. No
 transport type and no Mandates type has a new identity.
@@ -15,13 +15,16 @@ transport type and no Mandates type has a new identity.
   state of a mandate (its BlueId is signed; attestations of one mandate form a
   hash chain through `sequence` and `previous`).
 - `RISC Zero Succinct Receipt Profile`: the first
-  `CoordinationEvidence/Evidence Profile`, with `programImageId` and
-  `allowedProviders`. The provider set digest is derived from the list and is
-  not a field.
+  `CoordinationEvidence/Evidence Profile`, with `programImageId`,
+  `allowedProviders` and `receiverBuildSha256`. The provider set digest is derived
+  from the list and is not a field.
 
-The validity of the target document state is a premise of every proof: the proof
-does not show it and the receiver does not check it. A processor accepts a proof
-only for a state it produced or admitted itself. This version supports mandates
+A proof has two premises that neither the proof nor its verification checks: the
+target document state is valid, and the operation entry is a valid entry on its
+timeline. A processor accepts a proof only for a state and an entry it produced or
+admitted itself. Verifying a receipt is done by one pinned build, named in the
+profile by its SHA-256; comparing the public output with the processor's own values
+is done by the processor. This version supports mandates
 of type `Mandates/Operation Mandate` and its subtypes, on the same edition as the
 target document; see §1 and §4.1 of the specification.
 
@@ -36,7 +39,8 @@ stays supported and unchanged. A runtime must explicitly support this package's
 protocol, including the verifier of a declared profile, before a proof decides
 anything. Installing this data package grants no native support.
 
-Type and field names are provisional; see §7 of the specification. This is an
+Type names, field names and encodings are fixed; what is not decided is listed in
+§7 of the specification. This is an
 unpublished candidate. Build and verify from the repository root:
 
 ```sh

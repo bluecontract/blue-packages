@@ -1,6 +1,6 @@
 # Coordination evidence channels
 
-`blue-coordination-evidence` **0.1.0-preview.1** is an additive package. It requires
+`blue-coordination-evidence` **0.1.0-preview.2** is an additive package. It requires
 the exact `blue-coordination` 0.2.0-access-events.1 publication and adds one channel
 type, the evidence profile base type and two entry types. No existing Coordination
 type, archive or identity changes, and that publication remains selectable on its own.
@@ -19,8 +19,13 @@ no support for this package.
   profiles are specialisations published by other packages.
 - `Proof Entry` and `Rejection Entry`: the two defined messages on an evidence
   timeline. Their schemas are open: the processor checks an entry and skips one that
-  is not well formed. In a Proof Entry `document` and `operationEntry` are an advisory
-  hint with no force.
+  is not well formed. A Proof Entry requires only `receipt`; `document` and
+  `operationEntry` are optional there and are an advisory hint with no force.
+- A rejection decided from the evidence timeline has one of two durable reasons,
+  the same on every processor: `AUTHORITY_EVIDENCE_DENIED` for a verified proof
+  that denies and `AUTHORITY_EVIDENCE_REJECTED` for a Rejection Entry.
+- `mandateProcessorKey` must be a well-formed Ed25519 key: canonical encoding of a
+  curve point that is not of small order.
 
 The package's protocol identity is the capability a host must support for a
 document that declares the new channel. A host without it must refuse such a
@@ -29,8 +34,8 @@ document. Installing this data package grants no native support.
 Concrete evidence profiles and the authority type that is decided from an evidence
 timeline are defined by `blue-private-mandates`, which requires this package.
 
-Field names and the entry grammar are provisional; see section 8 of the
-specification. This is an unpublished candidate. Build and verify from the
+Type names, field names and encodings are fixed; what is not decided is listed in
+section 8 of the specification. This is an unpublished candidate. Build and verify from the
 repository root:
 
 ```sh
