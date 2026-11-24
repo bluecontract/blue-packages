@@ -1,0 +1,1261 @@
+{
+  "name": "Reseller Partnership: Tide Lantern Lodge x Bay Signal Bikes",
+  "type": {
+    "blueId": "7cgSSaD4o6TGN6DMvZdi6VHebEEHfzU6NDqFJyzDYA27"
+  },
+  "template": {
+    "id": "catalogue-agreement-authoring",
+    "version": "19"
+  },
+  "terms": {
+    "currency": "USD",
+    "exclusive": false,
+    "payoutOperator": "stripe",
+    "payoutFeePolicy": "myos-commission-fee-v1",
+    "payoutFeeBps": 2000,
+    "payoutOperatorAccountId": {
+      "type": "Text"
+    },
+    "initialCommissionBps": 1250,
+    "type": {
+      "initialCommissionBps": {
+        "type": "Integer",
+        "schema": {
+          "minimum": 0,
+          "maximum": 10000
+        }
+      },
+      "commissionBps": {
+        "type": "Integer"
+      },
+      "currency": {
+        "type": "Text",
+        "schema": {
+          "enum": [
+            "PLN",
+            "USD",
+            "EUR"
+          ]
+        }
+      },
+      "exclusive": {
+        "type": "Boolean"
+      }
+    }
+  },
+  "orders": {},
+  "payouts": {},
+  "description": "Book a two-hour bicycle rental with a helmet for an outing along the harbor.",
+  "products": {
+    "revision": 1,
+    "supplierId": "seller",
+    "currency": "USD",
+    "entries": {
+      "harbor-bike": {
+        "label": "Harbor bicycle rental",
+        "description": "Two-hour bicycle rental with helmet for a harbor outing.",
+        "pricingUnit": "per_unit",
+        "dateRequired": false,
+        "unitAmountMinor": 8000,
+        "guestDiscountPercent": 10
+      }
+    }
+  },
+  "offer": {
+    "title": "Harbor Pedal Outing",
+    "text": "Book a two-hour bicycle rental with a helmet for an outing along the harbor.",
+    "sections": []
+  },
+  "clauses": {
+    "activation": {
+      "type": {
+        "blueId": "9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj"
+      },
+      "parameters": {
+        "parties": {
+          "seller": {
+            "type": {
+              "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+            },
+            "business": {
+              "type": {
+                "blueId": "6oNfLaBHNpwcqPF75kTQ22KSbqStGEiPxwj5bBavL4VV"
+              },
+              "displayName": "Bay Signal Bikes"
+            }
+          },
+          "partner": {
+            "type": {
+              "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+            },
+            "business": {
+              "type": {
+                "blueId": "6oNfLaBHNpwcqPF75kTQ22KSbqStGEiPxwj5bBavL4VV"
+              },
+              "displayName": "Tide Lantern Lodge"
+            }
+          }
+        },
+        "required": [
+          "seller",
+          "partner"
+        ],
+        "preActivationConnections": [
+          {
+            "clause": "catalog",
+            "action": "validate",
+            "automatic": true
+          }
+        ],
+        "negotiation": {
+          "allowedPaths": [
+            "/terms/initialCommissionBps",
+            "/terms/exclusive"
+          ]
+        }
+      }
+    },
+    "catalog": {
+      "type": {
+        "blueId": "9s5acB23ioD1ycnAVbpwfd5nmrKRTQuvo7cQJr2akW1R"
+      },
+      "bindings": {
+        "state": "/products"
+      }
+    },
+    "quoteCommission": {
+      "type": {
+        "blueId": "7KbJT4mN89aF6HAkuWSjw7sWmHn6PaKCJWWzSaAQEzo8"
+      },
+      "parameters": {
+        "actions": {
+          "initializeRate": {
+            "do": [
+              {
+                "$appendChange": {
+                  "op": "add",
+                  "path": "/terms/commissionBps",
+                  "val": {
+                    "$document": "/terms/initialCommissionBps"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "bindings": {
+        "initializeRate": {
+          "firstActivation": {
+            "on": "activated",
+            "once": true
+          }
+        }
+      }
+    },
+    "orders": {
+      "type": {
+        "type": {
+          "blueId": "3ZugrpKGtj7sCSdEcnLfCokUadLffFmWfKrepuzpo2cJ"
+        },
+        "optionalBindings": [
+          "template",
+          "fulfilment"
+        ],
+        "bindingTypes": {
+          "catalog": "pointer",
+          "fulfilment": "pointer"
+        }
+      },
+      "parameters": {
+        "suppliedBy": "partner",
+        "suppliedParties": [
+          "customer"
+        ],
+        "customerRole": "customer",
+        "prepareFor": "bootstrap",
+        "obtain": "provide",
+        "preparationDefinition": {
+          "type": {
+            "blueId": "FVMLYWpPnXjmtEdBmPvoWy5NQGmpGsoVcKsZhPZrfCvS"
+          }
+        },
+        "selectBeforeActivation": true,
+        "allowedFields": [
+          "orderDescription",
+          "customerAccountId",
+          "customerEmail",
+          "amountMinor",
+          "currency",
+          "quote",
+          "quoteBlueId",
+          "orderSnapshot"
+        ],
+        "privateTerms": {
+          "commissionTerms": {
+            "fields": {
+              "revision": "/commissionAmendments/revision",
+              "commissionBps": "/terms/commissionBps"
+            }
+          }
+        },
+        "wholeOrderGroup": "booking-1"
+      },
+      "bindings": {
+        "template": "/orderTemplate",
+        "collection": "/orders",
+        "catalog": "/products",
+        "parties": {
+          "seller": "seller",
+          "partner": "partner"
+        },
+        "prepare": {
+          "prepareOrder": {
+            "on": "workflow",
+            "party": "partner",
+            "request": {
+              "type": {
+                "blueId": "EDJssftiVyrgWmPBBtj7qU1W1Pov5mFL7YJdqTEJdNo1"
+              }
+            },
+            "inputParams": {
+              "/key": "/key",
+              "/requestId": "/requestId",
+              "/fields": "/fields",
+              "/values": "/values"
+            }
+          }
+        },
+        "provide": {
+          "provideOrder": {
+            "on": "workflow",
+            "party": "partner"
+          }
+        },
+        "fulfilment": "/orderTemplate/reservationPolicy"
+      }
+    },
+    "receipts": {
+      "type": {
+        "blueId": "Eu7G85oiFYPFkzwYaZ8TBYvuZenBAw1EvhD4Y5rNdmXU"
+      },
+      "bindings": {
+        "reconcile": {
+          "afterAccessRestored": {
+            "on": "event",
+            "event": {
+              "type": {
+                "blueId": "EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs"
+              }
+            }
+          },
+          "afterTermsAccepted": {
+            "on": "event",
+            "event": {
+              "type": {
+                "blueId": "7dL9TXBk1TmaAuzEeui7rGX2D9X2apTDMenQmFP1z5Xu"
+              }
+            }
+          }
+        }
+      }
+    },
+    "commission": {
+      "type": {
+        "blueId": "Dm7RSKsudNMdcVcopgKBkyQCjksLdK8ABEqJqL28irt4"
+      },
+      "bindings": {
+        "state": "/commission",
+        "receipts": "/receipts",
+        "orders": "/orders",
+        "orderEntries": "/process_orders/entries",
+        "frozenRate": "/domainTerms/commissionTerms/commissionBps",
+        "payouts": "/payouts",
+        "payoutEntries": "/process_payouts/entries",
+        "accruePercent": {
+          "accrue": {
+            "on": "event",
+            "event": {
+              "type": {
+                "blueId": "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+              },
+              "kind": "Confirmed Receipts Changed"
+            }
+          }
+        },
+        "reserve": {
+          "reservePayout": {
+            "on": "event",
+            "event": {
+              "type": {
+                "blueId": "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+              },
+              "kind": "Commission Payout Opened",
+              "collection": "/payouts"
+            }
+          }
+        },
+        "observePayout": {
+          "paymentTerminal": {
+            "on": "collection",
+            "path": "/payouts",
+            "event": {
+              "type": {
+                "blueId": "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+              }
+            }
+          }
+        },
+        "catchUpPayout": {
+          "payoutAdmitted": {
+            "on": "event",
+            "event": {
+              "type": {
+                "blueId": "9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx"
+              }
+            }
+          }
+        },
+        "reconcilePayouts": {
+          "afterAccessRestored": {
+            "on": "event",
+            "event": {
+              "type": {
+                "blueId": "EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs"
+              }
+            }
+          },
+          "afterTermsAccepted": {
+            "on": "event",
+            "event": {
+              "type": {
+                "blueId": "7dL9TXBk1TmaAuzEeui7rGX2D9X2apTDMenQmFP1z5Xu"
+              }
+            }
+          }
+        }
+      }
+    },
+    "payouts": {
+      "type": {
+        "blueId": "3ZugrpKGtj7sCSdEcnLfCokUadLffFmWfKrepuzpo2cJ"
+      },
+      "parameters": {
+        "allowedFields": [],
+        "fieldPaths": {
+          "limitMinor": "/paymentTerms/limitMinor",
+          "netMinor": "/paymentTerms/amountMinor",
+          "payoutTerms": "/paymentDetails/payoutTerms"
+        },
+        "method": "myos-account-to-account",
+        "obtain": "provide",
+        "prepareFor": "bootstrap",
+        "suppliedBy": "seller",
+        "suppliedParties": [
+          "guarantor"
+        ],
+        "preparationDefinition": {
+          "type": {
+            "blueId": "Hi2UMpAbaZT6Axpkdx7AD3RJ4nHFc8p9dyxihrWgEN8M"
+          }
+        },
+        "ledger": "/commission",
+        "transferTerms": "/terms",
+        "payerChannel": "seller",
+        "payeeChannel": "partner",
+        "guarantorChannel": "guarantor"
+      },
+      "bindings": {
+        "collection": "/payouts",
+        "parties": {
+          "partner": "partner",
+          "seller": "seller"
+        },
+        "template": "/payoutTemplate",
+        "prepare": {
+          "startPayout": {
+            "on": "workflow",
+            "party": "seller"
+          }
+        },
+        "provide": {
+          "providePayout": {
+            "on": "workflow",
+            "party": "seller"
+          }
+        },
+        "cancel": {
+          "cancelPayout": {
+            "on": "workflow",
+            "party": "seller"
+          }
+        }
+      }
+    },
+    "catalogAmendments": {
+      "parameters": {
+        "paths": [
+          "/products"
+        ],
+        "approvers": [
+          "seller",
+          "partner"
+        ],
+        "replacementValidator": {
+          "definition": {
+            "type": {
+              "blueId": "DJxPnV9MewgrBZwi2XV4bhAspo3iWB3ocR4pQaroTMvX"
+            }
+          },
+          "function": "validateCatalogReplacement"
+        }
+      },
+      "bindings": {
+        "state": "/catalogAmendments",
+        "editable": "/activation/everActivated",
+        "propose": {
+          "proposeCatalog": {
+            "on": "workflow",
+            "party": "seller",
+            "input": true
+          }
+        },
+        "approve": {
+          "approveCatalog_seller": {
+            "on": "workflow",
+            "party": "seller",
+            "input": true,
+            "requireExactDocumentVersion": true
+          },
+          "approveCatalog_partner": {
+            "on": "workflow",
+            "party": "partner",
+            "input": true,
+            "requireExactDocumentVersion": true
+          }
+        }
+      },
+      "type": {
+        "blueId": "EQxSgdf6iWPuAUxi1sF85mxTL6HVYrony7C1Ef8PoPjB"
+      }
+    },
+    "commissionAmendments": {
+      "parameters": {
+        "paths": [
+          "/terms/commissionBps"
+        ],
+        "approvers": [
+          "seller",
+          "partner"
+        ],
+        "replacementSchema": {
+          "path": "/terms/type/initialCommissionBps",
+          "kind": "integer"
+        }
+      },
+      "bindings": {
+        "state": "/commissionAmendments",
+        "editable": "/activation/everActivated",
+        "propose": {
+          "proposeCommission_seller": {
+            "on": "workflow",
+            "party": "seller",
+            "input": true
+          },
+          "proposeCommission_partner": {
+            "on": "workflow",
+            "party": "partner",
+            "input": true
+          }
+        },
+        "approve": {
+          "approveCommission_seller": {
+            "on": "workflow",
+            "party": "seller",
+            "input": true,
+            "requireExactDocumentVersion": true
+          },
+          "approveCommission_partner": {
+            "on": "workflow",
+            "party": "partner",
+            "input": true,
+            "requireExactDocumentVersion": true
+          }
+        }
+      },
+      "type": {
+        "blueId": "EQxSgdf6iWPuAUxi1sF85mxTL6HVYrony7C1Ef8PoPjB"
+      }
+    }
+  },
+  "orderTemplate": {
+    "currency": "USD",
+    "description": "Book a two-hour bicycle rental with a helmet for an outing along the harbor.",
+    "name": "Harbor Pedal Outing",
+    "type": {
+      "blueId": "DdBscRF7QFEKtaysJ8K4oaambxm8QG1EYdTJyzyedx5k"
+    },
+    "clauses": {
+      "activation": {
+        "parameters": {
+          "parties": {
+            "customer": {
+              "type": {
+                "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+              }
+            },
+            "partner": {
+              "type": {
+                "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+              }
+            },
+            "seller": {
+              "type": {
+                "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+              }
+            }
+          },
+          "preActivationOperations": [
+            "preparePayment",
+            "providePayment",
+            "rejectOrder",
+            "confirmReservation",
+            "proposeAlternative",
+            "acceptProposal",
+            "cancelOrder",
+            "cancelBySupplier"
+          ],
+          "readers": {
+            "guarantor": {
+              "myosAccountId": {
+                "type": "Text"
+              },
+              "readerKeys": [
+                {
+                  "type": "Text"
+                }
+              ]
+            }
+          },
+          "required": [
+            "seller"
+          ],
+          "preActivationConnections": [
+            {
+              "clause": "reservation",
+              "action": "initialize",
+              "automatic": true
+            },
+            {
+              "clause": "reservation",
+              "action": "close",
+              "connection": "afterCancellation"
+            },
+            {
+              "clause": "cancellation",
+              "action": "refreshAvailability",
+              "observations": true
+            }
+          ],
+          "reviewedApprovals": {
+            "seller": {
+              "event": {
+                "type": {
+                  "blueId": "4sVucwHteBZg8zTK6sEE8ezV8Wzg9g4rMhRPZswg9Ujc"
+                },
+                "clause": "reservation",
+                "subject": "booking-1"
+              },
+              "source": "/reservations/booking-1",
+              "basis": "/amountMinor",
+              "acceptanceBy": "customer"
+            }
+          }
+        },
+        "type": {
+          "blueId": "9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj"
+        }
+      },
+      "reservation": {
+        "type": {
+          "blueId": "EwN4ow4CiQpPFcAJ7jgNr4Cviz3vFXY2qGKabRqBFddv"
+        },
+        "parameters": {
+          "conditionGroups": {
+            "fundedReview": {
+              "type": {
+                "blueId": "55uaSTukUDkmtxRzCWRmXZuT7SF1MTfuxCYiCmQbNDiv"
+              },
+              "actions": [
+                "confirm",
+                "alternative",
+                "accept"
+              ],
+              "inputs": {
+                "instruction": "/payment",
+                "amountMinor": "/amountMinor",
+                "revision": "/activation/revision",
+                "termsRef": "/activation/terms/ref"
+              }
+            }
+          }
+        },
+        "bindings": {
+          "confirm": {
+            "confirmReservation": {
+              "on": "workflow",
+              "party": "seller",
+              "input": true,
+              "requireExactDocumentVersion": true
+            }
+          },
+          "alternative": {
+            "proposeAlternative": {
+              "on": "workflow",
+              "party": "seller",
+              "input": true,
+              "requireExactDocumentVersion": true
+            }
+          },
+          "accept": {
+            "acceptProposal": {
+              "on": "workflow",
+              "party": "customer",
+              "input": true,
+              "requireExactDocumentVersion": true
+            }
+          },
+          "wholeReservation": "/wholeOrderReservation",
+          "customerAccount": "/activation/parties/customer/myosAccountId",
+          "close": {
+            "afterCancellation": {
+              "on": "event",
+              "event": {
+                "type": {
+                  "blueId": "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+                },
+                "kind": "Order Cancellation Accepted",
+                "clause": "cancellation"
+              },
+              "params": {
+                "groupId": "booking-1",
+                "reason": {
+                  "$document": "/cancellationDecision/reason"
+                }
+              }
+            }
+          }
+        }
+      },
+      "windowStart": {
+        "type": {
+          "blueId": "F1TqzuivcCiydJQ7noHUxZJTH6uFu3KmNN3y1r9M44cL"
+        },
+        "bindings": {
+          "result": "/clockStartMicros",
+          "startFromEntry": {
+            "activation": {
+              "on": "activated"
+            }
+          }
+        }
+      },
+      "cancellation": {
+        "type": {
+          "blueId": "FyMd6AMcd6ADtyyHkzTeCXhzaeeXiLWGQXGCymBzSvvH"
+        },
+        "parameters": {
+          "freeCancellationHoursAfterStart": 2,
+          "beforeWindowStarts": "free",
+          "freeCancellationHoursBeforeStart": 24,
+          "lateCancellationChargePercent": 25,
+          "closedOrderStatuses": [
+            "REJECTED"
+          ]
+        },
+        "bindings": {
+          "amount": "/amountMinor",
+          "decision": "/cancellationDecision",
+          "availability": "/cancellationAvailability",
+          "retentionBasis": "/payment/payment/completed",
+          "confirmation": "/activation/approved/seller",
+          "orderStatus": "/orderDecision/status",
+          "windowStart": "/clockStartMicros",
+          "serviceStart": "/wholeOrderReservation/confirmedStartMicros",
+          "accept": {
+            "cancelOrder": {
+              "on": "workflow",
+              "party": "customer",
+              "input": true,
+              "requireExactDocumentVersion": true
+            }
+          },
+          "acceptWithoutCharge": {
+            "cancelBySupplier": {
+              "on": "workflow",
+              "party": "seller",
+              "input": true,
+              "requireExactDocumentVersion": true
+            }
+          },
+          "refreshAvailability": {
+            "afterCapture": {
+              "on": "event",
+              "event": {
+                "type": {
+                  "blueId": "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW"
+                },
+                "clause": "payment",
+                "instructionPath": "/payment",
+                "event": {
+                  "type": {
+                    "blueId": "EBuskkMM84G1os5d9eEvLJesCVi6vt2TeQUAoa2Q44At"
+                  }
+                }
+              }
+            },
+            "afterPaymentSelected": {
+              "on": "event",
+              "event": {
+                "type": {
+                  "blueId": "3apzpYPbFPod5ipDZwiQA2pok9SfsoV4K6DnCm6xu8go"
+                },
+                "clauseId": "payment",
+                "itemKey": "single"
+              }
+            },
+            "afterPaymentAttached": {
+              "on": "event",
+              "event": {
+                "type": {
+                  "blueId": "9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx"
+                },
+                "clauseId": "payment",
+                "itemKey": "single"
+              }
+            },
+            "afterAccessRestored": {
+              "on": "event",
+              "event": {
+                "type": {
+                  "blueId": "EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs"
+                }
+              }
+            },
+            "afterConfirmation": {
+              "on": "change",
+              "path": "/activation"
+            },
+            "afterOrderStatusChange": {
+              "on": "change",
+              "path": "/orderDecision"
+            },
+            "afterWindowStart": {
+              "on": "change",
+              "path": "/clockStartMicros"
+            },
+            "afterServiceChange": {
+              "on": "change",
+              "path": "/wholeOrderReservation"
+            }
+          }
+        }
+      },
+      "payment": {
+        "type": {
+          "blueId": "FbCgWezGFphFCZzHrPNQ5iV8kmYTQxDvE9gsjqEjEFtm"
+        },
+        "bindings": {
+          "instruction": "/payment",
+          "observe": {
+            "selectedInstruction": {
+              "on": "embedded",
+              "path": "/payment",
+              "embed": false
+            }
+          },
+          "parties": {
+            "observer": "partner",
+            "payee": "seller",
+            "payer": "customer"
+          },
+          "prepare": {
+            "preparePayment": {
+              "on": "workflow",
+              "party": "seller",
+              "documentParams": {
+                "/values/amountMinor": "/amountMinor",
+                "/values/limitMinor": "/amountMinor",
+                "/values/currency": "/currency",
+                "/values/orderOrigin": "/contracts/initialized/document",
+                "/values/orderRevision": "/activation/revision",
+                "/values/orderTermsRef": "/activation/terms/ref"
+              },
+              "inputParams": {
+                "/values/providerReference": "/providerReference"
+              }
+            }
+          },
+          "provide": {
+            "providePayment": {
+              "on": "workflow",
+              "party": "seller"
+            }
+          }
+        },
+        "parameters": {
+          "fieldPaths": {
+            "amountMinor": "/paymentTerms/amountMinor",
+            "currency": "/paymentTerms/currency",
+            "limitMinor": "/paymentTerms/limitMinor",
+            "orderOrigin": "/businessContext/orderOrigin",
+            "orderRevision": "/businessContext/orderRevision",
+            "orderTermsRef": "/businessContext/orderTermsRef",
+            "providerReference": "/paymentDetails/providerReference"
+          },
+          "obtain": "provide",
+          "prepareFor": "bootstrap",
+          "sourcePaths": {
+            "order": ""
+          },
+          "suppliedBy": "seller",
+          "suppliedParties": [
+            "guarantor"
+          ],
+          "template": {
+            "businessContext": {
+              "orderOrigin": {
+                "schema": {
+                  "required": true
+                }
+              },
+              "orderRevision": {
+                "schema": {
+                  "minimum": 1,
+                  "required": true
+                },
+                "type": "Integer"
+              },
+              "orderTermsRef": {
+                "schema": {
+                  "required": true
+                }
+              }
+            },
+            "clauses": {
+              "activation": {
+                "parameters": {
+                  "parties": {
+                    "guarantor": {
+                      "myosAccountId": {
+                        "type": "Text"
+                      },
+                      "readerKeys": {
+                        "itemType": "Text",
+                        "items": [
+                          {
+                            "type": "Text"
+                          }
+                        ],
+                        "schema": {
+                          "maxItems": 1,
+                          "minItems": 1,
+                          "uniqueItems": true
+                        },
+                        "type": "List"
+                      },
+                      "type": {
+                        "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+                      }
+                    },
+                    "observer": {
+                      "type": {
+                        "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+                      }
+                    },
+                    "payee": {
+                      "type": {
+                        "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+                      }
+                    },
+                    "payer": {
+                      "type": {
+                        "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+                      }
+                    }
+                  },
+                  "required": []
+                },
+                "type": {
+                  "blueId": "9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj"
+                }
+              },
+              "method": {
+                "type": {
+                  "blueId": "E7LRiTh19QD6CpRT1auSpyCoc98xoqU9WLDP7hTHJdn"
+                }
+              },
+              "payment": {
+                "type": {
+                  "blueId": "5rzupigxrqAKqdskbG12yJDW1v2mb4qBdDg7f8QgMaJ5"
+                },
+                "parameters": {
+                  "capture": {
+                    "type": {
+                      "blueId": "EQcAFTiBMhve8nPSEaJeUHjCaY11oMZw6BSCF1RfiA1R"
+                    },
+                    "requestId": "order-accepted-capture",
+                    "blockedBy": "cancellation",
+                    "requires": {
+                      "path": "/sources/order/wholeOrderReservation/status",
+                      "equals": "confirmed"
+                    }
+                  },
+                  "sources": {
+                    "order": {}
+                  },
+                  "selectedPayment": {
+                    "source": "/sources/order",
+                    "expectedSourceOrigin": "/businessContext/orderOrigin",
+                    "entries": "/sources/order/process_payment/entries",
+                    "path": "/payment",
+                    "key": "single"
+                  },
+                  "adjustments": {
+                    "cancellation": {
+                      "decision": {
+                        "path": "/sources/order/cancellationDecision",
+                        "when": {
+                          "field": "status",
+                          "equals": "accepted"
+                        },
+                        "retainMinorFrom": "retainedMinor"
+                      },
+                      "requestIds": {
+                        "refund": "order-cancellation-refund",
+                        "void": "order-cancellation-void"
+                      }
+                    },
+                    "rejection": {
+                      "decision": {
+                        "path": "/sources/order/orderDecision",
+                        "when": {
+                          "field": "status",
+                          "equals": "REJECTED"
+                        },
+                        "retainMinor": 0
+                      },
+                      "requestIds": {
+                        "void": "order-rejected-void"
+                      }
+                    }
+                  }
+                },
+                "bindings": {
+                  "requestAuthorize": {
+                    "authorize": {
+                      "on": "workflow",
+                      "party": "guarantor",
+                      "input": true
+                    }
+                  },
+                  "requestRefund": {
+                    "refund": {
+                      "on": "workflow",
+                      "party": "payee",
+                      "input": true
+                    }
+                  },
+                  "requestVoid": {
+                    "voidPayment": {
+                      "on": "workflow",
+                      "party": "guarantor",
+                      "input": true
+                    }
+                  },
+                  "adjust": {
+                    "afterSelection": {
+                      "on": "change",
+                      "path": "/sources/order/process_payment/entries"
+                    },
+                    "afterPaymentAttached": {
+                      "on": "embedded",
+                      "path": "/sources/order",
+                      "embed": false,
+                      "event": {
+                        "type": {
+                          "blueId": "9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx"
+                        },
+                        "clauseId": "payment"
+                      }
+                    },
+                    "afterLink": {
+                      "on": "change",
+                      "path": "/sourceLinks"
+                    },
+                    "afterPaymentOutcome": {
+                      "on": "event",
+                      "event": {
+                        "type": {
+                          "blueId": "81xyv2z2JxycpEAb9bzdTv3S7kkpny6fvDTvYsDcf3o4"
+                        }
+                      }
+                    },
+                    "afterPaymentSelected": {
+                      "on": "embedded",
+                      "path": "/sources/order",
+                      "embed": false,
+                      "event": {
+                        "type": {
+                          "blueId": "3apzpYPbFPod5ipDZwiQA2pok9SfsoV4K6DnCm6xu8go"
+                        },
+                        "clauseId": "payment",
+                        "itemKey": "single"
+                      }
+                    },
+                    "afterCancellation": {
+                      "on": "embedded",
+                      "path": "/sources/order",
+                      "embed": false,
+                      "event": {
+                        "type": {
+                          "blueId": "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+                        },
+                        "kind": "Order Cancellation Accepted",
+                        "clause": "cancellation"
+                      },
+                      "params": {
+                        "adjustment": "cancellation"
+                      }
+                    },
+                    "afterDecisionAttached": {
+                      "on": "change",
+                      "path": "/sources/order/cancellationDecision"
+                    },
+                    "afterOrderRejection": {
+                      "on": "embedded",
+                      "path": "/sources/order",
+                      "embed": false,
+                      "event": {
+                        "type": {
+                          "blueId": "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+                        },
+                        "name": "Order rejected"
+                      },
+                      "params": {
+                        "adjustment": "rejection"
+                      }
+                    },
+                    "afterRejectionAttached": {
+                      "on": "change",
+                      "path": "/sources/order/orderDecision"
+                    }
+                  }
+                }
+              }
+            },
+            "name": "Harbor Pedal Outing",
+            "paymentDetails": {
+              "customerPaymentTerms": {
+                "paymentWindowDays": 30,
+                "recipientPaymentAccountId": {
+                  "type": "Text"
+                }
+              },
+              "method": "myos-customer",
+              "providerReference": {
+                "type": "Text"
+              }
+            },
+            "paymentTerms": {
+              "allowedPayees": [
+                "payee"
+              ],
+              "amountMinor": {
+                "type": "Integer"
+              },
+              "currency": {
+                "type": "Text"
+              },
+              "guarantorChannel": "guarantor",
+              "limitMinor": {
+                "type": "Integer"
+              },
+              "payeeChannel": "payee",
+              "payerChannel": "payer",
+              "recipientApprovalRequired": false
+            },
+            "type": {
+              "blueId": "HELwiXNwpB136D2CikyAV3SZe1k8i937TFD67LhHzY1a"
+            }
+          }
+        }
+      }
+    },
+    "contracts": {
+      "orderOpen": {
+        "constants": {
+          "closedStates": {
+            "cancelled": {
+              "path": "/cancellationDecision/status",
+              "equals": "accepted",
+              "reason": "ORDER_CANCELLED"
+            }
+          },
+          "actions": {
+            "reservation": [
+              "confirm",
+              "alternative",
+              "accept"
+            ]
+          }
+        }
+      }
+    },
+    "reservationPolicy": {
+      "confirmationMode": "supplier",
+      "dateRequired": true,
+      "fulfilmentText": "Book a two-hour bicycle rental with a helmet for an outing along the harbor."
+    }
+  },
+  "payoutTemplate": {
+    "name": "Partner commission payout",
+    "type": {
+      "blueId": "9hpsLLvz2pt8nioeMPptomxZY49DW2n2V1q5BxURA86Y"
+    },
+    "paymentTerms": {
+      "amountMinor": {
+        "type": {
+          "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+        }
+      },
+      "limitMinor": {
+        "type": {
+          "blueId": "E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq"
+        }
+      },
+      "currency": "USD",
+      "payerChannel": "seller",
+      "payeeChannel": "partner",
+      "guarantorChannel": "guarantor",
+      "allowedPayees": [
+        "partner"
+      ],
+      "captureGate": "",
+      "recipientApprovalRequired": false
+    },
+    "paymentDetails": {
+      "method": "myos-account-to-account",
+      "payoutTerms": {}
+    },
+    "clauses": {
+      "activation": {
+        "type": {
+          "blueId": "9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj"
+        },
+        "parameters": {
+          "parties": {
+            "seller": {
+              "type": {
+                "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+              }
+            },
+            "partner": {
+              "type": {
+                "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+              }
+            },
+            "guarantor": {
+              "type": {
+                "blueId": "BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid"
+              }
+            }
+          },
+          "required": [
+            "seller"
+          ]
+        }
+      },
+      "payment": {
+        "type": {
+          "blueId": "DGGUGxRXhq2GoaMFPnu2p4iac7JaavxNJjyLqzabFzZp"
+        },
+        "bindings": {
+          "requestAuthorize": {
+            "securePayout": {
+              "on": "workflow",
+              "party": "guarantor",
+              "params": {
+                "requestId": "payout-secure"
+              },
+              "documentParams": {
+                "/amountMinor": "/paymentTerms/amountMinor"
+              },
+              "request": {
+                "description": "Executes the complete frozen payout; no input fields."
+              }
+            }
+          },
+          "requestCapture": {
+            "capturePayout": {
+              "on": "workflow",
+              "party": "guarantor",
+              "params": {
+                "requestId": "payout-capture"
+              },
+              "documentParams": {
+                "/amountMinor": "/paymentTerms/amountMinor"
+              },
+              "request": {
+                "description": "Executes the complete frozen payout; no input fields."
+              }
+            }
+          },
+          "requestVoid": {
+            "voidPayout": {
+              "on": "workflow",
+              "party": "seller",
+              "params": {
+                "requestId": "payout-void"
+              },
+              "documentParams": {
+                "/amountMinor": "/payment/secured"
+              },
+              "request": {
+                "description": "Executes the complete frozen payout; no input fields."
+              }
+            }
+          }
+        }
+      },
+      "method": {
+        "type": {
+          "blueId": "E7LRiTh19QD6CpRT1auSpyCoc98xoqU9WLDP7hTHJdn"
+        },
+        "bindings": {
+          "validateAccountTransfer": {
+            "fixedTerms": {
+              "on": "event",
+              "event": {
+                "type": {
+                  "blueId": "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+                }
+              }
+            }
+          },
+          "confirmAccountSettlement": {
+            "confirmAccountSettlement": {
+              "on": "workflow",
+              "party": "guarantor",
+              "input": true
+            }
+          }
+        }
+      }
+    }
+  },
+  "cataloguePresentation": {
+    "heading": "Bicycle rentals",
+    "categories": []
+  }
+}

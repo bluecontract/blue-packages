@@ -3,6 +3,85 @@ type: Documents/Document Access Functions
 description: Named dependencies bind immutable native process identities. Binding a source does not change
   commercial approval requirements.
 functions:
+  collectionItemKey:
+    args:
+      collection: {type: Text}
+      sourcePath: {type: Text}
+    do:
+    - $let: {name: token, expr: {$sliceAfter: [{$var: sourcePath}, {$concat: [{$var: collection}, /]}]}}
+    - $if:
+        cond: {$or: [{$eq: [{$var: token}, '']}, {$ne: [{$size: {$split: {text: {$var: token}, separator: /}}}, 1]}]}
+        then:
+        - $return: ''
+    - $return:
+        $listGet:
+          list: {$keys: {$pointerSet: {object: {}, path: {$concat: [/, {$var: token}]}, op: set, val: true}}}
+          index: 0
+  usableCollectionEntry:
+    args:
+      collection: {type: Text}
+      entries: {type: Text}
+      key: {type: Text}
+    do:
+    - $if:
+        cond: {$eq: [{$var: key}, '']}
+        then:
+        - $return: {}
+    - $let:
+        vars:
+          entry: {$document: {$concat: [{$var: entries}, /, {$nodeBlueId: {$var: key}}]}}
+          path: {$concat: [{$var: collection}, {$pointerJoin: [{$var: key}]}]}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: entry, path: /key}}, {$var: key}]}
+            - {$eq: [{$var: {name: entry, path: /path}}, {$var: path}]}
+            - {$eq: [{$var: {name: entry, path: /status}}, usable]}
+        then:
+        - $return: {}
+    - $let: {name: document, expr: {$document: {$var: path}}}
+    - $let: {name: original, expr: {$var: {name: document, path: /contracts/initialized/document}}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$exists: {$var: original}}
+            - {$eq: [{$var: {name: entry, path: /documentOrigin}}, {$nodeBlueId: {$var: original}}]}
+        then:
+        - $return: {}
+    - $return: {key: {$var: key}, document: {$var: document}, entry: {$var: entry}}
+  usableAttachedEntry:
+    args:
+      collection: {type: Text}
+      entries: {type: Text}
+      event: {}
+    do:
+    - $let: {name: key, expr: {$var: {name: event, path: /itemKey}}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$is: {node: {$var: event}, pattern: {type: Documents/Document Attached}}}
+            - {$isKind: {val: {$var: key}, kind: text}}
+            - {$eq: [{$var: entries}, {$concat: [/process_, {$var: {name: event, path: /clauseId}}, /entries]}]}
+        then:
+        - $return: {}
+    - $let:
+        name: linked
+        expr: {$call: {function: usableCollectionEntry, args: {collection: {$var: collection}, entries: {$var: entries}, key: {$var: key}}}}
+    - $let: {name: entry, expr: {$var: {name: linked, path: /entry}}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$exists: {$var: entry}}
+            - {$exists: {$var: {name: entry, path: /requestId}}}
+            - {$eq: [{$var: {name: entry, path: /requestId}}, {$var: {name: event, path: /inResponseTo}}]}
+            - {$eq: [{$var: {name: entry, path: /documentOrigin}}, {$var: {name: event, path: /documentOrigin}}]}
+        then:
+        - $return: {}
+    - $return: {$var: linked}
   processOrigin:
     args:
       document: {}

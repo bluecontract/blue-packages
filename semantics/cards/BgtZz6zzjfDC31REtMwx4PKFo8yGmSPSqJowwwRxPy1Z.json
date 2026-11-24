@@ -1,0 +1,160 @@
+{
+  "blueId": "BgtZz6zzjfDC31REtMwx4PKFo8yGmSPSqJowwwRxPy1Z",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde"
+    ],
+    "displayLabel": "Payment Process Functions",
+    "limitations": [],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Instruction.paymentTerms",
+        "id": "currency",
+        "meaning": "Currency used by this instruction for its minor-unit amounts.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "An empty value means no transaction has been attached.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and initiate",
+        "id": "transactionId",
+        "meaning": "Attached transaction identity.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Current secured funds after confirmed effects",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "secured",
+        "meaning": "Remaining confirmed secured funds in the instruction currency.",
+        "path": "/payment/secured",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed captures",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "completed",
+        "meaning": "Cumulative confirmed captures before refunds in the instruction currency.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed post-capture reversals",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reversed",
+        "meaning": "Cumulative confirmed post-capture refunds in the instruction currency.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open secure reservations",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reservedSecure",
+        "meaning": "Secure requests currently reserved, in the instruction currency.",
+        "path": "/payment/reserved/secure",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open capture reservations",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reservedCapture",
+        "meaning": "Capture requests currently reserved, in the instruction currency.",
+        "path": "/payment/reserved/capture",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open refund reservations",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reservedRefund",
+        "meaning": "Refund requests currently reserved, in the instruction currency.",
+        "path": "/payment/reserved/refund",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open void reservations",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reservedVoid",
+        "meaning": "Void requests currently reserved, in the instruction currency.",
+        "path": "/payment/reserved/void",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Payment Process Functions\n\nCarries out declared financial adjustments only on the original selected Payment Instruction. The selector checks the expected source and initialized origins, the linked instruction, the admitted preparation record and its exact requirement. Incomplete or wrong evidence leaves the adjustment ineligible.\n\n`applyAdjustments` evaluates configured definitions, or one specifically named by the connected action's parameter. It rereads the decision from the document and checks the named equality and a nonnegative whole minor-unit target. Missing decision or target evidence produces no request. A confirmed net amount above the target can yield a refund of the excess. At zero target and zero confirmed net capture, the void leg can release remaining secured funds. A missing leg or already recorded request key yields no new request. The first new request ends that invocation.\n\n`refundAbove` and `voidableFunds` are pure amount reads in the instruction currency. The readiness checks cover accepted transaction identity, in-progress cancellation, native reservations and the selected action lock. `voidableFunds` requires charging to be open. `applyAdjustment` sends the eligible native request with the declared stable ID. Confirmed capture, refunds and authorization release are separate native payment outcomes."
+}

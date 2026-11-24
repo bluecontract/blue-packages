@@ -1,0 +1,72 @@
+{
+  "blueId": "6JxhnzsB1jAFtuth47x3pz5ctnjicWmYsBtHHGwTCwxB",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "JAVfq3idjXE65QjTiGepqJFPb35tjpEQew6af6qPJZHj",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Account Settlement Functions",
+    "limitations": [
+      "The supplied definitions do not establish who may invoke these functions, when they run, or how payment acceptance and transaction identity are established.",
+      "The lifecycle and outcomes of secure, capture, void and control requests are not defined here.",
+      "The supplied documentPaths omit the settlement receipt and a standalone currency field, although the functions establish their use."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; the attestation guard is not satisfied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.attestTransferBreakdown: /payment/accepted guard.",
+        "id": "paymentAccepted",
+        "meaning": "Payment acceptance flag; must equal true for attestation. It does not establish transfer completion.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; the attestation guard is not satisfied.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.attestTransferBreakdown: transactionId guard and report.",
+        "id": "transactionId",
+        "meaning": "Nonempty payment transaction identifier required for attestation and copied into the settlement report.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no amount default is defined.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.validateFixedTransfer: amountMinor; attestTransferBreakdown: report.",
+        "id": "fixedNetAmount",
+        "meaning": "Fixed transfer amount in minor units; currency comes from currency within /paymentDetails/payoutTerms.",
+        "path": "/paymentDetails/payoutTerms/netMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no payee default is defined.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.validateFixedTransfer and requireFixedTransfer: payeeChannel.",
+        "id": "fixedPayeeChannel",
+        "meaning": "Payee channel that the payment profile and payee control intents must retain when validation applies.",
+        "path": "/paymentDetails/payoutTerms/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Account Settlement Functions\n\nCallable helpers that enforce fixed account-transfer terms and record an operator's settlement attestation. The supplied definitions do not establish automatic triggers or caller authorization.\n\n## Fixed transfer rules\n\n`validateFixedTransfer()` calls `requireFixedTransfer(payment, amountMinor, payeeChannel, requestPrefix)` using `/payment`, `/paymentDetails/payoutTerms/netMinor`, `/paymentDetails/payoutTerms/payeeChannel` and the prefix `payout-`.\n\nIf `payment.targetMinor` is absent, validation returns immediately without checking the remaining rules. Otherwise:\n\n- `targetMinor` must equal `amountMinor`, `payeeChannel` must match the supplied channel, `details` must equal `{}`, and `reversed` must equal `0`. Violations fail with `PAYOUT_PROFILE_IMMUTABLE`.\n- Every entry in `payment.requests` must have an `intent.action` of `secure`, `capture` or `void`, an `intent.amountMinor` equal to the full fixed amount, and a request key equal to `requestPrefix` followed by the action. Violations fail with `PAYOUT_FULL_AMOUNT_REQUIRED`. These checks do not allow refund requests or partial amounts.\n- In `payment.controlRequests`, a `payee` action must retain `intent.input.payeeRef`, a `finalAmount` action must retain `intent.input.finalAmount`, and a `details` action must keep `intent.input.transactionDetails` equal to `{}`. Changes fail with `PAYOUT_PROFILE_IMMUTABLE`. This helper places no additional restrictions on other control actions.\n\nValidation inspects recorded intents; it does not execute or confirm their outcomes.\n\n## Settlement attestation\n\n`confirmAccountSettlement(input)` takes `input.debitReference` and `input.transferReference`. It calls `attestTransferBreakdown` with the current `/paymentDetails/payoutTerms` as `breakdown` and `/accountSettlement` as `receiptPath`. These are wrapper-supplied arguments, not defaults for the general helper.\n\n`attestTransferBreakdown(breakdown, debitReference, transferReference, receiptPath)` requires `/payment/accepted` to equal `true`, and `/payment/transactionId`, `debitReference` and `transferReference` to be nonempty text. Failure produces `ACCOUNT_SETTLEMENT_INVALID`.\n\nThe report contains `transactionId`, both references, and `instructionOrigin`, obtained as the node BlueId of `/contracts/initialized/document`. It copies `payoutKey`, `currency`, `grossMinor`, `feeMinor` and `netMinor` from `breakdown`, and preserves the complete breakdown as `payoutTerms`. The gross, fee and net fields represent distinct amounts in minor currency units, associated with `breakdown.currency`; the helper neither calculates nor validates their arithmetic relationship, currency or completeness.\n\nAfter the guards pass, an existing report at `receiptPath` must equal the newly constructed report in full. An equal report returns `outcome: duplicate` without another write; a different report fails with `ACCOUNT_SETTLEMENT_CONFLICT`. If no report exists, the helper stores it and returns `outcome: acceptedNew` with `settlement` containing the report.\n\nOnly a new report through `confirmAccountSettlement` emits an `Event` with `kind: Account Settlement Confirmed` and the `settlement` payload. Calling `attestTransferBreakdown` directly does not emit that event. Event authority derives from its authenticated input or document origin, not its name.\n\nSettlement confirmation does not call the fixed-transfer validator or check capture completion or external banking results. It records an attestation under the stated guards; it does not independently establish that funds moved."
+}

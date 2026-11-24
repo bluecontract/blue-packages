@@ -2,14 +2,19 @@
 """Export the selected unpublished packages and clause examples to an explicit Core checkout."""
 import argparse, hashlib, json, sys
 from pathlib import Path
-from check_clause_tutorial import SourceLoader
+from check_clause_tutorial import historical_payment_examples, SourceLoader
 import yaml
 ROOT=Path(__file__).resolve().parents[1]
 def read(p): return yaml.load(p.read_text(),Loader=SourceLoader)
 def write_changed(path, data):
     raw=data.encode() if isinstance(data,str) else data
     if not path.exists() or path.read_bytes()!=raw:path.write_bytes(raw)
-def export(core):
+def export(core, current_launcher=False):
+    historical_payment_examples()
+    fixture_names={p.name for p in (ROOT/'examples/apps').iterdir() if p.suffix in {'.blue','.yaml'}}
+    current_payment = {'31-current-payment-preparation', '32-current-two-payment-obligations'}
+    if not current_launcher:
+        fixture_names = {name for name in fixture_names if name.split('.')[0] not in current_payment}
     catalog=json.loads((ROOT/'PACKAGES.json').read_text())
     by_ns={r['namespace']:r for r in catalog['packages']}
     manifests={ns:read(ROOT/r['directory']/'blue-package.yaml') for ns,r in by_ns.items()}
@@ -68,14 +73,13 @@ def export(core):
       '29':'Reject an instruction and verify that rejected payments cannot continue through the normal flow.'}
     fixtures=core/'examples/clause-apps'
     fixtures.mkdir(parents=True,exist_ok=True)
-    current={p.name for p in (ROOT/'examples/apps').iterdir() if p.suffix in {'.blue','.yaml'}}
     # This directory is owned by this exporter. Remove retired scenario kinds too,
     # e.g. a mock-transport case replaced by a real-provider native scenario.
     for path in fixtures.iterdir():
-        if path.is_file() and path.suffix in {'.blue','.yaml'} and path.name not in current:
+        if path.is_file() and path.suffix in {'.blue','.yaml'} and path.name not in fixture_names:
             path.unlink()
     for path in (ROOT/'examples/apps').iterdir():
-        if path.suffix in {'.blue','.yaml'}:write_changed(fixtures/path.name,path.read_bytes())
+        if path.name in fixture_names:write_changed(fixtures/path.name,path.read_bytes())
     mounts={}
     for ns,row in by_ns.items():
         manifest=manifests[ns]
@@ -96,6 +100,8 @@ def export(core):
     write_changed(fixtures/'packages.json',json.dumps(dict(mounts=mounts),indent=2)+'\n')
     examples=[]
     for path in sorted(list((ROOT/'examples/apps').glob('*.case.yaml'))+list((ROOT/'examples/apps').glob('*.time.yaml'))+list((ROOT/'examples/apps').glob('*.native.yaml'))):
+        if path.name not in fixture_names or (current_launcher and path.name.split('.')[0] not in current_payment):
+            continue
         case=read(path);source=(path.parent/case['document']).read_text();doc=read(path.parent/case['document'])
         activation=next(c for c in doc['clauses'].values() if c['type']=='Activation/Activation Clause')
         wanted=set();namespaces(doc,wanted)
@@ -109,4 +115,7 @@ def export(core):
     target=core/'core-ui/src/data/clause-examples.json';target.parent.mkdir(exist_ok=True);write_changed(target,json.dumps(examples,indent=2)+'\n')
     print('Exported',len(examples),'documents and verified candidate packages to',core)
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('core',type=Path);export(p.parse_args().core.resolve())
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('core',type=Path)
+    p.add_argument('--current-payment-launcher',action='store_true',help='Export the two current payment walkthroughs in the launcher on a separate Core checkout')
+    args=p.parse_args()
+    export(args.core.resolve(),args.current_payment_launcher)

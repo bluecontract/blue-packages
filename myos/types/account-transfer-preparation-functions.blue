@@ -1,0 +1,63 @@
+name: Account Transfer Preparation Functions
+type: Contracts/Compute Definition
+description: Freeze the account-transfer terms at preparation and verify them at admission.
+functions:
+  $blue:membersFrom: {definition: {type: MyOS/Payout Preparation Functions}, field: functions}
+  roundBps:
+    $blue:functionFrom: {definition: {type: Money/Rounding}, function: roundBps}
+  accountTransferPlan:
+    $blue:functionFrom: {definition: {type: MyOS/Payment Setup}, function: accountTransferPlan}
+  freezeAccountTransferInstruction:
+    $blue:functionFrom: {definition: {type: MyOS/Payment Setup}, function: freezeAccountTransferInstruction}
+  validateAccountTransferCandidate:
+    $blue:functionFrom: {definition: {type: MyOS/Payment Setup}, function: validateAccountTransferCandidate}
+  payoutPreparationInput:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: parameters
+        expr: {$call: {function: configurationParameters, args: {}}}
+    - $let: {name: terms, expr: {$document: {$var: {name: parameters, path: /transferTerms}}}}
+    - $let:
+        name: split
+        expr:
+          $call:
+            function: accountTransferPlan
+            args:
+              input: {$var: input}
+              options:
+                currency: {$var: {name: terms, path: /currency}}
+                feeBps: {$var: {name: terms, path: /payoutFeeBps}}
+                feePolicy: {$var: {name: terms, path: /payoutFeePolicy}}
+                operator: {$var: {name: terms, path: /payoutOperator}}
+                operatorAccountId: {$var: {name: terms, path: /payoutOperatorAccountId}}
+                payerChannel: {$var: {name: parameters, path: /payerChannel}}
+                payeeChannel: {$var: {name: parameters, path: /payeeChannel}}
+                guarantorChannel: {$var: {name: parameters, path: /guarantorChannel}}
+              parties: {$document: /activation/parties}
+              agreementOrigin: {$nodeBlueId: {$document: /contracts/initialized/document}}
+    - $return:
+        key: {$var: {name: input, path: /key}}
+        values:
+          limitMinor: {$var: {name: split, path: /netMinor}}
+          netMinor: {$var: {name: split, path: /netMinor}}
+          payoutTerms: {$var: split}
+  validatePayoutPreparationInput:
+    args:
+      input: {}
+    expr: true
+  domainPrepare:
+    args:
+      prepared: {}
+    expr: {$call: {function: freezeAccountTransferInstruction, args: {prepared: {$var: prepared}}}}
+  domainValidateCandidate:
+    args:
+      candidate: {}
+      frozenTerms: {}
+    expr: {$call: {function: validateAccountTransferCandidate, args: {candidate: {$var: candidate}, frozenTerms: {$var: frozenTerms}}}}
+  sharedCancel:
+    args:
+      input: {}
+    do:
+    - $failIf: {cond: true, message: PAYOUT_RECONCILE_INSTRUCTION}

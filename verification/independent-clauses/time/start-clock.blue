@@ -1,0 +1,19 @@
+name: Remember First Timestamp
+type: Connections/Connected Clause
+bindingTypes:
+  result: pointer
+actions:
+  startAt:
+    do:
+    - $let:
+        vars:
+          time: {$var: {name: params, path: /timestampMicros}}
+          result: {$const: {name: bindings, path: /result}}
+    - $if:
+        cond:
+          $and:
+          - {$isKind: {val: {$var: time}, kind: integer}}
+          - {$gt: [{$var: time}, 0]}
+          - {$not: {$exists: {$document: {$var: result}}}}
+        then:
+        - $appendChange: {op: add, path: {$var: result}, val: {$var: time}}

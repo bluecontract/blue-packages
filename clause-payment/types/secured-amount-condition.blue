@@ -1,0 +1,43 @@
+name: Secured Amount Condition
+description: Require the live secured balance of the selected managed instruction to cover the current reviewed amount.
+inputs: {}
+condition:
+  $and:
+  - $not:
+      $some:
+        in:
+        - {$pointerGet: {object: {$var: conditionInputs}, path: /instruction, default: ''}}
+        - {$pointerGet: {object: {$var: conditionInputs}, path: /amountMinor, default: ''}}
+        - {$pointerGet: {object: {$var: conditionInputs}, path: /revision, default: ''}}
+        - {$pointerGet: {object: {$var: conditionInputs}, path: /termsRef, default: ''}}
+        item: pointer
+        where:
+          $or:
+          - {$not: {$isKind: {val: {$var: pointer}, kind: text}}}
+          - {$not: {$startsWith: [{$var: pointer}, /]}}
+          - {$eq: [{$var: pointer}, /]}
+  - $some:
+      in:
+      - instruction: {$document: {$var: {name: conditionInputs, path: /instruction}}}
+        amountMinor: {$document: {$var: {name: conditionInputs, path: /amountMinor}}}
+        revision: {$document: {$var: {name: conditionInputs, path: /revision}}}
+        termsRef: {$document: {$var: {name: conditionInputs, path: /termsRef}}}
+      item: reviewed
+      where:
+        $and:
+        - {$isKind: {val: {$var: {name: reviewed, path: /amountMinor}}, kind: integer}}
+        - {$exists: {$var: {name: reviewed, path: /revision}}}
+        - {$exists: {$var: {name: reviewed, path: /termsRef}}}
+        - {$eq: [{$var: {name: reviewed, path: /revision}}, {$var: {name: reviewed, path: /instruction/businessContext/orderRevision}}]}
+        - {$eq: [{$var: {name: reviewed, path: /termsRef}}, {$var: {name: reviewed, path: /instruction/businessContext/orderTermsRef}}]}
+        - {$eq: [{$var: {name: reviewed, path: /instruction/payment/closed}}, false]}
+        - {$eq: [{$var: {name: reviewed, path: /instruction/payment/cancellationPending}}, false]}
+        - {$isKind: {val: {$var: {name: reviewed, path: /instruction/payment/secured}}, kind: integer}}
+        - {$isKind: {val: {$var: {name: reviewed, path: /instruction/payment/reserved/capture}}, kind: integer}}
+        - {$isKind: {val: {$var: {name: reviewed, path: /instruction/payment/reserved/void}}, kind: integer}}
+        - $gte:
+          - $subtract:
+            - {$var: {name: reviewed, path: /instruction/payment/secured}}
+            - {$var: {name: reviewed, path: /instruction/payment/reserved/capture}}
+            - {$var: {name: reviewed, path: /instruction/payment/reserved/void}}
+          - {$var: {name: reviewed, path: /amountMinor}}

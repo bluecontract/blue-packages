@@ -1,0 +1,51 @@
+{
+  "blueId": "HMFAMTqNKA6X9UxNpW2Js5MTk8CivLMJfACT1p4bdWBx",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "BS4XZrpkhY6KCLyzpMVcm8Jd1nu8Ly5BpvYmZCcns6Yu",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k"
+    ],
+    "displayLabel": "Whole Order Cancellation Plan",
+    "limitations": [
+      "The supplied evidence does not define the cancellation action bodies, their actors, or the transitions that record a cancellation decision.",
+      "No concrete decision data binding or default path is supplied, so cancellation decision status cannot be represented as a located state fact."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; false is only a planned initialization value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: slot initialization and timer arm taskBody.",
+        "id": "connectionArmed",
+        "meaning": "Records timer arming; never cleared here, so true does not establish a currently pending timer.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false is only a planned initialization value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: slot initialization and body once guards.",
+        "id": "connectionFired",
+        "meaning": "For once=true, records reaching the final action marker and suppresses later invocations; not cancellation acceptance.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Whole Order Cancellation Plan\n\nBuilds a clause’s Connections contracts and initial-state declarations, validates cancellation configuration, and optionally adds a document dispatch veto after a recorded cancellation acceptance. The configured clause supplies the action bodies and connections that determine how cancellation is requested and decided. This planner reads acceptance; it does not itself record it.\n\n## Cancellation configuration and veto\n\nThe planner reads the candidate clause at `/clauseRuntime/work/candidate/{clauseKey}` and first builds its inherited Connections plan.\n\n- `parameters.closedOrderStatuses` defaults to `[]` when absent. It must be a list of nonempty Text values, otherwise planning fails with `INVALID_CLOSED_ORDER_STATUSES`. This function validates the list; it does not compare it with an order status or independently prevent cancellation of a closed order.\n- `parameters.blockedOperationsAfterAcceptance` also defaults to `[]`. It must be a list of nonempty Text values, otherwise planning fails with `INVALID_CANCELLATION_OPERATION_LIST`. An empty list adds no cancellation dispatch policy.\n- For a nonempty operation list, the policy takes its decision-object path directly from `bindings.decision` and reads `/status` beneath that path. This path selection does not fall back to `type.defaultBindings`.\n\nThe added policy returns `allowed: false` with reason `ORDER_CANCELLED` only when the runtime dispatch kind is exactly `EXTERNAL`, its operation is in the configured list, and the decision status is exactly `accepted`. Other deliveries receive `allowed: true` from this policy; other policies and admission requirements still apply. An absent decision status does not establish acceptance or another decision outcome.\n\nA dispatch veto skips every handler for that delivery. The external input is still consumed and checkpointed; it is not held for later replay. The policy is read-only and does not reverse earlier changes. Embedded documents process independently, so a parent’s veto does not undo child processing already performed before the parent delivery.\n\n## Inherited connection behavior\n\nActions come from `type.actions`, or from `parameters.actions` when `type.configurableActions` is `true`. Clause bindings override `type.defaultBindings` for ordinary connection planning. Property bindings must match `type.bindingTypes`; bindings listed in `type.optionalBindings` may be absent. Pointer bindings must be non-root document pointers. Clause, action and connection names must be nonempty and contain no dot, slash or tilde. An action’s `automatic` connection uses the reserved name `_automatic`.\n\nConnections select their source through `on`: `workflow`, `channel`, `event`, `embedded`, `collection`, `change`, `initialized`, `activated` or `timer`. `initialized` selects the successful clause-installation event; `activated` selects Document Activated. Workflow connections require an authenticated channel binding, using `party` when supplied and otherwise `channel`. Declaring a workflow does not establish a particular person’s permission. Collection connections additionally check that the event’s `sourcePath` is beneath their configured path. Embedded and collection sources request embedding unless `embed` is `false`.\n\nAction parameters merge `defaults`, workflow request fields when `input: true`, and connection `params`, in that precedence order. Workflow `inputParams` and then `documentParams` copy existing values from their source pointers into target parameter pointers. `requireExactDocumentVersion: true` requires the corresponding call flag to be true, otherwise execution fails with `EXACT_REVIEW_REQUIRED`.\n\nA connection’s `when` defaults to `true`; a false result skips execution. Declared `args` are checked, followed by `require.when` and the action condition. `require.when` defaults to `true`. Individual `parameters.conditions` default to `true` and are combined with every applicable `conditionGroups` condition; a group’s absent `condition` defaults to `false`. Unknown referenced actions fail planning. A `connectionProfiles` entry may supply only `params` and `when`, and cannot be combined with either field locally on that connection.\n\nIf `preflight` exists, it must produce `actionResult.outcome` equal to `acceptedNew`, `duplicate`, `rejected` or `skipped`; only `acceptedNew` proceeds to connection `before` and action `do`. With `resultContract: \"outcome-v1\"`, the action must also produce one of those outcomes, and only `acceptedNew` proceeds to connection `after` and the one-shot marker. The default `resultContract` is `legacy`, which does not require that explicit outcome. `acceptedNew` is an action-processing result, distinct from cancellation decision status `accepted`.\n\n`once` defaults to `false`. When true, a recorded `fired` marker suppresses later invocations. The marker is written only after the applicable action-result checks and `after` steps.\n\n### Timers\n\nA timer requires exactly one of `timestamp` and `afterEvent`. Absolute `timestamp` is an integer Unix-microsecond instant from 0 through 9007199254740991; absolute timers reject `delayMs` and `policy`. Relative timers require a timestamped source other than initialization and a positive integer `delayMs` no greater than 9007199254740, measured in milliseconds. Their deadline uses the source timestamp and must remain within the supported microsecond range.\n\nRelative `policy` defaults to `first`; `first` suppresses further arming while `armed` is true, while `latest` permits another keyed request. `cancelOn`, when supplied, must identify a nonempty supported source and emits a cancellation request. Committed requests use key `connection` within the generated timer channel: replacement affects a pending registration, and cancellation cannot undo an earlier firing. Emission alone does not confirm registration or firing. Processing requires the selected Time runtime and its deadline, commit and input-history admission rules.\n\n## Planned state and configuration changes\n\nThe plan proposes `armed: false` and `fired: false` for each connection beneath `/connectionState_{clauseKey}`. These are initialization values, not conclusions about absent state. `armed` is set when the timer arm handler stages a request and is not cleared by the generated cancellation or firing handlers. It therefore does not prove that a timer is currently pending. `fired` records the one-shot execution marker, not cancellation acceptance or an external outcome; it remains false for connections that do not use `once`.\n\n`type.initialState` can additionally propose object state at declared pointer bindings and can support a clause with no actions. The supplied evidence does not establish a concrete cancellation-decision state location or its lifecycle.\n\n`validateConfiguration` delegates to a function that returns `allowed: true`; planning performs the configuration checks described above. `validateTransition` permits an existing clause key only when its candidate definition equals `/clauses/{clauseKey}`. A mismatch returns `allowed: false` with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`."
+}

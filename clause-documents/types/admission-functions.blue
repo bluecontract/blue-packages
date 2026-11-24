@@ -1,12 +1,18 @@
 name: Admission Functions
 type: Documents/Factory Functions
 functions:
-  # Selection is separate from commercial activation. Only an authored domain
-  # definition may opt in; the provision request never supplies this policy.
+  # Selection is separate from commercial activation. The preparation clause's
+  # authored parameters supply this policy.
   maySelectInactiveCandidate:
     args: {}
     do:
-    - $return: false
+    - $return:
+        $eq:
+        - $pointerGet:
+            object: {$call: {function: configurationParameters, args: {}}}
+            path: /selectBeforeActivation
+            default: false
+        - true
   mappedBootstrapPartyCovered:
     args:
       item: {}
@@ -577,8 +583,8 @@ functions:
     - $if:
         cond: {$eq: [{$var: selectInactive}, true]}
         then:
-        # The hook is part of the exact clause captured by the planner and frozen
-        # at prepare time. A later clause change cannot widen this obligation.
+        # The authored clause is part of the intent frozen at preparation.
+        # A later clause change cannot widen this obligation.
         - $failIf:
             cond:
               $ne:

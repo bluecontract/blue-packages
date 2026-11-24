@@ -1,0 +1,117 @@
+{
+  "blueId": "erwD9m2PC6DPwmRDaoJBo88WbC7ox13u1Cr1gmvjeeq",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "7gjcSjrbHT6av8FR27nhY2xLRX18jBRqC255dCjDX82d",
+      "BPMByZokSM9z9aVJWWzmEdPwa45uRvvAWjMWuRnkWWnV",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid",
+      "9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj",
+      "9cS1ar5Qvs8Sr5knJHittFjawuypceYWDsspeMwsRzGY",
+      "69Vz15WWecriPLjyRD2wBQQ46BUBKuY1WXLZ1bg9dxVC",
+      "EpAGfKidGeyW6nEe3QKyYyvzBKXfT9c3PHj6GSz9vc7e"
+    ],
+    "displayLabel": "Child Activation Functions",
+    "limitations": [],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no parent roster is established.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in the executing document's /activation/parties",
+          "unit": "party roles"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Child Activation Functions.activateChild; Party Mapping Functions.resolvePartyMappings",
+        "id": "partyRoleCount",
+        "meaning": "Number of party roles in the executing document; roles need not represent distinct main identities.",
+        "path": "/activation/parties",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; absence does not prove no prior activation.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.commitState: everActivated",
+        "id": "everActivated",
+        "meaning": "Whether activation has ever been reached; true remains true through later access suspension.",
+        "path": "/activation/everActivated",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialization must establish a revision.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.approve, updateParty, admitApprovedParties",
+        "id": "activationRevision",
+        "meaning": "Activation revision checked by approvals and admissions; advances when roster changes are committed.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no current terms identity is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, commitState, approve",
+        "id": "termsReference",
+        "meaning": "Exact identity of the current terms definition and field values used to bind reviewed acceptance.",
+        "path": "/activation/terms/ref",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization sets 1 only when it runs.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, commitState: termsRevision",
+        "id": "termsRevision",
+        "meaning": "Terms revision, advanced by commitState when parties or required approvers change.",
+        "path": "/activation/termsRevision",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; absence is not permission to edit.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, approveCurrentTerms",
+        "id": "negotiationEditable",
+        "meaning": "Negotiation editability; initialized true and cleared by approveCurrentTerms when the document becomes active.",
+        "path": "/activation/negotiation/editable",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown unless proposal initialization or clearing is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, approveCurrentTerms, commitState",
+        "id": "pendingProposalId",
+        "meaning": "Pending negotiation proposal identity; acceptance or changed party authority can close and clear it.",
+        "path": "/activation/negotiation/proposal/id",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Child Activation Functions\n\nA reusable function library for preparing a child document's parties, access-document references and transport contracts. It supports independently declared child roles through explicit mappings and retains a legacy same-role constructor. Its preparation functions return a child value; they do not initialize the child, record acceptance, grant private-timeline access or confirm activation.\n\n## Explicit child mappings\n\n`prepareChild(child, mapping, suppliedRoles)` requires an uninitialized child with the exact Activation Clause type at `/clauses/activation/type`. An existing `/contracts/initialized` causes `CHILD_ALREADY_INITIALIZED`; a different activation type causes `CHILD_ACTIVATION_REQUIRED`.\n\nThe child's `/clauses/activation/parameters/parties` declares its receiver roles. `mapping` maps each receiver role to either a role name in the executing document's `/activation/parties` or an explicit `Party` value. The parent roster and child declarations must be nonempty objects, and `mapping` must be an object.\n\n- Every child role needs a mapping unless listed in `suppliedRoles`. A supplied role must exist in the declarations and must not also be mapped; its declaration is retained unchanged.\n- Mapping keys must name declared child roles. Receiver names must be nonempty text without `.`, `/`, `~` or `__`.\n- Each mapped party must satisfy the `Party` type and its child declaration. It needs a `lead/channel` and a nonempty `readerKeys` list containing distinct, nonempty text values.\n- Every parent party's main identity must remain represented somewhere in the resulting child roster. Matching requires the same exact lead-channel identity and the same reader-key set, irrespective of key order. Role names may differ; this is not a one-to-one mapping requirement.\n\n`bindChild(child, mapping)` calls `prepareChild` with an empty `suppliedRoles` list, so every declared child role must be mapped.\n\nPreparation replaces the child's activation `parties` while preserving its other parameters. Existing child `accessPaths` are retained, defaulting to an empty list for this construction. Parent access paths, also read with an empty-list fallback, are appended as exact content references under `/timelineAccess/configurerN`, where `N` starts at the existing child path count. An occupied destination causes `CHILD_ACCESS_PATH_CONFLICT`.\n\nTransport contracts are added only for resulting roles that have `lead/channel`. A lead uses the role name; additional representatives use `role__representative`. An existing equal contract is retained, while an unequal one causes `CHILD_CHANNEL_CONFLICT`. Supplied declarations without a lead channel remain unresolved and receive no transport contracts.\n\n## Legacy same-role construction\n\n`activateChild(child, roles, readerNames, frozen)` returns `child` unchanged when the executing document has no `/activation`. Otherwise, empty `roles` selects every parent party; a nonempty list selects those exact parent role names. `readerNames` selects named groups from `/activation/readers`; an empty list selects none. Missing selections cause `CHILD_PARTY_NOT_IN_PARENT` or `CHILD_READER_NOT_IN_PARENT`.\n\nThis route replaces the child's `timelineAccess` collection with references named `grant0`, `grant1`, and so on, copied from the parent's access paths. It replaces the activation clause with the standard Activation Clause and merges its existing parameters with the selected `parties`, selected `readers`, Boolean `frozen` argument and new `accessPaths`. Existing `required` is preserved; if absent, it becomes an explicit empty list. This differs from ordinary Activation Clause initialization, where an omitted `required` selects all roster roles.\n\nSelected lead and representative transports are written into `/contracts`, replacing existing entries with those names. Unlike `prepareChild`, this legacy route does not check whether the child is initialized or reject those transport conflicts.\n\n## Inherited activation behavior\n\nInherited functions act on the document where they are invoked. The preparation functions read that document's `/activation` as their parent context; paths written inside the returned `child` belong to the child itself.\n\nThe inherited activation routines distinguish current readiness from historical activation. Readiness requires sufficient timeline access, approval from every `required` role, unchanged recorded terms and an open document. Computed statuses are `WAITING_FOR_ACCESS`, `SUSPENDED_ACCESS` after earlier activation, `AWAITING_ACCEPTANCE`, `ACTIVE` and `CLOSED`. `everActivated` remains true after suspension. Access checks require each non-external transport's timeline and provider to match an access document that contains at least one alternative key from every reader group; external-channel transports bypass that check.\n\n`approve` requires an exact document review, the current revision, a party-lead channel and sufficient access. Negotiable terms additionally require the current `termsRef`. Recording one party's acceptance does not establish that all required parties have accepted. `updateParty` requires exact review and an unfrozen roster; a lead can replace its own party or add a new party when enabled. It checks access, clears approvals and advances the revision. `admitApprovedParties` separately requires a matching revision, an admission policy, an unfrozen roster and sufficient access. Access-update requests remain requests; provider-owned permission changes and participant consent are separate outcomes.\n\nInherited amendment helpers likewise separate a pending proposal from application. Recording checks the revision, allowed path, editable state, proposal identity and replacement validation. Application requires every configured approver, rechecks editability and validation, then replaces the value, records history and clears the proposal. A false `validateReplacement` result rejects the replacement; configured `replacementSchema` adds scalar-kind and schema checks."
+}

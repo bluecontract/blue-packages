@@ -1,0 +1,47 @@
+name: Independent original Order fixture
+type: Orders/Order with Clauses
+amountMinor: 7200
+currency: USD
+serviceStatus: waiting
+ordinaryReview: pending
+contracts:
+  owner: {type: Contracts/External Channel, event: {source: owner}}
+  select:
+    type: Contracts/Sequential Workflow Operation
+    channel: owner
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - {op: add, path: /payment, val: {$binding: call/request/payment}}
+      - {op: add, path: /process_payment, val: {$binding: call/request/process}}
+    - type: Contracts/Compute
+      do:
+      - $appendEvent: {type: Events/Event, name: Original payment selected}
+  exerciseGates:
+    type: Contracts/Sequential Workflow Operation
+    channel: owner
+    steps:
+    - type: Contracts/Update Document
+      changeset:
+      - {op: replace, path: /serviceStatus, val: {$binding: call/request/serviceStatus}}
+      - {op: replace, path: /ordinaryReview, val: {$binding: call/request/ordinaryReview}}
+    - type: Contracts/Compute
+      do:
+      - $appendEvent: {type: Events/Event, name: Reviewed facts changed}
+  decide:
+    type: Contracts/Sequential Workflow Operation
+    channel: owner
+    steps:
+    - type: Contracts/Compute
+      do:
+      - $appendChange: {op: add, path: /priceCorrection, val: {$binding: call/request}}
+      - $appendEvent: {type: Events/Event, name: Price correction accepted}
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        owner:
+          type: Parties/Party
+          lead: {channel: {type: Contracts/External Channel, event: {source: owner}}}
+      required: []

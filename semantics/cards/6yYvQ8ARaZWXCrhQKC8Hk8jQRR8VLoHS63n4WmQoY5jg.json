@@ -1,0 +1,116 @@
+{
+  "blueId": "6yYvQ8ARaZWXCrhQKC8Hk8jQRR8VLoHS63n4WmQoY5jg",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "erwD9m2PC6DPwmRDaoJBo88WbC7ox13u1Cr1gmvjeeq",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "mKos9GALDbZ8KX4UgbTgLq6LLew1zez3zAz6Wx32sLM",
+      "DGGUGxRXhq2GoaMFPnu2p4iac7JaavxNJjyLqzabFzZp",
+      "8SyArpLrA57CwG1jdVJWxEMdtKDgnAcrnNM1sMs7LJoS",
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh",
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde"
+    ],
+    "displayLabel": "Payment Setup",
+    "limitations": [
+      "The supplied evidence declares no concrete amount or instruction data binding. The child destination and its financial state therefore cannot be assigned fixed paths in this card.",
+      "Receipt statePath and key are supplied by callers. Their locations, included instruction population and aggregate initialization are not established here, so receipt totals have no fixed-path state facts."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "No recorded identity; payment outcome is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: identityPath, instanceKey check and identity write.",
+        "id": "instructionIdentity",
+        "meaning": "Persisted child instance identity used to recognize duplicate construction and destination conflicts.",
+        "path": "/connectionState_{clauseKey}/instructionIdentity",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Not stored here; effective build amount is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: config merge and amount selection; supportsPaymentAmount.",
+        "id": "configuredAmountMinor",
+        "meaning": "Configured amount in the build configuration's currency; positive values take priority over the amount binding.",
+        "path": "/clauses/{clauseKey}/parameters/amountMinor",
+        "scope": "clause",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Not stored here; effective build currency is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: config.currency, validation and paymentTerms construction.",
+        "id": "configuredCurrency",
+        "meaning": "Configured instruction currency before configOverride and termsOverride; the builder requires nonempty text.",
+        "path": "/clauses/{clauseKey}/parameters/currency",
+        "scope": "clause",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Not stored here; effective build role is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: config.payer, roles checks and terms.payerChannel.",
+        "id": "payerRole",
+        "meaning": "Configured host party used for the child's payerChannel before overrides.",
+        "path": "/clauses/{clauseKey}/parameters/payer",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Not stored here; effective build role is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: config.payee, roles checks and generated terms.",
+        "id": "payeeRole",
+        "meaning": "Configured host recipient used for payeeChannel and allowedPayees before overrides.",
+        "path": "/clauses/{clauseKey}/parameters/payee",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Not stored here; effective build role is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: config.guarantor and child guarantor alias writes.",
+        "id": "guarantorRole",
+        "meaning": "Configured host guarantor party, also installed under the child's guarantor role when differently named.",
+        "path": "/clauses/{clauseKey}/parameters/guarantor",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Not stored here; effective requirement is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: generated terms; Payment Functions.request: capture guard.",
+        "id": "configuredRecipientApprovalRequired",
+        "meaning": "Configured requirement for current recipient approval before capture, subject to build overrides.",
+        "path": "/clauses/{clauseKey}/parameters/recipientApprovalRequired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Setup\n\nReusable functions for constructing a Payment Instruction with Clauses from a host document, connecting payment requests, and projecting confirmed receipt amounts. Invocation depends on the calling clause; this definition does not declare its own setup trigger.\n\n## Instruction construction\n\n`buildInstruction` combines its built-in configuration, `/clauses/{clauseKey}/parameters`, then `configOverride`, with later values taking precedence:\n\n- `payer`, `payee` and `guarantor` default to `customer`, `seller` and `guarantor`. Each must be a nonempty participant name without `.`, `/` or `~`, exist in the host's `/activation/parties`, and remain included in the child roster. A differently named guarantor is also installed under the child's `guarantor` party and channel.\n- `amountMinor` defaults to `0`. A positive configured value supplies the instruction amount; otherwise the function reads the document location supplied by the caller's `amount` binding. The selected amount must be an integer from 1 through 1,000,000,000,000 in minor currency units. `currency` defaults to `EUR` and must be nonempty text.\n- `recipientApprovalRequired` defaults to `false`. When enabled in the resulting payment terms, capture requires approval from the current recipient. `approveRecipient` itself requires that recipient's workflow channel.\n- `parties` defaults to `[]`, meaning all host parties are selected. A nonempty list selects named host parties. `readers` defaults to `[]` and selects additional named reader groups from the host. Existing access-document references and participant transports are carried into the child, whose activation configuration receives `frozen: true`. Selection does not itself grant access or record consent.\n- `instructionClauses` defaults to `{}` and overrides same-named entries in `methodClauses`. Clause keys follow the participant-name restrictions; `activation` and `payment` are reserved. `recipient` is accepted as a configuration key but is not read by this function. Other configuration keys are rejected.\n\nConstruction checks the host's active state and current participant access. For workflow invocation, it also checks that the invoking channel still belongs to a party or declared representative.\n\nThe generated `paymentTerms` initially use the selected amount for both `amountMinor` and `limitMinor`, the selected payee for `payeeChannel` and the sole `allowedPayees` entry, the selected payer for `payerChannel`, and `guarantor` for `guarantorChannel`. `captureGate` starts empty. `termsOverride` is applied last; the resulting terms remain subject to the instruction's validation. The base amount and currency checks occur before this override.\n\n`details` becomes the child's `paymentDetails`; this does not establish the ledger's confirmed `payment.details`. `instructionPatch.rootType` replaces the default child root type, and `instructionPatch.contracts` supplies its contracts. The child includes a `payment` clause of type Payment Request Actions.\n\nThe caller's `instruction` binding supplies the destination. Setup reuses `/connectionState_{clauseKey}/instructionIdentity`, or derives an identity from the host document identity and clause key. An existing destination with a different `instanceKey` fails with `PAYMENT_DESTINATION_CONFLICT`. A matching destination returns `created: false`, `outcome: duplicate` and its `path`; it does not update or compare its terms and details. A new construction records the identity and child, returning `created: true`, `outcome: acceptedNew` and `path`. Here, `acceptedNew` means instruction creation, not guarantor acceptance or payment completion.\n\n## Request connections\n\nSetup forwards named connections for `approveRecipient`, `requestAuthorize`, `requestCapture`, `requestRefund`, `requestVoid`, `requestPayeeAssignment`, `requestTransactionDetailsUpdate`, `requestFinalAmountResolution`, and the lock/unlock pairs `requestPaymentCompletionLock`/`requestPaymentCompletionUnlock`, `requestPaymentReversalLock`/`requestPaymentReversalUnlock`, and `requestTransactionDetailsUpdateLock`/`requestTransactionDetailsUpdateUnlock`.\n\nConnections default to `in: instruction`, so their sources refer to the instruction's own document. Explicit `in: agreement` accepts only `event`, `change`, `embedded` or `collection` sources. Agreement workflows are rejected: request workflows belong to the instruction. Agreement events become embedded sources at `/sources/order`; other agreement source paths are prefixed with `/sources/order`. Timer `afterEvent` and `cancelOn` sources are translated separately and may override the enclosing scope. Any agreement source requires an initialized host and adds its back-reference to the child.\n\nThese connections configure attempts and requests. Financial requests reserve capacity while awaiting guarantor outcomes. Only confirmed successful outcomes change financial amounts: `secured` is remaining authorization, `completed` is cumulative captured value before refunds, and `reversed` is cumulative refunded value. An `unknown` outcome retains its reservation; terminal failure or decline releases it without confirming funds. A successful void releases remaining authorization and closes further charges; it is not a refund. Control requests change payee, details, final amount or locks only after the corresponding successful guarantor decision. Connection availability alone establishes neither personal obligation nor a particular person's permission.\n\n## Confirmed receipts and recipient results\n\n`planConfirmedReceipt` and `projectConfirmedAmounts` accept Payment Instruction values. A nonmatching type returns `duplicate`. They require nonempty `paymentTerms.currency`, agreement with any expected currency and established projection currency, and integral `payment.completed` and `payment.reversed` with nonnegative reversals no greater than completed value.\n\nFor each supplied `key`, they record `grossConfirmedMinor` from cumulative completed captures, `refundsMinor` from cumulative reversals, and `netReceivedMinor` as confirmed receipts after those refunds. All use the instruction's currency and minor units. These amounts exclude requested payments and uncompleted authorization.\n\n`planConfirmedReceipt` returns proposed target/currency changes and contribution deltas without applying them; its existing projection currency comes from `currencyExpectation.projected`. `projectConfirmedAmounts` reads the currency at the supplied `statePath` and applies changes to the target record and maintained totals. Those totals represent the latest recorded contributions across the keys included by callers, not automatically every instruction in the host. Unchanged target amounts return `duplicate`. The projection function does not initialize the aggregate amount fields.\n\n`recipientPaymentResult` returns `paidMinor`, the current confirmed amount after refunds, only when `completed` exists, no financial request remains unresolved, and at least one condition holds: caller-supplied `retired` is true, the instruction is rejected or closed, or completed value equals caller-supplied `reservedMinor`. Otherwise it returns `{}`, which is not a zero-payment result.\n\n`unresolvedFinancialRequests` detects request statuses `pending` or `unknown`, or a nonzero combined reservation for `secure`, `capture`, `void` and `refund`. This helper treats an absent request dictionary as empty and absent reservation entries as zero; it does not inspect `controlRequests`. Its result does not establish that an absent ledger is initialized, or guarantee that no later refund can occur."
+}

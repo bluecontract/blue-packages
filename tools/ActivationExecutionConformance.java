@@ -26,6 +26,10 @@ public final class ActivationExecutionConformance {
           var result=processor.process(document,OperationCatalogConformance.event(document,"owner","updateParty_owner",request),time);
           require(result.status().equals("APPLIED"),"Party replacement: "+result.status()+" "+result.receipt());
           require("Changed owner".equals(processor.read(result.document(),"/activation/parties/owner/displayName")),"Party replacement effect");
+          require("owner".equals(processor.read(result.document(), "/contracts/approve_owner/steps/0/constants/activationApprovalRole")),
+              "Reinstalled approval keeps its role");
+          require(processor.read(result.document(), "/contracts/updateParty_owner/steps/0/constants/activationApprovalRole")
+              == blue.bex.Values.UNDEFINED, "Reinstalled access update has no approval role");
         } else if(action.equals("withdrawAcceptance")) {
           var request=m("type","Activation/Terms Selection Input","termsRef",processor.read(document,"/activation/terms/ref"));
           var result=processor.process(document,OperationCatalogConformance.event(document,"owner","withdrawAcceptance_owner",request),time);

@@ -10,7 +10,7 @@
 | `<package>/blue-package.lock.json` | Exact dependency locks. |
 | `<package>/types/`, `spec/` | Authored types, BEX programs and protocol rules. |
 | `<package>/dist/` | Built archive and its exact unpacked contents. |
-| `examples/apps/` | Current clause-based application sources and executable scenario assertions. |
+| `examples/apps/` | Clause-based application sources, scenario assertions and the retained payment-edition manifest. |
 | `catalogue/payment-family.json` | Example descriptions for the walkthrough viewer; no package selection. |
 | `verification/reference/` | Frozen foundation conformance implementations and source locks. |
 | `verification/publications/` | Exact historical conformance inputs, never current source selections. |

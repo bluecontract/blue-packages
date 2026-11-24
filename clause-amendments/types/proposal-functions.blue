@@ -1,6 +1,53 @@
 name: Amendment Proposal Functions
 type: Parties/Party Mapping Functions
 functions:
+  # An optional validator may reject the proposed replacement or return false.
+  # Duplicates and approvals that cannot apply it do not run this validation.
+  validateReplacement:
+    args:
+      proposal: {}
+  checkAmendmentReplacement:
+    args:
+      parameters: {}
+      proposal: {}
+    do:
+    - $failIf:
+        cond: {$eq: [{$call: {function: validateReplacement, args: {proposal: {$var: proposal}}}}, false]}
+        message: INVALID_AMENDMENT_REPLACEMENT
+    - $let: {name: declaration, expr: {$var: {name: parameters, path: /replacementSchema}}}
+    - $if:
+        cond: {$exists: {$var: declaration}}
+        then:
+        - $let: {name: schemaPath, expr: {$var: {name: declaration, path: /path}}}
+        - $let: {name: scalarKind, expr: {$var: {name: declaration, path: /kind}}}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$isKind: {val: {$var: schemaPath}, kind: text}}
+                - {$includes: {list: [boolean, double, integer, text], val: {$var: scalarKind}}}
+            message: AMENDMENT_REPLACEMENT_SCHEMA_REQUIRED
+        - $let:
+            name: replacementPattern
+            expr: {$document: {path: {$var: schemaPath}, view: definition}}
+        - $failIf:
+            cond: {$not: {$exists: {$var: replacementPattern}}}
+            message: AMENDMENT_REPLACEMENT_SCHEMA_REQUIRED
+        - $let: {name: replacement, expr: {$var: {name: proposal, path: /replacement}}}
+        # Check the submitted primitive before Blue specializes it against the declaration.
+        - $failIf:
+            cond: {$ne: [{$kind: {$var: replacement}}, {$var: scalarKind}]}
+            message: INVALID_AMENDMENT_REPLACEMENT
+        - $let:
+            name: validated
+            expr:
+              $nodeBlueId:
+                $objectFromEntries:
+                - key: type
+                  val: {$var: replacementPattern}
+                - key: value
+                  val: {$unwrap: {$var: replacement}}
+    - $return: true
   recordAmendmentProposal:
     args:
       input: {}
@@ -180,6 +227,9 @@ functions:
                 path: /proposal/id
             - $var: id
         message: PROPOSAL_PENDING
+    - $call:
+        function: checkAmendmentReplacement
+        args: {parameters: {$var: parameters}, proposal: {$var: p}}
     - $appendChange:
         op: replace
         path:
@@ -344,6 +394,9 @@ functions:
         cond:
           $var: ready
         then:
+        - $call:
+            function: checkAmendmentReplacement
+            args: {parameters: {$var: parameters}, proposal: {$var: p}}
         - $appendChange:
             op: replace
             path:

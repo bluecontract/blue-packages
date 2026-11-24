@@ -3,6 +3,224 @@ type: Activation/Child Activation Functions
 description: 'One request-binding model: execute in PI by default; explicit agreement sources add a back-reference.
   No secondary payment policy language.'
 functions:
+  projectConfirmedAmounts:
+    args:
+      instruction: {}
+      key: {type: Text}
+      statePath: {type: Text}
+      currencyExpectation: {}
+    do:
+    - $if:
+        cond: {$not: {$is: {node: {$var: instruction}, pattern: {type: PaymentInstruction/Payment Instruction}}}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        vars:
+          gross: {$var: {name: instruction, path: /payment/completed}}
+          reversed: {$var: {name: instruction, path: /payment/reversed}}
+          currency: {$var: {name: instruction, path: /paymentTerms/currency}}
+          projected: {$document: {$concat: [{$var: statePath}, /currency]}}
+          expectedCurrency: {$var: {name: currencyExpectation, path: /currency}}
+    - $failIf:
+        cond:
+          $or:
+          - {$not: {$isKind: {val: {$var: currency}, kind: text}}}
+          - {$eq: [{$var: currency}, '']}
+          - {$and: [{$exists: {$var: expectedCurrency}}, {$ne: [{$var: expectedCurrency}, {$var: currency}]}]}
+          - {$and: [{$exists: {$var: projected}}, {$ne: [{$var: projected}, {$var: currency}]}]}
+        message: RECEIPT_CURRENCY_MISMATCH
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$isKind: {val: {$var: gross}, kind: integer}}
+            - {$isKind: {val: {$var: reversed}, kind: integer}}
+            - {$gte: [{$var: reversed}, 0]}
+            - {$gte: [{$var: gross}, {$var: reversed}]}
+        message: INVALID_RECEIPT_INPUT
+    - $let:
+        vars:
+          next:
+            grossConfirmedMinor: {$var: gross}
+            refundsMinor: {$var: reversed}
+            netReceivedMinor: {$subtract: [{$var: gross}, {$var: reversed}]}
+          targetPath: {$concat: [{$var: statePath}, {$pointerJoin: [targets, {$var: key}]}]}
+    - $let:
+        name: old
+        expr: {$pointerGet: {object: {$document: {$var: statePath}}, path: {$pointerJoin: [targets, {$var: key}]}, default: {}}}
+    - $if:
+        cond: {$eq: [{$var: old}, {$var: next}]}
+        then:
+        - $return: {outcome: duplicate}
+    - $if:
+        cond: {$not: {$exists: {$var: projected}}}
+        then:
+        - $appendChange:
+            op: add
+            path: {$concat: [{$var: statePath}, /currency]}
+            val:
+              $objectSet:
+                object:
+                  name: Receipts Currency
+                  description: Currency reported by the confirmed Payment Instructions included in these receipt totals.
+                  type: Text
+                key: value
+                val: {$var: currency}
+    - $appendChange: {op: add, path: {$var: targetPath}, val: {$var: next}}
+    - $forEach:
+        key: field
+        item: amount
+        in: {$var: next}
+        do:
+        - $let: {name: fieldPath, expr: {$concat: [{$var: statePath}, /, {$var: field}]}}
+        - $appendChange:
+            op: replace
+            path: {$var: fieldPath}
+            val:
+              $add:
+              - {$document: {$var: fieldPath}}
+              - {$subtract: [{$var: amount}, {$pointerGet: {object: {$var: old}, path: {$pointerJoin: [{$var: field}]}, default: 0}}]}
+    - $return: {outcome: acceptedNew}
+  planConfirmedReceipt:
+    args:
+      instruction: {}
+      key: {type: Text}
+      statePath: {type: Text}
+      currencyExpectation: {}
+    do:
+    - $if:
+        cond: {$not: {$is: {node: {$var: instruction}, pattern: {type: PaymentInstruction/Payment Instruction}}}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        vars:
+          gross: {$var: {name: instruction, path: /payment/completed}}
+          reversed: {$var: {name: instruction, path: /payment/reversed}}
+          currency: {$var: {name: instruction, path: /paymentTerms/currency}}
+          expectedCurrency: {$var: {name: currencyExpectation, path: /currency}}
+          projected: {$var: {name: currencyExpectation, path: /projected}}
+    - $failIf:
+        cond:
+          $or:
+          - {$not: {$isKind: {val: {$var: currency}, kind: text}}}
+          - {$eq: [{$var: currency}, '']}
+          - {$and: [{$exists: {$var: expectedCurrency}}, {$ne: [{$var: expectedCurrency}, {$var: currency}]}]}
+          - {$and: [{$exists: {$var: projected}}, {$ne: [{$var: projected}, {$var: currency}]}]}
+        message: RECEIPT_CURRENCY_MISMATCH
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$isKind: {val: {$var: gross}, kind: integer}}
+            - {$isKind: {val: {$var: reversed}, kind: integer}}
+            - {$gte: [{$var: reversed}, 0]}
+            - {$gte: [{$var: gross}, {$var: reversed}]}
+        message: INVALID_RECEIPT_INPUT
+    - $let:
+        vars:
+          next:
+            grossConfirmedMinor: {$var: gross}
+            refundsMinor: {$var: reversed}
+            netReceivedMinor: {$subtract: [{$var: gross}, {$var: reversed}]}
+          targetPath: {$concat: [{$var: statePath}, {$pointerJoin: [targets, {$var: key}]}]}
+    - $let: {name: old, expr: {$document: {$var: targetPath}}}
+    - $if:
+        cond: {$eq: [{$var: old}, {$var: next}]}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        vars:
+          changes:
+          - {op: add, path: {$var: targetPath}, val: {$var: next}}
+          delta: {}
+    - $if:
+        cond: {$not: {$exists: {$var: projected}}}
+        then:
+        - $set:
+            name: changes
+            expr:
+              $listConcat:
+              - {$var: changes}
+              - - op: add
+                  path: {$concat: [{$var: statePath}, /currency]}
+                  val:
+                    $objectSet:
+                      object:
+                        name: Receipts Currency
+                        description: Currency reported by the confirmed Payment Instructions included in these receipt totals.
+                        type: Text
+                      key: value
+                      val: {$var: currency}
+    - $forEach:
+        key: field
+        item: amount
+        in: {$var: next}
+        do:
+        - $set:
+            name: delta
+            expr:
+              $objectSet:
+                object: {$var: delta}
+                key: {$var: field}
+                val: {$subtract: [{$var: amount}, {$pointerGet: {object: {$var: old}, path: {$pointerJoin: [{$var: field}]}, default: 0}}]}
+    - $return: {outcome: acceptedNew, currency: {$var: currency}, changes: {$var: changes}, delta: {$var: delta}}
+  unresolvedFinancialRequests:
+    args:
+      payment: {}
+    do:
+    - $forEach:
+        key: requestKey
+        item: request
+        in: {$pointerGet: {object: {$var: payment}, path: /requests, default: {}}}
+        do:
+        - $if:
+            cond: {$includes: {list: [pending, unknown], val: {$var: {name: request, path: /status}}}}
+            then:
+            - $return: true
+    - $return:
+        $ne:
+        - $add:
+          - {$pointerGet: {object: {$var: payment}, path: /reserved/secure, default: 0}}
+          - {$pointerGet: {object: {$var: payment}, path: /reserved/capture, default: 0}}
+          - {$pointerGet: {object: {$var: payment}, path: /reserved/void, default: 0}}
+          - {$pointerGet: {object: {$var: payment}, path: /reserved/refund, default: 0}}
+        - 0
+  recipientPaymentResult:
+    args:
+      instruction: {}
+      reservedMinor: {type: Integer}
+      retired: {type: Boolean}
+    do:
+    - $if:
+        cond: {$not: {$is: {node: {$var: instruction}, pattern: {type: PaymentInstruction/Payment Instruction}}}}
+        then:
+        - $return: {}
+    - $let: {name: payment, expr: {$var: {name: instruction, path: /payment}}}
+    - $let: {name: completed, expr: {$var: {name: payment, path: /completed}}}
+    - $if:
+        cond:
+          $and:
+          - {$exists: {$var: completed}}
+          - {$not: {$call: {function: unresolvedFinancialRequests, args: {payment: {$var: payment}}}}}
+          - $or:
+            - {$var: retired}
+            - {$eq: [{$var: {name: payment, path: /rejected}}, true]}
+            - {$eq: [{$var: {name: payment, path: /closed}}, true]}
+            - {$eq: [{$var: completed}, {$var: reservedMinor}]}
+        then:
+        - $return:
+            paidMinor: {$subtract: [{$var: completed}, {$var: {name: payment, path: /reversed}}]}
+    - $return: {}
+  supportsPaymentAmount:
+    args:
+      terms: {}
+    do:
+    - $let: {name: amount, expr: {$var: {name: terms, path: /amountMinor}}}
+    - $return:
+        $and:
+        - {$isKind: {val: {$var: amount}, kind: integer}}
+        - {$gt: [{$var: amount}, 0]}
+        - {$lte: [{$var: amount}, 1000000000000]}
   validateRole:
     args:
       candidate:
@@ -137,16 +355,10 @@ functions:
         cond:
           $not:
             $and:
-            - $isKind:
-                val:
-                  $var: amount
-                kind: integer
-            - $gt:
-              - $var: amount
-              - 0
-            - $lte:
-              - $var: amount
-              - 1000000000000
+            - $call:
+                function: supportsPaymentAmount
+                args:
+                  terms: {amountMinor: {$var: amount}}
             - $isKind:
                 val:
                   $var: currency

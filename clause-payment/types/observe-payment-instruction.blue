@@ -1,0 +1,25 @@
+name: Observe Payment Instruction
+type: Connections/Action Declaration
+description: Relay an original native event from the document at the bound instruction path.
+observation: true
+do:
+- $if:
+    cond:
+      $not:
+        $and:
+        - {$is: {node: {$event: ''}, pattern: {type: Contracts/Embedded Event Delivery}}}
+        - {$eq: [{$event: /sourcePath}, {$const: {name: bindings, path: /instruction}}]}
+        - {$is: {node: {$event: /event}, pattern: {type: Events/Event}}}
+    then:
+    - $return: {}
+- $appendEvent:
+    $merge:
+    - type: Payment/Payment Event Received
+    - kind: {$var: {name: trigger, path: /kind}}
+      clause: {$const: clauseKey}
+      instructionPath: {$const: {name: bindings, path: /instruction}}
+      event:
+        $objectSet:
+          object: {}
+          key: blueId
+          val: {$nodeBlueId: {$event: /event}}

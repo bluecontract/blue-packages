@@ -1,0 +1,84 @@
+{
+  "blueId": "3nHoKpS4DJmLjMNYVojYGu6LaMeUYbidPbzY8qMJLCjD",
+  "metadata": {
+    "covers": [],
+    "dependencies": [],
+    "displayLabel": "Remember First Timestamp",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.result",
+      "bindings.unavailable",
+      "bindings.fallback",
+      "bindings.ready",
+      "bindings.sourceReady"
+    ],
+    "stateFacts": [
+      {
+        "absent": "No qualifying timestamp recorded.",
+        "aggregate": null,
+        "binding": "result",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp.startAt",
+        "id": "startedAt",
+        "meaning": "First qualifying input recorded at this bound destination.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No explicit missing timestamp observation recorded.",
+        "aggregate": null,
+        "binding": "unavailable",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp.startAt",
+        "id": "unavailable",
+        "meaning": "A configured startAt observation explicitly reported no timestamp.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No candidate fallback timestamp available.",
+        "aggregate": null,
+        "binding": "fallback",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp bound inputs",
+        "id": "fallbackTime",
+        "meaning": "Candidate fallback timestamp to consider after an observed missing primary timestamp.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "A configured readiness flag has yet to become true.",
+        "aggregate": null,
+        "binding": "ready",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp bound inputs",
+        "id": "ready",
+        "meaning": "True permits the optional readiness check for a fallback.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "A configured source-readiness flag has yet to become true.",
+        "aggregate": null,
+        "binding": "sourceReady",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp bound inputs",
+        "id": "sourceReady",
+        "meaning": "True permits the optional source-readiness check for a fallback.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Remember First Timestamp\n\nPreserves one positive integer timestamp in Unix microseconds at the required `result` binding, which has no default path. The connected `startFromEntry` action reads the native invocation timestamp. If a valid timestamp is present it records the result. When the timestamp is genuinely absent, it can set the optional `unavailable` marker. An invalid supplied value leaves the marker unset.\n\nThe connected `startFromFallback` action needs an unset result, the bound `unavailable` marker equal to true and a bound `fallback` timestamp. If `ready` or `sourceReady` is configured, each must read true. A valid earlier fallback fact cannot displace a present primary timestamp. For example, the native priority proof records 10:03 when the primary entry supplies that time and the 10:00 fallback fact becomes observable before, during, or after the entry. The first accepted timestamp remains fixed. An absent result means this clause has recorded no time.\n\nExisting `startAt` connections may provide `timestampMicros` explicitly. Such a connection can pass `recordUnavailable: true` with an absent input to set the same optional marker. Configure the sources to give each action the intended authority and meaning."
+}

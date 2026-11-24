@@ -1,3 +1,3 @@
 # Payment family
 
-The current guide is [Build connected applications with clauses](clauses-tutorial.md#5-payment-is-one-family-the-instruction-owns-the-protocol). Complete Payment, MyOS, manual bank and ACME examples are in [examples/apps](../examples/apps). Guarantor operations are declared by the PI domain, never the Payment clause.
+The guide explains the Documents preparation API and the instruction protocol. The application examples identify the current preparation walkthrough and earlier payment editions. The Payment Instruction declares guarantor operations. [Clause tutorial](clauses-tutorial.md#5-prepare-a-payment-instruction-and-run-its-protocol) · [Application examples](../examples/apps/README.md)

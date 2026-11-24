@@ -1,0 +1,156 @@
+{
+  "blueId": "7WwJAXWdrdMQN3V6Xa8j35CDQW1fQQ2ip9JxkBHcPdPv",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HJNwWVfDZ6PhWofXE2PR3ESLujQRbMjXnZFWQRaEirZG",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q"
+    ],
+    "displayLabel": "Ledger Clause",
+    "limitations": [
+      "Currency is supplied by the configured agreement or integration.",
+      "Payout evidence and authority depend on the configured action definition and connections."
+    ],
+    "parameterRefs": [
+      "bindings.state",
+      "bindings.receipts",
+      "bindings.orders",
+      "bindings.orderEntries",
+      "bindings.frozenRate",
+      "bindings.payouts",
+      "bindings.payoutEntries"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Current obligation targets",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.setTarget",
+        "id": "accrued",
+        "meaning": "Total current keyed obligations in the owning ledger currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/accrued",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open settlement reservations",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve, settle and closeReservation",
+        "id": "reserved",
+        "meaning": "Total outstanding settlement reservations in the owning ledger currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Recorded settlement paid amounts",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.settle and closeReservation",
+        "id": "paid",
+        "meaning": "Ledger-recorded settlements in the owning ledger currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paid",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No obligation target recorded for this key.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.setTarget",
+        "id": "obligationTarget",
+        "meaning": "Current absolute obligation for a key, in the owning ledger currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No settlement status recorded for this key.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve, settle and closeReservation",
+        "id": "settlementStatus",
+        "meaning": "Reserved holds funds against the obligation, paid settles in full, and closed records a terminal amount.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "No reservation amount recorded for this key.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve",
+        "id": "settlementAmount",
+        "meaning": "Original reservation amount in the owning ledger currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "The full settle action records paid status and the original amount.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.closeReservation",
+        "id": "settledAmount",
+        "meaning": "Terminal amount from closeReservation in the owning ledger currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/paidMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "A fee has not been recorded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.recordSettlement",
+        "id": "settlementFee",
+        "meaning": "Verified fee provided by a configured settlement reporter, in the settlement currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/feeMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "A transferred amount has not been recorded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.recordSettlement",
+        "id": "settlementTransfer",
+        "meaning": "Verified amount transferred when supplied by the reporter, in the settlement currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/transferredMinor",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Ledger Clause\n\nMaintains a single ledger of keyed obligations, settlement reservations and paid amounts. `state` defaults to `/balance`. Initialization creates empty targets and settlements and zero accrued, reserved and paid totals. Amounts use minor units. The stock ledger stores no currency field, so currency must come from the owning agreement or integration.\n\n`setTarget` sets a nonnegative integer obligation for a key. The accrued total tracks those absolute targets, including downward adjustments. The same target is a duplicate. `accruePercent` can update a target from a receipt-changed event if its `receiptState` matches the `receipts` binding. It reads the order's net receipts, the usable order entry from `orders` and `orderEntries`, and the per-order rate at `frozenRate` within the entry. It skips incomplete evidence. It applies the frozen basis-point rate and rounds the target in minor units and escapes percent, slash and tilde in the derived ledger key.\n\n`reserve` requires a positive integer amount within accrued obligations still available after paid and reserved amounts. It keeps the original amount against the settlement key. An identical reservation repeats safely. Reusing the key with a different amount conflicts. `settle` moves an existing reserved amount in full to paid. `closeReservation` accepts a verified terminal paid amount from zero to the original reservation, releases any remaining reservation and records that amount. It can adjust a previous closing when the verified amount changes. A later decrease in an obligation target changes accrued only.\n\n`payouts` and `payoutEntries` are optional observation bindings. The stock definition declares `observePayout` and `catchUpPayout` actions. Their behavior depends on the configured action definition. An extension using `recordSettlement` may record verified fee and transferred amounts when its outcome carries them. A ledger action does not itself send a transfer."
+}

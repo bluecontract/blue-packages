@@ -44,3 +44,10 @@ The integration must handle `Documents/Document Provision Requested`, retrieve t
 Run the selected cases with `tools/run_reseller.py`, a qualified `BLUE_JAVA_CLASSPATH` and `JAVA_HOME`. `bootstrap-preparation.case.json` covers current catalog-priced preparation. `preview-clauses.case.json` covers bilateral approval and invalid commercial terms.
 
 The local generated document, clause definitions, semantic cards, Overview and Terms are in `reports/reseller-20261103/business-preview/index.html`. These are local review artifacts, not a deployed agreement or proof of real card processing. The separate broader settlement qualification remains incomplete.
+
+
+The alias-authored examples and signed Order attachment probe use the
+[retained shared package selection](../../retained/pre-declarative-reseller/PACKAGES.json).
+Existing Go-authored sources carry their own exact type references. The
+[declarative example](../sales/declarative/README.md) uses the current shared
+clauses for undated checkout.

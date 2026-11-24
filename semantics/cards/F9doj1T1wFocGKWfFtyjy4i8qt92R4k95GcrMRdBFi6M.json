@@ -1,0 +1,80 @@
+{
+  "blueId": "F9doj1T1wFocGKWfFtyjy4i8qt92R4k95GcrMRdBFi6M",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "5F8CAS5wXyETFCFowUdyfQachUiVSvzbPZcUSWBjCNk8",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "27WsCFhXj41q6qD1aFwcDj5879XnBYzGFpwKUiGEjXmr",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "DrWgoLeVxQYSxAhWk1YrvCL5L8mCx27uguNJmSnnzXEq",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Product Clause",
+    "limitations": [
+      "The supplied quote definition establishes no currency format, allowed currency values or missing-currency handling."
+    ],
+    "parameterRefs": [
+      "bindings.product"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no initial quantity is supplied.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: quantity guard and $appendChange.val.quantity.",
+        "id": "quantity",
+        "meaning": "Product units in the stored quote; quote accepts integers from 1 through 1,000.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/quantity",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; absence does not mean a zero price.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: price guard and $appendChange.val.unitPriceMinor.",
+        "id": "unitPrice",
+        "meaning": "Quoted price per unit in product.currency minor units; accepted range is 0 through 1,000,000,000.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/unitPriceMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no initial total is supplied.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Product units in the current stored quote, excluding earlier quote attempts.",
+          "unit": "Minor units of product.currency."
+        },
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: $appendChange.val.totalMinor uses price and quantity.",
+        "id": "totalPrice",
+        "meaning": "Stored total price for the current quoted quantity, in product.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/totalMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no currency fallback is declared.",
+        "aggregate": null,
+        "binding": "product",
+        "defaultPath": null,
+        "evidence": "Product Functions.quote: $appendChange.val.currency reads parameters.currency.",
+        "id": "currency",
+        "meaning": "Currency copied from parameters.currency when quoting; denomination of unitPriceMinor and totalMinor.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      }
+    ]
+  },
+  "semanticText": "# Product Clause\n\nMaintains a single document-owned product quote through the `quote` action, recording quantity, unit price, total price and currency together.\n\n## Binding and inputs\n\n- `bindings.product` is required and has no default. It must be a non-root JSON Pointer beginning with `/`, locating the quote in the executing document.\n- `unitPriceMinor` is required: an integer from 0 through 1,000,000,000, expressed in minor units of the configured currency. A zero price is permitted.\n- `quantity` is required: an integer from 1 through 1,000, representing product units.\n- `parameters.currency` supplies the stored `currency`. The quote function declares no currency validation or fallback.\n\nMissing, non-integer or out-of-range price or quantity causes `Invalid product quote` before the quote body stages any changes.\n\n## Invocation and effects\n\nNamed connections in `bindings.quote` determine when the action runs. The type supplies no default connection, automatic trigger or fixed actor. Connections can use `workflow`, `event`, `channel`, `change`, `embedded`, `collection`, `initialized`, `activated` or `timer` sources. A workflow connection requires an authenticated channel selected through `party` or `channel`; the action declaration alone grants no caller permission.\n\nConnection `params` supplies arguments. Workflow `input: true` also forwards request fields, with connection `params` taking precedence. Workflow `inputParams` and then `documentParams` apply field projections afterward. A false connection `when` skips execution; configured `parameters.conditions.quote` and applicable `parameters.conditionGroups` must pass. Individual conditions default to true; a condition group without `condition` defaults to false. Connection `before` and `after` bodies surround the quote body. `once` defaults to false; when true, it suppresses later executions on that connection after execution reaches its successful end. Changing an installed clause's configuration requires a new clause key under the inherited transition check.\n\nThe quote body stages replacement of the entire bound product value with `unitPriceMinor`, `quantity`, `totalMinor` and `currency`. Other existing fields at that location are not preserved by this replacement. `totalMinor` is the extended price for the quoted quantity at the supplied unit price, in the stored currency. Each quote replaces the previous quote rather than accumulating earlier quotes.\n\nThe body also emits a `Domain Event` with `kind: \"Product Quoted\"`, `clause` identifying the clause key, and `totalMinor` carrying the quoted total. Currency is stored with the product and is not included in this event. An invocation is an attempt; the applied document change establishes the stored quote.\n\nNo initial product value or quote-specific lifecycle status is declared. Missing quote fields mean unknown, not zero or a completed quote."
+}

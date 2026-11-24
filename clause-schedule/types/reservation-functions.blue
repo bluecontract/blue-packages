@@ -1,0 +1,1149 @@
+name: Reservation Functions
+description: Validate dated selections and apply exact reservation proposals, changes and decisions.
+type: Contracts/Compute Definition
+functions:
+  validateFields:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateFields
+  validateInteger:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateInteger
+  validateIdentifier:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateIdentifier
+  roundBps:
+    $blue:functionFrom:
+      definition: {type: Money/Rounding}
+      function: roundBps
+  validateCatalogState:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateCatalogState
+  validateItems:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateItems
+  validatePositiveInteger:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validatePositiveInteger
+  validatePricingAmount:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validatePricingAmount
+  validateCalendarDate:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateCalendarDate
+  priceSelections:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: priceSelections
+  priceLine:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: priceLine
+  validateTerms:
+    args:
+      terms: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate: {$var: terms}
+          allowed: [fulfilmentText, agreementDescription, confirmationMode, dateRequired]
+          required: [fulfilmentText, agreementDescription, confirmationMode]
+          error: INVALID_TERMS
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val: {$var: {name: terms, path: /fulfilmentText}}
+                kind: text
+            - $is:
+                node: {$var: {name: terms, path: /fulfilmentText}}
+                pattern:
+                  type: Text
+                  schema:
+                    minLength: 1
+        message: INVALID_FULFILMENT_TEXT
+    - $failIf:
+        cond:
+          $not:
+            $isKind:
+              val: {$var: {name: terms, path: /agreementDescription}}
+              kind: text
+        message: INVALID_AGREEMENT_DESCRIPTION
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list: [automatic, supplier]
+              val: {$var: {name: terms, path: /confirmationMode}}
+        message: INVALID_CONFIRMATION_MODE
+    - $if:
+        cond:
+          $hasKey:
+            object: {$var: terms}
+            key: dateRequired
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $isKind:
+                  val: {$var: {name: terms, path: /dateRequired}}
+                  kind: boolean
+            message: INVALID_DATE_REQUIREMENT
+    - $return: true
+  validateGroupSelections:
+    args:
+      groups: []
+      quote: {}
+    do:
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $isKind:
+                val: {$var: groups}
+                kind: list
+            - $gte:
+              - $size: {$var: groups}
+              - 1
+            - $lte:
+              - $size: {$var: groups}
+              - 20
+        message: INVALID_GROUPS
+    - $let:
+        name: seenIds
+        expr: []
+    - $let:
+        name: seenLines
+        expr: []
+    - $forEach:
+        in: {$var: groups}
+        item: spec
+        do:
+        - $call:
+            function: validateFields
+            args:
+              candidate: {$var: spec}
+              allowed: [id, lineIndices, proposedStartMicros]
+              required: [id, lineIndices]
+              error: INVALID_GROUP_FIELDS
+        - $call:
+            function: validateIdentifier
+            args:
+              candidate: {$var: {name: spec, path: /id}}
+              error: INVALID_GROUP_ID
+        - $failIf:
+            cond:
+              $includes:
+                list: {$var: seenIds}
+                val: {$var: {name: spec, path: /id}}
+            message: DUPLICATE_GROUP
+        - $set:
+            name: seenIds
+            expr:
+              $listConcat:
+              - {$var: seenIds}
+              - - {$var: {name: spec, path: /id}}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - $isKind:
+                    val: {$var: {name: spec, path: /lineIndices}}
+                    kind: list
+                - $gte:
+                  - $size: {$var: {name: spec, path: /lineIndices}}
+                  - 1
+            message: EMPTY_GROUP
+        - $if:
+            cond:
+              $hasKey:
+                object: {$var: spec}
+                key: proposedStartMicros
+            then:
+            - $call:
+                function: validateInteger
+                args:
+                  candidate: {$var: {name: spec, path: /proposedStartMicros}}
+                  minimum: 0
+                  maximum: 9007199254740991
+                  error: INVALID_START
+        - $let:
+            name: dates
+            expr: []
+        - $forEach:
+            in: {$var: {name: spec, path: /lineIndices}}
+            item: lineIndex
+            do:
+            - $call:
+                function: validateInteger
+                args:
+                  candidate: {$var: lineIndex}
+                  minimum: 0
+                  maximum:
+                    $subtract:
+                    - $size: {$var: {name: quote, path: /lines}}
+                    - 1
+                  error: INVALID_LINE_INDEX
+            - $failIf:
+                cond:
+                  $includes:
+                    list: {$var: seenLines}
+                    val: {$var: lineIndex}
+                message: LINE_IN_MULTIPLE_GROUPS
+            - $set:
+                name: seenLines
+                expr:
+                  $listConcat:
+                  - {$var: seenLines}
+                  - - {$var: lineIndex}
+            - $let:
+                name: line
+                expr:
+                  $listGet:
+                    list: {$var: {name: quote, path: /lines}}
+                    index: {$var: lineIndex}
+            - $if:
+                cond:
+                  $hasKey:
+                    object: {$var: line}
+                    key: serviceDate
+                then:
+                - $if:
+                    cond:
+                      $not:
+                        $includes:
+                          list: {$var: dates}
+                          val: {$var: {name: line, path: /serviceDate}}
+                    then:
+                    - $set:
+                        name: dates
+                        expr:
+                          $listConcat:
+                          - {$var: dates}
+                          - - {$var: {name: line, path: /serviceDate}}
+        - $failIf:
+            cond:
+              $not:
+                $lte:
+                - $size: {$var: dates}
+                - 1
+            message: GROUP_HAS_DIFFERENT_DATES
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - $size: {$var: seenLines}
+            - $size: {$var: {name: quote, path: /lines}}
+        message: UNGROUPED_QUOTE_LINE
+    - $return: true
+  makeProposal:
+    args:
+      quote: {}
+      indices: []
+      number: {type: Integer}
+      start: {}
+    do:
+    - $let:
+        name: amount
+        expr: 0
+    - $forEach:
+        in: {$var: indices}
+        item: lineIndex
+        do:
+        - $set:
+            name: amount
+            expr:
+              $add:
+              - {$var: amount}
+              - $pointerGet:
+                  object:
+                    $listGet:
+                      list: {$var: {name: quote, path: /lines}}
+                      index: {$var: lineIndex}
+                  path: /lineTotalMinor
+    - $return:
+        $merge:
+        - number: {$var: number}
+          quote: {$var: quote}
+          quoteBlueId:
+            $nodeBlueId: {$var: quote}
+          lineIndices: {$var: indices}
+          amountMinor: {$var: amount}
+        - {$var: start}
+  reservationRequest:
+    args:
+      input: {}
+      action: {type: Text}
+      allowed: []
+      required: []
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate: {$var: input}
+          allowed: {$var: allowed}
+          required: {$var: required}
+          error: INVALID_RESERVATION_FIELDS
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate: {$var: {name: input, path: /key}}
+          error: INVALID_REQUEST_KEY
+    - $call:
+        function: validateIdentifier
+        args:
+          candidate: {$var: {name: input, path: /groupId}}
+          error: INVALID_GROUP_ID
+    - $let:
+        name: intent
+        expr:
+          action: {$var: action}
+          input: {$var: input}
+          actor: {$binding: call/channel}
+    - $let:
+        name: previous
+        expr:
+          $get:
+            object:
+              $document: {$const: {name: bindings, path: /requests}}
+            key: {$var: {name: input, path: /key}}
+    - $if:
+        cond:
+          $exists: {$var: previous}
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $eq:
+                - {$var: {name: previous, path: /intent}}
+                - {$var: intent}
+            message: REQUEST_KEY_CONFLICT
+        - $return:
+            duplicate: true
+    - $failIf:
+        cond:
+          $not:
+            $lt:
+            - $size:
+                $document: {$const: {name: bindings, path: /requests}}
+            - 500
+        message: REQUEST_LIMIT
+    - $let:
+        name: group
+        expr:
+          $get:
+            object:
+              $document: {$const: {name: bindings, path: /state}}
+            key: {$var: {name: input, path: /groupId}}
+    - $failIf:
+        cond:
+          $not:
+            $exists: {$var: group}
+        message: UNKNOWN_GROUP
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - {$var: {name: input, path: /expectedProposalBlueId}}
+            - {$var: {name: group, path: /proposalBlueId}}
+        message: STALE_PROPOSAL
+    - $return:
+        duplicate: false
+        group: {$var: group}
+  publishWholeOrderReservation:
+    args:
+      groupId: {type: Text}
+      group: {}
+    do:
+    - $let:
+        name: snapshot
+        expr: {$document: {$const: {name: bindings, path: /snapshot}}}
+    - $let: {name: output, expr: {$const: {name: bindings, path: /wholeReservation}}}
+    - $if:
+        cond:
+          $and:
+          - {$exists: {$var: output}}
+          - {$eq: [{$size: {$var: {name: snapshot, path: /groups}}}, 1]}
+          - {$eq: [{$var: groupId}, {$var: {name: snapshot, path: /groups/0/id}}]}
+        then:
+        - $appendChange:
+            op: add
+            path: {$var: output}
+            val:
+              id: {$var: groupId}
+              status: {$var: {name: group, path: /status}}
+              confirmedStartMicros: {$var: {name: group, path: /confirmedStartMicros}}
+  saveReservation:
+    args:
+      input: {}
+      action: {type: Text}
+      group: {}
+    do:
+    - $appendChange:
+        op: replace
+        path:
+          $concat:
+          - {$const: {name: bindings, path: /state}}
+          - /
+          - {$var: {name: input, path: /groupId}}
+        val: {$var: group}
+    - $appendChange:
+        op: add
+        path:
+          $concat:
+          - {$const: {name: bindings, path: /requests}}
+          - /
+          - {$var: {name: input, path: /key}}
+        val:
+          intent:
+            action: {$var: action}
+            input: {$var: input}
+            actor: {$binding: call/channel}
+          status: {$var: {name: group, path: /status}}
+          timestampMicros: {$binding: timestamp}
+    - $call:
+        function: publishWholeOrderReservation
+        args: {groupId: {$var: {name: input, path: /groupId}}, group: {$var: group}}
+    - $appendEvent:
+        $merge:
+        - {type: Commerce/Domain Event}
+        - clause: {$const: clauseKey}
+          kind: Reservation Changed
+          groupId: {$var: {name: input, path: /groupId}}
+          status: {$var: {name: group, path: /status}}
+          requestKey: {$var: {name: input, path: /key}}
+    - $if:
+        cond:
+          $and:
+          - {$eq: [{$binding: call/requireExactDocumentVersion}, true]}
+          - {$includes: {list: [confirm, alternative, accept], val: {$var: action}}}
+        then:
+        - $appendEvent:
+            $merge:
+            - {type: Schedule/Reservation Reviewed}
+            - clause: {$const: clauseKey}
+              subject: {$var: {name: input, path: /groupId}}
+              decision: {$get: {object: {confirm: approve, alternative: offer, accept: accept}, key: {$var: action}}}
+              actor: {$binding: call/channel}
+              proposal: {$var: {name: group, path: /proposalBlueId}}
+              basis: {$var: {name: group, path: /proposal/amountMinor}}
+              recordBlueId: {$nodeBlueId: {$var: group}}
+              requestBlueId: {$nodeBlueId: {$binding: call/request}}
+    - $return: {outcome: acceptedNew}
+  confirmProposal:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input: {$var: input}
+              action: confirm
+              allowed: [key, groupId, expectedProposalBlueId]
+              required: [key, groupId, expectedProposalBlueId]
+    - $if:
+        cond: {$var: {name: context, path: /duplicate}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        name: group
+        expr: {$var: {name: context, path: /group}}
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - {$var: {name: group, path: /status}}
+            - pending_supplier
+        message: NOT_PENDING_SUPPLIER
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $not:
+                $hasKey:
+                  object: {$var: group}
+                  key: responseDeadlineMicros
+            - $lt:
+              - {$binding: timestamp}
+              - {$var: {name: group, path: /responseDeadlineMicros}}
+        message: RESPONSE_DEADLINE_PASSED
+    - $call:
+        function: validateInteger
+        args:
+          candidate: {$var: {name: group, path: /proposal/proposedStartMicros}}
+          minimum: 0
+          maximum: 9007199254740991
+          error: EXACT_START_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - {$var: {name: group, path: /proposal/proposedStartMicros}}
+            - {$binding: timestamp}
+        message: START_NOT_FUTURE
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - {$var: group}
+          - status: confirmed
+            supplierApproved: true
+            confirmedStartMicros: {$var: {name: group, path: /proposal/proposedStartMicros}}
+            confirmedAtMicros: {$binding: timestamp}
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input: {$var: input}
+            action: confirm
+            group: {$var: group}
+  acceptProposal:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input: {$var: input}
+              action: accept
+              allowed: [key, groupId, expectedProposalBlueId]
+              required: [key, groupId, expectedProposalBlueId]
+    - $if:
+        cond: {$var: {name: context, path: /duplicate}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        name: group
+        expr: {$var: {name: context, path: /group}}
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - {$var: {name: group, path: /status}}
+            - pending_customer
+        message: NOT_PENDING_CUSTOMER
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $not:
+                $hasKey:
+                  object: {$var: group}
+                  key: responseDeadlineMicros
+            - $lt:
+              - {$binding: timestamp}
+              - {$var: {name: group, path: /responseDeadlineMicros}}
+        message: RESPONSE_DEADLINE_PASSED
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - {$var: {name: group, path: /supplierApproved}}
+            - true
+        message: SUPPLIER_APPROVAL_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - {$var: {name: group, path: /proposal/proposedStartMicros}}
+            - {$binding: timestamp}
+        message: START_NOT_FUTURE
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - {$var: group}
+          - status: confirmed
+            confirmedStartMicros: {$var: {name: group, path: /proposal/proposedStartMicros}}
+            confirmedAtMicros: {$binding: timestamp}
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input: {$var: input}
+            action: accept
+            group: {$var: group}
+  proposeAlternative:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input: {$var: input}
+              action: alternative
+              allowed: [key, groupId, expectedProposalBlueId, catalog, lines, proposedStartMicros]
+              required: [key, groupId, expectedProposalBlueId, catalog, lines, proposedStartMicros]
+    - $if:
+        cond: {$var: {name: context, path: /duplicate}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        name: group
+        expr: {$var: {name: context, path: /group}}
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list: [pending_supplier, pending_customer]
+              val: {$var: {name: group, path: /status}}
+        message: NOT_PENDING
+    - $failIf:
+        cond:
+          $not:
+            $or:
+            - $not:
+                $hasKey:
+                  object: {$var: group}
+                  key: responseDeadlineMicros
+            - $lt:
+              - {$binding: timestamp}
+              - {$var: {name: group, path: /responseDeadlineMicros}}
+        message: RESPONSE_DEADLINE_PASSED
+    - $failIf:
+        cond:
+          $not:
+            $lt:
+            - $size: {$var: {name: group, path: /history}}
+            - 20
+        message: PROPOSAL_LIMIT
+    - $call:
+        function: validateCatalogState
+        args:
+          catalogState: {$var: {name: input, path: /catalog}}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - $eq:
+              - {$var: {name: input, path: /catalog/supplierId}}
+              - $pointerGet:
+                  object:
+                    $document: {$const: {name: bindings, path: /snapshot}}
+                  path: /quote/supplierId
+            - $eq:
+              - {$var: {name: input, path: /catalog/currency}}
+              - $pointerGet:
+                  object:
+                    $document: {$const: {name: bindings, path: /snapshot}}
+                  path: /quote/currency
+        message: ALTERNATIVE_SELLER_OR_CURRENCY_MISMATCH
+    - $call:
+        function: validateInteger
+        args:
+          candidate: {$var: {name: input, path: /proposedStartMicros}}
+          minimum: 0
+          maximum: 9007199254740991
+          error: EXACT_START_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - {$var: {name: input, path: /proposedStartMicros}}
+            - {$binding: timestamp}
+        message: START_NOT_FUTURE
+    - $let:
+        name: quote
+        expr:
+          $call:
+            function: priceSelections
+            args:
+              input:
+                key: {$var: {name: input, path: /key}}
+                lines: {$var: {name: input, path: /lines}}
+                catalogRevision: {$var: {name: input, path: /catalog/revision}}
+              catalogState: {$var: {name: input, path: /catalog}}
+    - $let:
+        name: indices
+        expr: []
+    - $let:
+        name: n
+        expr: 0
+    - $forEach:
+        in: {$var: {name: quote, path: /lines}}
+        item: line
+        do:
+        - $set:
+            name: indices
+            expr:
+              $listConcat:
+              - {$var: indices}
+              - - {$var: n}
+        - $set:
+            name: n
+            expr:
+              $add:
+              - {$var: n}
+              - 1
+    - $call:
+        function: validateGroupSelections
+        args:
+          quote: {$var: quote}
+          groups:
+          - id: {$var: {name: input, path: /groupId}}
+            lineIndices: {$var: indices}
+            proposedStartMicros: {$var: {name: input, path: /proposedStartMicros}}
+    - $let:
+        name: proposal
+        expr:
+          $call:
+            function: makeProposal
+            args:
+              quote: {$var: quote}
+              indices: {$var: indices}
+              number:
+                $add:
+                - {$var: {name: group, path: /proposal/number}}
+                - 1
+              start:
+                proposedStartMicros: {$var: {name: input, path: /proposedStartMicros}}
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - {$var: group}
+          - status: pending_customer
+            proposal: {$var: proposal}
+            proposalBlueId:
+              $nodeBlueId: {$var: proposal}
+            history:
+              $listConcat:
+              - {$var: {name: group, path: /history}}
+              - - {$var: proposal}
+            supplierApproved: true
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input: {$var: input}
+            action: alternative
+            group: {$var: group}
+  setResponseDeadline:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input: {$var: input}
+              action: deadline
+              allowed: [key, groupId, expectedProposalBlueId, deadlineMicros]
+              required: [key, groupId, expectedProposalBlueId, deadlineMicros]
+    - $if:
+        cond: {$var: {name: context, path: /duplicate}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        name: group
+        expr: {$var: {name: context, path: /group}}
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list: [pending_supplier, pending_customer]
+              val: {$var: {name: group, path: /status}}
+        message: NOT_PENDING
+    - $failIf:
+        cond:
+          $hasKey:
+            object: {$var: group}
+            key: responseDeadlineMicros
+        message: DEADLINE_ALREADY_SET
+    - $call:
+        function: validateInteger
+        args:
+          candidate: {$var: {name: input, path: /deadlineMicros}}
+          minimum: 0
+          maximum: 9007199254740991
+          error: INVALID_DEADLINE
+    - $failIf:
+        cond:
+          $not:
+            $gt:
+            - {$var: {name: input, path: /deadlineMicros}}
+            - {$binding: timestamp}
+        message: DEADLINE_NOT_FUTURE
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - {$var: group}
+          - responseDeadlineMicros: {$var: {name: input, path: /deadlineMicros}}
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input: {$var: input}
+            action: deadline
+            group: {$var: group}
+  fulfilGroup:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input: {$var: input}
+              action: fulfil
+              allowed: [key, groupId, expectedProposalBlueId]
+              required: [key, groupId, expectedProposalBlueId]
+    - $if:
+        cond: {$var: {name: context, path: /duplicate}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        name: group
+        expr: {$var: {name: context, path: /group}}
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - {$var: {name: group, path: /status}}
+            - confirmed
+        message: NOT_CONFIRMED
+    - $failIf:
+        cond:
+          $not:
+            $gte:
+            - {$binding: timestamp}
+            - {$var: {name: group, path: /confirmedStartMicros}}
+        message: SERVICE_NOT_STARTED
+    - $set:
+        name: group
+        expr:
+          $merge:
+          - {$var: group}
+          - status: fulfilled
+            fulfilledAtMicros: {$binding: timestamp}
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input: {$var: input}
+            action: fulfil
+            group: {$var: group}
+  initialGroups:
+    args:
+      snapshot: {}
+    do:
+    - $call:
+        function: validateTerms
+        args:
+          terms: {$var: {name: snapshot, path: /terms}}
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - {$var: {name: snapshot, path: /quoteBlueId}}
+            - $nodeBlueId: {$var: {name: snapshot, path: /quote}}
+        message: QUOTE_ID_MISMATCH
+    - $failIf:
+        cond:
+          $not:
+            $eq:
+            - {$var: {name: snapshot, path: /termsBlueId}}
+            - $nodeBlueId: {$var: {name: snapshot, path: /terms}}
+        message: TERMS_ID_MISMATCH
+    - $call:
+        function: validateGroupSelections
+        args:
+          groups: {$var: {name: snapshot, path: /groups}}
+          quote: {$var: {name: snapshot, path: /quote}}
+    - $let:
+        name: result
+        expr: {}
+    - $forEach:
+        in: {$var: {name: snapshot, path: /groups}}
+        item: spec
+        do:
+        - $if:
+            cond:
+              $pointerGet:
+                object: {$var: snapshot}
+                path: /terms/dateRequired
+                default: false
+            then:
+            - $call:
+                function: validateInteger
+                args:
+                  candidate: {$var: {name: spec, path: /proposedStartMicros}}
+                  minimum: 0
+                  maximum: 9007199254740991
+                  error: PROPOSED_DATE_REQUIRED
+        - $let:
+            name: proposal
+            expr:
+              $call:
+                function: makeProposal
+                args:
+                  quote: {$var: {name: snapshot, path: /quote}}
+                  indices: {$var: {name: spec, path: /lineIndices}}
+                  number: 1
+                  start:
+                    $choose:
+                      cond:
+                        $hasKey:
+                          object: {$var: spec}
+                          key: proposedStartMicros
+                      then:
+                        proposedStartMicros:
+                          $get:
+                            object: {$var: spec}
+                            key: proposedStartMicros
+                      else: {}
+        - $let:
+            name: group
+            expr:
+              status: pending_supplier
+              originalLineIndices: {$var: {name: spec, path: /lineIndices}}
+              proposal: {$var: proposal}
+              proposalBlueId:
+                $nodeBlueId: {$var: proposal}
+              history:
+              - {$var: proposal}
+        - $let:
+            name: automatic
+            expr: {$eq: [{$var: {name: snapshot, path: /terms/confirmationMode}}, automatic]}
+        - $let:
+            name: scheduled
+            expr:
+              $or:
+              - {$eq: [{$var: {name: snapshot, path: /terms/dateRequired}}, true]}
+              - {$exists: {$var: {name: proposal, path: /proposedStartMicros}}}
+        - $if:
+            cond: {$and: [{$var: automatic}, {$not: {$var: scheduled}}]}
+            then:
+            - $set:
+                name: group
+                expr: {$merge: [{$var: group}, {status: confirmed}]}
+        - $if:
+            cond: {$and: [{$var: automatic}, {$var: scheduled}]}
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - $eq:
+                      - {$var: {name: snapshot, path: /supplierReadiness/quoteBlueId}}
+                      - {$var: {name: snapshot, path: /quoteBlueId}}
+                    - $eq:
+                      - {$var: {name: snapshot, path: /supplierReadiness/groups}}
+                      - {$var: {name: snapshot, path: /groups}}
+                message: SUPPLIER_READINESS_REQUIRED
+            - $call:
+                function: validateInteger
+                args:
+                  candidate: {$var: {name: proposal, path: /proposedStartMicros}}
+                  minimum: 0
+                  maximum: 9007199254740991
+                  error: EXACT_START_REQUIRED
+            - $failIf:
+                cond:
+                  $not:
+                    $gt:
+                    - {$var: {name: proposal, path: /proposedStartMicros}}
+                    - {$var: {name: snapshot, path: /acceptedAtMicros}}
+                message: START_NOT_FUTURE
+            - $set:
+                name: group
+                expr:
+                  $merge:
+                  - {$var: group}
+                  - status: confirmed
+                    confirmedStartMicros: {$var: {name: proposal, path: /proposedStartMicros}}
+                    confirmedAtMicros: {$var: {name: snapshot, path: /acceptedAtMicros}}
+        - $set:
+            name: result
+            expr:
+              $objectSet:
+                object: {$var: result}
+                key: {$var: {name: spec, path: /id}}
+                val: {$var: group}
+    - $return: {$var: result}
+  freezeReservation:
+    args:
+      quote: {}
+      terms: {}
+      groups: []
+    do:
+    - $let:
+        name: snapshot
+        expr:
+          quote: {$var: quote}
+          quoteBlueId: {$nodeBlueId: {$var: quote}}
+          terms: {$var: terms}
+          termsBlueId: {$nodeBlueId: {$var: terms}}
+          groups: {$var: groups}
+    - $call: {function: initialGroups, args: {snapshot: {$var: snapshot}}}
+    - $if:
+        cond: {$eq: [{$var: {name: terms, path: /dateRequired}}, true]}
+        then:
+        - $forEach:
+            item: group
+            in: {$var: groups}
+            do:
+            - $failIf:
+                cond: {$not: {$gt: [{$var: {name: group, path: /proposedStartMicros}}, {$binding: timestamp}]}}
+                message: START_NOT_FUTURE
+    - $return: {$var: snapshot}
+  initializeOrder:
+    args: {}
+    do:
+    - $let: {name: accountPath, expr: {$const: {name: bindings, path: /customerAccount}}}
+    - $if:
+        cond: {$exists: {$var: accountPath}}
+        then:
+        - $let: {name: account, expr: {$document: {$var: accountPath}}}
+        - $failIf:
+            cond: {$not: {$is: {node: {$var: account}, pattern: {type: Text, schema: {minLength: 1, maxLength: 256}}}}}
+            message: CUSTOMER_BINDING_REQUIRED
+        - $if:
+            cond: {$exists: {$document: /customerAccountId}}
+            then:
+            - $failIf: {cond: {$ne: [{$var: account}, {$document: /customerAccountId}]}, message: CUSTOMER_ORDER_IDENTITY_CHANGED}
+            else:
+            - $appendChange: {op: add, path: /customerAccountId, val: {$var: account}}
+    - $let: {name: snapshot, expr: {$document: {$const: {name: bindings, path: /snapshot}}}}
+    - $if:
+        cond: {$exists: {$var: snapshot}}
+        then:
+        - $failIf:
+            cond: {$ne: [{$object: {$document: {$const: {name: bindings, path: /state}}}}, {}]}
+            message: RESERVATIONS_MUST_BE_EMPTY
+        - $failIf:
+            cond: {$ne: [{$object: {$document: {$const: {name: bindings, path: /requests}}}}, {}]}
+            message: REQUESTS_MUST_BE_EMPTY
+        - $let: {name: groups, expr: {$call: {function: initialGroups, args: {snapshot: {$var: snapshot}}}}}
+        - $appendChange:
+            op: add
+            path: {$const: {name: bindings, path: /state}}
+            val: {$var: groups}
+        - $if:
+            cond: {$eq: [{$size: {$var: {name: snapshot, path: /groups}}}, 1]}
+            then:
+            - $let: {name: groupId, expr: {$var: {name: snapshot, path: /groups/0/id}}}
+            - $call:
+                function: publishWholeOrderReservation
+                args: {groupId: {$var: groupId}, group: {$get: {object: {$var: groups}, key: {$var: groupId}}}}
+        - $appendChange:
+            op: add
+            path: {$const: {name: bindings, path: /requests}}
+            val: {}
+    - $return: {outcome: acceptedNew}
+  closeReservation:
+    args:
+      groupId: {type: Text}
+      reason: {type: Text}
+    do:
+    - $let:
+        name: group
+        expr: {$get: {object: {$document: {$const: {name: bindings, path: /state}}}, key: {$var: groupId}}}
+    - $if:
+        cond:
+          $not:
+            $includes:
+              list: [pending_supplier, pending_customer, confirmed]
+              val: {$var: {name: group, path: /status}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let:
+        name: closed
+        expr: {$merge: [{$var: group}, {status: cancelled}]}
+    - $appendChange:
+        op: replace
+        path: {$concat: [{$const: {name: bindings, path: /state}}, /, {$var: groupId}]}
+        val: {$var: closed}
+    - $call:
+        function: publishWholeOrderReservation
+        args: {groupId: {$var: groupId}, group: {$var: closed}}
+    - $appendEvent:
+        $merge:
+        - {type: Commerce/Domain Event}
+        - clause: {$const: clauseKey}
+          kind: Reservation Changed
+          groupId: {$var: groupId}
+          reason: {$var: reason}
+          status: cancelled
+    - $return: {outcome: acceptedNew}
+  endReservation:
+    args:
+      input: {}
+      action: {type: Text}
+    do:
+    - $let:
+        name: context
+        expr:
+          $call:
+            function: reservationRequest
+            args:
+              input: {$var: input}
+              action: {$var: action}
+              allowed: [key, groupId, expectedProposalBlueId, reason]
+              required: [key, groupId, expectedProposalBlueId, reason]
+    - $if: {cond: {$var: {name: context, path: /duplicate}}, then: [{$return: {outcome: duplicate}}]}
+    - $failIf:
+        cond: {$not: {$is: {node: {$var: {name: input, path: /reason}}, pattern: {type: Text, schema: {minLength: 1}}}}}
+        message: REASON_REQUIRED
+    - $let: {name: group, expr: {$var: {name: context, path: /group}}}
+    - $let: {name: status, expr: {$var: {name: group, path: /status}}}
+    - $let: {name: now, expr: {$binding: timestamp}}
+    - $let: {name: pending, expr: {$includes: {list: [pending_supplier, pending_customer], val: {$var: status}}}}
+    - $let: {name: confirmed, expr: {$eq: [{$var: status}, confirmed]}}
+    - $let: {name: nextStatus, expr: cancelled}
+    - $if:
+        cond: {$includes: {list: [cancel, supplierCancel], val: {$var: action}}}
+        then:
+        - $failIf: {cond: {$not: {$or: [{$var: pending}, {$var: confirmed}]}}, message: CANCELLATION_CLOSED}
+        else:
+        - $if:
+            cond: {$eq: [{$var: action}, noShow]}
+            then:
+            - $failIf: {cond: {$not: {$var: confirmed}}, message: NOT_CONFIRMED}
+            - $failIf:
+                cond: {$not: {$gte: [{$var: now}, {$var: {name: group, path: /confirmedStartMicros}}]}}
+                message: SERVICE_NOT_STARTED
+            - $set: {name: nextStatus, expr: no_show}
+            else:
+            - $failIf: {cond: {$not: {$var: pending}}, message: NOT_PENDING}
+            - $set: {name: nextStatus, expr: declined}
+            - $if:
+                cond: {$eq: [{$var: action}, expire]}
+                then:
+                - $let: {name: deadline, expr: {$var: {name: group, path: /responseDeadlineMicros}}}
+                - $failIf: {cond: {$not: {$exists: {$var: deadline}}}, message: NO_DEADLINE}
+                - $failIf: {cond: {$lt: [{$var: now}, {$var: deadline}]}, message: DEADLINE_NOT_REACHED}
+                - $set: {name: nextStatus, expr: expired}
+    - $return:
+        $call:
+          function: saveReservation
+          args:
+            input: {$var: input}
+            action: {$var: action}
+            group:
+              $merge:
+              - {$var: group}
+              - status: {$var: nextStatus}
