@@ -1,0 +1,307 @@
+{
+  "blueId": "ENrAb2QgH7LKMvjyezHi5SroN6V7EVhDxYezKmcto1Xz",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "7MBQjwZKYdkkgJJvYunuFQxu7GzaDPtzMjjA4vPFPyYF",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "GXZn9atEC4uY5rKMRVP2K36kB4DeHBXkVbJJXuyj1hkC",
+      "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde",
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "6Kt2QFDkzh731yaMrVF1p9zRF1WqJTr7XPCcm23bEPGE",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Payment Process Plan",
+    "limitations": [
+      "The supplied functions validate selectedPayment and adjustment declarations but do not establish payment selection, retention calculation or adjustment execution."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; conditional mode initializes false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Conditional Process Plan.plan; Payment Process Plan.policyAction.",
+        "id": "captureAllowed",
+        "meaning": "Activation, source readiness and capture predicate gate; financial checks remain separate.",
+        "path": "/paymentProcess_{clauseKey}/captureAllowed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.accept and initialize.",
+        "id": "accepted",
+        "meaning": "Guarantor acceptance; false alone does not distinguish undecided from rejected.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.accept.",
+        "id": "rejected",
+        "meaning": "Guarantor rejection of the instruction; a rejected instruction cannot later be accepted.",
+        "path": "/payment/rejected",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; initialized empty means unattached.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, initiate and request.",
+        "id": "transactionId",
+        "meaning": "Guarantor-attached transaction identifier; required before a capture request.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.confirm and request.",
+        "id": "closed",
+        "meaning": "Successful void has closed further charges; refunds remain permitted by this closure guard.",
+        "path": "/payment/closed",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request and confirm.",
+        "id": "cancellationPending",
+        "meaning": "A pending or unknown void awaits guarantor resolution and blocks new securing or capture.",
+        "path": "/payment/cancellationPending",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.configure and request.",
+        "id": "captureLocked",
+        "meaning": "Guarantor-controlled lock preventing new capture requests while true.",
+        "path": "/payment/locks/capture",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.approveRecipient and configure.",
+        "id": "recipientApproved",
+        "meaning": "Current payee's workflow approval; changing the payee resets it.",
+        "path": "/payment/recipientApproved",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; empty means no selected payee.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure and request.",
+        "id": "payeeChannel",
+        "meaning": "Selected recipient channel; a nonempty selection is required for capture.",
+        "path": "/payment/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; required for valid initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Process Plan.requestStep; Payment Functions.initialize.",
+        "id": "captureAmount",
+        "meaning": "Fixed automatic capture amount in /paymentTerms/currency minor units.",
+        "path": "/paymentTerms/amountMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure and request.",
+        "id": "targetAmount",
+        "meaning": "Current capture target in /paymentTerms/currency minor units; initially amountMinor.",
+        "path": "/payment/targetMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown if absent.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.configure, action finalAmount.",
+        "id": "finalResolved",
+        "meaning": "Guarantor has finalized targetMinor; later resolution to a different amount is rejected.",
+        "path": "/payment/finalResolved",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; required for valid initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and emit; Complete Payment Requested.amount.",
+        "id": "currency",
+        "meaning": "Instruction currency for payment amounts, balances, reservations and emitted payment events.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; required for valid initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and configure.",
+        "id": "approvedLimit",
+        "meaning": "Approved amount ceiling in /paymentTerms/currency minor units, at most 1,000,000,000,000.",
+        "path": "/paymentTerms/limitMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Successful securing, reduced by successful captures and void releases",
+          "unit": "minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and confirm.",
+        "id": "secured",
+        "meaning": "Remaining confirmed authorization in /paymentTerms/currency minor units.",
+        "path": "/payment/secured",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Succeeded capture requests",
+          "unit": "minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.confirm, capture succeeded branch.",
+        "id": "completed",
+        "meaning": "Cumulative successful captures in /paymentTerms/currency minor units, without deducting refunds.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Succeeded refund requests",
+          "unit": "minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.confirm, refund succeeded branch.",
+        "id": "reversed",
+        "meaning": "Cumulative successful refunds in /paymentTerms/currency minor units; excludes voids.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Pending or unknown capture requests",
+          "unit": "minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request and confirm.",
+        "id": "captureReserved",
+        "meaning": "Capture capacity awaiting guarantor resolution, in /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/capture",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize sets zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Pending or unknown void requests",
+          "unit": "minor units of /paymentTerms/currency"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request and confirm.",
+        "id": "voidReserved",
+        "meaning": "Authorization reserved for unresolved voids, in /paymentTerms/currency minor units.",
+        "path": "/payment/reserved/void",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialize creates an empty object.",
+        "aggregate": {
+          "operation": "count",
+          "over": "All recorded financial request entries, every status",
+          "unit": "requests"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm.",
+        "id": "financialRequestCount",
+        "meaning": "Requests across pending, unknown, succeeded, declined and failed; pending/unknown await guarantor resolution.",
+        "path": "/payment/requests",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      }
+    ]
+  },
+  "semanticText": "# Payment Process Plan\n\nPlans payment action connections and an optional conditional capture policy for a payment instruction. It creates rules for requesting capture; it does not itself confirm payment completion. All payment paths refer to the instruction's own document, including when that instruction is nested in another document.\n\n## Capture configuration\n\nConfiguration is read from the candidate clause's `parameters`:\n\n- `method` accepts `reservation`, `card` or `myos-customer`, defaulting to `reservation`.\n- `capture.mode` defaults to `workflow`. This mode retains configured action connections without adding conditional capture automation.\n- `capture.mode: when` requires `capture.when` and a nonempty text `capture.requestId`. `capture.whenAlso`, when supplied, adds another condition. The request identifier must also satisfy payment execution's identifier rules: no `/` or `~`.\n- `capture.blockedBy` names an entry in `adjustments`. Capture requires that entry's `decision.path` plus `decision.when.field` **not** equal `decision.when.equals`.\n- `capture.requires` adds an equality requirement using its non-root absolute `path` and required `equals` value. `blockedBy` and `requires` are rejected outside `when` mode.\n\nConditional predicates use static, pure expressions. Supported operators are `$document`, `$nodeBlueId`, equality and ordering comparisons, `$and`, `$or`, `$not`, `$exists`, `$includes`, `$size`, `$add`, `$subtract` and `$literal`, with `list` and `val` operand fields. Document reads require non-root absolute paths; `$nodeBlueId` must wrap a single `$document` read. Reads under `/sources/` require the corresponding alias in `parameters.sources`. Unsupported operators, dynamic paths and excessive nesting are rejected.\n\nThe inherited transition validator rejects changes to an installed process policy with `PAYMENT_PROCESS_POLICY_IMMUTABLE`.\n\n## Conditional capture behavior\n\nIn `when` mode, the plan initializes `/paymentProcess_{clauseKey}/captureAllowed` to false and installs its path as `paymentTerms.captureGate`. A different existing capture gate causes rejection. The gate is reevaluated on changes to `/payment`, `/activation`, `/sourceLinks` and predicate dependencies; declared `sources` also add an embedded-event trigger.\n\nThe gate becomes true only when `/activation/active` is true, the combined predicate evaluates to true, and either `/clauses/documentSources` is absent or `/sourceLinks/ready` is true. This gate expresses policy readiness, not financial readiness or completion. The payment request validator enforces it on every new capture route.\n\nAfter reevaluation, the automatic step attempts capture only when the gate is true, the instruction is accepted, a nonempty `transactionId` is recorded, charges are open, capture is unlocked, cancellation is not pending, and sufficient secured funds remain unreserved by capture or void requests. Recipient approval must either be explicitly unnecessary or already recorded. No financial request with the configured `requestId` may exist. Otherwise the step does nothing.\n\nThe attempted amount is always `/paymentTerms/amountMinor`, not a newly calculated remainder or the potentially revised `targetMinor`. The common request validator additionally checks the selected payee, target capacity and identifier conflicts with control requests. Passing the automatic checks therefore does not guarantee request acceptance. Once that financial request identifier exists, this automatic step does not retry it, even after failure or decline.\n\nAn accepted request records `status: pending`, reserves capture capacity and emits `Complete Payment Requested`. Only a matching guarantor workflow response establishes an outcome. `unknown` remains unresolved and retains its reservation; `declined` and `failed` release the reservation without increasing completed funds. `succeeded` releases it, reduces remaining secured funds and increases cumulative completed captures. Optional response amount assertions must match the recorded request; non-success public responses require a reason. Matching duplicate responses are idempotent, while conflicting responses are rejected.\n\n## Adjustment configuration\n\nIf supplied, `adjustments` must be an object. Each nonempty adjustment name requires `decision.path`, a single `decision.when.field` containing neither `/` nor `~`, and a present `decision.when.equals`.\n\nRetention configuration requires either a similarly restricted `decision.retainMinorFrom` field with no `decision.retainMinor`, or literal `decision.retainMinor: 0` with no refund request identifier. `selectedPayment.source`, `expectedSourceOrigin`, `entries` and `path` must be non-root absolute pointer strings; `selectedPayment.key` must be nonempty text. Clause-level `selectedPayment` supplies the whole selector only where an adjustment has no local `selectedPayment`; it does not merge missing fields into a local selector.\n\nEach adjustment needs a nonempty `requestIds` object containing only `refund` and/or `void`, with nonempty text identifiers unique across all adjustment legs. These functions validate adjustment declarations and use their decisions as capture blockers. They do not establish how payment selection, retention calculation or adjustment execution occurs.\n\n## Connections and payment state\n\nInherited connection planning uses `type.actions`, or `parameters.actions` when `type.configurableActions` is true, and combines default bindings with clause overrides. Actions can connect to authenticated workflows, events, channels, document changes, embedded nodes, collections, initialization, activation or timers. Workflow authority comes from the configured channel.\n\nConnection `when`, action requirements, `parameters.conditions` and `conditionGroups` govern execution. `params`, workflow `input`, `inputParams` and `documentParams` provide action arguments. `connectionProfiles` may supply `params` and `when` but cannot coexist with local versions of either field. Connections support `before`, `after` and `once`; preflight and `outcome-v1` results continue only for `acceptedNew`, stopping for `duplicate`, `rejected` or `skipped`. `requireExactDocumentVersion` requires the corresponding workflow-call assertion.\n\nTimer connections use an absolute Unix-microsecond `timestamp`, or a timestamped `afterEvent` with positive `delayMs`. Relative policy defaults to `first`, which ignores later arm triggers once armed; `latest` replaces the pending keyed timer. `cancelOn` requests cancellation. Scheduling is not firing, and firing requires the Time runtime's admission rules.\n\nPayment amounts are integer minor units of `/paymentTerms/currency`. `amountMinor` is positive; `limitMinor` must cover it and cannot exceed 1,000,000,000,000. Initialization sets `targetMinor` to `amountMinor`, financial balances and reservations to zero, and acceptance, rejection, closure and approval flags to false. These are initialization effects, not interpretations of missing data.\n\n`secured` is remaining confirmed authorization, reduced by successful captures and voids. `completed` is cumulative successful captures, without subtracting refunds; `reversed` separately records successful refunds. Reservations represent pending or unresolved requests. A successful void releases remaining authorization and closes further charges; it is not a refund, and refunds may still be requested after closure. `targetMinor` may be finalized by the guarantor within the approved limit and cannot fall below completed captures plus pending capture reservations. `finalResolved` records that resolution. Recipient approval belongs to the selected payee and is reset when that payee changes. Absent state is unknown."
+}

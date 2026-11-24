@@ -1,0 +1,30 @@
+{
+  "blueId": "Eur9JE31qGM32GpfiXhjQGxt5tiiimjB9QATvs1dpZsP",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "JAVfq3idjXE65QjTiGepqJFPb35tjpEQew6af6qPJZHj"
+    ],
+    "displayLabel": "Order Dispatch Functions",
+    "limitations": [
+      "The supplied definition does not establish who sets /orderDecision/status or its lifecycle values beyond the REJECTED condition."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; the REJECTED check does not match.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Dispatch Functions.functions.guard: /orderDecision/status equals REJECTED.",
+        "id": "orderDecisionStatus",
+        "meaning": "Order-decision status; REJECTED activates special closing checks when sellerDecision is true.",
+        "path": "/orderDecision/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Order Dispatch Functions\n\nThis Compute Definition provides a read-only `guard` decision for order dispatches, using configured closing conditions, approval routes, clause actions and workflow operations. It returns `{allowed: true}` or `{allowed: false, reason: ...}`. The result does not execute an operation, change order state or confirm an external outcome. Passing these checks does not establish an actor’s permission.\n\n## Configuration\n\nThe constants default to `actions: {}`, `closedStates: {}`, `operations: []` and `sellerDecision: false`. With these defaults, `guard` allows every dispatch.\n\n- `closedStates` supplies selectors. Each selector’s `val` contains a document `path`, an `equals` value and optional `approvals`, `actions` and `reason`. A selector matches only when `path` is text, `equals` exists and the document value at that path equals it. Paths refer to the document where these functions execute.\n- `actions` maps clause keys to action names. A matching selector’s own `actions` adds further clause actions. `operations` lists operation names. These selections apply within closing checks; they are not unconditional prohibitions.\n- A selector’s `approvals` may be `\"all\"` or a list of role names. When absent, it defaults to `[\"seller\"]` if `sellerDecision` is true, otherwise `[]`. Other values select no approval roles.\n- `sellerDecision: true` additionally includes the `orderDecision` clause’s `reject` action in matching-selector checks and enables the separate rejected-order check described below.\n\n## Guard behavior\n\n`guard` immediately allows dispatch kinds other than `EXTERNAL` and `TRIGGERED`. It treats a non-text `dispatch/operation` as an empty operation name.\n\n`approvalBlocked` resolves an approval role differently by dispatch kind: `TRIGGERED` uses `/contracts/activationDispatch/constants/reviewedApprovalRoles` keyed by `dispatch/channel`; `EXTERNAL` uses `activationApprovalRole` in the named operation contract’s first step. Only a nonempty text role can be blocked. `\"all\"` selects every such resolved role; a role list selects only its members.\n\nFor `EXTERNAL` dispatches with a nonempty operation name, `blocked` also checks the operation list and selected clause actions. `actionBlocked` finds the operation’s connection in each selected action binding and matches only connections whose `on` is `\"workflow\"`. It uses `/clauses/{clause}/bindings/{action}` when present, otherwise `/clauses/{clause}/type/defaultBindings/{action}`. An existing action binding suppresses that fallback even if it lacks the operation. These operation and action checks do not apply to `TRIGGERED` dispatches.\n\nThe first selector that both matches its document condition and blocks the dispatch returns `allowed: false`, using its `reason` or the default `ORDER_CLOSED`. A matching closing condition alone does not block every dispatch.\n\nAfter selector checks, if `sellerDecision` is true and `/orderDecision/status` is exactly `REJECTED`, the guard checks all resolved approval roles, configured `actions`, and configured `operations` extended with `/clauses/orderDecision/parameters/activationOperations`. Operation and action checks retain their external-dispatch restrictions. This branch does not independently add the `reject` action. A blocked dispatch returns `ORDER_REJECTED`; otherwise the guard allows it.\n\nThe functions read order-decision status but do not establish who records it or its other lifecycle values. Missing status is unknown and does not satisfy the `REJECTED` check."
+}

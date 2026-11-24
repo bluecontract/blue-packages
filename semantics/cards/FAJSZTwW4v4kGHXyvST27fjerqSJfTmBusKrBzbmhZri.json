@@ -1,0 +1,253 @@
+{
+  "blueId": "FAJSZTwW4v4kGHXyvST27fjerqSJfTmBusKrBzbmhZri",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "HYhMRDJ9ja4ZTy2VvLRTYuNVZxNdwmM6ymU6cuExuACs",
+      "RXLPXgcyzM1EnFQehbTmGu9uNc12j8LMvZcHCkhrtyo",
+      "6yYvQ8ARaZWXCrhQKC8Hk8jQRR8VLoHS63n4WmQoY5jg",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "erwD9m2PC6DPwmRDaoJBo88WbC7ox13u1Cr1gmvjeeq",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "2z4eqvvy328TSUVmT1NHnyJEiSdmKfcGqCDgS3knP14x",
+      "mKos9GALDbZ8KX4UgbTgLq6LLew1zez3zAz6Wx32sLM",
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh",
+      "8SyArpLrA57CwG1jdVJWxEMdtKDgnAcrnNM1sMs7LJoS",
+      "E7LRiTh19QD6CpRT1auSpyCoc98xoqU9WLDP7hTHJdn",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq",
+      "6JxhnzsB1jAFtuth47x3pz5ctnjicWmYsBtHHGwTCwxB"
+    ],
+    "displayLabel": "MyOS Customer Payment",
+    "limitations": [
+      "Customer-session implementations are omitted, so session lifecycle fields, expiry units, the expiry default duration and detailed funding guards are not established.",
+      "Payment-ledger implementations are omitted. Full response guards, initialization values, reservation update rules and secured-balance semantics are not established; supplied readers establish the reported amount distinctions."
+    ],
+    "parameterRefs": [
+      "bindings.amount",
+      "bindings.instruction"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; creation may not have occurred.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.buildInstruction: amount selection and terms.amountMinor.",
+        "id": "instructionAmount",
+        "meaning": "Initial payment amount in minor units of this instruction's paymentTerms.currency; not a confirmed payment.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paymentTerms/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; do not substitute EUR for missing state.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.buildInstruction; planConfirmedReceipt reads paymentTerms.currency.",
+        "id": "currency",
+        "meaning": "Currency selected at creation for the instruction's terms and financial amounts.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paymentTerms/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.buildInstruction: terms.payerChannel.",
+        "id": "payerChannel",
+        "meaning": "Payer role copied into the payment terms; distinct from the literal payer funding-workflow channel.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paymentTerms/payerChannel",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.build and resolveParty; buildInstruction: terms.payeeChannel.",
+        "id": "payeeChannel",
+        "meaning": "Recipient party channel resolved at creation and copied into the payment terms.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paymentTerms/payeeChannel",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; absence is not rejection.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Account Settlement Functions.attestTransferBreakdown checks payment.accepted.",
+        "id": "accepted",
+        "meaning": "Instruction acceptance flag; acceptance alone does not confirm funds or a completed payment.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/accepted",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.recipientPaymentResult: payment.rejected.",
+        "id": "rejected",
+        "meaning": "Rejection flag considered when settling a recipient result; outstanding financial requests must also resolve.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/rejected",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.recipientPaymentResult: payment.closed.",
+        "id": "closed",
+        "meaning": "Closure flag considered when settling a recipient result; closure alone does not clear unresolved requests.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/closed",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no recorded transaction ID is available.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Instruction.recordTransactionInitiated; attestTransferBreakdown.",
+        "id": "transactionId",
+        "meaning": "Recorded guarantor transaction identifier; not evidence of capture or refund completion.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/transactionId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed captures for this embedded payment instruction.",
+          "unit": "Minor units of paymentTerms.currency, before refunds."
+        },
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.planConfirmedReceipt maps payment.completed to grossConfirmedMinor.",
+        "id": "completedMinor",
+        "meaning": "Gross confirmed payment completions before refunds, in this instruction's paymentTerms.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/completed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; not zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed refunds for this embedded payment instruction.",
+          "unit": "Minor units of paymentTerms.currency."
+        },
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.planConfirmedReceipt maps payment.reversed to refundsMinor.",
+        "id": "refundedMinor",
+        "meaning": "Confirmed refunds in this instruction's paymentTerms.currency minor units; excludes voids before completion.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reversed",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; not a successful or failed outcome.",
+        "aggregate": null,
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.unresolvedFinancialRequests iterates payment.requests and checks status.",
+        "id": "requestStatus",
+        "meaning": "Per-request status: pending and unknown remain unresolved, awaiting a guarantor outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/requests/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; the unresolved check uses zero locally.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Outstanding secure reservations in this instruction.",
+          "unit": "Minor units of paymentTerms.currency."
+        },
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.unresolvedFinancialRequests: reserved.secure.",
+        "id": "secureReservedMinor",
+        "meaning": "Outstanding secure-request reservation in paymentTerms.currency minor units; not confirmed secured funds.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reserved/secure",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; the unresolved check uses zero locally.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Outstanding capture reservations in this instruction.",
+          "unit": "Minor units of paymentTerms.currency."
+        },
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.unresolvedFinancialRequests: reserved.capture.",
+        "id": "captureReservedMinor",
+        "meaning": "Outstanding capture-request reservation in paymentTerms.currency minor units; not confirmed completion.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reserved/capture",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; the unresolved check uses zero locally.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Outstanding void reservations in this instruction.",
+          "unit": "Minor units of paymentTerms.currency."
+        },
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.unresolvedFinancialRequests: reserved.void.",
+        "id": "voidReservedMinor",
+        "meaning": "Outstanding void-request reservation in paymentTerms.currency minor units; not a refund.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reserved/void",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; the unresolved check uses zero locally.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Outstanding refund reservations in this instruction.",
+          "unit": "Minor units of paymentTerms.currency."
+        },
+        "binding": "instruction",
+        "defaultPath": "/payment",
+        "evidence": "Payment Setup.unresolvedFinancialRequests: reserved.refund.",
+        "id": "refundReservedMinor",
+        "meaning": "Outstanding refund-request reservation in paymentTerms.currency minor units; not a confirmed reversal.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/payment/reserved/refund",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# MyOS Customer Payment\n\nA clause that creates and observes one customer-funded payment instruction for a MyOS recipient. Customer funding sessions and external execution are handled separately from instruction creation. Its `paymentMethod` is `myos-customer`.\n\n## Configuration\n\n- `bindings.amount` is a required non-root JSON pointer, defaulting to `/product/totalMinor`. A positive `amountMinor` parameter overrides this source; otherwise the bound value is used. The selected amount must be an integer from 1 through 1,000,000,000,000, in minor currency units. The configuration default `amountMinor: 0` selects the binding; it does not establish a zero payment.\n- `bindings.instruction` is a required non-root JSON pointer, defaulting to `/payment`. It locates the embedded instruction that this clause creates and observes.\n- `recipient` must identify an existing activation party role, a MyOS account ID, or an object containing `myosAccountId`. Account-based lookup must match exactly one declared party and find its channel. An explicit party role uses that party directly. The resolved recipient replaces the shared configuration's `payee` value.\n- `payer` defaults to `customer`; `guarantor` defaults to `guarantor`. These roles and the resolved payee must exist in the host activation roster and be included in the child. A differently named guarantor is also installed under the child's canonical `guarantor` channel.\n- `currency` defaults to `EUR` and must be nonempty text. `recipientApprovalRequired` defaults to `false` and is copied into the instruction's terms. Initial `amountMinor` and `limitMinor` both receive the selected amount; `allowedPayees` initially contains the resolved recipient channel.\n- `parties` defaults to `[]`, selecting all host activation parties. `readers` defaults to `[]`, selecting no additional named reader groups. Selected parties, their transports and access references are carried into a child with a frozen party roster.\n- `instructionClauses` defaults to `{}` and adds or overrides child clauses, including the default method clause. Keys `activation` and `payment` are reserved. Unknown payment parameter names are rejected.\n\n## Creation and connections\n\n`start` calls the builder through a configured connection; no automatic start is declared. Creation checks host activation and participant access, and checks current actor authority for workflow invocation. It stores a recipient snapshot in `paymentDetails.parties.recipient` and creates a MyOS Customer Payment Instruction at the `instruction` binding.\n\nRepeated creation for the same instruction identity returns `duplicate` without replacing the child. An occupied destination with another identity is rejected. `acceptedNew` means the instruction was created, not that funding or payment succeeded.\n\nChild connections support recipient approval, authorization, capture, refund, void, payee assignment, final-amount resolution, transaction-details updates, and completion, reversal and details-update lock/unlock requests. Their `in` defaults to `instruction`. Explicit `in: agreement` supports event, change, embedded and collection sources through the child's `/sources/order` reference and requires an initialized host. Request workflows belong to the instruction. Timer `afterEvent` and `cancelOn` sources use the same scope rules.\n\n`observe` automatically receives embedded instruction events. For events matching `Event`, it emits `Payment Event Received` with the clause key, instruction path, original event reference and kind. This relay preserves the event's meaning; it does not independently confirm payment.\n\n## Funding and outcomes\n\nThe child sets `paymentTerms.initiationGate` to `/customerSession/funded`, relative to the child's own document. Its funding workflows declare `provideSession` and `confirmFunding` on channel `guarantor`, and `requestCustomerFunding` on literal channel `payer`. Each identifies a session with a nonempty `sessionId`. The configurable `payer` sets `paymentTerms.payerChannel`; the supplied builder does not show an alias from that role to the literal funding channel. Omitting `expiresAt` uses an execution-time expiry default, whose value and units are not supplied.\n\nBy default, the method clause emits `Customer Payment Session Requested` once on clause initialization. A `Payment Requested` event causes it to emit `MyOS Execution Requested`, carrying the method, payment details and original request. Both are requests to an adapter, not evidence of external success.\n\nThe instruction separately exposes guarantor acceptance, rejection, transaction initiation and responses to recorded requests. Financial responses distinguish securing funds, completing a capture, voiding before completion and refunding after completion, with succeeded, declined, failed or unknown outcomes. Responses identify the recorded request with `requestId`; adverse or unknown responses require a reason. A void is not a refund.\n\nWithin the embedded instruction, `payment.completed` is the gross confirmed completion amount, before refunds; `payment.reversed` records refunds. Both use `paymentTerms.currency`. Requests with status `pending` or `unknown`, and nonzero `payment.reserved.secure`, `capture`, `void` or `refund` amounts, remain unresolved. These reservations are distinct from confirmed amounts. Rejection or closure alone does not resolve outstanding financial requests.\n\nWith default placement, the child's ledger is at `/payment/payment` in the host. Missing ledger values are unknown, not zero or false. The supplied evidence does not establish the full ledger transition rules, secured-balance semantics or customer-session lifecycle."
+}

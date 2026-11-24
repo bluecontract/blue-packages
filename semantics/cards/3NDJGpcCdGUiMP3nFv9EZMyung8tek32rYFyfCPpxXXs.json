@@ -1,0 +1,302 @@
+{
+  "blueId": "3NDJGpcCdGUiMP3nFv9EZMyung8tek32rYFyfCPpxXXs",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "6yYvQ8ARaZWXCrhQKC8Hk8jQRR8VLoHS63n4WmQoY5jg",
+      "erwD9m2PC6DPwmRDaoJBo88WbC7ox13u1Cr1gmvjeeq",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "mKos9GALDbZ8KX4UgbTgLq6LLew1zez3zAz6Wx32sLM",
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh",
+      "Ds9fKXh94ak2K3FYte9RpsMX95aNfYjvzdT7UeNJae98",
+      "DGGUGxRXhq2GoaMFPnu2p4iac7JaavxNJjyLqzabFzZp",
+      "8SyArpLrA57CwG1jdVJWxEMdtKDgnAcrnNM1sMs7LJoS",
+      "47RWeZpAFbZSkn53GFGxW57hiwZ9erFaZeKLLozDygJZ",
+      "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde"
+    ],
+    "displayLabel": "Standard Payment Setup",
+    "limitations": [
+      "The build trigger and default paths for contextual amount and instruction bindings are not supplied.",
+      "Detailed connection dispatch and timer scheduling are not established by the supplied implementation."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "No stored identity is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: identityPath and destination check.",
+        "id": "instructionIdentity",
+        "meaning": "Stable setup identity copied to the child's instanceKey; identifies duplicate builds, not payment success.",
+        "path": "/connectionState_{clauseKey}/instructionIdentity",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; do not substitute EUR for missing state.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction: terms.currency.",
+        "id": "currency",
+        "meaning": "Currency of all monetary amounts in the child instruction.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Setup.buildInstruction; Payment Functions.configure.",
+        "id": "limit",
+        "meaning": "Approved ceiling, initially the selected setup amount; minor units of /paymentTerms/currency.",
+        "path": "/paymentTerms/limitMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(finalAmount), request.",
+        "id": "target",
+        "meaning": "Current payment target, initially amountMinor; minor units of /paymentTerms/currency.",
+        "path": "/payment/targetMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, accept.",
+        "id": "accepted",
+        "meaning": "Guarantor accepted the instruction; false alone does not establish rejection.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, accept.",
+        "id": "rejected",
+        "meaning": "Guarantor rejected the instruction; initially both decision flags are false, awaiting its decision.",
+        "path": "/payment/rejected",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; empty string means no attachment.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, initiate.",
+        "id": "transaction",
+        "meaning": "Single guarantor transaction attached after acceptance; does not establish payment.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; empty string means no selected payee.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(payee), request.",
+        "id": "payee",
+        "meaning": "Selected recipient channel, constrained by /paymentTerms/allowedPayees.",
+        "path": "/payment/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.approveRecipient, configure(payee), request.",
+        "id": "recipientApproved",
+        "meaning": "Selected recipient approved through its workflow; required for capture when recipientApprovalRequired is true.",
+        "path": "/payment/recipientApproved",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, configure(finalAmount).",
+        "id": "finalResolved",
+        "meaning": "Guarantor resolved the final target; subsequent resolution cannot select a different amount.",
+        "path": "/payment/finalResolved",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Succeeded secure, capture and void requests in this instruction.",
+          "unit": "Minor units of /paymentTerms/currency."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm.",
+        "id": "secured",
+        "meaning": "Remaining confirmed authorization, not historical authorization; minor units of /paymentTerms/currency.",
+        "path": "/payment/secured",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Succeeded capture requests in this instruction.",
+          "unit": "Minor units of /paymentTerms/currency."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(capture).",
+        "id": "completed",
+        "meaning": "Cumulative confirmed captures before refunds; minor units of /paymentTerms/currency.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Succeeded refund requests in this instruction.",
+          "unit": "Minor units of /paymentTerms/currency."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(refund).",
+        "id": "reversed",
+        "meaning": "Cumulative confirmed refunds, excluding voids; minor units of /paymentTerms/currency.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Secure requests with pending or unknown outcomes.",
+          "unit": "Minor units of /paymentTerms/currency."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request, confirm.",
+        "id": "reservedSecure",
+        "meaning": "Capacity reserved for securing, awaiting definitive guarantor outcomes; minor units of /paymentTerms/currency.",
+        "path": "/payment/reserved/secure",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Capture requests with pending or unknown guarantor outcomes.",
+          "unit": "Minor units of /paymentTerms/currency."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request, confirm.",
+        "id": "reservedCapture",
+        "meaning": "Secured capacity reserved for unconfirmed captures; minor units of /paymentTerms/currency.",
+        "path": "/payment/reserved/capture",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Refund requests with pending or unknown guarantor outcomes.",
+          "unit": "Minor units of /paymentTerms/currency."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request, confirm.",
+        "id": "reservedRefund",
+        "meaning": "Completed funds reserved for unconfirmed refunds; minor units of /paymentTerms/currency.",
+        "path": "/payment/reserved/refund",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Void requests with pending or unknown guarantor outcomes.",
+          "unit": "Minor units of /paymentTerms/currency."
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.request, confirm.",
+        "id": "reservedVoid",
+        "meaning": "Authorization reserved for unconfirmed release, not refund; minor units of /paymentTerms/currency.",
+        "path": "/payment/reserved/void",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request(void), confirm.",
+        "id": "cancellationPending",
+        "meaning": "Void awaits a definitive guarantor outcome, blocking new securing and capture even for a zero-amount void.",
+        "path": "/payment/cancellationPending",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, confirm(void), request.",
+        "id": "closed",
+        "meaning": "Successful void closed further charges; eligible refunds remain possible.",
+        "path": "/payment/closed",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Standard Payment Setup\n\nBuilds a nested **Payment Instruction with Clauses**, carrying payment terms, participant channels and configured request connections. `build` takes no arguments and calls `buildInstruction` with empty overrides, payment details and method clauses. Creating the instruction does not accept it, initiate a transaction or confirm payment.\n\n## Configuration\n\nConfiguration comes from `/clauses/{clauseKey}/parameters`:\n\n- `payer`, `payee` and `guarantor` default to `customer`, `seller` and `guarantor`. Each must identify an existing parent activation party, using a nonempty name without `/`, `~` or `.`. A differently named guarantor is also installed under the child's `guarantor` channel.\n- `amountMinor` defaults to `0`. A positive configured value takes precedence; otherwise the amount is read through the contextual `amount` binding. The selected amount must be an integer from 1 through 1,000,000,000,000, in minor units of `currency`. `currency` defaults to `EUR` and must be nonempty text.\n- `recipientApprovalRequired` defaults to `false`; when true, capture requires approval from the selected recipient's workflow channel.\n- `parties` defaults to `[]`, which selects all parent parties. An explicit selection must retain the payer, payee and guarantor. `readers` defaults to `[]` and selects additional named reader groups from the parent.\n- `instructionClauses` defaults to `{}` and adds child clauses. Keys must pass the same name validation; `activation` and `payment` are reserved.\n- `recipient` is accepted as a parameter name but is not used by this standard build to select the payee. Other parameter names are rejected.\n\nThe child receives matching `paymentTerms.amountMinor` and `paymentTerms.limitMinor`, the configured currency and payer, and the configured payee as both `payeeChannel` and the sole member of `allowedPayees`. `guarantorChannel` is `guarantor`; `captureGate` starts empty. `paymentDetails` starts as `{}`. Selected party channels and parent timeline-access references are copied into a child activation clause with a frozen roster and an empty required-approval list. Copying these declarations does not itself prove that child activation has completed.\n\n## Building and connecting the instruction\n\nThe contextual `instruction` binding selects the destination. Before building, the parent activation must be active and its participant access valid; workflow invocation additionally checks that the invoking channel belongs to a current party or declared representative.\n\nThe setup stores a stable identity at `/connectionState_{clauseKey}/instructionIdentity` and uses it as the child's `instanceKey`. Initially it derives that identity from the host document identity and clause key. After the initial guards, an existing destination with that identity returns `created: false`, `outcome: duplicate`; it is not rebuilt to match changed configuration. A different identity is rejected. A new child returns `created: true`, `outcome: acceptedNew` and its destination `path`. These outcomes concern construction only.\n\nNamed connections under `/clauses/{clauseKey}/bindings` are transferred for `approveRecipient`, `requestAuthorize`, `requestCapture`, `requestRefund`, `requestVoid`, `requestPayeeAssignment`, `requestTransactionDetailsUpdate`, `requestFinalAmountResolution`, `requestPaymentCompletionLock`, `requestPaymentCompletionUnlock`, `requestPaymentReversalLock`, `requestPaymentReversalUnlock`, `requestTransactionDetailsUpdateLock` and `requestTransactionDetailsUpdateUnlock`.\n\nConnection sources default to `in: instruction`. Explicit `in: agreement` supports `event`, `change`, `embedded` and `collection` sources, requires an initialized host, and adds a child back-reference at `/sources/order`. Agreement events become embedded-document sources; other agreement source paths are prefixed with that back-reference. Agreement-scoped workflows are rejected: request workflows belong to the instruction. Timer connections apply this source translation to their `afterEvent` and `cancelOn` entries. The supplied evidence does not establish detailed connection dispatch or timer scheduling.\n\n## Payment meaning in the child\n\nThe following paths belong to the **child instruction's own document**. Its initialization step runs after clause initialization or activation, provided `/payment/accepted` is absent and the child's activation permits initialization. It establishes zero financial balances and reservations, false decision and closure flags, an empty `transactionId`, and `targetMinor` equal to the initial amount. Missing fields before initialization remain unknown.\n\nThe guarantor separately accepts or rejects the instruction; rejection requires a reason, and an established acceptance or rejection cannot be switched. Acceptance and transaction attachment check active-party access. The guarantor can then attach one transaction through `recordTransactionInitiated`; attachment is not evidence of secured or completed funds.\n\nFinancial requests carry a `requestId` and amount. `amount` takes precedence over `amountMinor`; a void can default to the remaining secured amount. New requests reserve capacity and begin as `pending`. Only matching guarantor responses establish `succeeded`, `declined`, `failed` or `unknown`. Non-success responses require a reason, and any supplied amount assertion must equal the recorded request. `unknown` preserves the reservation and awaits a later definitive response; terminal outcomes release it. Identical retries are duplicates, while conflicting reuse of identifiers or terminal responses is rejected.\n\n- `requestAuthorize` requests securing funds within the target after existing captures, secured funds and pending securing are accounted for. Successful securing increases `/payment/secured`.\n- `requestCapture` requires acceptance, an attached transaction, a selected payee, any required recipient approval, unlocked capture, and sufficient unreserved secured funds within the target. Success reduces `secured` and increases `completed`.\n- `requestRefund` uses completed funds that have neither been refunded nor reserved for refund. Success increases `reversed`. `completed` remains cumulative gross captures, not net receipts.\n- `requestVoid` requests release of the entire remaining authorization, including a possible zero amount. It requires unresolved securing, capture and void reservations to be cleared. Pending cancellation blocks new securing and capture. Successful void sets `secured` to zero and `closed` to true; it is not a refund, and eligible refunds remain possible after closure.\n\nControl requests propose changes; they do not apply them immediately. Guarantor confirmation applies payee assignment, transaction details, final amount or locks. Payee assignment must use `allowedPayees`, precede completed or reserved capture, and respect the details lock; changing the payee resets recipient approval. Final amount resolution must stay within `limitMinor` and cover completed plus reserved capture, and cannot later change to a different amount. Capture, refund and details locks govern their corresponding operations. Payee and final-amount requests support confirmation or rejection; details requests also support failure, while lock changes support confirmation or failure. Rejected instructions cannot request these changes.\n\nThe supplied definition does not specify the trigger that invokes `build` or default document paths for the contextual `amount` and `instruction` bindings."
+}
