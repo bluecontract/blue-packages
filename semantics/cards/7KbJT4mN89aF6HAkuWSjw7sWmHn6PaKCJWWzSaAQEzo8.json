@@ -1,0 +1,58 @@
+{
+  "blueId": "7KbJT4mN89aF6HAkuWSjw7sWmHn6PaKCJWWzSaAQEzo8",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "5F8CAS5wXyETFCFowUdyfQachUiVSvzbPZcUSWBjCNk8",
+      "C8ZEht8u9KanZoJSU7uNJ3z5mnNnUNYKWi6t1ebvKDod",
+      "27WsCFhXj41q6qD1aFwcDj5879XnBYzGFpwKUiGEjXmr",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "AuF1RcKUxTup3rM36a7WweeXvBUQSs6ZmR27Cop9yMVd",
+      "2yptEvvEY2YiHkCHMtndjY9rydfiYewMUgxCSDdYtCs5",
+      "3x6QGNycNcWQf2no3pa9BemUeLw7EwBUd1quNNQkvc8X",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "EdcMeh93AEEwTmZ4HKBbBMphAoCn6dJ8GZ69w86oBe1k",
+      "8XwYjMfTDgiHM3W8mapZcD9k2N9fJpJKpvGc1VcvKn4Z",
+      "4MMmDodcVEMXtQdojrASfeQo4PstzHKfewMbcDRLeZPR",
+      "AEv62VbSKuz2FXVbFqskcHzMepwu9tsyKhNYZqFpo8x7",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Feature Clause",
+    "limitations": [
+      "Custom business state and outcomes depend on the supplied action bodies; this exact type establishes only connection flags.",
+      "The referenced Contracts specification is omitted, so full operation admission and exact-version enforcement semantics are not established here."
+    ],
+    "parameterRefs": [
+      "parameters.actions"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; false is an initialization value only.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: state initialization and timer arm task.",
+        "id": "connectionArmed",
+        "meaning": "Per named connection: timer arming recorded; remains true after cancel or firing, so does not establish pending status.",
+        "path": "/connectionState_{clauseKey}/*/armed",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; false is an initialization value only.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections: once guard and final fired change.",
+        "id": "connectionFired",
+        "meaning": "Per named connection: once-only execution reached its final marker; false does not exclude non-once execution.",
+        "path": "/connectionState_{clauseKey}/*/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Feature Clause\n\nA named, document-local business feature whose actions are supplied in `parameters.actions`. It supports custom BEX behavior through the inherited Connected Clause connection machinery, without defining a new package type. It establishes no particular business outcome, amount or business status of its own.\n\n## Actions and connections\n\n`configurableActions: true` selects `parameters.actions` instead of type-defined actions. Supply an object of named action declarations; no default action set is established. Each action separates its declarative `args` pattern from its executable `do` steps. Optional action fields include `defaults`, `require`, `preflight`, `resultContract` and `automatic`.\n\n`bindings` maps action names to dictionaries of named connections. An action's `automatic` connection is added under reserved name `_automatic`; a binding cannot replace it. This exact type declares no property data bindings. Clause, action and connection names must be nonempty text without `.`, `/` or `~`. Changing an installed clause under the same key fails transition validation with `CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY`.\n\nEach connection selects an `on` source:\n\n- `workflow`: an operation using `party`, or otherwise `channel`, as its authenticated channel binding; optional `request` and `event` configure its handler.\n- `channel`: an existing named channel, optionally filtered by `event`.\n- `event`: a triggered-event source, optionally filtered by `event`.\n- `change`: updates at a non-root JSON Pointer `path`.\n- `embedded` or `collection`: events from an embedded document or collection descendants at `path`. Both contribute embedding unless `embed: false`; collection handling checks that the source lies below that path.\n- `initialized`: successful initial clause installation, represented by Clauses Initialized.\n- `activated`: Document Activated events.\n- `timer`: processor-admitted timer firings, configured as described below.\n\nConnections support `params`, `when`, `before`, `after` and `once`. Unsupported fields for a source are rejected. A named `profile` resolves through `parameters.connectionProfiles`; profiles may contain only `params` and `when`, and cannot be combined with either field locally. A callable workflow alone establishes neither a personal obligation nor the current reader's authority.\n\n## Invocation and outcomes\n\nParameters merge action `defaults`, then the workflow request when `input: true`, then connection `params`. Workflow `inputParams` and `documentParams` subsequently project existing values from the request and executing document, respectively; mappings use non-root JSON Pointers, and document projections are applied last. `input` defaults to false. With `requireExactDocumentVersion: true`, the call must also carry that flag as true or fail with `EXACT_REVIEW_REQUIRED`; the option defaults to false.\n\nExecution first skips an already-fired `once` connection and unrelated collection events. After parameter construction, a false connection `when` silently skips execution; its default is true. Supplied `args` are checked against their declared pattern, failing with `ACTION_ARGUMENT_INVALID`. Action `require.when` defaults to true; failure uses `require.message`, defaulting to `ACTION_REQUIREMENT_FAILED`.\n\nThe action must also satisfy its entry in `parameters.conditions` and every applicable `parameters.conditionGroups` condition, or fail with `ACTION_CONDITION_FAILED`. Individual conditions default to true; a group's missing `condition` defaults to false. Groups identify their `actions` and may expose `inputs` as `conditionInputs`. References to unknown actions are rejected.\n\nIf `preflight` exists, it must set `actionResult.outcome` to `acceptedNew`, `duplicate`, `rejected` or `skipped`. Only `acceptedNew` proceeds to connection `before`, action `do`, and subsequent processing. With `resultContract: \"outcome-v1\"`, the action must again provide one of these outcomes after `do`; only `acceptedNew` proceeds to `after` and the one-time marker. Other outcomes return early; missing or invalid outcomes fail. The default `resultContract` is `legacy`, which does not require this explicit result.\n\n`once` defaults to false. When true, `fired` is set only after the guarded action and `after` steps reach their end. This marker records the connection's execution gate, not confirmation of an external business outcome. Any emitted request must be distinguished from its eventual fulfillment.\n\n## Timers and recorded state\n\nA timer requires exactly one of `timestamp` or `afterEvent`. Absolute `timestamp` is a nonnegative integer Unix-microsecond deadline, at most 9007199254740991; it arms on clause initialization and forbids `delayMs` and `policy`. Relative timers use a timestamped `afterEvent` source plus positive integer `delayMs`, at most 9007199254740 milliseconds. Initialization cannot supply that relative base. The resulting deadline must remain within the supported timestamp range.\n\nRelative `policy` defaults to `first`, which ignores further arming while `armed` is true. `latest` permits replacement requests. Optional `cancelOn` emits a keyed cancellation request. Timer arm/cancel selectors support `event`, `channel`, `change`, `embedded`, `collection` and `initialized`, subject to the relative-initialization restriction.\n\nEach connection has an `actionName.connectionName` entry under `/connectionState_{clauseKey}`, initialized with `armed: false` and `fired: false`. Timer arming sets `armed` true and emits a Timer Request using key `connection`. Neither cancellation nor firing clears `armed` in this implementation, so it is not a reliable indication of a currently pending timer. `fired` is updated only for `once` connections; false does not prove an action has never run. Missing flags are unknown, not initialization defaults.\n\nTimer requests become effective only through committed effects and require an explicitly supported Time runtime. Reusing the key replaces a pending registration; cancellation cannot reverse an earlier firing. Firing awaits authoritative time and closed input history and may occur late in wall-clock time while retaining the requested logical deadline. New requests must follow the invocation's logical timestamp; a new standalone initialization without a prior external position may use an elapsed absolute deadline. Emitting a request or setting `armed` does not establish that a firing or its business effects occurred."
+}

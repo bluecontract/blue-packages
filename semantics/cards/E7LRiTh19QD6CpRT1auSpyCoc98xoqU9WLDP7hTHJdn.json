@@ -1,0 +1,102 @@
+{
+  "blueId": "E7LRiTh19QD6CpRT1auSpyCoc98xoqU9WLDP7hTHJdn",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "5F8CAS5wXyETFCFowUdyfQachUiVSvzbPZcUSWBjCNk8",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "6JxhnzsB1jAFtuth47x3pz5ctnjicWmYsBtHHGwTCwxB",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "CJgGWmocYCpqmt9isfL6aJab4Qs4i62qhUt7T7QubHoo",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Method Events",
+    "limitations": [
+      "The supplied documentPaths omit /accountSettlement and individual payout currency, gross and fee paths, preventing structured facts for those receipt fields.",
+      "The logic that establishes payment acceptance, transaction identity, secured funds and completed transfers is not supplied.",
+      "No confirming actor or channel is fixed here; settlement attestation does not independently verify external execution."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no method default is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Method Events.actions.announce and actions.request",
+        "id": "paymentMethod",
+        "meaning": "Selects the customer-session announcement for myos-customer; copied into execution requests.",
+        "path": "/paymentDetails/method",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; settlement attestation fails its guard.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.attestTransferBreakdown acceptance guard",
+        "id": "paymentAccepted",
+        "meaning": "Must be exactly true to record settlement; does not itself establish transfer completion.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; settlement attestation fails its guard.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.attestTransferBreakdown transactionId and report",
+        "id": "paymentTransactionId",
+        "meaning": "Nonempty transaction identifier required for, and copied into, the settlement receipt.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; no amount default is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.validateFixedTransfer amountMinor",
+        "id": "fixedNetTransferAmount",
+        "meaning": "Fixed full transfer amount in minor units of paymentDetails.payoutTerms.currency; not a completed amount.",
+        "path": "/paymentDetails/payoutTerms/netMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no payee default is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.validateFixedTransfer and requireFixedTransfer",
+        "id": "fixedPayeeChannel",
+        "meaning": "Payee channel that the initialized transfer profile and payee controls must preserve.",
+        "path": "/paymentDetails/payoutTerms/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; false is initialized only by planning.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Connection Planning Functions.planConnections; Payment Method Events.announce",
+        "id": "initialAnnouncementCompleted",
+        "meaning": "Tracks completion of the once-only initialization announcement, not external payment execution.",
+        "path": "/connectionState_{clauseKey}/announce._automatic/fired",
+        "scope": "clause",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payment Method Events\n\nA connected clause that announces payment instructions, forwards payment requests for MyOS execution, validates fixed account-transfer terms, and records an operator's settlement attestation. It reads `/paymentDetails` and `/payment` in the document where it executes, including a nested instruction's own document.\n\n## Announcements and execution requests\n\n- `announce` runs automatically on clause initialization, once per automatic connection. It emits a Payment Event carrying `/paymentDetails` as `details`. Its `kind` is `Customer Payment Session Requested` when `paymentDetails.method` equals `myos-customer`; otherwise it is `Account Payment Instruction Created`. This branch does not validate other method values or establish a default method.\n- `request` automatically responds to an Event with `kind: Payment Requested`. It emits a Payment Event with `kind: MyOS Execution Requested`, the current payment `details` and `method`, and the triggering event as `request`. No once-only restriction is declared for this connection.\n\nThese emissions announce intentions; they do not confirm a session was created, funds were secured, or a transfer completed.\n\n## Fixed account-transfer validation\n\n`validateAccountTransfer` calls `validateFixedTransfer`, using `paymentDetails.payoutTerms.netMinor` as the fixed transfer amount and `paymentDetails.payoutTerms.payeeChannel` as the fixed payee channel. The amount is in minor units of `payoutTerms.currency`.\n\nIf `/payment/targetMinor` is absent, validation returns without checking the transfer profile. Otherwise, `targetMinor` must equal the fixed amount, `payeeChannel` must match, `details` must be an empty object, and `reversed` must be zero; violations fail with `PAYOUT_PROFILE_IMMUTABLE`.\n\nEvery entry in `payment.requests` must have an `intent.action` of `secure`, `capture`, or `void`, an `intent.amountMinor` equal to the full fixed amount, and a request key equal to `payout-` followed by that action. Violations fail with `PAYOUT_FULL_AMOUNT_REQUIRED`. This constrains requests, not confirmed financial outcomes; a void is not a refund.\n\nFor `payment.controlRequests`, `payee` controls must preserve `intent.input.payeeRef`, `finalAmount` controls must preserve `intent.input.finalAmount`, and `details` controls must keep `intent.input.transactionDetails` empty. Other control actions are not constrained by this function. Validation itself neither executes a transfer nor records settlement.\n\n## Settlement attestation\n\n`confirmAccountSettlement` takes `debitReference` and `transferReference` through its action parameters. Both must be nonempty text. It also requires `/payment/accepted` to be exactly `true` and `/payment/transactionId` to be nonempty text; otherwise it fails with `ACCOUNT_SETTLEMENT_INVALID`.\n\nThe function builds `/accountSettlement` from the transaction ID, supplied references, the initialized document's identity as `instructionOrigin`, and the current `paymentDetails.payoutTerms`. It copies the entire breakdown as `payoutTerms` and separately copies `payoutKey`, `currency`, `grossMinor`, `feeMinor`, and `netMinor`. These are distinct gross, fee, and net amounts in minor currency units; this function does not check their arithmetic or completeness.\n\nA new receipt returns `acceptedNew` and emits an Event with `kind: Account Settlement Confirmed` and the receipt as `settlement`. An identical existing receipt returns `duplicate` without another confirmation event. A different existing receipt fails with `ACCOUNT_SETTLEMENT_CONFLICT`. This records an operator's attestation; the function performs no external transfer verification and does not call `validateAccountTransfer` itself.\n\n## Connections and access\n\nThe two account actions have no automatic trigger declared here; configured action connections determine when they run. Inherited connection `when` conditions can skip execution, while clause `conditions` and applicable `conditionGroups` can reject it. Workflow connections require an authenticated channel, but this type fixes no confirming actor or channel and grants no viewer permission.\n\n`confirmAccountSettlement` uses `outcome-v1`: only `acceptedNew` proceeds to connection `after` steps and any once-only completion marker. `duplicate`, `rejected`, and `skipped` stop there; its supplied settlement function returns only `acceptedNew` or `duplicate`, or fails. Changing an installed clause configuration requires a new clause key."
+}

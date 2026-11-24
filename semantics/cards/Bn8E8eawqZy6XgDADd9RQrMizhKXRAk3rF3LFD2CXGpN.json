@@ -1,0 +1,73 @@
+{
+  "blueId": "Bn8E8eawqZy6XgDADd9RQrMizhKXRAk3rF3LFD2CXGpN",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "5F8CAS5wXyETFCFowUdyfQachUiVSvzbPZcUSWBjCNk8",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Secure Timestamp Projection",
+    "limitations": [
+      "The supplied definitions do not establish the currency source for amountMinor or amountSecured."
+    ],
+    "parameterRefs": [
+      "bindings.fact"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; no qualifying record is established.",
+        "aggregate": null,
+        "binding": "fact",
+        "defaultPath": null,
+        "evidence": "Secure Timestamp Projection.actions.record: guards and $appendChange.requestId",
+        "id": "authorizationRequestId",
+        "meaning": "Request identifier preserved when complete authorization passes record's success and provenance checks.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/requestId",
+        "type": "string"
+      },
+      {
+        "absent": "Authorization time is unknown.",
+        "aggregate": null,
+        "binding": "fact",
+        "defaultPath": null,
+        "evidence": "Secure Timestamp Projection.actions.record; Time: ordered timer inputs / 2 §2",
+        "id": "authorizationTimestamp",
+        "meaning": "Native guarantor operation instant copied from timestamp, in Unix microseconds; not current fund availability.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/timestampMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Required amount is unknown; no default is defined.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Secure Timestamp Projection.actions.record: amount read and equality guards",
+        "id": "requiredAuthorizationAmount",
+        "meaning": "Positive full amount required to match secure intent and amountSecured, in minor units; currency source unspecified.",
+        "path": "/paymentTerms/amountMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Expected guarantor channel is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Secure Timestamp Projection.actions.record: cause/channel comparison",
+        "id": "guarantorChannel",
+        "meaning": "Expected channel of the causal secureFunds operation checked before recording authorization.",
+        "path": "/paymentTerms/guarantorChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Secure Timestamp Projection\n\nPreserves the request identifier and native guarantor operation timestamp of the first qualifying complete authorization observed by `record`. It records existing success evidence; it does not secure funds itself or establish that funds remain secured later.\n\n`bindings.fact` is required and must be a non-root JSON Pointer in the executing document. There is no default destination or initial fact. `record` runs through configured connections and their conditions; this type declares no automatic trigger.\n\n### Recording conditions\n\n`record` reads `requestId` from the trigger and `timestamp` from the execution binding. It uses `processingEvent/operation` as the cause when `processingEvent/operation/operation` exists; otherwise it uses `processingEvent`.\n\nRecording requires all of the following:\n\n- The trigger's `requestId` is nonempty text, and the `fact` destination does not already exist.\n- The cause's `operation` is `secureFunds`, its `channel` equals `/paymentTerms/guarantorChannel`, and its `request/requestId` matches the trigger's identifier.\n- The execution timestamp is a positive integer, and `/paymentTerms/amountMinor` is positive.\n- The matching entry in `/payment/requests` has both `status` and `response/outcome` equal to `succeeded`, with `intent/action` equal to `secure`.\n- Both the request's `intent/amountMinor` and the trigger's `amountSecured` equal `/paymentTerms/amountMinor`. The supplied evidence does not establish the currency source.\n\nWhen these checks pass, `record` adds `{requestId, timestampMicros}` at `bindings.fact`. `timestampMicros` copies the native execution timestamp, a Unix instant in microseconds, rather than reading a clock. A request attempt or success-shaped trigger alone is insufficient.\n\nFailed recording checks leave the fact unchanged without an explicit rejection result. Any existing destination blocks recording, even if its contents are incomplete. This action never updates or clears a recorded fact: “first” means the first qualifying invocation recorded while the destination is absent, not a search for the earliest historical authorization. An absent fact leaves authorization and its time unknown."
+}
