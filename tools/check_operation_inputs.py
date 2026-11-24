@@ -24,6 +24,7 @@ CASES = {
     'activation-inputs': ('OperationCatalogConformance', 'activation-complete'),
     'representative-access': ('RepresentativeAccessConformance',),
     'activation-effects': ('ActivationExecutionConformance',),
+    'activation-connection-references': ('ActivationConnectionReferencesConformance',),
     'source-path-declarations': ('SourcePathsDeclarationConformance',),
     'source-path-observation': ('SourcePathsObservationConformance',),
     **{'source-path-' + mode: ('SourcePathsObservationConformance', mode)
@@ -37,6 +38,17 @@ CASES = {
     'source-binding-routing': ('SourceBindingConformance', 'routing'),
     'document-provision': ('ProvisionInputConformance',),
     'bootstrap-preparation': ('BootstrapPreparationConformance',),
+    'declarative-commerce': ('BaseCommerceConformance',),
+    'whole-order-cancellation': ('WholeOrderCancellationConformance',),
+    'schedule-reservation': ('ScheduleReservationConformance',),
+    'declarative-order-preparation': ('blue.core.DeclarativeOrderPreparationConformance',),
+    'declarative-timed-payment-init': ('blue.core.CatalogOrderAttachmentConformance',
+                                       'examples/sales/declarative/timed-bicycle-rental-agreement.blue',
+                                       'timed-typed-pi-init'),
+    'declarative-order-decision': ('OrderDecisionConformance',),
+    'declarative-receipts': ('DeclarativeReceiptsConformance',),
+    'declarative-account-payouts': ('blue.core.CommissionPayoutConformance', '--declarative'),
+    'declarative-stripe-payout-preparation': ('blue.core.CommissionPayoutConformance', '--declarative-stripe-preparation'),
     'reseller-catalog-capacity': ('CatalogCapacityConformance',),
     'reseller-catalog-order-attachment': ('blue.core.CatalogOrderAttachmentConformance',),
     'reseller-catalog-order-independent': ('blue.core.CatalogOrderIndependentConformance',),
@@ -48,6 +60,7 @@ CASES = {
     'admission-definition': ('AdmissionDefinitionConformance',),
     'static-identity-predicate': ('StaticIdentityPredicateConformance',),
     'connections-automatic': ('OperationCatalogConformance', 'automatic'),
+    'connections-condition-groups': ('ConnectionConditionGroupsConformance',),
     'shipping': ('OperationCatalogConformance', 'shipping'),
     'payment-inputs': ('PaymentInputConformance',),
     'payment-effects': ('blue.core.PaymentExecutionConformance',),
@@ -55,7 +68,9 @@ CASES = {
     'actions': ('ActionInputConformance',),
     **{'documents-' + mode: ('DocumentInputConformance', mode)
        for mode in ('source', 'inputs', 'consent', 'access', 'reference', 'representation', 'connection', 'preparation', 'accessGuards', 'paymentPreparation', 'attachmentValues', 'documentPreparationFields', 'documentPreparationValues')},
-    'configured-actions': ('blue.core.CurrentOperationScenarios', '07', '15', '16', '18', '20', '25'),
+    'configured-actions': ('blue.core.CurrentOperationScenarios', '07', '13', '14', '15', '16', '18', '20', '25'),
+    'current-payment-obligations': ('blue.core.CurrentOperationScenarios', '31', '32'),
+    'two-payment-provisions': ('blue.core.TwoPaymentObligationsConformance',),
 }
 
 
@@ -91,13 +106,15 @@ def main():
     sources = {'QualificationRuntime', 'OperationInputs', 'BuildPaymentFamily', 'BuildFinalGas', 'OperationInputConformance'}
     for key in selected:
         sources.add(CASES[key][0].split('.')[-1])
-    if {'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance', 'RefreshDefinitionConformance', 'AdmissionProvisionConformance', 'ProvidedOrderAdmissionConformance'} & sources:
+    if 'DeclarativeOrderPreparationConformance' in sources:
+        sources.add('CommissionPayoutConformance')
+    if {'DeclarativeReceiptsConformance', 'SourcePathsDeclarationConformance', 'SourcePathsObservationConformance', 'AdmissionDefinitionConformance', 'RefreshDefinitionConformance', 'AdmissionProvisionConformance', 'ProvidedOrderAdmissionConformance'} & sources:
         sources.add('BootstrapPreparationConformance')
     if {'StaticIdentityPredicateConformance', 'AdmissionProvisionConformance'} & sources:
         sources.add('AdmissionConsentDispatchConformance')
     if {'ActivationExecutionConformance', 'DocumentInputConformance'} & sources:
         sources.add('OperationCatalogConformance')
-    if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance'} & sources:
+    if {'PaymentExecutionConformance', 'MyosInstructionTypesConformance', 'TwoPaymentObligationsConformance'} & sources:
         sources.add('CurrentOperationScenarios')
     if independent_cases.intersection(selected):
         sources.update({'CatalogOrderIndependentGuarantor', 'CatalogOrderIndependentMandates',
@@ -139,6 +156,10 @@ def main():
             row = {'id': key, 'command': command, 'status': 'PASS' if result.returncode == 0 else 'FAIL',
                    'exitCode': result.returncode, 'seconds': round(time.monotonic() - start, 3),
                    'log': str(report_dir / (key + '.log'))}
+            if key == 'reseller-catalog-order-attachment':
+                selection = ROOT / 'retained/pre-declarative-reseller/PACKAGES.json'
+                row['cataloguePath'] = str(selection.relative_to(ROOT))
+                row['catalogueSha256'] = hashlib.sha256(selection.read_bytes()).hexdigest()
             report['cases'].append(row)
             (report_dir / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
             print(key + ': ' + row['status'], flush=True)

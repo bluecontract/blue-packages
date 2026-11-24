@@ -1,0 +1,50 @@
+name: Whole Order Cancellation Policy
+description: Decide cancellation for one whole order using its amount, optional time and confirmation facts, and confirmed retention basis. Publishes a single accepted decision for independent effects.
+type: Clauses/Clause
+hookAbi: document-context-1
+hookDefinition:
+  type: Commerce/Whole Order Cancellation Plan
+actionDefinition:
+  type: Commerce/Whole Order Cancellation Functions
+bindingTypes:
+  amount: pointer
+  decision: pointer
+  windowStart: pointer
+  serviceStart: pointer
+  confirmation: pointer
+  retentionBasis: pointer
+  availability: pointer
+  orderStatus: pointer
+optionalBindings: [windowStart, serviceStart, confirmation, retentionBasis, availability, orderStatus]
+initialState:
+  decision: {}
+actions:
+  type: Dictionary
+  valueType: {type: Connections/Action Declaration}
+  accept:
+    args:
+      key: {type: Text, schema: {required: true, minLength: 1}}
+      reason: {type: Text, schema: {required: true, minLength: 1}}
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr: {$call: {function: acceptCancellation, args: {input: {$var: params}, feeWaived: false}}}
+  acceptWithoutCharge:
+    args:
+      key: {type: Text, schema: {required: true, minLength: 1}}
+      reason: {type: Text, schema: {required: true, minLength: 1}}
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr: {$call: {function: acceptCancellation, args: {input: {$var: params}, feeWaived: true}}}
+  refreshAvailability:
+    automatic:
+      'on': initialized
+    observation: true
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr: {$call: {function: refreshAvailability, args: {}}}

@@ -1,497 +1,92 @@
 name: Balance Functions
 type: Money/Rounding
 functions:
-  initialize:
-    args:
-      input: {}
+  $blue:membersFrom:
+    definition: {type: Ledger/Target and Settlement Functions}
+    field: functions
+  usableCollectionEntry:
+    $blue:functionFrom: {definition: {type: Documents/Source Functions}, function: usableCollectionEntry}
+  accruePercent:
+    args: {}
     do:
-    - $failIf:
-        cond:
-          $exists:
-            $document:
-              $const:
-                name: bindings
-                path: /state
-        message: LEDGER_STATE_ALREADY_EXISTS
-    - $appendChange:
-        op: add
-        path:
-          $const:
-            name: bindings
-            path: /state
-        val:
-          targets: {}
-          accrued: 0
-          paid: 0
-          reserved: 0
-          settlements: {}
-    - $return:
-        outcome: acceptedNew
-  setTarget:
-    args:
-      input:
-        description: Set the obligation target for an existing ledger key. Amount is nonnegative.
-        key:
-          type: Text
-          description: Ledger key, without slash or tilde; reuse only for the same obligation or reservation.
-          schema:
-            minLength: 1
-        amountMinor:
-          type: Integer
-          description: Exact integer amount in minor currency units.
-          schema:
-            minimum: 0
-    do:
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $pointerGet:
-                    object:
-                      $var: input
-                    path: /key
-                kind: text
-            - $ne:
-              - $pointerGet:
-                  object:
-                    $var: input
-                  path: /key
-              - ''
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $pointerGet:
-                        object:
-                          $var: input
-                        path: /key
-                    separator: /
-              - 1
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $pointerGet:
-                        object:
-                          $var: input
-                        path: /key
-                    separator: '~'
-              - 1
-        message: INVALID_LEDGER_KEY
     - $let:
-        name: s
-        expr:
-          $document:
-            $const:
-              name: bindings
-              path: /state
-    - $let:
-        name: key
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /key
-    - $let:
-        name: amount
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /amountMinor
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $var: amount
-                kind: integer
-            - $gte:
-              - $var: amount
-              - 0
-        message: NONNEGATIVE_INTEGRAL_TARGET_REQUIRED
-    - $let:
-        name: old
-        expr:
-          $pointerGet:
-            object:
-              $pointerGet:
-                object:
-                  $var: s
-                path: /targets
-            path:
-              $concat:
-              - /
-              - $var: key
-            default: 0
+        vars:
+          key: {$event: /key}
+          receipts: {$const: {name: bindings, path: /receipts}}
     - $if:
         cond:
-          $eq:
-          - $var: old
-          - $var: amount
+          $or:
+          - {$not: {$exists: {$var: receipts}}}
+          - {$ne: [{$event: /receiptState}, {$var: receipts}]}
+          - {$not: {$isKind: {val: {$var: key}, kind: text}}}
+          - {$eq: [{$var: key}, '']}
         then:
-        - $return:
-            outcome: duplicate
-    - $appendChange:
-        op: add
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /targets/
-          - $var: key
-        val:
-          $var: amount
-    - $appendChange:
-        op: replace
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /accrued
-        val:
-          $add:
-          - $pointerGet:
-              object:
-                $var: s
-              path: /accrued
-          - $subtract:
-            - $var: amount
-            - $var: old
-    - $appendEvent:
-        $merge:
-        - type: Commerce/Domain Event
-        - kind: Balance Target Changed
-          clause:
-            $const: clauseKey
-          key:
-            $var: key
-          amountMinor:
-            $var: amount
-          deltaMinor:
-            $subtract:
-            - $var: amount
-            - $var: old
+        - $return: {outcome: skipped}
+    - $let:
+        vars:
+          linked:
+            $call:
+              function: usableCollectionEntry
+              args:
+                collection: {$const: {name: bindings, path: /orders}}
+                entries: {$const: {name: bindings, path: /orderEntries}}
+                key: {$var: key}
+          net:
+            $document: {$concat: [{$var: receipts}, {$pointerJoin: [targets, {$var: key}, netReceivedMinor]}]}
+    - $let:
+        name: bps
+        expr:
+          $pointerGet:
+            object: {$var: {name: linked, path: /entry}}
+            path: {$const: {name: bindings, path: /frozenRate}}
+    - $if:
+        cond: {$or: [{$not: {$exists: {$var: net}}}, {$not: {$exists: {$var: bps}}}]}
+        then:
+        - $return: {outcome: skipped}
+    - $let:
+        name: encoded
+        expr: {$var: key}
+    - $forEach:
+        item: escape
+        in: [{char: '%', code: '%25'}, {char: /, code: '%2F'}, {char: '~', code: '%7E'}]
+        do:
+        - $set:
+            name: encoded
+            expr:
+              $join:
+                list: {$split: {text: {$var: encoded}, separator: {$var: {name: escape, path: /char}}}}
+                separator: {$var: {name: escape, path: /code}}
     - $return:
-        outcome: acceptedNew
-  reserve:
+        $call:
+          function: setTarget
+          args:
+            input:
+              key: {$var: encoded}
+              amountMinor: {$call: {function: roundBps, args: {basis: {$var: net}, bps: {$var: bps}}}}
+  recordSettlement:
     args:
-      input:
-        description: Reserve a positive amount against the available unreserved obligation.
-        key:
-          type: Text
-          description: Ledger key, without slash or tilde; reuse only for the same obligation or reservation.
-          schema:
-            minLength: 1
-        amountMinor:
-          type: Integer
-          description: Exact integer amount in minor currency units.
-          schema:
-            minimum: 1
+      key: {type: Text}
+      result: {}
     do:
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $pointerGet:
-                    object:
-                      $var: input
-                    path: /key
-                kind: text
-            - $ne:
-              - $pointerGet:
-                  object:
-                    $var: input
-                  path: /key
-              - ''
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $pointerGet:
-                        object:
-                          $var: input
-                        path: /key
-                    separator: /
-              - 1
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $pointerGet:
-                        object:
-                          $var: input
-                        path: /key
-                    separator: '~'
-              - 1
-        message: INVALID_LEDGER_KEY
+    - $if:
+        cond: {$not: {$exists: {$var: {name: result, path: /paidMinor}}}}
+        then:
+        - $return: {outcome: skipped}
     - $let:
-        name: s
+        name: settled
         expr:
-          $document:
-            $const:
-              name: bindings
-              path: /state
-    - $let:
-        name: key
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /key
-    - $let:
-        name: amount
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /amountMinor
-    - $let:
-        name: old
-        expr:
-          $get:
-            object:
-              $pointerGet:
-                object:
-                  $var: s
-                path: /settlements
-            key:
-              $var: key
+          $call:
+            function: closeReservation
+            args: {input: {key: {$var: key}, paidMinor: {$var: {name: result, path: /paidMinor}}}}
     - $if:
         cond:
-          $exists:
-            $var: old
+          $and:
+          - {$eq: [{$var: {name: settled, path: /outcome}}, acceptedNew]}
+          - {$exists: {$var: {name: result, path: /feeMinor}}}
         then:
-        - $failIf:
-            cond:
-              $ne:
-              - $pointerGet:
-                  object:
-                    $var: old
-                  path: /amountMinor
-              - $var: amount
-            message: SETTLEMENT_ID_CONFLICT
-        - $return:
-            outcome: duplicate
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $var: amount
-                kind: integer
-            - $gt:
-              - $var: amount
-              - 0
-            - $lte:
-              - $var: amount
-              - $subtract:
-                - $pointerGet:
-                    object:
-                      $var: s
-                    path: /accrued
-                - $add:
-                  - $pointerGet:
-                      object:
-                        $var: s
-                      path: /paid
-                  - $pointerGet:
-                      object:
-                        $var: s
-                      path: /reserved
-        message: INSUFFICIENT_UNRESERVED_OBLIGATION
-    - $appendChange:
-        op: add
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /settlements/
-          - $var: key
-        val:
-          amountMinor:
-            $var: amount
-          status: reserved
-    - $appendChange:
-        op: replace
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /reserved
-        val:
-          $add:
-          - $pointerGet:
-              object:
-                $var: s
-              path: /reserved
-          - $var: amount
-    - $appendEvent:
-        $merge:
-        - type: Commerce/Domain Event
-        - kind: Settlement Reserved
-          clause:
-            $const: clauseKey
-          key:
-            $var: key
-          amountMinor:
-            $var: amount
-    - $return:
-        outcome: acceptedNew
-  settle:
-    args:
-      input:
-        description: Settle the existing reservation identified by key; amount comes from ledger state.
-        key:
-          type: Text
-          description: Ledger key, without slash or tilde; reuse only for the same obligation or reservation.
-          schema:
-            minLength: 1
-    do:
-    - $failIf:
-        cond:
-          $not:
-            $and:
-            - $isKind:
-                val:
-                  $pointerGet:
-                    object:
-                      $var: input
-                    path: /key
-                kind: text
-            - $ne:
-              - $pointerGet:
-                  object:
-                    $var: input
-                  path: /key
-              - ''
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $pointerGet:
-                        object:
-                          $var: input
-                        path: /key
-                    separator: /
-              - 1
-            - $eq:
-              - $size:
-                  $split:
-                    text:
-                      $pointerGet:
-                        object:
-                          $var: input
-                        path: /key
-                    separator: '~'
-              - 1
-        message: INVALID_LEDGER_KEY
-    - $let:
-        name: s
-        expr:
-          $document:
-            $const:
-              name: bindings
-              path: /state
-    - $let:
-        name: key
-        expr:
-          $pointerGet:
-            object:
-              $var: input
-            path: /key
-    - $let:
-        name: old
-        expr:
-          $get:
-            object:
-              $pointerGet:
-                object:
-                  $var: s
-                path: /settlements
-            key:
-              $var: key
-    - $failIf:
-        cond:
-          $not:
-            $exists:
-              $var: old
-        message: UNKNOWN_SETTLEMENT
-    - $if:
-        cond:
-          $eq:
-          - $pointerGet:
-              object:
-                $var: old
-              path: /status
-          - paid
-        then:
-        - $return:
-            outcome: duplicate
-    - $appendChange:
-        op: replace
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /settlements/
-          - $var: key
-          - /status
-        val: paid
-    - $appendChange:
-        op: replace
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /reserved
-        val:
-          $subtract:
-          - $pointerGet:
-              object:
-                $var: s
-              path: /reserved
-          - $pointerGet:
-              object:
-                $var: old
-              path: /amountMinor
-    - $appendChange:
-        op: replace
-        path:
-          $concat:
-          - $const:
-              name: bindings
-              path: /state
-          - /paid
-        val:
-          $add:
-          - $pointerGet:
-              object:
-                $var: s
-              path: /paid
-          - $pointerGet:
-              object:
-                $var: old
-              path: /amountMinor
-    - $appendEvent:
-        $merge:
-        - type: Commerce/Domain Event
-        - kind: Settlement Confirmed
-          clause:
-            $const: clauseKey
-          key:
-            $var: key
-    - $return:
-        outcome: acceptedNew
+        - $let:
+            name: settlementPath
+            expr: {$concat: [{$const: {name: bindings, path: /state}}, {$pointerJoin: [settlements, {$var: key}]}]}
+        - $appendChange: {op: add, path: {$concat: [{$var: settlementPath}, /feeMinor]}, val: {$var: {name: result, path: /feeMinor}}}
+        - $appendChange: {op: add, path: {$concat: [{$var: settlementPath}, /transferredMinor]}, val: {$var: {name: result, path: /transferredMinor}}}
+    - $return: {$var: settled}

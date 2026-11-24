@@ -359,7 +359,7 @@ def evidence(blue_id, definitions):
             if pattern:
                 clause_paths.add(pattern)
             change = value.get('$appendChange')
-            if isinstance(change, dict) and change.get('op') in {'add', 'replace'}:
+            if isinstance(change, dict) and change.get('op') in ('add', 'replace'):
                 fields(change.get('val'), change.get('path'))
             for child in value.values():
                 literals(child)

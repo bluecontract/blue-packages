@@ -1,0 +1,117 @@
+{
+  "blueId": "ERYqhdMRZkpZiYNxx2PrhLkWnWL9jLig4Jr2AboopgeE",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "EvdM7kMXtqGSRaBe9u1SX6sTxkba3g9yQ6Fu42cyvnYV",
+      "EgXu4TQ1LqQcxZsmQreYjQL5F2vcBvF2BxfA1kpWPKBU",
+      "J16WhLSf4JymLnuyxru8jLSPTRBbYD2uh3cqzD7rnjUS",
+      "3RijTMYQZwqTUVZmfuUcVA8qLGUXUNydey6Ar9gFNpMA",
+      "7KYfEyJtnzEhJ3G8DubeFznPZnZF1qhH7DB5bGXfphXr"
+    ],
+    "displayLabel": "Documents Clause",
+    "limitations": [
+      "The selected document and provision submission use separate identities from the exact preparation requirement."
+    ],
+    "parameterRefs": [
+      "bindings.collection",
+      "bindings.parties",
+      "bindings.sources",
+      "bindings.template"
+    ],
+    "stateFacts": [
+      {
+        "absent": "No preparation key available.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.checkPreparation",
+        "id": "entryKey",
+        "meaning": "Key of the prepared collection member.",
+        "path": "/process_{clauseKey}/entries/*/key",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.checkPreparation and sharedPrepare",
+        "id": "entryRequest",
+        "meaning": "Request identifier used to correlate provision with preparation.",
+        "path": "/process_{clauseKey}/entries/*/requestId",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No requirement reference recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare",
+        "id": "requirementRef",
+        "meaning": "Exact identity of the prepared document requirement.",
+        "path": "/process_{clauseKey}/entries/*/requirementRef",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No selected document origin recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedProvide and sharedRefresh",
+        "id": "documentOrigin",
+        "meaning": "Initialized identity of the selected document.",
+        "path": "/process_{clauseKey}/entries/*/documentOrigin",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No preparation state recorded for this key.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare, sharedProvide and sharedRefresh",
+        "id": "entryStatus",
+        "meaning": "Preparation and readiness phase. Awaiting provider, selected and usable distinguish the ordinary provision path.",
+        "path": "/process_{clauseKey}/entries/*/status",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No supplying role recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.sharedPrepare",
+        "id": "supplier",
+        "meaning": "Configured role expected to supply the document in provide mode.",
+        "path": "/process_{clauseKey}/entries/*/supplier",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Preparation Functions.checkPreparation and sharedRefresh",
+        "id": "destination",
+        "meaning": "Document location for the prepared collection member.",
+        "path": "/process_{clauseKey}/entries/*/path",
+        "scope": "clause",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Documents Clause\n\nManages preparation, provision and readiness of documents in a keyed embedded collection. The `collection` binding supplies the destination path. The optional `template` binding snapshots a template at clause initialization. The `parties` and `sources` declarations describe how party roles and named source requirements are populated. They default to empty mappings.\n\n`prepare` and its compatibility alias `start` resolve a key and request identity from the configured input mapping, snapshot the resulting document requirement and record its exact `requirementRef`. `fields` and `values` default to empty objects. Declared `privateTerms` are frozen in the process entry. A default `obtain` of `create` installs the prepared document at its destination. With `obtain: provide` the clause requests provision from the configured `suppliedBy` role. Retrying the same preparation can recover the existing requirement, while a conflicting request for a used key is rejected.\n\n`provide` correlates the document to the preparation with the key, `inResponseTo` and `requirementRef`. Admission checks the configured provider, reviewed requirement, allowed specializations and applicable party and source conditions. An external document's initialized origin is distinct from the preparation's requirement reference. The clause can link an admitted document early when `selectBeforeActivation` applies. A selected document becomes usable only once active, with named sources and required readers ready. Only the transition to usable emits Document Attached. `resume` refreshes selected entries. `cancel` follows the configured cancellation rules for the entry.\n\nThe process entry is maintained at `/process_{clauseKey}/entries` in the owning document, keyed by the BlueId of the preparation key. Preparation, provision, selection and usability are separate stages. An external provision request can wait for the supplier or for admission and activation evidence."
+}

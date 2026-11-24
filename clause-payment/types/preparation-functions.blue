@@ -165,15 +165,12 @@ functions:
                   val:
                     $var: policyAction
               - $eq:
-                - $pointerGet:
-                    object:
-                      $var: processClause
-                    path:
-                      $concat:
-                      - /parameters/
-                      - $var: policyAction
-                      - /mode
-                    default: workflow
+                - $call:
+                    function: preparedPolicyMode
+                    args:
+                      processClause: {$var: processClause}
+                      processKey: {$var: processKey}
+                      policyAction: {$var: policyAction}
                 - when
             then:
             - $set:
@@ -195,6 +192,34 @@ functions:
                       - Allowed
     - $return:
         $var: terms
+  preparedPolicyMode:
+    args:
+      processClause: {}
+      processKey: {type: Text}
+      policyAction: {type: Text}
+    do:
+    - $let:
+        name: modePath
+        expr: {$pointerJoin: [parameters, {$var: policyAction}, mode]}
+    - $let:
+        name: mode
+        expr: {$pointerGet: {object: {$var: processClause}, path: {$var: modePath}}}
+    - $if:
+        cond: {$exists: {$var: mode}}
+        then:
+        - $return: {$var: mode}
+    - $set:
+        name: mode
+        expr:
+          $call:
+            function: configuredTemplateValue
+            args:
+              path: {$concat: [{$pointerJoin: [clauses, {$var: processKey}]}, {$var: modePath}]}
+    - $return:
+        $choose:
+          cond: {$exists: {$var: mode}}
+          then: {$var: mode}
+          else: workflow
   domainValidateCandidate:
     args:
       frozenTerms: {}

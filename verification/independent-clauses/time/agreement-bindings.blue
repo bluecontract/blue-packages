@@ -1,0 +1,34 @@
+producer:
+  fact: /securedTimestamp
+  record:
+    onFundsSecured:
+      'on': event
+      event: {type: PaymentInstruction/Funds Secured}
+automatic:
+  result: /clockStartMicros
+  startAt:
+    activation:
+      'on': activated
+      when: {$exists: {$binding: timestamp}}
+      params:
+        timestampMicros: {$binding: timestamp}
+    authorizationEvent:
+      'on': embedded
+      path: /monetarySource
+      event: {type: PaymentInstruction/Funds Secured}
+      when: {$eq: [{$document: /activation/active}, true]}
+      params:
+        timestampMicros: {$document: /monetarySource/securedTimestamp/timestampMicros}
+    authorizationAttachment:
+      'on': change
+      path: /monetarySource
+      when: {$eq: [{$document: /activation/active}, true]}
+      params:
+        timestampMicros: {$document: /monetarySource/securedTimestamp/timestampMicros}
+merchant:
+  result: /clockStartMicros
+  startAt:
+    approval:
+      'on': activated
+      params:
+        timestampMicros: {$binding: timestamp}

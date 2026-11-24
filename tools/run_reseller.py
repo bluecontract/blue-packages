@@ -21,7 +21,9 @@ def main():
     classpath = os.environ.get('BLUE_JAVA_CLASSPATH')
     if not classpath:
         parser.error('Set BLUE_JAVA_CLASSPATH to the native Language/BEX/Contracts classes, dependencies and resources')
-    catalog = json.loads((ROOT / 'PACKAGES.json').read_text())
+    catalogue_path = ROOT / 'retained/pre-declarative-reseller/PACKAGES.json'
+    catalogue_bytes = catalogue_path.read_bytes()
+    catalog = json.loads(catalogue_bytes)
     if args.reseller_archive is not None:
         retained = json.loads((ROOT / 'PACKAGE-SOURCES.json').read_text())['retainedArchives']
         archive = args.reseller_archive.resolve()
@@ -41,7 +43,7 @@ def main():
     runtime = {'packages': [dict(namespace=namespace, path=str(ROOT / pin['path']),
                                 packageBlueId=pin['blueId'], archiveSha256=pin['archiveSha256'])
                             for namespace, pin in catalog['mounts'].items() if namespace in namespaces],
-               'evidence': {'catalogueSha256': 'sha256:' + hashlib.sha256((ROOT / 'PACKAGES.json').read_bytes()).hexdigest(),
+               'evidence': {'catalogueSha256': 'sha256:' + hashlib.sha256(catalogue_bytes).hexdigest(),
                             'classpath': classpath, 'scope': 'Native component channels; no hosted identity, inventory or PSP claim'}}
     runtime_path = output / 'runtime.json'
     runtime_path.write_text(json.dumps(runtime, indent=2) + '\n')

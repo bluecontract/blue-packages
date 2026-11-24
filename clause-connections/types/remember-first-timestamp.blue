@@ -1,0 +1,102 @@
+name: Remember First Timestamp
+type: Connections/Connected Clause
+description: Remember a supplied timestamp or prefer the native primary entry timestamp over a bound fallback.
+bindingTypes:
+  result: pointer
+  unavailable: pointer
+  fallback: pointer
+  ready: pointer
+  sourceReady: pointer
+optionalBindings:
+- unavailable
+- fallback
+- ready
+- sourceReady
+actions:
+  startAt:
+    do:
+    - $let:
+        vars:
+          time: {$var: {name: params, path: /timestampMicros}}
+          result: {$const: {name: bindings, path: /result}}
+          unavailable: {$const: {name: bindings, path: /unavailable}}
+    - $if:
+        cond: {$exists: {$document: {$var: result}}}
+        then:
+        - $return: {}
+    - $if:
+        cond:
+          $and:
+          - {$isKind: {val: {$var: time}, kind: integer}}
+          - {$gt: [{$var: time}, 0]}
+        then:
+        - $appendChange: {op: add, path: {$var: result}, val: {$var: time}}
+        - $return: {}
+    - $if:
+        cond:
+          $and:
+          - {$eq: [{$var: {name: params, path: /recordUnavailable}}, true]}
+          - {$not: {$exists: {$var: time}}}
+          - {$exists: {$var: unavailable}}
+          - {$not: {$exists: {$document: {$var: unavailable}}}}
+        then:
+        - $appendChange: {op: add, path: {$var: unavailable}, val: true}
+  startFromEntry:
+    do:
+    - $let:
+        vars:
+          time: {$binding: timestamp}
+          result: {$const: {name: bindings, path: /result}}
+          unavailable: {$const: {name: bindings, path: /unavailable}}
+    - $if:
+        cond: {$exists: {$document: {$var: result}}}
+        then:
+        - $return: {}
+    - $if:
+        cond: {$exists: {$var: time}}
+        then:
+        - $if:
+            cond:
+              $and:
+              - {$isKind: {val: {$var: time}, kind: integer}}
+              - {$gt: [{$var: time}, 0]}
+            then:
+            - $appendChange: {op: add, path: {$var: result}, val: {$var: time}}
+        - $return: {}
+    - $if:
+        cond:
+          $and:
+          - {$exists: {$var: unavailable}}
+          - {$not: {$exists: {$document: {$var: unavailable}}}}
+        then:
+        - $appendChange: {op: add, path: {$var: unavailable}, val: true}
+  startFromFallback:
+    do:
+    - $let:
+        vars:
+          result: {$const: {name: bindings, path: /result}}
+          unavailable: {$const: {name: bindings, path: /unavailable}}
+          fallback: {$const: {name: bindings, path: /fallback}}
+          ready: {$const: {name: bindings, path: /ready}}
+          sourceReady: {$const: {name: bindings, path: /sourceReady}}
+    - $if:
+        cond:
+          $or:
+          - {$exists: {$document: {$var: result}}}
+          - {$not: {$exists: {$var: unavailable}}}
+          - {$not: {$exists: {$var: fallback}}}
+          - {$ne: [{$document: {$var: unavailable}}, true]}
+          - {$and: [{$exists: {$var: ready}}, {$ne: [{$document: {$var: ready}}, true]}]}
+          - {$and: [{$exists: {$var: sourceReady}}, {$ne: [{$document: {$var: sourceReady}}, true]}]}
+        then:
+        - $return: {}
+    - $let:
+        name: time
+        expr: {$document: {$var: fallback}}
+    - $if:
+        cond:
+          $and:
+          - {$isKind: {val: {$var: time}, kind: integer}}
+          - {$gt: [{$var: time}, 0]}
+        then:
+        - $appendChange: {op: add, path: {$var: result}, val: {$var: time}}

@@ -1,0 +1,128 @@
+name: Account Settlement Functions
+type: Contracts/Compute Definition
+description: Enforce fixed account-transfer terms and record the operator's confirmed breakdown.
+functions:
+  requireFixedTransfer:
+    args:
+      payment: {}
+      amountMinor: {type: Integer}
+      payeeChannel: {type: Text}
+      requestPrefix: {type: Text}
+    do:
+    - $if:
+        cond: {$not: {$exists: {$var: {name: payment, path: /targetMinor}}}}
+        then:
+        - $return: {}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: payment, path: /targetMinor}}, {$var: amountMinor}]}
+            - {$eq: [{$var: {name: payment, path: /payeeChannel}}, {$var: payeeChannel}]}
+            - {$eq: [{$var: {name: payment, path: /details}}, {}]}
+            - {$eq: [{$var: {name: payment, path: /reversed}}, 0]}
+        message: PAYOUT_PROFILE_IMMUTABLE
+    - $forEach:
+        key: requestKey
+        item: request
+        in: {$var: {name: payment, path: /requests}}
+        do:
+        - $let: {name: action, expr: {$var: {name: request, path: /intent/action}}}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$includes: {list: [secure, capture, void], val: {$var: action}}}
+                - {$eq: [{$var: {name: request, path: /intent/amountMinor}}, {$var: amountMinor}]}
+                - {$eq: [{$var: requestKey}, {$concat: [{$var: requestPrefix}, {$var: action}]}]}
+            message: PAYOUT_FULL_AMOUNT_REQUIRED
+    - $forEach:
+        key: controlKey
+        item: control
+        in: {$var: {name: payment, path: /controlRequests}}
+        do:
+        - $let: {name: action, expr: {$var: {name: control, path: /intent/action}}}
+        - $failIf:
+            cond:
+              $or:
+              - {$and: [{$eq: [{$var: action}, payee]}, {$ne: [{$var: {name: control, path: /intent/input/payeeRef}}, {$var: payeeChannel}]}]}
+              - {$and: [{$eq: [{$var: action}, finalAmount]}, {$ne: [{$var: {name: control, path: /intent/input/finalAmount}}, {$var: amountMinor}]}]}
+              - {$and: [{$eq: [{$var: action}, details]}, {$ne: [{$var: {name: control, path: /intent/input/transactionDetails}}, {}]}]}
+            message: PAYOUT_PROFILE_IMMUTABLE
+    - $return: {}
+  attestTransferBreakdown:
+    args:
+      breakdown: {}
+      receiptPath: {type: Text}
+      debitReference: {type: Text}
+      transferReference: {type: Text}
+    do:
+    - $let: {name: transactionId, expr: {$document: /payment/transactionId}}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$document: /payment/accepted}, true]}
+            - {$isKind: {val: {$var: transactionId}, kind: text}}
+            - {$ne: [{$var: transactionId}, '']}
+            - {$isKind: {val: {$var: debitReference}, kind: text}}
+            - {$ne: [{$var: debitReference}, '']}
+            - {$isKind: {val: {$var: transferReference}, kind: text}}
+            - {$ne: [{$var: transferReference}, '']}
+        message: ACCOUNT_SETTLEMENT_INVALID
+    - $let:
+        name: report
+        expr:
+          payoutKey: {$var: {name: breakdown, path: /payoutKey}}
+          grossMinor: {$var: {name: breakdown, path: /grossMinor}}
+          feeMinor: {$var: {name: breakdown, path: /feeMinor}}
+          netMinor: {$var: {name: breakdown, path: /netMinor}}
+          currency: {$var: {name: breakdown, path: /currency}}
+          transactionId: {$var: transactionId}
+          debitReference: {$var: debitReference}
+          transferReference: {$var: transferReference}
+          payoutTerms: {$var: breakdown}
+          instructionOrigin: {$nodeBlueId: {$document: /contracts/initialized/document}}
+    - $let: {name: previous, expr: {$document: {$var: receiptPath}}}
+    - $if:
+        cond: {$exists: {$var: previous}}
+        then:
+        - $failIf:
+            cond: {$ne: [{$var: previous}, {$var: report}]}
+            message: ACCOUNT_SETTLEMENT_CONFLICT
+        - $return: {outcome: duplicate}
+    - $appendChange: {op: add, path: {$var: receiptPath}, val: {$var: report}}
+    - $return: {outcome: acceptedNew, settlement: {$var: report}}
+  validateFixedTransfer:
+    args: {}
+    do:
+    - $return:
+        $call:
+          function: requireFixedTransfer
+          args:
+            payment: {$document: /payment}
+            amountMinor: {$document: /paymentDetails/payoutTerms/netMinor}
+            payeeChannel: {$document: /paymentDetails/payoutTerms/payeeChannel}
+            requestPrefix: payout-
+  confirmAccountSettlement:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: result
+        expr:
+          $call:
+            function: attestTransferBreakdown
+            args:
+              breakdown: {$document: /paymentDetails/payoutTerms}
+              receiptPath: /accountSettlement
+              debitReference: {$var: {name: input, path: /debitReference}}
+              transferReference: {$var: {name: input, path: /transferReference}}
+    - $if:
+        cond: {$eq: [{$var: {name: result, path: /outcome}}, acceptedNew]}
+        then:
+        - $appendEvent:
+            $merge:
+            - {type: Events/Event, kind: Account Settlement Confirmed}
+            - {settlement: {$var: {name: result, path: /settlement}}}
+    - $return: {$var: result}

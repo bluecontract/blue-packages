@@ -1,0 +1,23 @@
+name: Selected Order Capture
+description: Capture the one admitted PI for the active Order recorded in its business context.
+mode: when
+when:
+  $and:
+  - {$ne: [{$document: /sources/order/orderDecision/status}, REJECTED]}
+  - {$eq: [{$document: /sources/order/activation/active}, true]}
+  - {$eq: [{$document: /sources/order/activation/accessReady}, true]}
+  - {$eq: [{$nodeBlueId: {$document: /sources/order/contracts/initialized/document}}, {$nodeBlueId: {$document: /businessContext/orderOrigin}}]}
+  # Documents indexes the single payment obligation by the BlueId of the Text 'single'.
+  - {$exists: {$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/candidateOrigin}}
+  - {$exists: {$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/documentOrigin}}
+  - {$exists: {$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/requirementRef}}
+  - {$exists: {$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/prepared}}
+  - {$eq: [{$document: /businessContext/orderRevision}, {$document: /sources/order/activation/revision}]}
+  - {$eq: [{$document: /businessContext/orderTermsRef}, {$document: /sources/order/activation/terms/ref}]}
+  - {$eq: [{$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/candidateOrigin}, {$nodeBlueId: {$document: /contracts/initialized/document}}]}
+  - {$eq: [{$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/documentOrigin}, {$nodeBlueId: {$document: /contracts/initialized/document}}]}
+  - {$eq: [{$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/requirementRef}, {$nodeBlueId: {$document: /sources/order/process_payment/entries/BEBjgocEv82EQ16WxjrHRs9oVwDMzxS89tzEuJdLwqDY/prepared}}]}
+  - {$exists: {$document: /sources/order/payment/contracts/initialized/document}}
+  - {$eq: [{$nodeBlueId: {$document: /sources/order/payment/contracts/initialized/document}}, {$nodeBlueId: {$document: /contracts/initialized/document}}]}
+  - {$eq: [{$document: /sources/order/amountMinor}, {$document: /paymentTerms/amountMinor}]}
+  - {$eq: [{$document: /sources/order/currency}, {$document: /paymentTerms/currency}]}

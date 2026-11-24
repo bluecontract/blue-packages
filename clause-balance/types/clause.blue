@@ -2,9 +2,23 @@ name: Ledger Clause
 type: Connections/Connected Clause
 bindingTypes:
   state: pointer
+  receipts: pointer
+  orders: pointer
+  orderEntries: pointer
+  frozenRate: pointer
+  payouts: pointer
+  payoutEntries: pointer
+optionalBindings: [receipts, orders, orderEntries, frozenRate, payouts, payoutEntries]
 actionDefinition:
   type: Ledger/Balance Functions
 actions:
+  accruePercent:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call: {function: accruePercent, args: {}}
   setTarget:
     resultContract: outcome-v1
     do:
@@ -18,6 +32,9 @@ actions:
                 $var: params
   reserve:
     resultContract: outcome-v1
+    defaults:
+      key: {$var: {name: trigger, path: /key}}
+      amountMinor: {$var: {name: trigger, path: /amountMinor}}
     do:
     - $set:
         name: actionResult
@@ -38,6 +55,27 @@ actions:
             args:
               input:
                 $var: params
+  closeReservation:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call: {function: closeReservation, args: {input: {$var: params}}}
+  observePayout:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call: {function: observePayout, args: {}}
+  catchUpPayout:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call: {function: catchUpPayout, args: {}}
 defaultBindings:
   state: /balance
 initialState:

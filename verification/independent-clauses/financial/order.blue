@@ -1,0 +1,105 @@
+name: Order with independent cancellation and price adjustment
+type: Orders/Order with Clauses
+currency: USD
+purchaseAmountMinor: 10000
+agreedPriceMinor: 10000
+retainedOnCancellationMinor: 2000
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      required: []
+      parties:
+        customer:
+          type: Parties/Party
+          myosAccountId: customer-account
+          readerKeys: [customer-reader]
+          lead:
+            channel: {type: Contracts/External Channel, event: {source: customer}}
+        seller:
+          type: Parties/Party
+          myosAccountId: seller-account
+          readerKeys: [seller-reader]
+          lead:
+            channel: {type: Contracts/External Channel, event: {source: seller}}
+  cancellation:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        accept:
+          args:
+            key: {type: Text, schema: {minLength: 1}}
+          resultContract: outcome-v1
+          do:
+          - $if:
+              cond: {$exists: {$document: /cancellationDecision}}
+              then: [{$return: {outcome: duplicate}}]
+          - $let: {name: basis, expr: {$document: /purchaseAmountMinor}}
+          - $let: {name: retained, expr: {$document: /retainedOnCancellationMinor}}
+          - $failIf:
+              cond: {$or: [{$lt: [{$var: retained}, 0]}, {$gt: [{$var: retained}, {$var: basis}]}]}
+              message: Invalid reviewed retention
+          - $appendChange:
+              op: add
+              path: /cancellationDecision
+              val:
+                key: {$var: {name: params, path: /key}}
+                status: accepted
+                retainedMinor: {$var: retained}
+                releasedMinor: {$subtract: [{$var: basis}, {$var: retained}]}
+          - $appendEvent:
+              $merge:
+              - type: Commerce/Domain Event
+                kind: Order Cancellation Accepted
+                clause: cancellation
+              - entityId: {$var: {name: params, path: /key}}
+          - $set: {name: actionResult, expr: {outcome: acceptedNew}}
+    bindings:
+      accept:
+        cancelOrder: {on: workflow, party: customer, input: true, requireExactDocumentVersion: true}
+  priceAdjustment:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers: [seller, customer]
+      paths: [/agreedPriceMinor]
+    bindings:
+      editable: /activation/everActivated
+      propose:
+        proposePrice: {on: workflow, party: seller, input: true, requireExactDocumentVersion: true}
+      approve:
+        approvePriceSeller: {on: workflow, party: seller, input: true, requireExactDocumentVersion: true}
+        approvePriceCustomer: {on: workflow, party: customer, input: true, requireExactDocumentVersion: true}
+  credit:
+    type: Features/Feature Clause
+    parameters:
+      actions:
+        approve:
+          do:
+          - $failIf:
+              cond: {$lt: [{$var: {name: params, path: /amountMinor}}, 0]}
+              message: This agreement only approves price reductions
+          - $if:
+              cond: {$gt: [{$var: {name: params, path: /amountMinor}}, 0]}
+              then:
+              - $appendEvent:
+                  $merge:
+                  - type: Commerce/Domain Event
+                    kind: Credit Approved
+                    clause: credit
+                  - entityId: {$var: {name: params, path: /requestId}}
+                    amountMinor: {$var: {name: params, path: /amountMinor}}
+    bindings:
+      approve:
+        fromCancellation:
+          on: event
+          event: {type: Commerce/Domain Event, kind: Order Cancellation Accepted, clause: cancellation}
+          params:
+            requestId: {$var: {name: trigger, path: /entityId}}
+            amountMinor: {$document: /cancellationDecision/releasedMinor}
+        fromPriceAdjustment:
+          on: change
+          path: /agreedPriceMinor
+          event: {type: Contracts/Document Update, op: replace}
+          params:
+            requestId: {$document: /amendments/proposal/id}
+            amountMinor: {$subtract: [{$var: {name: trigger, path: /before}}, {$var: {name: trigger, path: /after}}]}

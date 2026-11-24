@@ -1,6 +1,234 @@
 name: Payment Setup
 type: Payment/Payment Setup
 functions:
+  roundBps:
+    $blue:functionFrom:
+      definition: {type: Money/Rounding}
+      function: roundBps
+  accountTransferPlan:
+    args:
+      input: {}
+      options: {}
+      parties: {}
+      agreementOrigin: {type: Text}
+    do:
+    - $forEach:
+        item: field
+        in: {$keys: {$var: input}}
+        do:
+        - $failIf:
+            cond: {$not: {$includes: {list: [key, amountMinor, accountContext], val: {$var: field}}}}
+            message: UNKNOWN_INPUT_FIELD
+    - $let:
+        vars:
+          gross: {$var: {name: input, path: /amountMinor}}
+          accountContext: {$var: {name: input, path: /accountContext}}
+          feeBps: {$var: {name: options, path: /feeBps}}
+          payer: {$var: {name: options, path: /payerChannel}}
+          payee: {$var: {name: options, path: /payeeChannel}}
+    - $failIf:
+        cond: {$not: {$and: [{$isKind: {val: {$var: gross}, kind: integer}}, {$gt: [{$var: gross}, 0]}]}}
+        message: INVALID_AMOUNT
+    - $forEach:
+        item: path
+        in: [/payerBinding, /payeeBinding, /platformAccountId, /environment]
+        do:
+        - $let: {name: fieldValue, expr: {$pointerGet: {object: {$var: accountContext}, path: {$var: path}}}}
+        - $failIf:
+            cond: {$or: [{$not: {$isKind: {val: {$var: fieldValue}, kind: text}}}, {$eq: [{$var: fieldValue}, '']}]}
+            message: PAYOUT_ACCOUNT_CONTEXT_REQUIRED
+    - $failIf:
+        cond: {$not: {$includes: {list: [TEST, LIVE], val: {$var: {name: accountContext, path: /environment}}}}}
+        message: PAYOUT_ACCOUNT_CONTEXT_REQUIRED
+    - $failIf:
+        cond: {$ne: [{$var: {name: options, path: /feePolicy}}, myos-commission-fee-v1]}
+        message: PAYOUT_FEE_POLICY_UNSUPPORTED
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$isKind: {val: {$var: feeBps}, kind: integer}}
+            - {$gte: [{$var: feeBps}, 0]}
+            - {$lte: [{$var: feeBps}, 9999]}
+        message: PAYOUT_FEE_BPS_INVALID
+    - $let: {name: fee, expr: {$call: {function: roundBps, args: {basis: {$var: gross}, bps: {$var: feeBps}}}}}
+    - $let: {name: net, expr: {$subtract: [{$var: gross}, {$var: fee}]}}
+    - $failIf: {cond: {$lte: [{$var: net}, 0]}, message: PAYOUT_NET_NOT_POSITIVE}
+    - $return:
+        $merge:
+        - {$var: options}
+        - payoutKey: {$var: {name: input, path: /key}}
+          grossMinor: {$var: gross}
+          feeMinor: {$var: fee}
+          netMinor: {$var: net}
+          agreementOrigin: {$var: agreementOrigin}
+          payerBinding: {$var: {name: accountContext, path: /payerBinding}}
+          payeeBinding: {$var: {name: accountContext, path: /payeeBinding}}
+          platformAccountId: {$var: {name: accountContext, path: /platformAccountId}}
+          environment: {$var: {name: accountContext, path: /environment}}
+          payerAccountId: {$pointerGet: {object: {$var: parties}, path: {$pointerJoin: [{$var: payer}, myosAccountId]}}}
+          payeeAccountId: {$pointerGet: {object: {$var: parties}, path: {$pointerJoin: [{$var: payee}, myosAccountId]}}}
+  freezeAccountTransferInstruction:
+    args:
+      prepared: {}
+    do:
+    - $let:
+        vars:
+          details: {$var: {name: prepared, path: /paymentDetails}}
+          terms: {$var: {name: prepared, path: /paymentTerms}}
+          split: {$var: {name: prepared, path: /paymentDetails/payoutTerms}}
+    - $let:
+        vars:
+          operator: {$var: {name: split, path: /operator}}
+          payer: {$var: {name: split, path: /payerChannel}}
+    - $failIf:
+        cond: {$not: {$includes: {list: [test, stripe], val: {$var: operator}}}}
+        message: PAYOUT_OPERATOR_UNSUPPORTED
+    - $let:
+        name: instructionType
+        expr:
+          $choose:
+            cond: {$eq: [{$var: operator}, test]}
+            then: {$get: {object: {type: MyOS/MyOS Test Account to Account Payment Instruction}, key: type}}
+            else: {$get: {object: {type: MyOS/MyOS Stripe Account to Account Payment Instruction}, key: type}}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$nodeBlueId: {$var: {name: prepared, path: /type}}}, {$nodeBlueId: {$var: instructionType}}]}
+            - {$eq: [{$var: {name: details, path: /method}}, myos-account-to-account]}
+            - {$eq: [{$var: {name: terms, path: /amountMinor}}, {$var: {name: split, path: /netMinor}}]}
+            - {$eq: [{$var: {name: terms, path: /limitMinor}}, {$var: {name: split, path: /netMinor}}]}
+            - {$eq: [{$var: {name: terms, path: /currency}}, {$var: {name: split, path: /currency}}]}
+            - {$includes: {list: {$var: {name: prepared, path: /clauses/activation/parameters/required}}, val: {$var: payer}}}
+            - {$isKind: {val: {$var: {name: split, path: /operatorAccountId}}, kind: text}}
+            - {$ne: [{$var: {name: split, path: /operatorAccountId}}, '']}
+        message: PAYOUT_INSTRUCTION_INVALID
+    - $forEach:
+        item: path
+        in: [/payerChannel, /payeeChannel, /guarantorChannel]
+        do:
+        - $failIf:
+            cond: {$ne: [{$pointerGet: {object: {$var: terms}, path: {$var: path}}}, {$pointerGet: {object: {$var: split}, path: {$var: path}}}]}
+            message: PAYOUT_INSTRUCTION_INVALID
+    - $forEach:
+        item: role
+        in:
+        - {channel: {$var: {name: split, path: /payerChannel}}, account: {$var: {name: split, path: /payerAccountId}}}
+        - {channel: {$var: {name: split, path: /payeeChannel}}, account: {$var: {name: split, path: /payeeAccountId}}}
+        do:
+        - $failIf:
+            cond:
+              $ne:
+              - {$pointerGet: {object: {$var: prepared}, path: {$pointerJoin: [clauses, activation, parameters, parties, {$var: {name: role, path: /channel}}, myosAccountId]}}}
+              - {$var: {name: role, path: /account}}
+            message: PAYOUT_PARTY_MISMATCH
+    - $return: {paymentTerms: {$var: terms}, paymentDetails: {$var: details}}
+  validateAccountTransferCandidate:
+    args:
+      candidate: {}
+      frozenTerms: {}
+    do:
+    - $failIf:
+        cond:
+          $or:
+          - {$ne: [{$var: {name: candidate, path: /paymentTerms}}, {$var: {name: frozenTerms, path: /paymentTerms}}]}
+          - {$ne: [{$var: {name: candidate, path: /paymentDetails}}, {$var: {name: frozenTerms, path: /paymentDetails}}]}
+        message: PAYOUT_TERMS_MISMATCH
+    - $let: {name: split, expr: {$var: {name: frozenTerms, path: /paymentDetails/payoutTerms}}}
+    - $forEach:
+        item: role
+        in:
+        - {channel: {$var: {name: split, path: /payerChannel}}, account: {$var: {name: split, path: /payerAccountId}}}
+        - {channel: {$var: {name: split, path: /payeeChannel}}, account: {$var: {name: split, path: /payeeAccountId}}}
+        - {channel: {$var: {name: split, path: /guarantorChannel}}, account: {$var: {name: split, path: /operatorAccountId}}}
+        do:
+        - $failIf:
+            cond:
+              $ne:
+              - {$pointerGet: {object: {$var: candidate}, path: {$pointerJoin: [activation, parties, {$var: {name: role, path: /channel}}, myosAccountId]}}}
+              - {$var: {name: role, path: /account}}
+            message: PAYOUT_PARTY_MISMATCH
+    - $return: true
+  requireFixedTransfer:
+    $blue:functionFrom: {definition: {type: MyOS/Account Settlement Functions}, function: requireFixedTransfer}
+  attestTransferBreakdown:
+    $blue:functionFrom: {definition: {type: MyOS/Account Settlement Functions}, function: attestTransferBreakdown}
+  accountTransferResult:
+    args:
+      instruction: {}
+      key: {type: Text}
+      reservedMinor: {type: Integer}
+      receiptPath: {type: Text}
+      requestPrefix: {type: Text}
+    do:
+    - $if:
+        cond:
+          $not:
+            $includes:
+              list:
+              - {$nodeBlueId: {$get: {object: {type: MyOS/MyOS Test Account to Account Payment Instruction}, key: type}}}
+              - {$nodeBlueId: {$get: {object: {type: MyOS/MyOS Stripe Account to Account Payment Instruction}, key: type}}}
+              val: {$nodeBlueId: {$var: {name: instruction, path: /type}}}
+        then:
+        - $return: {}
+    - $let:
+        vars:
+          payment: {$pointerGet: {object: {$var: instruction}, path: /payment, default: {}}}
+          breakdown: {$var: {name: instruction, path: /paymentDetails/payoutTerms}}
+          report: {$pointerGet: {object: {$var: instruction}, path: {$var: receiptPath}, default: {}}}
+          original: {$var: {name: instruction, path: /contracts/initialized/document}}
+    - $let:
+        vars:
+          gross: {$var: {name: breakdown, path: /grossMinor}}
+          fee: {$var: {name: breakdown, path: /feeMinor}}
+          net: {$var: {name: breakdown, path: /netMinor}}
+          completed: {$pointerGet: {object: {$var: payment}, path: /completed, default: 0}}
+    - $failIf:
+        cond:
+          $or:
+          - {$ne: [{$var: {name: breakdown, path: /payoutKey}}, {$var: key}]}
+          - {$ne: [{$var: gross}, {$var: reservedMinor}]}
+          - {$ne: [{$add: [{$var: fee}, {$var: net}]}, {$var: gross}]}
+        message: INVALID_PAYOUT_TERMS
+    - $if:
+        cond:
+          $or:
+          - {$not: {$exists: {$var: original}}}
+          - {$call: {function: unresolvedFinancialRequests, args: {payment: {$var: payment}}}}
+        then:
+        - $return: {accountTransfer: true}
+    - $if:
+        cond:
+          $and:
+          - {$eq: [{$var: {name: report, path: /grossMinor}}, {$var: gross}]}
+          - {$eq: [{$var: {name: report, path: /feeMinor}}, {$var: fee}]}
+          - {$eq: [{$var: {name: report, path: /netMinor}}, {$var: net}]}
+          - {$eq: [{$var: {name: report, path: /payoutTerms}}, {$var: breakdown}]}
+          - {$eq: [{$var: {name: report, path: /payoutKey}}, {$var: key}]}
+          - {$eq: [{$var: {name: report, path: /transactionId}}, {$var: {name: payment, path: /transactionId}}]}
+          - {$eq: [{$var: {name: report, path: /instructionOrigin}}, {$nodeBlueId: {$var: original}}]}
+          - {$eq: [{$var: completed}, {$var: net}]}
+          - {$eq: [{$pointerGet: {object: {$var: payment}, path: /reversed, default: 0}}, 0]}
+        then:
+        - $return: {accountTransfer: true, paidMinor: {$var: gross}, transferredMinor: {$var: net}, feeMinor: {$var: fee}}
+    - $let:
+        vars:
+          secure: {$pointerGet: {object: {$var: payment}, path: {$pointerJoin: [requests, {$concat: [{$var: requestPrefix}, secure]}, status]}}}
+          void: {$pointerGet: {object: {$var: payment}, path: {$pointerJoin: [requests, {$concat: [{$var: requestPrefix}, void]}, status]}}}
+    - $if:
+        cond:
+          $and:
+          - {$eq: [{$var: completed}, 0]}
+          - {$eq: [{$pointerGet: {object: {$var: payment}, path: /secured, default: 0}}, 0]}
+          - {$eq: [{$var: report}, {}]}
+          - $or:
+            - {$eq: [{$var: {name: payment, path: /rejected}}, true]}
+            - {$includes: {list: [declined, failed], val: {$var: secure}}}
+            - {$eq: [{$var: void}, succeeded]}
+        then:
+        - $return: {accountTransfer: true, paidMinor: 0, transferredMinor: 0, feeMinor: 0}
+    - $return: {accountTransfer: true}
   resolveParty:
     args:
       input: {}

@@ -6,6 +6,90 @@ Authored native Blue proposal package. See the top-level evidence and catalogue 
 Unpublished candidate. Authored Blue/BEX definitions are authoritative. See ../docs/payment-family.md for the tested package selection and integration boundaries.
 
 
+## Connections before activation
+
+Use `parameters.preActivationConnections` to admit specific Connections actions
+while commercial activation is pending. Name the clause instance and its action.
+Use `automatic: true` for the action's automatic declaration, or `connection`
+for one named binding. Use `observations: true` to cover the dedicated internal
+sources of an action declared with `observation: true`.
+
+```yaml
+parameters:
+  preActivationConnections:
+    - clause: reservation
+      action: initialize
+      automatic: true
+    - clause: cancellation
+      action: refreshAvailability
+      observations: true
+```
+
+Connections resolves these references against the composed document, including
+default bindings and configurable actions. The referenced clause's hook must
+use the Connections planner, as the Schedule and Commerce planning hooks do.
+Unknown references fail planning. An individual entry identifies a declaration
+by exact name. An observation entry expands the action's event, embedded,
+collection, change, initialized and activated connections, including an eligible
+automatic connection. Workflows, timers and shared channels keep their own
+dispatch rules.
+Keep generated source channels private to the planner. A custom raw handler
+on a generated channel shares that channel's native dispatch decision.
+
+A workflow reference validates the declaration. To let an external caller run
+it before activation, include the operation key in `preActivationOperations`.
+A shared channel cannot be admitted through a logical reference because
+dispatch grants apply to the whole channel. Timers deliver their firing
+through a native external channel and cannot be admitted through a logical
+reference. Existing timer and external operation rules continue to apply.
+Activation checks document access and closure for every resolved connection.
+
+A lawful composition change retains grants for the same clause declaration and
+drops grants when that declaration is removed. A replacement needs its own
+explicit policy. Adding a connection to a replacement does not extend the
+original grant. Activation's own amendment rules and the target clause's
+lifecycle rules still apply.
+
+`preActivationChannels` remains available for existing documents and
+channel-level configurations. When both fields are supplied, Activation
+combines the explicitly listed channels with the resolved connection grants.
+Invalid logical references still fail planning. New Connections configurations
+can use the logical references so their authors do not need generated names.
+Historical package identities retain their existing behavior.
+
+## Review approval using a local signed decision
+
+A required role can use `parameters.reviewedApprovals.<role>` to approve
+through a mounted local clause. For example, configure the seller of a
+scheduled Order to use the signed review of its single booking group:
+
+```yaml
+reviewedApprovals:
+  seller:
+    event:
+      type: Schedule/Reservation Reviewed
+      clause: reservation
+      subject: booking-1
+    source: /reservations/booking-1
+    basis: /amountMinor
+    acceptanceBy: customer
+```
+
+The selector uses the exact type, source clause and subject. `source` and
+`basis` are absolute document pointers. Every configured selector belongs to
+one required role. For that role, Activation guards the direct `approve`,
+`activate` and `proposeAndActivate` operations. Ordinary operations remain
+available for other roles under their existing rules.
+
+The handler checks live access, the signed exact-version operation's actor and
+request digest, the saved record digest and the current basis. An `approve`
+from the configured role approves its current terms. An `offer` from that role
+records a grant. Only the declared `acceptanceBy` role can accept the exact
+current grant. It binds the approver, document, revision, terms reference,
+source, subject, proposal, basis and acceptance role. Activation consumes the
+grant when applying the approval. Omit `acceptanceBy` to allow direct reviewed
+approval only.
+
 ## Owner-mediated party admission
 
 An approved admission can emit `Party Addition Requested` with its exact

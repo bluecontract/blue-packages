@@ -1,12 +1,36 @@
 name: Payment Process Clause
 type: Payment/Conditional Payment Clause
-description: PI-local request actions and a statically validated conditional capture
-  policy. Every capture path uses the native instruction gate; only the guarantor
-  confirms money.
+description: PI-local request actions, conditional capture and optional adjustments
+  to the selected original payment. The guarantor confirms money.
 hookDefinition:
   type: Payment/Payment Process Plan
+actionDefinition:
+  type: Payment/Payment Process Functions
 readParametersFromDocument: true
 actions:
+  adjust:
+    defaults:
+      adjustment: ''
+    args:
+      adjustment: {type: Text}
+    resultContract: outcome-v1
+    do:
+    - $let:
+        name: configuration
+        expr: {$document: {$pointerJoin: [clauses, {$const: clauseKey}, parameters]}}
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: applyAdjustments
+            args:
+              adjustment: {$var: {name: params, path: /adjustment}}
+              adjustments:
+                $call:
+                  function: withSharedSelection
+                  args:
+                    adjustments: {$pointerGet: {object: {$var: configuration}, path: /adjustments, default: {}}}
+                    sharedSelection: {$pointerGet: {object: {$var: configuration}, path: /selectedPayment, default: {}}}
   requestAuthorize:
     defaults:
       amountMinor:

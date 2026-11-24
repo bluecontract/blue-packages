@@ -38,6 +38,49 @@ functions:
                   $var: candidate
                 separator: .
           - 1
+  connectionWithProfile:
+    args:
+      connection: {}
+      profiles: {}
+    do:
+    - $let:
+        name: profileName
+        expr: {$var: {name: connection, path: /profile}}
+    - $if:
+        cond: {$not: {$exists: {$var: profileName}}}
+        then:
+        - $return: {$var: connection}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$isKind: {val: {$var: profileName}, kind: text}}
+            - {$call: {function: validName, args: {candidate: {$var: profileName}}}}
+        message: CONNECTION_PROFILE_NAME_INVALID
+    - $let:
+        name: profile
+        expr: {$get: {object: {$var: profiles}, key: {$var: profileName}}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: profile}, kind: object}}}
+        message: CONNECTION_PROFILE_UNKNOWN
+    - $forEach:
+        key: field
+        item: profileField
+        in: {$var: profile}
+        do:
+        - $failIf:
+            cond: {$not: {$includes: {list: [params, when], val: {$var: field}}}}
+            message: CONNECTION_PROFILE_FIELD_UNSUPPORTED
+    - $failIf:
+        cond:
+          $or:
+          - {$hasKey: {object: {$var: connection}, key: params}}
+          - {$hasKey: {object: {$var: connection}, key: when}}
+        message: CONNECTION_PROFILE_LOCAL_CONFLICT
+    - $return:
+        $merge:
+        - {$pointerSet: {object: {$var: connection}, path: /profile, op: remove}}
+        - {$var: profile}
   selector:
     args:
       s: {}
@@ -235,6 +278,49 @@ functions:
                   type: Parties/Document Activated
     - $return:
         $var: result
+  workflowParamPaths:
+    args:
+      connection: {}
+    do:
+    - $let: {name: paths, expr: []}
+    - $forEach:
+        item: sourceKind
+        in: [inputParams, documentParams]
+        do:
+        - $let:
+            name: mapping
+            expr:
+              $pointerGet:
+                object: {$var: connection}
+                path: {$concat: [/, {$var: sourceKind}]}
+                default: {}
+        - $failIf:
+            cond: {$not: {$isKind: {val: {$var: mapping}, kind: object}}}
+            message: WORKFLOW_PARAM_PATHS_MUST_BE_OBJECT
+        - $forEach:
+            item: source
+            key: target
+            in: {$var: mapping}
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - {$isKind: {val: {$var: source}, kind: text}}
+                    - {$startsWith: [{$var: source}, /]}
+                    - {$startsWith: [{$var: target}, /]}
+                    - {$ne: [{$var: source}, /]}
+                    - {$ne: [{$var: target}, /]}
+                message: WORKFLOW_PARAM_PATH_REQUIRED
+            - $set:
+                name: paths
+                expr:
+                  $listConcat:
+                  - {$var: paths}
+                  - - target: {$var: target}
+                      source: {$var: source}
+                      document: {$eq: [{$var: sourceKind}, documentParams]}
+    - $return: {$var: paths}
   validateConnectionsConfiguration:
     args: {}
     do:
@@ -256,68 +342,126 @@ functions:
               - /clauseRuntime/work/candidate/
               - $const: clauseKey
         code: CONNECTIONS_REQUIRE_NEW_CLAUSE_KEY
-  planConnections:
-    args: {}
+  connectionConfiguration:
+    args:
+      clauseKey: {type: Text}
     do:
     - $let:
-        name: clause
-        expr:
-          $document:
-            $concat:
-            - /clauseRuntime/work/candidate/
-            - $const: clauseKey
+        name: path
+        expr: {$concat: [/clauseRuntime/work/candidate/, {$var: clauseKey}]}
     - $let:
-        name: bindings
-        expr:
-          $merge:
-          - $object:
-              $document:
-                $concat:
-                - /clauseRuntime/work/candidate/
-                - $const: clauseKey
-                - /type/defaultBindings
-          - $object:
-              $var:
-                name: clause
-                path: /bindings
+        vars:
+          clause: {$document: {$var: path}}
+          configurable: {$eq: [{$document: {$concat: [{$var: path}, /type/configurableActions]}}, true]}
     - $let:
         name: actionsPath
         expr:
           $concat:
-          - /clauseRuntime/work/candidate/
-          - $const: clauseKey
-          - /type/actions
+          - {$var: path}
+          - {$choose: {cond: {$var: configurable}, then: /parameters/actions, else: /type/actions}}
+    - $return:
+        clause: {$var: clause}
+        bindings:
+          $merge:
+          - {$object: {$document: {$concat: [{$var: path}, /type/defaultBindings]}}}
+          - {$object: {$var: {name: clause, path: /bindings}}}
+        actionsPath: {$var: actionsPath}
+        actions:
+          $choose:
+            cond: {$var: configurable}
+            then: {$var: {name: clause, path: /parameters/actions}}
+            else: {$document: {$var: actionsPath}}
+  connectionId:
+    args:
+      clauseKey: {type: Text}
+      actionName: {type: Text}
+      connectionName: {type: Text}
+    expr: {$concat: [cx., {$var: clauseKey}, ., {$var: actionName}, ., {$var: connectionName}]}
+  connectionSourceChannel:
+    args:
+      id: {type: Text}
+    expr: {$concat: [{$var: id}, _source]}
+  resolveConnectionChannels:
+    args:
+      clauseKey: {type: Text}
+      actionName: {type: Text}
+      connectionName: {type: Text}
+      automatic: {type: Boolean}
+    do:
     - $let:
-        name: actions
+        name: config
+        expr: {$call: {function: connectionConfiguration, args: {clauseKey: {$var: clauseKey}}}}
+    - $let:
+        name: action
+        expr: {$get: {object: {$var: {name: config, path: /actions}}, key: {$var: actionName}}}
+    - $if:
+        cond: {$not: {$isKind: {val: {$var: action}, kind: object}}}
+        then:
+        - $return: {allowed: false, code: PRE_ACTIVATION_CONNECTION_UNKNOWN_ACTION}
+    - $let:
+        name: automaticConnection
+        expr: {$var: {name: action, path: /automatic}}
+    - $let:
+        name: connection
         expr:
-          $document:
-            $concat:
-            - /clauseRuntime/work/candidate/
-            - $const: clauseKey
-            - /type/actions
+          $choose:
+            cond: {$var: automatic}
+            then: {$var: automaticConnection}
+            else:
+              $get:
+                object: {$get: {object: {$var: {name: config, path: /bindings}}, key: {$var: actionName}}}
+                key: {$var: connectionName}
     - $if:
         cond:
-          $eq:
-          - $document:
-              $concat:
-              - /clauseRuntime/work/candidate/
-              - $const: clauseKey
-              - /type/configurableActions
-          - true
+          $or:
+          - {$not: {$isKind: {val: {$var: connection}, kind: object}}}
+          - $and:
+            - {$not: {$var: automatic}}
+            - {$eq: [{$var: connectionName}, _automatic]}
+            - {$exists: {$var: automaticConnection}}
         then:
-        - $set:
-            name: actionsPath
-            expr:
-              $concat:
-              - /clauseRuntime/work/candidate/
-              - $const: clauseKey
-              - /parameters/actions
-        - $set:
-            name: actions
-            expr:
-              $var:
-                name: clause
-                path: /parameters/actions
+        - $return: {allowed: false, code: PRE_ACTIVATION_CONNECTION_UNKNOWN_CONNECTION}
+    - $let:
+        name: mode
+        expr: {$var: {name: connection, path: /on}}
+    - $if:
+        cond: {$eq: [{$var: mode}, workflow]}
+        then:
+        - $return: {allowed: true, code: '', channels: []}
+    - $if:
+        cond: {$eq: [{$var: mode}, channel]}
+        then:
+        - $return: {allowed: false, code: PRE_ACTIVATION_CONNECTION_SHARED_CHANNEL}
+    - $if:
+        cond: {$eq: [{$var: mode}, timer]}
+        then:
+        - $return: {allowed: false, code: PRE_ACTIVATION_CONNECTION_TIMER_UNSUPPORTED}
+    - $let:
+        name: id
+        expr:
+          $call:
+            function: connectionId
+            args:
+              clauseKey: {$var: clauseKey}
+              actionName: {$var: actionName}
+              connectionName: {$choose: {cond: {$var: automatic}, then: _automatic, else: {$var: connectionName}}}
+    - $return:
+        allowed: true
+        code: ''
+        channels:
+        - {$call: {function: connectionSourceChannel, args: {id: {$var: id}}}}
+  planConnections:
+    args: {}
+    do:
+    - $let:
+        name: config
+        expr: {$call: {function: connectionConfiguration, args: {clauseKey: {$const: clauseKey}}}}
+    - $let:
+        vars:
+          clause: {$var: {name: config, path: /clause}}
+          bindings: {$var: {name: config, path: /bindings}}
+          actionsPath: {$var: {name: config, path: /actionsPath}}
+          actions: {$var: {name: config, path: /actions}}
     - $failIf:
         cond:
           $not:
@@ -575,12 +719,71 @@ functions:
                   key:
                     $var: conditionName
             message: CONNECTION_UNKNOWN_CONDITION_ACTION
+    - $let:
+        name: conditionGroups
+        expr: {$object: {$var: {name: clause, path: /parameters/conditionGroups}}}
+    - $forEach:
+        item: group
+        key: groupName
+        in: {$var: conditionGroups}
+        do:
+        - $forEach:
+            item: groupedAction
+            in: {$var: {name: group, path: /actions}}
+            do:
+            - $failIf:
+                cond: {$not: {$hasKey: {object: {$var: actions}, key: {$var: groupedAction}}}}
+                message: CONNECTION_UNKNOWN_CONDITION_ACTION
     - $forEach:
         item: action
         key: actionName
         in:
           $var: actions
         do:
+        - $let:
+            name: individualCondition
+            expr:
+              $pointerGet:
+                object: {$var: clause}
+                path: {$concat: [/parameters/conditions/, {$var: actionName}]}
+                default: true
+        - $let: {name: conditions, expr: [{$var: individualCondition}]}
+        - $forEach:
+            item: group
+            key: groupName
+            in: {$var: conditionGroups}
+            do:
+            - $if:
+                cond: {$includes: {list: {$var: {name: group, path: /actions}}, val: {$var: actionName}}}
+                then:
+                - $let:
+                    vars:
+                      inputs: {$var: {name: group, path: /inputs}}
+                      condition: {$pointerGet: {object: {$var: group}, path: /condition, default: false}}
+                - $set:
+                    name: conditions
+                    expr:
+                      $listConcat:
+                      - {$var: conditions}
+                      - - $choose:
+                            cond: {$exists: {$var: inputs}}
+                            then:
+                              $objectSet:
+                                object: {}
+                                key: $some
+                                val:
+                                  in:
+                                  - $objectSet: {object: {}, key: $literal, val: {$var: inputs}}
+                                  item: conditionInputs
+                                  where: {$var: condition}
+                            else: {$var: condition}
+        - $let:
+            name: actionCondition
+            expr:
+              $choose:
+                cond: {$gt: [{$size: {$var: conditions}}, 1]}
+                then: {$objectSet: {object: {}, key: $and, val: {$var: conditions}}}
+                else: {$var: individualCondition}
         - $let:
             name: connections
             expr:
@@ -682,7 +885,7 @@ functions:
                     val:
                       $var: automatic
         - $forEach:
-            item: c
+            item: suppliedConnection
             key: connectionName
             in:
               $var: connections
@@ -703,9 +906,17 @@ functions:
                             $var: connectionName
                     - $isKind:
                         val:
-                          $var: c
+                          $var: suppliedConnection
                         kind: object
                 message: Invalid named connection
+            - $let:
+                name: c
+                expr:
+                  $call:
+                    function: connectionWithProfile
+                    args:
+                      connection: {$var: suppliedConnection}
+                      profiles: {$pointerGet: {object: {$var: clause}, path: /parameters/connectionProfiles, default: {}}}
             - $let:
                 name: mode
                 expr:
@@ -731,6 +942,10 @@ functions:
                       - event
                       - request
                       - party
+                      - input
+                      - inputParams
+                      - documentParams
+                      - requireExactDocumentVersion
                       event:
                       - event
                       embedded:
@@ -806,6 +1021,23 @@ functions:
                               path: /embed
                           kind: boolean
                     message: Embed must be Boolean
+            - $forEach:
+                item: option
+                in:
+                - input
+                - requireExactDocumentVersion
+                do:
+                - $failIf:
+                    cond:
+                      $not:
+                        $isKind:
+                          val:
+                            $pointerGet:
+                              object: {$var: c}
+                              path: {$concat: [/, {$var: option}]}
+                              default: false
+                          kind: boolean
+                    message: {$concat: [{$var: option}, ' must be Boolean']}
             - $let:
                 name: timer
                 expr:
@@ -831,13 +1063,12 @@ functions:
             - $let:
                 name: id
                 expr:
-                  $concat:
-                  - cx.
-                  - $const: clauseKey
-                  - .
-                  - $var: actionName
-                  - .
-                  - $var: connectionName
+                  $call:
+                    function: connectionId
+                    args:
+                      clauseKey: {$const: clauseKey}
+                      actionName: {$var: actionName}
+                      connectionName: {$var: connectionName}
             - $let:
                 name: slot
                 expr:
@@ -874,9 +1105,9 @@ functions:
             - $let:
                 name: channel
                 expr:
-                  $concat:
-                  - $var: id
-                  - _source
+                  $call:
+                    function: connectionSourceChannel
+                    args: {id: {$var: id}}
             - $let:
                 name: handler
                 expr:
@@ -1058,12 +1289,23 @@ functions:
                                   contract:
                                     $var: declaration
             - $let:
+                name: paramPaths
+                expr:
+                  $choose:
+                    cond: {$eq: [{$var: mode}, workflow]}
+                    then:
+                      $call:
+                        function: workflowParamPaths
+                        args: {connection: {$var: c}}
+                    else: []
+            - $let:
                 name: constants
                 expr:
                   clauseKey:
                     $const: clauseKey
                   connectionKey:
                     $var: connectionName
+                  paramPaths: {$var: paramPaths}
                   parameters:
                     $choose:
                       cond:
@@ -1080,12 +1322,20 @@ functions:
                           object:
                             $pointerSet:
                               object:
-                                $var:
-                                  name: clause
-                                  path: /parameters
-                              path: /actions
+                                $pointerSet:
+                                  object:
+                                    $pointerSet:
+                                      object:
+                                        $var:
+                                          name: clause
+                                          path: /parameters
+                                      path: /actions
+                                      op: remove
+                                  path: /conditions
+                                  op: remove
+                              path: /conditionGroups
                               op: remove
-                          path: /conditions
+                          path: /connectionProfiles
                           op: remove
                   bindings:
                     $var: propertyBindings
@@ -1311,6 +1561,14 @@ functions:
                                       $event: /request/context/trigger
                                     else:
                                       $event: ''
+                  - $choose:
+                      cond: {$eq: [{$var: {name: c, path: /requireExactDocumentVersion}}, true]}
+                      then:
+                        $literal:
+                        - $failIf:
+                            cond: {$ne: [{$binding: call/requireExactDocumentVersion}, true]}
+                            message: EXACT_REVIEW_REQUIRED
+                      else: []
                   - - $pointerSet:
                         object:
                           $literal:
@@ -1328,11 +1586,46 @@ functions:
                                   $var: action
                                 path: /defaults
                                 default: {}
+                            - $choose:
+                                cond: {$eq: [{$var: {name: c, path: /input}}, true]}
+                                then:
+                                  $literal:
+                                    $object: {$var: trigger}
+                                else: {}
                             - $pointerGet:
                                 object:
                                   $var: c
                                 path: /params
                                 default: {}
+                  - $choose:
+                      cond: {$gt: [{$size: {$var: paramPaths}}, 0]}
+                      then:
+                        $literal:
+                        - $forEach:
+                            item: projection
+                            in: {$const: paramPaths}
+                            do:
+                            - $let:
+                                name: projected
+                                expr:
+                                  $choose:
+                                    cond: {$var: {name: projection, path: /document}}
+                                    then: {$document: {$var: {name: projection, path: /source}}}
+                                    else:
+                                      $pointerGet:
+                                        object: {$var: trigger}
+                                        path: {$var: {name: projection, path: /source}}
+                            - $if:
+                                cond: {$exists: {$var: projected}}
+                                then:
+                                - $set:
+                                    name: params
+                                    expr:
+                                      $pointerSet:
+                                        object: {$var: params}
+                                        path: {$var: {name: projection, path: /target}}
+                                        val: {$var: projected}
+                      else: []
                   - - $pointerSet:
                         object:
                           $literal:
@@ -1381,14 +1674,7 @@ functions:
                               message: ACTION_CONDITION_FAILED
                         path: /$failIf/cond/$not
                         val:
-                          $pointerGet:
-                            object:
-                              $var: clause
-                            path:
-                              $concat:
-                              - /parameters/conditions/
-                              - $var: actionName
-                            default: true
+                          $var: actionCondition
                   - $literal:
                     - $let:
                         name: actionResult

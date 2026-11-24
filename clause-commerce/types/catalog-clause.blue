@@ -1,0 +1,47 @@
+name: Catalog Clause
+description: Validate a document-owned supplier catalog and create immutable keyed quotes. Descriptive
+  offer text and groups can accompany the catalog.
+type: Connections/Connected Clause
+parameters:
+  offer:
+    title:
+      type: Text
+    text:
+      type: Text
+    sections:
+      type: List
+actionDefinition:
+  type: Commerce/Catalog Functions
+actions:
+  validate:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: validateInitialCatalog
+            args: {}
+    automatic:
+      'on': initialized
+      once: true
+  quote:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: createQuote
+            args:
+              input:
+                $var: params
+bindingTypes:
+  state: pointer
+  quotes: pointer
+  quoteSnapshots: pointer
+optionalBindings:
+- quoteSnapshots
+defaultBindings:
+  state: /catalog
+  quotes: /quotes

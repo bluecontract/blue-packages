@@ -1,6 +1,6 @@
 # Build connected applications with clauses
 
-This tutorial describes the connection model and the earlier domain-facade API. The unpublished `0.8.0-preview.1` introduces independent document preparation: `Documents/Document Clause`, `Payment/Payment Clause`, and their keyed collections use prepare/provide/resume instead of the earlier start facade. See the [Documents API](../clause-documents/README.md) and [Payment API](../clause-payment/README.md) before copying the domain examples below. The earlier Payment facade is explicitly named `Payment/Legacy Payment Clause` in this preview. Package sources live at the repository root; `PACKAGES.json` pins their exact built identities.
+This is the guide to the single current clause package set in this repository. It replaces the earlier catalogue of overlapping, narrowly named clauses. Package sources live at the repository root. `PUBLIC-CLAUSES.json` selects the public families; `PACKAGES.json` pins their exact built identities.
 
 The packages are unpublished candidates. The examples are real Blue source documents, accompanied by executable Java scenarios. Local scenario validation, authenticated multi-account integration, and AWS deployment are separate checks. A passing local example does not certify a banking integration or a production deployment.
 
@@ -170,110 +170,46 @@ The lead can replace its own party definition through `updateParty_<party>`, usi
 
 When a child is created, its selected parties and readers are a snapshot. Payment Instructions freeze that roster. Changes in an agreement do not silently expand the PI's membership or reader set. A new PI or an explicitly designed migration is required when its frozen membership must change.
 
-## 5. Payment is one family; the instruction owns the protocol
+## 5. Prepare a Payment Instruction and run its protocol
 
-A Payment clause represents one payment obligation. Its `start` action creates and embeds one Payment Instruction. Repeating the same creation intent is idempotent; a conflicting payment at the same destination is rejected.
+The current `Payment/Payment Clause` represents one payment obligation. It
+specializes the Documents lifecycle for a single Payment Instruction. The Order
+prepares the instruction from its configured template and inputs. Depending on
+`obtain`, Documents initializes or requests a separate document. Provision and
+admission check the selected instruction and its reviewed terms. A repeated
+preparation or provision uses the original intent and identity.
 
-The generic `Payment/Payment Clause` uses the provider-neutral protocol. `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment` and `ManualPayments/Manual Bank Payment` specialize how that payment is initialized and confirmed. They share the same request-connection model.
+The current Payment clause delegates the protocol to the instruction. The
+instruction's payer, payee and guarantor have distinct authority. `requestCapture`
+requests capture. Only the guarantor's `completePayment` operation establishes a
+confirmed capture. The same distinction applies to authorization, refund and
+release. [One-obligation walkthrough](../examples/apps/31-current-payment-preparation.blue) · [Two-obligation walkthrough](../examples/apps/32-current-two-payment-obligations.blue) · [Payment package](../clause-payment/README.md)
 
-**The Payment clause does not expose guarantor confirmations.** `requestCapture` requests capture. `completePayment` is an authoritative operation on the PI, available to its guarantor. An agreement cannot prove that money moved by emitting its own success event.
+### The current Payment clause source
 
-`PaymentInstruction/Payment Instruction` owns the payment state, correlated request ledger and named response operations. `PaymentInstruction/Payment Instruction with Clauses` extends it and adds the ordinary clause host. Clause support does not replace the standard protocol.
-
-### The actual Payment clause source
-
-The public Payment type selects a setup implementation. Its shared base creates the child, declares the embedded dependency and echoes typed events. The list of child actions contains requests, not the guarantor's result operations.
+This declaration uses the shared Documents base for collaboration and linking.
+[Documents base](../clause-documents/types/base.blue)
 
 ```yaml
 name: Payment Clause
-type: Payment/Payment Base
+type: Documents/Document Base
+description: Prepare or receive one independent Payment Instruction. The shared base owns correlation,
+  admission and linking; the instruction owns financial requests and confirmed outcomes.
 actionDefinition:
-  type: Payment/Standard Payment Setup
-description: One payment. Named request bindings execute in its Payment Instruction; an explicit agreement
-  source creates a cycle. Only the Payment Instruction exposes guarantor operations.
-```
-
-Its complete shared base:
-
-```yaml
-name: Payment Base
-type: Connections/Connected Clause
-description: Create and observe a standard PI. Capture connections execute inside PI; inputs and placement
-  remain explicit.
+  type: Payment/Payment Preparation Functions
+cardinality: single
+destinationBinding: instruction
 bindingTypes:
   instruction: pointer
-  amount: pointer
-defaultBindings:
-  instruction: /payment
-  amount: /product/totalMinor
 embeds:
 - instruction
-readParametersFromDocument: true
 actions:
-  start:
-    do:
-    - $set:
-        name: actionResult
-        expr:
-          $call:
-            function: build
-    resultContract: outcome-v1
   observe:
-    automatic:
-      'on': embedded
-      pathBinding: instruction
-    do:
-    - $if:
-        cond:
-          $not:
-            $is:
-              node:
-                $event: /event
-              pattern:
-                type: Events/Event
-        then:
-        - $return: {}
-    - $appendEvent:
-        $merge:
-        - type: Payment/Payment Event Received
-        - kind:
-            $var:
-              name: trigger
-              path: /kind
-          clause:
-            $const: clauseKey
-          instructionPath:
-            $const:
-              name: bindings
-              path: /instruction
-          event:
-            $objectSet:
-              object: {}
-              key: blueId
-              val:
-                $nodeBlueId:
-                  $event: /event
-    observation: true
-childActions:
-- approveRecipient
-- requestCapture
-- requestRefund
-- requestVoid
-- requestPayeeAssignment
-- requestTransactionDetailsUpdate
-- requestFinalAmountResolution
-- requestPaymentCompletionLock
-- requestPaymentCompletionUnlock
-- requestPaymentReversalLock
-- requestPaymentReversalUnlock
-- requestTransactionDetailsUpdateLock
-- requestTransactionDetailsUpdateUnlock
-- requestAuthorize
+    type: Payment/Observe Payment Instruction
 ```
 
-The setup implementation is [Payment Setup](../clause-payment/types/conditional-setup.blue). It validates roles and terms, selects the party snapshot, separates local and agreement-sourced connections, and assembles the child before publishing it. It uses BEX throughout. It never edits a running child's type to turn it into another payment method.
-
-Here is the complete host declaration that adds clauses to the standard PI:
+The standard Payment Instruction with Clauses retains the native request and
+outcome protocol:
 
 ```yaml
 name: Payment Instruction with Clauses
@@ -328,81 +264,37 @@ contracts:
     order: -1000
     steps:
     - type: PaymentInstruction/Initialize Payment Step
+  __paymentActivated:
+    type: Contracts/Triggered Event Channel
+    event:
+      type: Parties/Document Activated
+  __paymentStartOnActivation:
+    type: Contracts/Sequential Workflow
+    channel: __paymentActivated
+    order: -1000
+    steps:
+    - type: PaymentInstruction/Initialize Payment Step
 ```
 
-### Requests, responses and the event hierarchy
+### Correlation and authority
 
-Every concrete payment request inherits `PaymentInstruction/Payment Request`, which inherits `Events/Request`, which inherits `Events/Event`. Concrete payment responses inherit `PaymentInstruction/Payment Response` → `Events/Response` → `Events/Event`. Shipping follows the same pattern with its own domain request and response bases.
+Native request types inherit `PaymentInstruction/Payment Request`; confirmations
+inherit `PaymentInstruction/Payment Response`. The request ID correlates one
+attempt. Repeating an identical intent reserves no additional amount. Conflicting
+reuse is rejected. Capture and refund reservations protect the current available
+amount. Reconcile an unknown outcome against the original request before creating
+another attempt.
 
-For example, a capture request is represented by the protocol's `PaymentInstruction/Complete Payment Requested`. The public clause action is named `requestCapture`; the guarantor answers through `completePayment`, producing `PaymentInstruction/Payment Completed`. The protocol also distinguishes rejection, failure and an unknown result. An unknown external outcome must be reconciled; it is not safe to issue a second independent charge merely because a timeout occurred.
+Put request logic in the PI. Where a PI action requires an Order fact, configure
+an explicit native source binding for that fact. A parent that needs to observe an
+admitted PI may bind `Payment/Payment Observation Clause`; the resulting event
+identifies the observed PI event. An observer can project confirmed amounts under
+its own business rules. [Payment protocol](payment-protocol.md)
 
-The request ID correlates the entire attempt. Repeating the same request does not reserve the amount twice. Reusing an ID for a conflicting amount is rejected. Capture and refund reservations protect against concurrent requests exceeding the available authorized or refundable amount. The ledger advances only on the corresponding authoritative response.
-
-```mermaid
-flowchart LR
-  A[Agreement or Order: Payment clause] -->|embeds| PI[Payment Instruction with Clauses]
-  U[Customer workflow or agreed signal] -->|requestCapture / requestRefund| PI
-  PI -->|typed request with requestId| G[Guarantor adapter]
-  G -->|authenticated response operation| PI
-  PI -->|Payment Event Received| A
-```
-
-The arrow to the adapter is a protocol request, not a synchronous network call inside BEX. The adapter performs external work and submits the correlated result. The document can therefore distinguish requested, pending, failed, unknown and confirmed outcomes.
-
-### Where the request logic runs
-
-By default, request connections execute **inside the PI**. A customer workflow belongs there if it only needs the PI's state and the supplied request. The Payment clause observes the PI and emits `Payment/Payment Event Received` with the clause name, instruction path, original event reference and event kind. Other agreement clauses listen to that observation.
-
-```yaml
-payment:
-  type: Payment/Payment Clause
-  parameters:
-    amountMinor: 10000
-    currency: EUR
-  bindings:
-    instruction: /payment
-    start:
-      startPayment: {on: workflow, party: customer}
-    requestCapture:
-      confirmSatisfaction:
-        on: workflow
-        party: customer
-        params: {requestId: capture-1, amountMinor: 10000}
-        before:
-          - $failIf:
-              cond: {$ne: [{$var: {name: trigger, path: /satisfied}}, true]}
-              message: SATISFACTION_REQUIRED
-        after:
-          - $appendEvent:
-              $merge:
-                - type: Events/Event
-                - {kind: Customer Satisfaction, satisfied: true}
-```
-
-`confirmSatisfaction` is a PI workflow. The customer supplies `satisfied: true`. The action requests capture; it does not confirm capture. Its completion event is visible to the agreement through the Payment clause's observation. The agreement can update a satisfaction indicator without pretending that payment is complete.
-
-When the condition comes from the agreement, add `in: agreement` to the connection. The PI embeds the agreement under `/sources/order` and observes it. The agreement already embeds the PI, so this is a deliberate cycle. The guarantor must therefore have visibility of the agreement's input domain. The selected Activation roster and access rules make this requirement explicit.
-
-```yaml
-requestCapture:
-  acceptedDelivery:
-    in: agreement
-    on: event
-    event: {type: Events/Event, kind: Delivery Accepted}
-    params: {requestId: delivery-capture, amountMinor: 10000}
-```
-
-A local embedded path is similarly resolved through the agreement. A smart-home or Shipping event can request capture, and a collection of Orders can produce signals used by a parent payment policy. No mandatory third “proof document” is inserted between the agreement and the PI. Use an independent source document only when it already represents an actual subsystem or business fact.
-
-### Common payment options
-
-`amountMinor` and `currency` define the amount and denomination. Alternatively bind `amount` to a document property, such as `/product/totalMinor`; the creation action snapshots it. `payer`, `payee` and `guarantor` select party roles. `recipientApprovalRequired` adds recipient approval. `parties` and `readers` select the roster copied from Activation; an empty party selection reuses the current roster. `instructionClauses` allows additional explicit PI features.
-
-Request actions include authorization, capture, refund, void/cancellation, recipient approval, payee assignment, transaction details updates, final amount resolution, and completion/reversal/details lock or unlock requests. They use the same `params`, `before`, `after` and trigger vocabulary. A requested lock does not become effective until the guarantor confirms it.
-
-MyOS payment methods accept selected MyOS parties or matching account IDs. An ID must resolve to a declared party; it does not bypass Activation. A customer payment can request a payment session and record funding through its PI's provider operations. An account-to-account payment selects the payer and recipient accounts. These package examples define and test the protocol; connecting actual financial services remains an adapter responsibility.
-
-Manual bank payment uses the recipient as the confirming authority. The payer can report a transfer, but that report does not mark the payment complete. ACME Bank illustrates a separate bank guarantor without coupling the family to a named commercial provider.
+Earlier application examples used a start-and-observe facade. The current edition
+keeps `Payment/Legacy Payment Clause` for explicit compatibility. The historical
+examples with the earlier symbolic name require the retained package selection.
+[Historical payment edition](../examples/apps/README.md#historical-payment-edition)
 
 ## 6. Other selected families
 
@@ -466,7 +358,7 @@ Every example here is provider-neutral unless its type says otherwise. Test guar
 
 ## 8. Running and auditing the examples
 
-Each source below lives in `examples/apps/` beside a `.case.yaml` scenario, a `.native.yaml` scenario for native mandate authority, or a `.time.yaml` signed-time walkthrough. Scenarios specify the actor, target document, operation, request, expected state and rejected cases. The Java runner executes those sources and compares replay gas, receipt and snapshot identities. Selected cases also export/import a snapshot before replay.
+The sources in `examples/apps/` have `.case.yaml` scenarios, `.native.yaml` scenarios for native mandate authority, or `.time.yaml` signed-time walkthroughs. The native runner executes the cases named in its command and checks replay. Historical examples use the retained selection identified below. [Application examples and commands](../examples/apps/README.md)
 
 The local Contracts runner uses explicit test transports. It tests business semantics and deterministic replay. The authenticated bootstrap integration separately verifies account lookup, reader-key grants, provider access documents and account routing. Timers require the native Time service; changing an operating-system clock or injecting a look-alike event is not an equivalent test.
 
@@ -479,35 +371,35 @@ The example launcher displays complete source and a step-by-step operation list.
 | Family | Public types | Purpose | Complete examples in this guide |
 |---|---|---|---|
 | Hello World | `Connections/Hello Clause` | Bind a greeting action to workflows and document signals. | [00-hello](#00-hello), [08-participants-agents](#08-participants-agents), [11-hello-events](#11-hello-events), [12-hello-change](#12-hello-change) |
-| Feature | `Features/Feature Clause` | Group native actions into a named business feature. | [01-order-payment](#01-order-payment), [05-smart-home](#05-smart-home), [06-membership](#06-membership), [09-evidence-mandate](#09-evidence-mandate) |
-| Activation | `Activation/Activation Clause` | Parties, representatives, reader access and acceptance. | [00-hello](#00-hello), [01-order-payment](#01-order-payment), [02-reseller-ledger](#02-reseller-ledger), [03-milestone-payments](#03-milestone-payments) |
+| Feature | `Features/Feature Clause` | Group native actions into a named business feature. | [09-evidence-mandate](#09-evidence-mandate), [11-hello-events](#11-hello-events), [12-hello-change](#12-hello-change), [17-termination](#17-termination) |
+| Activation | `Activation/Activation Clause` | Parties, representatives, reader access and acceptance. | [00-hello](#00-hello), [07-booking-amendment](#07-booking-amendment), [08-participants-agents](#08-participants-agents), [09-evidence-mandate](#09-evidence-mandate) |
 | Representation | `Representation/Representation Clause` | Explicit owner-approved operation delegation; not implied by a representative listing. | [09-evidence-mandate](#09-evidence-mandate) |
 | Amendments | `Amendments/Amendments Clause` | Propose and approve changes to editable terms. | [07-booking-amendment](#07-booking-amendment), [18-amendments](#18-amendments) |
-| Termination | `Termination/Termination Clause` | Request closure and finish after outstanding obligations permit it. | [06-membership](#06-membership), [17-termination](#17-termination) |
-| Status | `State/Status Clause` | Validate named state transitions. | [03-milestone-payments](#03-milestone-payments), [09-evidence-mandate](#09-evidence-mandate), [20-status-branch](#20-status-branch) |
+| Termination | `Termination/Termination Clause` | Request closure and finish after outstanding obligations permit it. | [17-termination](#17-termination) |
+| Status | `State/Status Clause` | Validate named state transitions. | [09-evidence-mandate](#09-evidence-mandate), [20-status-branch](#20-status-branch) |
 | Product | `Commerce/Product Clause` | Maintain a validated product quote. | [15-product](#15-product) |
-| Documents | `Documents/Documents Clause` | Start named child documents and reuse party snapshots. | [02-reseller-ledger](#02-reseller-ledger), [04-bundle-order](#04-bundle-order), [05-smart-home](#05-smart-home), [06-membership](#06-membership) |
-| Payment | `Payment/Payment Clause`, `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment`, `ManualPayments/Manual Bank Payment` | Create one payment instruction with request connections; provider-specific variants share one family. | [01-order-payment](#01-order-payment), [02-reseller-ledger](#02-reseller-ledger), [03-milestone-payments](#03-milestone-payments), [04-bundle-order](#04-bundle-order) |
-| Ledger | `Ledger/Ledger Clause` | Accrual targets, reservations and confirmed settlement accounting. | [02-reseller-ledger](#02-reseller-ledger), [10-net-settlement](#10-net-settlement), [16-ledger](#16-ledger) |
+| Documents | `Documents/Documents Clause` | Start named child documents and reuse party snapshots. | [09-evidence-mandate](#09-evidence-mandate), [13-hello-embedded](#13-hello-embedded), [14-hello-collection](#14-hello-collection) |
+| Payment | `Payment/Payment Clause`, `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment`, `ManualPayments/Manual Bank Payment` | Create one payment instruction with request connections; provider-specific variants share one family. | [21-myos-customer](#21-myos-customer), [22-myos-account](#22-myos-account), [23-manual-bank](#23-manual-bank), [24-acme-bank](#24-acme-bank) |
+| Ledger | `Ledger/Ledger Clause` | Accrual targets, reservations and confirmed settlement accounting. | [16-ledger](#16-ledger) |
 | Schedule | `Schedule/Schedule Clause` | Emit scheduled business signals using signed time completeness. | [26-timers](#26-timers) |
 | Shipping | `Shipping/Shipping Clause` | Create a shipping instruction and relay correlated carrier requests and responses. | [25-shipping](#25-shipping) |
 
 ## 9. Complete application documents
 
-Applications 01–10 adapt the scenarios from the supplied `myos-examples.zip`. That archive identifies its blueprints as a design interchange format, not executable Blue. The table below states the scope of each executable adaptation; it is not a claim that every proposed feature in the archive is complete. Document 00 introduces Hello, and documents 11–29 isolate additional behaviors and payment methods.
+Applications 01–10 adapt scenarios from `myos-examples.zip`. The table describes the demonstrated scope and selected historical edition. Documents 11–30 illustrate reusable clauses and payment methods. Examples 31 and 32 use the current Payment preparation API for one or two obligations.
 
 | Archive scenario | Executable adaptation | Scope |
 |---|---|---|
-| Order and payment | 01 | Delivery, customer satisfaction in the PI, authorization and confirmed capture; the order observes the PI event. |
-| Reseller and ledger | 02 | Commission from confirmed net collection, corrections after refunds and settlement of the resulting obligation. |
-| Milestone payments | 03 | Separate acceptance and payment for design and delivery, with explicit agreement observation. |
-| Bundle order | 04 | Independent child orders and payments; activity on an unrelated role does not satisfy another order. |
-| Smart home | 05 | Matching check-in requests capture; bounded temperature requests and separate provider confirmation. |
-| Membership | 06 | Trial attendance, explicit membership opt-in, independent paid periods and termination. |
+| Order and payment | 01 (historical) | Delivery, customer satisfaction in the PI, authorization and confirmed capture; the order observes the PI event. |
+| Reseller and ledger | 02 (historical) | Commission from confirmed net collection, corrections after refunds and settlement of the resulting obligation. |
+| Milestone payments | 03 (historical) | Separate acceptance and payment for design and delivery, with explicit agreement observation. |
+| Bundle order | 04 (historical) | Independent child orders and payments; activity on an unrelated role does not satisfy another order. |
+| Smart home | 05 (historical) | Matching check-in requests capture; bounded temperature requests and separate provider confirmation. |
+| Membership | 06 (historical) | Trial attendance, explicit membership opt-in, independent paid periods and termination. |
 | Booking amendment | 07 | Exact two-party amendment approval; an existing PI retains its original amount. |
 | Participants and agents | 08 | Predeclared representative actions and lead-only actions. Post-start representative provisioning is still a separate integration task. |
 | Evidence and mandate | 09 | Delivered-evidence validation and native fixed-scope mandate creation/approval. The archive's broader multi-evidence refund budget/freeze design and hosted delegated invocation are not implemented here. |
-| Net settlement | 10 | Material statement revisions and settlement against the selected statement, with confirmed payment accounting. |
+| Net settlement | 10 (historical) | Material statement revisions and settlement against the selected statement, with confirmed payment accounting. |
 
 ### 00-hello
 
@@ -566,6 +458,8 @@ Walkthrough: [`00-hello.case.yaml`](../examples/apps/00-hello.case.yaml). Target
 | 3 | owner | Main | sayHello | `{"text":"Rejected","approved":false}` | Rejected; no state change; `{"/message":"Hello Alice"}` |
 
 ### 01-order-payment
+
+Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).
 
 Source: [`01-order-payment.blue`](../examples/apps/01-order-payment.blue).
 
@@ -722,18 +616,20 @@ Walkthrough: [`01-order-payment.case.yaml`](../examples/apps/01-order-payment.ca
 | 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
 | 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 6 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
-| 7 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 8 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 6 | guarantor | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 7 | customer | /payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 8 | guarantor | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 9 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Rejected; no state change |
 | 10 | seller | /payment | reportDelivery | `{}` | Processed |
 | 11 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
 | 12 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
-| 13 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
-| 14 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
-| 15 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+| 13 | guarantor | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 14 | seller | /payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-1","amountMinor":2500}` | Processed |
+| 15 | guarantor | /payment | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
 
 ### 02-reseller-ledger
+
+Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).
 
 Source: [`02-reseller-ledger.blue`](../examples/apps/02-reseller-ledger.blue).
 
@@ -1000,22 +896,24 @@ Walkthrough: [`02-reseller-ledger.case.yaml`](../examples/apps/02-reseller-ledge
 | 5 | customer | Main | newOrder | `{"key":"lesson"}` | Processed |
 | 6 | customer | /orders/lesson | startPayment | `{}` | Processed |
 | 7 | guarantor | /orders/lesson/payment | acceptPaymentInstruction | `{}` | Processed |
-| 8 | guarantor | /orders/lesson/payment | recordTransactionInitiated | `{"transactionId":"orders-lesson-payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 9 | customer | /orders/lesson/payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 10 | guarantor | /orders/lesson/payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 8 | guarantor | /orders/lesson/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"orders-lesson-payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 9 | customer | /orders/lesson/payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 10 | guarantor | /orders/lesson/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 11 | customer | /orders/lesson/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
-| 12 | guarantor | /orders/lesson/payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/commission/accrued":1000}` |
-| 13 | seller | /orders/lesson/payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
-| 14 | guarantor | /orders/lesson/payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/commission/accrued":750}` |
+| 12 | guarantor | /orders/lesson/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/commission/accrued":1000}` |
+| 13 | seller | /orders/lesson/payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-1","amountMinor":2500}` | Processed |
+| 14 | guarantor | /orders/lesson/payment | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-1","amountReversed":2500}` | Processed; `{"/commission/accrued":750}` |
 | 15 | seller | Main | startPayout | `{}` | Processed; `{"/commission/reserved":750}` |
 | 16 | guarantor | /payout | acceptPaymentInstruction | `{}` | Processed |
-| 17 | guarantor | /payout | recordTransactionInitiated | `{"transactionId":"commission-payout","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 17 | guarantor | /payout | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"commission-payout","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
 | 18 | seller | /payout | authorizePayout | `{}` | Processed |
-| 19 | guarantor | /payout | secureFunds | `{"requestId":"payout-auth","amountSecured":750}` | Processed |
+| 19 | guarantor | /payout | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-auth","amountSecured":750}` | Processed |
 | 20 | seller | /payout | capturePayout | `{}` | Processed |
-| 21 | guarantor | /payout | completePayment | `{"requestId":"payout-capture","amountCompleted":750}` | Processed; `{"/commission/paid":750,"/commission/reserved":0}` |
+| 21 | guarantor | /payout | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"payout-capture","amountCompleted":750}` | Processed; `{"/commission/paid":750,"/commission/reserved":0}` |
 
 ### 03-milestone-payments
+
+Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).
 
 Source: [`03-milestone-payments.blue`](../examples/apps/03-milestone-payments.blue).
 
@@ -1163,19 +1061,21 @@ Walkthrough: [`03-milestone-payments.case.yaml`](../examples/apps/03-milestone-p
 | 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 4 | customer | Main | startDesignpayment | `{}` | Processed |
 | 5 | guarantor | /designPayment | acceptPaymentInstruction | `{}` | Processed |
-| 6 | guarantor | /designPayment | recordTransactionInitiated | `{"transactionId":"designPayment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 7 | customer | /designPayment | authorize | `{"requestId":"auth-1","amountMinor":30000}` | Processed |
-| 8 | guarantor | /designPayment | secureFunds | `{"requestId":"auth-1","amountSecured":30000}` | Processed |
+| 6 | guarantor | /designPayment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"designPayment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 7 | customer | /designPayment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":30000}` | Processed |
+| 8 | guarantor | /designPayment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":30000}` | Processed |
 | 9 | customer | Main | startDeliverypayment | `{}` | Processed |
 | 10 | guarantor | /deliveryPayment | acceptPaymentInstruction | `{}` | Processed |
-| 11 | guarantor | /deliveryPayment | recordTransactionInitiated | `{"transactionId":"deliveryPayment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 12 | customer | /deliveryPayment | authorize | `{"requestId":"auth-1","amountMinor":70000}` | Processed |
-| 13 | guarantor | /deliveryPayment | secureFunds | `{"requestId":"auth-1","amountSecured":70000}` | Processed |
+| 11 | guarantor | /deliveryPayment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"deliveryPayment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 12 | customer | /deliveryPayment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":70000}` | Processed |
+| 13 | guarantor | /deliveryPayment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":70000}` | Processed |
 | 14 | customer | Main | acceptDesign | `{}` | Processed; `{"/designPayment/payment/reserved/capture":30000,"/deliveryPayment/payment/reserved/capture":0}` |
-| 15 | guarantor | /designPayment | completePayment | `{"requestId":"design-capture","amountCompleted":30000}` | Processed |
+| 15 | guarantor | /designPayment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"design-capture","amountCompleted":30000}` | Processed |
 | 16 | customer | Main | acceptDelivery | `{}` | Processed; `{"/deliveryPayment/payment/reserved/capture":70000}` |
 
 ### 04-bundle-order
+
+Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).
 
 Source: [`04-bundle-order.blue`](../examples/apps/04-bundle-order.blue).
 
@@ -1425,21 +1325,23 @@ Walkthrough: [`04-bundle-order.case.yaml`](../examples/apps/04-bundle-order.case
 | 6 | customer | Main | bookRestaurant | `{}` | Processed |
 | 7 | customer | /orders/hotel | startPayment | `{}` | Processed |
 | 8 | guarantor | /orders/hotel/payment | acceptPaymentInstruction | `{}` | Processed |
-| 9 | guarantor | /orders/hotel/payment | recordTransactionInitiated | `{"transactionId":"hotel","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 10 | customer | /orders/hotel/payment | authorize | `{"requestId":"auth-1","amountMinor":30000}` | Processed |
-| 11 | guarantor | /orders/hotel/payment | secureFunds | `{"requestId":"auth-1","amountSecured":30000}` | Processed |
+| 9 | guarantor | /orders/hotel/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"hotel","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 10 | customer | /orders/hotel/payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":30000}` | Processed |
+| 11 | guarantor | /orders/hotel/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":30000}` | Processed |
 | 12 | customer | /orders/hotel/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
-| 13 | guarantor | /orders/hotel/payment | completePayment | `{"requestId":"capture-1","amountCompleted":30000}` | Processed |
+| 13 | guarantor | /orders/hotel/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":30000}` | Processed |
 | 14 | customer | /orders/dinner | startPayment | `{}` | Processed |
 | 15 | guarantor | /orders/dinner/payment | acceptPaymentInstruction | `{}` | Processed |
-| 16 | guarantor | /orders/dinner/payment | recordTransactionInitiated | `{"transactionId":"dinner","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 17 | customer | /orders/dinner/payment | authorize | `{"requestId":"auth-1","amountMinor":8000}` | Processed |
-| 18 | guarantor | /orders/dinner/payment | secureFunds | `{"requestId":"auth-1","amountSecured":8000}` | Processed |
+| 16 | guarantor | /orders/dinner/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"dinner","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 17 | customer | /orders/dinner/payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":8000}` | Processed |
+| 18 | guarantor | /orders/dinner/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":8000}` | Processed |
 | 19 | customer | /orders/dinner/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
-| 20 | guarantor | /orders/dinner/payment | completePayment | `{"requestId":"capture-1","amountCompleted":8000}` | Processed |
-| 21 | hotel | /orders/dinner/payment | refund | `{"requestId":"not-yours","amountMinor":100}` | Processed; `{"/orders/dinner/payment/payment/reversed":0}` |
+| 20 | guarantor | /orders/dinner/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":8000}` | Processed |
+| 21 | hotel | /orders/dinner/payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"not-yours","amountMinor":100}` | Processed; `{"/orders/dinner/payment/payment/reversed":0}` |
 
 ### 05-smart-home
+
+Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).
 
 Source: [`05-smart-home.blue`](../examples/apps/05-smart-home.blue).
 
@@ -1693,18 +1595,20 @@ Walkthrough: [`05-smart-home.case.yaml`](../examples/apps/05-smart-home.case.yam
 | 4 | customer | Main | openHouse | `{}` | Processed |
 | 5 | customer | Main | startPayment | `{}` | Processed |
 | 6 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 7 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 8 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 9 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 7 | guarantor | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 8 | customer | /payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 9 | guarantor | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 10 | seller | /houses/rental | checkIn | `{"reservation":"wrong"}` | Rejected; no state change |
 | 11 | seller | /houses/rental | checkIn | `{"reservation":"rental-7"}` | Processed; `{"/payment/payment/reserved/capture":10000}` |
-| 12 | guarantor | /payment | completePayment | `{"requestId":"check-in","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 12 | guarantor | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"check-in","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
 | 13 | customer__assistant | /houses/rental | requestTemperature | `{"requestId":"too-hot","temperatureC":35}` | Rejected; no state change |
 | 14 | customer__assistant | /houses/rental | requestTemperature | `{"requestId":"comfortable","temperatureC":22}` | Processed; `{"/houses/rental/requestedC":22,"/houses/rental/reportedC":20}` |
 | 15 | seller | /houses/rental | confirmTemperature | `{"requestId":"unrelated"}` | Rejected; no state change |
 | 16 | seller | /houses/rental | confirmTemperature | `{"requestId":"comfortable"}` | Processed; `{"/houses/rental/reportedC":22,"/houses/rental/temperatureRequest/status":"Confirmed"}` |
 
 ### 06-membership
+
+Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).
 
 Source: [`06-membership.blue`](../examples/apps/06-membership.blue).
 
@@ -1911,11 +1815,11 @@ Walkthrough: [`06-membership.case.yaml`](../examples/apps/06-membership.case.yam
 | 7 | customer | Main | renew | `{"key":"2027-01"}` | Processed |
 | 8 | customer | /periods/2027-01 | startPayment | `{}` | Processed |
 | 9 | guarantor | /periods/2027-01/payment | acceptPaymentInstruction | `{}` | Processed |
-| 10 | guarantor | /periods/2027-01/payment | recordTransactionInitiated | `{"transactionId":"period-1","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 11 | customer | /periods/2027-01/payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 12 | guarantor | /periods/2027-01/payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 10 | guarantor | /periods/2027-01/payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"period-1","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 11 | customer | /periods/2027-01/payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 12 | guarantor | /periods/2027-01/payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 13 | customer | /periods/2027-01/payment | confirmSatisfaction | `{"satisfied":true}` | Processed |
-| 14 | guarantor | /periods/2027-01/payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/periods/2027-01/payment/payment/completed":10000}` |
+| 14 | guarantor | /periods/2027-01/payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/periods/2027-01/payment/payment/completed":10000}` |
 | 15 | customer | Main | renew | `{"key":"2027-02"}` | Processed |
 | 16 | customer | /periods/2027-02 | startPayment | `{}` | Processed; `{"/periods/2027-01/payment/payment/completed":10000,"/periods/2027-02/payment/payment/completed":0}` |
 | 17 | customer | Main | requestTermination | `{}` | Processed |
@@ -2028,7 +1932,7 @@ Walkthrough: [`07-booking-amendment.case.yaml`](../examples/apps/07-booking-amen
 | 2 | host | Main | approve_host | `{"revision":1}` | Processed |
 | 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 4 | guest | Main | startPayment | `{}` | Processed; `{"/payment/paymentTerms/amountMinor":40000}` |
-| 5 | guest | Main | proposeBooking | `{"proposalId":"p1","expectedRevision":1,"path":"/booking","replacement":{"room":"B","priceMinor":45000}}` | Processed |
+| 5 | guest | Main | proposeBooking | `{"type":"Amendments/Amendment Input","proposalId":"p1","expectedRevision":1,"path":"/booking","replacement":{"room":"B","priceMinor":45000}}` | Processed |
 | 6 | guest | Main | guestApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"A"}` |
 | 7 | host | Main | hostApprove | `{"proposalId":"wrong"}` | Rejected; no state change |
 | 8 | host | Main | hostApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"B","/amendments/revision":2,"/payment/paymentTerms/amountMinor":40000}` |
@@ -2209,6 +2113,8 @@ Walkthrough: [`09-evidence-mandate.native.yaml`](../examples/apps/09-evidence-ma
 | 8 | buyer | Main | acceptEvidence | `{}` | Processed; `{"/accepted":true}` |
 
 ### 10-net-settlement
+
+Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).
 
 Source: [`10-net-settlement.blue`](../examples/apps/10-net-settlement.blue).
 
@@ -2589,11 +2495,11 @@ Walkthrough: [`10-net-settlement.case.yaml`](../examples/apps/10-net-settlement.
 | 13 | seller | Main | sellerApproveNet | `{}` | Processed; `{"/balance/accrued":3000}` |
 | 14 | customer | Main | startPayment | `{}` | Processed |
 | 15 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 16 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
-| 17 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":3000}` | Processed |
-| 18 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":3000}` | Processed |
+| 16 | guarantor | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"payment","railType":"test","attachmentPoint":"instruction","providerReference":"test"}` | Processed |
+| 17 | customer | /payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":3000}` | Processed |
+| 18 | guarantor | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":3000}` | Processed |
 | 19 | customer | /payment | settle | `{}` | Processed |
-| 20 | guarantor | /payment | completePayment | `{"requestId":"net-1","amountCompleted":3000}` | Processed; `{"/balance/paid":3000,"/balance/reserved":0}` |
+| 20 | guarantor | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"net-1","amountCompleted":3000}` | Processed; `{"/balance/paid":3000,"/balance/reserved":0}` |
 
 ### 11-hello-events
 
@@ -2735,7 +2641,10 @@ childTemplate:
     activation:
       type: Activation/Activation Clause
       parameters:
-        parties: {}
+        parties:
+          owner:
+            type: Parties/Party
+            displayName: Owner
         required: []
     hello:
       type: Connections/Hello Clause
@@ -2764,9 +2673,10 @@ clauses:
     type: Documents/Documents Clause
     parameters:
       allowedFields: []
-      parties: []
     bindings:
       template: /childTemplate
+      parties:
+        owner: owner
       collection: /children
       start:
         newChild:
@@ -2821,7 +2731,10 @@ childTemplate:
     activation:
       type: Activation/Activation Clause
       parameters:
-        parties: {}
+        parties:
+          owner:
+            type: Parties/Party
+            displayName: Owner
         required: []
     hello:
       type: Connections/Hello Clause
@@ -2850,9 +2763,10 @@ clauses:
     type: Documents/Documents Clause
     parameters:
       allowedFields: []
-      parties: []
     bindings:
       template: /childTemplate
+      parties:
+        owner: owner
       collection: /children
       start:
         newChild:
@@ -3036,9 +2950,13 @@ Walkthrough: [`16-ledger.case.yaml`](../examples/apps/16-ledger.case.yaml). Targ
 | 2 | partner | Main | approve_partner | `{"revision":1}` | Processed |
 | 3 | seller | Main | setTarget | `{"key":"orderA","amountMinor":1000}` | Processed; `{"/balance/accrued":1000}` |
 | 4 | seller | Main | setTarget | `{"key":"orderA","amountMinor":750}` | Processed; `{"/balance/accrued":750}` |
-| 5 | seller | Main | reserve | `{"key":"payout1","amountMinor":500}` | Processed; `{"/balance/reserved":500}` |
-| 6 | seller | Main | settle | `{"key":"payout1","outcome":"succeeded"}` | Processed; `{"/balance/paid":500,"/balance/reserved":0}` |
-| 7 | seller | Main | reserve | `{"key":"tooMuch","amountMinor":300}` | Rejected; no state change |
+| 5 | seller | Main | setTarget | `{"key":"orderA","amountMinor":750}` | Processed; `{"/balance/accrued":750,"/balance/targets":{"orderA":750}}` |
+| 6 | seller | Main | reserve | `{"key":"payout1","amountMinor":500}` | Processed; `{"/balance/reserved":500}` |
+| 7 | seller | Main | reserve | `{"key":"payout1","amountMinor":500}` | Processed; `{"/balance/reserved":500}` |
+| 8 | seller | Main | reserve | `{"key":"payout1","amountMinor":499}` | Rejected; no state change |
+| 9 | seller | Main | settle | `{"key":"payout1","outcome":"succeeded"}` | Processed; `{"/balance/paid":500,"/balance/reserved":0}` |
+| 10 | seller | Main | settle | `{"key":"payout1"}` | Processed; `{"/balance/accrued":750,"/balance/paid":500,"/balance/reserved":0,"/balance/settlements/payout1/amountMinor":500}` |
+| 11 | seller | Main | reserve | `{"key":"tooMuch","amountMinor":300}` | Rejected; no state change |
 
 ### 17-termination
 
@@ -3183,7 +3101,7 @@ Walkthrough: [`18-amendments.case.yaml`](../examples/apps/18-amendments.case.yam
 |---|---|---|---|---|---|
 | 1 | guest | Main | approve_guest | `{"revision":1}` | Processed |
 | 2 | host | Main | approve_host | `{"revision":1}` | Processed |
-| 3 | guest | Main | proposeBooking | `{"proposalId":"p1","expectedRevision":1,"path":"/booking","replacement":{"room":"B","priceMinor":45000}}` | Processed |
+| 3 | guest | Main | proposeBooking | `{"type":"Amendments/Amendment Input","proposalId":"p1","expectedRevision":1,"path":"/booking","replacement":{"room":"B","priceMinor":45000}}` | Processed |
 | 4 | guest | Main | guestApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"A"}` |
 | 5 | host | Main | hostApprove | `{"proposalId":"wrong"}` | Rejected; no state change |
 | 6 | host | Main | hostApprove | `{"proposalId":"p1"}` | Processed; `{"/booking/room":"B","/amendments/revision":2}` |
@@ -3310,9 +3228,9 @@ Walkthrough: [`20-status-branch.case.yaml`](../examples/apps/20-status-branch.ca
 |---|---|---|---|---|---|
 | 1 | customer | Main | approve_customer | `{"revision":1}` | Processed |
 | 2 | technician | Main | approve_technician | `{"revision":1}` | Processed |
-| 3 | technician | Main | advanceRepair | `{"to":"examining","reason":"Received"}` | Processed; `{"/status":"examining"}` |
-| 4 | technician | Main | advanceRepair | `{"to":"unrepairable","reason":"Part unavailable"}` | Processed; `{"/status":"unrepairable"}` |
-| 5 | technician | Main | advanceRepair | `{"to":"repaired","reason":"Not allowed"}` | Rejected; no state change; `{"/status":"unrepairable"}` |
+| 3 | technician | Main | advanceRepair | `{"type":"State/Transition Input","to":"examining","reason":"Received"}` | Processed; `{"/status":"examining"}` |
+| 4 | technician | Main | advanceRepair | `{"type":"State/Transition Input","to":"unrepairable","reason":"Part unavailable"}` | Processed; `{"/status":"unrepairable"}` |
+| 5 | technician | Main | advanceRepair | `{"type":"State/Transition Input","to":"repaired","reason":"Not allowed"}` | Rejected; no state change; `{"/status":"unrepairable"}` |
 
 ### 21-myos-customer
 
@@ -3449,16 +3367,16 @@ Walkthrough: [`21-myos-customer.case.yaml`](../examples/apps/21-myos-customer.ca
 | 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
 | 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 6 | guarantor | /payment | provideSession | `{"sessionId":"test-session"}` | Processed |
+| 6 | guarantor | /payment | provideSession | `{"type":"MyOS/Customer Session Input","sessionId":"test-session"}` | Processed |
 | 7 | guarantor | /payment | confirmFunding | `{"sessionId":"test-session"}` | Processed |
-| 8 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
-| 9 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 10 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 8 | guarantor | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 9 | customer | /payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 10 | guarantor | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 11 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
 | 12 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
-| 13 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
-| 14 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
-| 15 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+| 13 | guarantor | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 14 | seller | /payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-1","amountMinor":2500}` | Processed |
+| 15 | guarantor | /payment | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
 
 ### 22-myos-account
 
@@ -3596,14 +3514,14 @@ Walkthrough: [`22-myos-account.case.yaml`](../examples/apps/22-myos-account.case
 | 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
 | 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 6 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
-| 7 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 8 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 6 | guarantor | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 7 | customer | /payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 8 | guarantor | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 9 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
 | 10 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
-| 11 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
-| 12 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
-| 13 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+| 11 | guarantor | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 12 | seller | /payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-1","amountMinor":2500}` | Processed |
+| 13 | guarantor | /payment | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
 
 ### 23-manual-bank
 
@@ -3731,14 +3649,14 @@ Walkthrough: [`23-manual-bank.case.yaml`](../examples/apps/23-manual-bank.case.y
 | 2 | seller | Main | approve_seller | `{"revision":1}` | Processed |
 | 3 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
 | 4 | seller | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 5 | seller | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
-| 6 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 7 | seller | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 5 | seller | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 6 | customer | /payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 7 | seller | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 8 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
 | 9 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
-| 10 | seller | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
-| 11 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
-| 12 | seller | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+| 10 | seller | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 11 | seller | /payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-1","amountMinor":2500}` | Processed |
+| 12 | seller | /payment | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
 
 ### 24-acme-bank
 
@@ -3871,14 +3789,14 @@ Walkthrough: [`24-acme-bank.case.yaml`](../examples/apps/24-acme-bank.case.yaml)
 | 3 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 4 | customer | Main | startPayment | `{}` | Processed; `{"/payment/activation/active":true}` |
 | 5 | guarantor | /payment | acceptPaymentInstruction | `{}` | Processed |
-| 6 | guarantor | /payment | recordTransactionInitiated | `{"transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
-| 7 | customer | /payment | authorize | `{"requestId":"auth-1","amountMinor":10000}` | Processed |
-| 8 | guarantor | /payment | secureFunds | `{"requestId":"auth-1","amountSecured":10000}` | Processed |
+| 6 | guarantor | /payment | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"lesson-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"test-1"}` | Processed |
+| 7 | customer | /payment | authorize | `{"type":"PaymentInstruction/Payment Request Input","requestId":"auth-1","amountMinor":10000}` | Processed |
+| 8 | guarantor | /payment | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"auth-1","amountSecured":10000}` | Processed |
 | 9 | customer | /payment | confirmSatisfaction | `{"satisfied":false}` | Rejected; no state change |
 | 10 | customer | /payment | confirmSatisfaction | `{"satisfied":true}` | Processed; `{"/satisfied":true,"/payment/payment/reserved/capture":10000}` |
-| 11 | guarantor | /payment | completePayment | `{"requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
-| 12 | seller | /payment | refund | `{"requestId":"refund-1","amountMinor":2500}` | Processed |
-| 13 | guarantor | /payment | reverseAfterCompletion | `{"requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
+| 11 | guarantor | /payment | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-1","amountCompleted":10000}` | Processed; `{"/payment/payment/completed":10000}` |
+| 12 | seller | /payment | refund | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-1","amountMinor":2500}` | Processed |
+| 13 | guarantor | /payment | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-1","amountReversed":2500}` | Processed; `{"/payment/payment/reversed":2500}` |
 
 ### 25-shipping
 
@@ -3996,13 +3914,13 @@ Walkthrough: [`25-shipping.case.yaml`](../examples/apps/25-shipping.case.yaml). 
 | 3 | carrier | Main | approve_carrier | `{"revision":1}` | Processed |
 | 4 | seller | Main | startShipping | `{}` | Processed |
 | 5 | seller | /shipment | bookShipment | `{"requestId":"ship-1"}` | Processed |
-| 6 | carrier | /shipment | confirmShipment | `{"requestId":"ship-1","trackingId":"TEST123"}` | Processed; `{"/shipment/shipment/status":"accepted"}` |
-| 7 | carrier | /shipment | confirmDelivery | `{"requestId":"ship-1"}` | Rejected; no state change |
+| 6 | carrier | /shipment | confirmShipment | `{"type":"Shipping/Shipping Response Input","requestId":"ship-1","trackingId":"TEST123"}` | Processed; `{"/shipment/shipment/status":"accepted"}` |
+| 7 | carrier | /shipment | confirmDelivery | `{"type":"Shipping/Shipping Response Input","requestId":"ship-1"}` | Rejected; no state change |
 | 8 | seller | /shipment | changeAddress | `{"requestId":"address-1","address":"24 Blue Street"}` | Processed |
-| 9 | carrier | /shipment | confirmAddressChange | `{"requestId":"address-1"}` | Processed; `{"/shipment/destination":"24 Blue Street"}` |
-| 10 | carrier | /shipment | rejectAddressChange | `{"requestId":"address-1"}` | Rejected; no state change |
-| 11 | carrier | /shipment | recordDispatched | `{"requestId":"ship-1"}` | Processed; `{"/shipment/shipment/status":"dispatched"}` |
-| 12 | carrier | /shipment | confirmDelivery | `{"requestId":"ship-1"}` | Processed; `{"/delivered":true,"/shipment/shipment/status":"delivered"}` |
+| 9 | carrier | /shipment | confirmAddressChange | `{"type":"Shipping/Shipping Response Input","requestId":"address-1"}` | Processed; `{"/shipment/destination":"24 Blue Street"}` |
+| 10 | carrier | /shipment | rejectAddressChange | `{"type":"Shipping/Shipping Response Input","requestId":"address-1"}` | Rejected; no state change |
+| 11 | carrier | /shipment | recordDispatched | `{"type":"Shipping/Shipping Response Input","requestId":"ship-1"}` | Processed; `{"/shipment/shipment/status":"dispatched"}` |
+| 12 | carrier | /shipment | confirmDelivery | `{"type":"Shipping/Shipping Response Input","requestId":"ship-1"}` | Processed; `{"/delivered":true,"/shipment/shipment/status":"delivered"}` |
 
 ### 26-timers
 
@@ -4483,58 +4401,58 @@ Walkthrough: [`27-payment-protocol.case.yaml`](../examples/apps/27-payment-proto
 | 3 | seller2 | Main | approve_seller2 | `{"revision":1}` | Processed |
 | 4 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 5 | guarantor | Main | acceptPaymentInstruction | `{}` | Processed |
-| 6 | guarantor | Main | recordTransactionInitiated | `{"transactionId":"protocol-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"provider-1"}` | Processed |
-| 7 | customer | Main | requestSecureFunds | `{"requestId":"secure-declined","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
-| 8 | guarantor | Main | completePayment | `{"requestId":"secure-declined"}` | Rejected; no state change |
-| 9 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"secure-declined","transactionDetails":{}}` | Rejected; no state change |
-| 10 | guarantor | Main | declineSecureFunds | `{"requestId":"secure-declined","reason":"Provider declined"}` | Processed |
-| 11 | guarantor | Main | declineSecureFunds | `{"requestId":"secure-declined","reason":"Provider declined"}` | Processed |
-| 12 | customer | Main | requestSecureFunds | `{"requestId":"secure-failed","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
-| 13 | guarantor | Main | failSecureFunds | `{"requestId":"secure-failed","reason":"Provider failed"}` | Processed |
-| 14 | guarantor | Main | failSecureFunds | `{"requestId":"secure-failed","reason":"Provider failed"}` | Processed |
-| 15 | customer | Main | requestSecureFunds | `{"requestId":"secure-unknown","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
-| 16 | guarantor | Main | recordFundsSecuringUnknown | `{"requestId":"secure-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/secure":10000}` |
-| 17 | guarantor | Main | recordFundsSecuringUnknown | `{"requestId":"secure-unknown","reason":"Provider unknown"}` | Processed |
-| 18 | guarantor | Main | secureFunds | `{"requestId":"secure-unknown","amountSecured":999}` | Rejected; no state change; `{"/payment/reserved/secure":10000}` |
-| 19 | guarantor | Main | secureFunds | `{"requestId":"secure-unknown"}` | Processed |
-| 20 | guarantor | Main | secureFunds | `{"requestId":"secure-unknown"}` | Processed |
-| 21 | guarantor | Main | recordFundsSecuringUnknown | `{"requestId":"secure-unknown","reason":"Provider unknown"}` | Rejected; no state change |
-| 22 | customer | Main | requestCompletePayment | `{"requestId":"capture-declined","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
-| 23 | guarantor | Main | declineCompletePayment | `{"requestId":"capture-declined","reason":"Provider declined"}` | Processed |
-| 24 | guarantor | Main | declineCompletePayment | `{"requestId":"capture-declined","reason":"Provider declined"}` | Processed |
-| 25 | customer | Main | requestCompletePayment | `{"requestId":"capture-failed","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
-| 26 | guarantor | Main | failCompletePayment | `{"requestId":"capture-failed","reason":"Provider failed"}` | Processed |
-| 27 | guarantor | Main | failCompletePayment | `{"requestId":"capture-failed","reason":"Provider failed"}` | Processed |
-| 28 | customer | Main | requestCompletePayment | `{"requestId":"capture-unknown","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
-| 29 | guarantor | Main | recordPaymentCompletionUnknown | `{"requestId":"capture-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/capture":4000}` |
-| 30 | guarantor | Main | recordPaymentCompletionUnknown | `{"requestId":"capture-unknown","reason":"Provider unknown"}` | Processed |
-| 31 | guarantor | Main | completePayment | `{"requestId":"capture-unknown"}` | Processed |
-| 32 | guarantor | Main | completePayment | `{"requestId":"capture-unknown"}` | Processed |
-| 33 | guarantor | Main | recordPaymentCompletionUnknown | `{"requestId":"capture-unknown","reason":"Provider unknown"}` | Rejected; no state change |
-| 34 | customer | Main | requestReverseAfterCompletion | `{"requestId":"refund-declined","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
-| 35 | guarantor | Main | declineReverseAfterCompletion | `{"requestId":"refund-declined","reason":"Provider declined"}` | Processed |
-| 36 | guarantor | Main | declineReverseAfterCompletion | `{"requestId":"refund-declined","reason":"Provider declined"}` | Processed |
-| 37 | customer | Main | requestReverseAfterCompletion | `{"requestId":"refund-failed","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
-| 38 | guarantor | Main | failReverseAfterCompletion | `{"requestId":"refund-failed","reason":"Provider failed"}` | Processed |
-| 39 | guarantor | Main | failReverseAfterCompletion | `{"requestId":"refund-failed","reason":"Provider failed"}` | Processed |
-| 40 | customer | Main | requestReverseAfterCompletion | `{"requestId":"refund-unknown","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
-| 41 | guarantor | Main | recordPaymentReversalUnknown | `{"requestId":"refund-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/refund":1000}` |
-| 42 | guarantor | Main | recordPaymentReversalUnknown | `{"requestId":"refund-unknown","reason":"Provider unknown"}` | Processed |
-| 43 | guarantor | Main | reverseAfterCompletion | `{"requestId":"refund-unknown"}` | Processed |
-| 44 | guarantor | Main | reverseAfterCompletion | `{"requestId":"refund-unknown"}` | Processed |
-| 45 | guarantor | Main | recordPaymentReversalUnknown | `{"requestId":"refund-unknown","reason":"Provider unknown"}` | Rejected; no state change |
-| 46 | customer | Main | requestCancelBeforeCompletion | `{"requestId":"void-declined","reason":"Protocol walkthrough"}` | Processed |
-| 47 | guarantor | Main | declineCancelBeforeCompletion | `{"requestId":"void-declined","reason":"Provider declined"}` | Processed |
-| 48 | guarantor | Main | declineCancelBeforeCompletion | `{"requestId":"void-declined","reason":"Provider declined"}` | Processed |
-| 49 | customer | Main | requestCancelBeforeCompletion | `{"requestId":"void-failed","reason":"Protocol walkthrough"}` | Processed |
-| 50 | guarantor | Main | failCancelBeforeCompletion | `{"requestId":"void-failed","reason":"Provider failed"}` | Processed |
-| 51 | guarantor | Main | failCancelBeforeCompletion | `{"requestId":"void-failed","reason":"Provider failed"}` | Processed |
-| 52 | customer | Main | requestCancelBeforeCompletion | `{"requestId":"void-unknown","reason":"Protocol walkthrough"}` | Processed |
-| 53 | guarantor | Main | recordPaymentCancellationUnknown | `{"requestId":"void-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/void":6000}` |
-| 54 | guarantor | Main | recordPaymentCancellationUnknown | `{"requestId":"void-unknown","reason":"Provider unknown"}` | Processed |
-| 55 | guarantor | Main | cancelBeforeCompletion | `{"requestId":"void-unknown"}` | Processed |
-| 56 | guarantor | Main | cancelBeforeCompletion | `{"requestId":"void-unknown"}` | Processed |
-| 57 | guarantor | Main | recordPaymentCancellationUnknown | `{"requestId":"void-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+| 6 | guarantor | Main | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"protocol-transaction","railType":"test","attachmentPoint":"instruction","providerReference":"provider-1"}` | Processed |
+| 7 | customer | Main | requestSecureFunds | `{"type":"PaymentInstruction/Payment Request Input","requestId":"secure-declined","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
+| 8 | guarantor | Main | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-declined"}` | Rejected; no state change |
+| 9 | customer | Main | requestTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Request Input","requestId":"secure-declined","transactionDetails":{}}` | Rejected; no state change |
+| 10 | guarantor | Main | declineSecureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-declined","reason":"Provider declined"}` | Processed |
+| 11 | guarantor | Main | declineSecureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-declined","reason":"Provider declined"}` | Processed |
+| 12 | customer | Main | requestSecureFunds | `{"type":"PaymentInstruction/Payment Request Input","requestId":"secure-failed","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
+| 13 | guarantor | Main | failSecureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-failed","reason":"Provider failed"}` | Processed |
+| 14 | guarantor | Main | failSecureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-failed","reason":"Provider failed"}` | Processed |
+| 15 | customer | Main | requestSecureFunds | `{"type":"PaymentInstruction/Payment Request Input","requestId":"secure-unknown","amount":10000,"reason":"Protocol walkthrough"}` | Processed |
+| 16 | guarantor | Main | recordFundsSecuringUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/secure":10000}` |
+| 17 | guarantor | Main | recordFundsSecuringUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-unknown","reason":"Provider unknown"}` | Processed |
+| 18 | guarantor | Main | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-unknown","amountSecured":999}` | Rejected; no state change; `{"/payment/reserved/secure":10000}` |
+| 19 | guarantor | Main | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-unknown"}` | Processed |
+| 20 | guarantor | Main | secureFunds | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-unknown"}` | Processed |
+| 21 | guarantor | Main | recordFundsSecuringUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"secure-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+| 22 | customer | Main | requestCompletePayment | `{"type":"PaymentInstruction/Payment Request Input","requestId":"capture-declined","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
+| 23 | guarantor | Main | declineCompletePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-declined","reason":"Provider declined"}` | Processed |
+| 24 | guarantor | Main | declineCompletePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-declined","reason":"Provider declined"}` | Processed |
+| 25 | customer | Main | requestCompletePayment | `{"type":"PaymentInstruction/Payment Request Input","requestId":"capture-failed","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
+| 26 | guarantor | Main | failCompletePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-failed","reason":"Provider failed"}` | Processed |
+| 27 | guarantor | Main | failCompletePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-failed","reason":"Provider failed"}` | Processed |
+| 28 | customer | Main | requestCompletePayment | `{"type":"PaymentInstruction/Payment Request Input","requestId":"capture-unknown","amount":4000,"reason":"Protocol walkthrough"}` | Processed |
+| 29 | guarantor | Main | recordPaymentCompletionUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/capture":4000}` |
+| 30 | guarantor | Main | recordPaymentCompletionUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-unknown","reason":"Provider unknown"}` | Processed |
+| 31 | guarantor | Main | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-unknown"}` | Processed |
+| 32 | guarantor | Main | completePayment | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-unknown"}` | Processed |
+| 33 | guarantor | Main | recordPaymentCompletionUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"capture-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+| 34 | customer | Main | requestReverseAfterCompletion | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-declined","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
+| 35 | guarantor | Main | declineReverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-declined","reason":"Provider declined"}` | Processed |
+| 36 | guarantor | Main | declineReverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-declined","reason":"Provider declined"}` | Processed |
+| 37 | customer | Main | requestReverseAfterCompletion | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-failed","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
+| 38 | guarantor | Main | failReverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-failed","reason":"Provider failed"}` | Processed |
+| 39 | guarantor | Main | failReverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-failed","reason":"Provider failed"}` | Processed |
+| 40 | customer | Main | requestReverseAfterCompletion | `{"type":"PaymentInstruction/Payment Request Input","requestId":"refund-unknown","amount":1000,"reason":"Protocol walkthrough"}` | Processed |
+| 41 | guarantor | Main | recordPaymentReversalUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/refund":1000}` |
+| 42 | guarantor | Main | recordPaymentReversalUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-unknown","reason":"Provider unknown"}` | Processed |
+| 43 | guarantor | Main | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-unknown"}` | Processed |
+| 44 | guarantor | Main | reverseAfterCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-unknown"}` | Processed |
+| 45 | guarantor | Main | recordPaymentReversalUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"refund-unknown","reason":"Provider unknown"}` | Rejected; no state change |
+| 46 | customer | Main | requestCancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Request Input","requestId":"void-declined","reason":"Protocol walkthrough"}` | Processed |
+| 47 | guarantor | Main | declineCancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-declined","reason":"Provider declined"}` | Processed |
+| 48 | guarantor | Main | declineCancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-declined","reason":"Provider declined"}` | Processed |
+| 49 | customer | Main | requestCancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Request Input","requestId":"void-failed","reason":"Protocol walkthrough"}` | Processed |
+| 50 | guarantor | Main | failCancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-failed","reason":"Provider failed"}` | Processed |
+| 51 | guarantor | Main | failCancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-failed","reason":"Provider failed"}` | Processed |
+| 52 | customer | Main | requestCancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Request Input","requestId":"void-unknown","reason":"Protocol walkthrough"}` | Processed |
+| 53 | guarantor | Main | recordPaymentCancellationUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-unknown","reason":"Provider unknown"}` | Processed; `{"/payment/reserved/void":6000}` |
+| 54 | guarantor | Main | recordPaymentCancellationUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-unknown","reason":"Provider unknown"}` | Processed |
+| 55 | guarantor | Main | cancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-unknown"}` | Processed |
+| 56 | guarantor | Main | cancelBeforeCompletion | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-unknown"}` | Processed |
+| 57 | guarantor | Main | recordPaymentCancellationUnknown | `{"type":"PaymentInstruction/Payment Outcome Input","requestId":"void-unknown","reason":"Provider unknown"}` | Rejected; no state change |
 
 ### 28-payment-controls
 
@@ -4826,72 +4744,72 @@ Walkthrough: [`28-payment-controls.case.yaml`](../examples/apps/28-payment-contr
 | 3 | seller2 | Main | approve_seller2 | `{"revision":1}` | Processed |
 | 4 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 5 | guarantor | Main | acceptPaymentInstruction | `{}` | Processed |
-| 6 | customer | Main | requestPayeeAssignment | `{"requestId":"payee-declined","payeeRef":"seller2"}` | Processed; `{"/payment/payeeChannel":"seller"}` |
-| 7 | guarantor | Main | rejectPayeeAssignment | `{"requestId":"payee-declined","reason":"Provider declined"}` | Processed |
-| 8 | guarantor | Main | rejectPayeeAssignment | `{"requestId":"payee-declined","reason":"Provider declined"}` | Processed |
-| 9 | guarantor | Main | confirmPayeeAssignment | `{"requestId":"payee-declined"}` | Rejected; no state change |
-| 10 | customer | Main | requestPayeeAssignment | `{"requestId":"payee-succeeded","payeeRef":"seller2"}` | Processed; `{"/payment/payeeChannel":"seller"}` |
-| 11 | guarantor | Main | confirmPayeeAssignment | `{"requestId":"payee-succeeded"}` | Processed |
-| 12 | guarantor | Main | confirmPayeeAssignment | `{"requestId":"payee-succeeded"}` | Processed; `{"/payment/payeeChannel":"seller2"}` |
-| 13 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"details-declined","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
-| 14 | guarantor | Main | rejectTransactionDetailsUpdate | `{"requestId":"details-declined","reason":"Provider declined"}` | Processed |
-| 15 | guarantor | Main | rejectTransactionDetailsUpdate | `{"requestId":"details-declined","reason":"Provider declined"}` | Processed |
-| 16 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-declined"}` | Rejected; no state change |
-| 17 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"details-failed","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
-| 18 | guarantor | Main | failTransactionDetailsUpdate | `{"requestId":"details-failed","reason":"Provider failed"}` | Processed |
-| 19 | guarantor | Main | failTransactionDetailsUpdate | `{"requestId":"details-failed","reason":"Provider failed"}` | Processed |
-| 20 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-failed"}` | Rejected; no state change |
-| 21 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"details-succeeded","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
-| 22 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-succeeded"}` | Processed |
-| 23 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"details-succeeded"}` | Processed; `{"/payment/details/merchantReference":"shop-1"}` |
-| 24 | customer | Main | requestFinalAmountResolution | `{"requestId":"finalAmount-declined","finalAmount":9000,"reason":"Actual total"}` | Processed |
-| 25 | guarantor | Main | rejectFinalAmountResolution | `{"requestId":"finalAmount-declined","reason":"Provider declined"}` | Processed |
-| 26 | guarantor | Main | rejectFinalAmountResolution | `{"requestId":"finalAmount-declined","reason":"Provider declined"}` | Processed |
-| 27 | guarantor | Main | resolveFinalAmount | `{"requestId":"finalAmount-declined"}` | Rejected; no state change |
-| 28 | customer | Main | requestFinalAmountResolution | `{"requestId":"finalAmount-succeeded","finalAmount":9000,"reason":"Actual total"}` | Processed |
-| 29 | guarantor | Main | resolveFinalAmount | `{"requestId":"finalAmount-succeeded"}` | Processed |
-| 30 | guarantor | Main | resolveFinalAmount | `{"requestId":"finalAmount-succeeded"}` | Processed; `{"/payment/targetMinor":9000}` |
-| 31 | customer | Main | requestPaymentCompletionLock | `{"requestId":"completionLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/capture":false}` |
-| 32 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/capture":false}` |
-| 33 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionLock-failed","reason":"Operator failed"}` | Processed |
-| 34 | customer | Main | requestPaymentCompletionLock | `{"requestId":"completionLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/capture":false}` |
-| 35 | guarantor | Main | lockPaymentCompletion | `{"requestId":"completionLock-ok"}` | Processed; `{"/payment/locks/capture":true}` |
-| 36 | guarantor | Main | lockPaymentCompletion | `{"requestId":"completionLock-ok"}` | Processed |
-| 37 | customer | Main | requestPaymentCompletionUnlock | `{"requestId":"completionUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/capture":true}` |
-| 38 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/capture":true}` |
-| 39 | guarantor | Main | failPaymentCompletionLockChange | `{"requestId":"completionUnlock-failed","reason":"Operator failed"}` | Processed |
-| 40 | customer | Main | requestPaymentCompletionUnlock | `{"requestId":"completionUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/capture":true}` |
-| 41 | guarantor | Main | unlockPaymentCompletion | `{"requestId":"completionUnlock-ok"}` | Processed; `{"/payment/locks/capture":false}` |
-| 42 | guarantor | Main | unlockPaymentCompletion | `{"requestId":"completionUnlock-ok"}` | Processed |
-| 43 | customer | Main | requestPaymentReversalLock | `{"requestId":"reversalLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/refund":false}` |
-| 44 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/refund":false}` |
-| 45 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalLock-failed","reason":"Operator failed"}` | Processed |
-| 46 | customer | Main | requestPaymentReversalLock | `{"requestId":"reversalLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/refund":false}` |
-| 47 | guarantor | Main | lockPaymentReversal | `{"requestId":"reversalLock-ok"}` | Processed; `{"/payment/locks/refund":true}` |
-| 48 | guarantor | Main | lockPaymentReversal | `{"requestId":"reversalLock-ok"}` | Processed |
-| 49 | customer | Main | requestPaymentReversalUnlock | `{"requestId":"reversalUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/refund":true}` |
-| 50 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/refund":true}` |
-| 51 | guarantor | Main | failPaymentReversalLockChange | `{"requestId":"reversalUnlock-failed","reason":"Operator failed"}` | Processed |
-| 52 | customer | Main | requestPaymentReversalUnlock | `{"requestId":"reversalUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/refund":true}` |
-| 53 | guarantor | Main | unlockPaymentReversal | `{"requestId":"reversalUnlock-ok"}` | Processed; `{"/payment/locks/refund":false}` |
-| 54 | guarantor | Main | unlockPaymentReversal | `{"requestId":"reversalUnlock-ok"}` | Processed |
-| 55 | customer | Main | requestTransactionDetailsUpdateLock | `{"requestId":"detailsUpdateLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/details":false}` |
-| 56 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/details":false}` |
-| 57 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateLock-failed","reason":"Operator failed"}` | Processed |
-| 58 | customer | Main | requestTransactionDetailsUpdateLock | `{"requestId":"detailsUpdateLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/details":false}` |
-| 59 | guarantor | Main | lockTransactionDetailsUpdate | `{"requestId":"detailsUpdateLock-ok"}` | Processed; `{"/payment/locks/details":true}` |
-| 60 | guarantor | Main | lockTransactionDetailsUpdate | `{"requestId":"detailsUpdateLock-ok"}` | Processed |
-| 61 | customer | Main | requestTransactionDetailsUpdate | `{"requestId":"while-locked","transactionDetails":{"merchantReference":"bad"}}` | Processed |
-| 62 | guarantor | Main | confirmTransactionDetailsUpdated | `{"requestId":"while-locked"}` | Rejected; no state change; `{"/payment/details/merchantReference":"shop-1"}` |
-| 63 | customer | Main | requestTransactionDetailsUpdateUnlock | `{"requestId":"detailsUpdateUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/details":true}` |
-| 64 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/details":true}` |
-| 65 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"requestId":"detailsUpdateUnlock-failed","reason":"Operator failed"}` | Processed |
-| 66 | customer | Main | requestTransactionDetailsUpdateUnlock | `{"requestId":"detailsUpdateUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/details":true}` |
-| 67 | guarantor | Main | unlockTransactionDetailsUpdate | `{"requestId":"detailsUpdateUnlock-ok"}` | Processed; `{"/payment/locks/details":false}` |
-| 68 | guarantor | Main | unlockTransactionDetailsUpdate | `{"requestId":"detailsUpdateUnlock-ok"}` | Processed |
+| 6 | customer | Main | requestPayeeAssignment | `{"type":"PaymentInstruction/Payment Request Input","requestId":"payee-declined","payeeRef":"seller2"}` | Processed; `{"/payment/payeeChannel":"seller"}` |
+| 7 | guarantor | Main | rejectPayeeAssignment | `{"type":"PaymentInstruction/Payment Control Input","requestId":"payee-declined","reason":"Provider declined"}` | Processed |
+| 8 | guarantor | Main | rejectPayeeAssignment | `{"type":"PaymentInstruction/Payment Control Input","requestId":"payee-declined","reason":"Provider declined"}` | Processed |
+| 9 | guarantor | Main | confirmPayeeAssignment | `{"type":"PaymentInstruction/Payment Control Input","requestId":"payee-declined"}` | Rejected; no state change |
+| 10 | customer | Main | requestPayeeAssignment | `{"type":"PaymentInstruction/Payment Request Input","requestId":"payee-succeeded","payeeRef":"seller2"}` | Processed; `{"/payment/payeeChannel":"seller"}` |
+| 11 | guarantor | Main | confirmPayeeAssignment | `{"type":"PaymentInstruction/Payment Control Input","requestId":"payee-succeeded"}` | Processed |
+| 12 | guarantor | Main | confirmPayeeAssignment | `{"type":"PaymentInstruction/Payment Control Input","requestId":"payee-succeeded"}` | Processed; `{"/payment/payeeChannel":"seller2"}` |
+| 13 | customer | Main | requestTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Request Input","requestId":"details-declined","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
+| 14 | guarantor | Main | rejectTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-declined","reason":"Provider declined"}` | Processed |
+| 15 | guarantor | Main | rejectTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-declined","reason":"Provider declined"}` | Processed |
+| 16 | guarantor | Main | confirmTransactionDetailsUpdated | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-declined"}` | Rejected; no state change |
+| 17 | customer | Main | requestTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Request Input","requestId":"details-failed","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
+| 18 | guarantor | Main | failTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-failed","reason":"Provider failed"}` | Processed |
+| 19 | guarantor | Main | failTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-failed","reason":"Provider failed"}` | Processed |
+| 20 | guarantor | Main | confirmTransactionDetailsUpdated | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-failed"}` | Rejected; no state change |
+| 21 | customer | Main | requestTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Request Input","requestId":"details-succeeded","transactionDetails":{"merchantReference":"shop-1","displayLabel":"My merchant"}}` | Processed |
+| 22 | guarantor | Main | confirmTransactionDetailsUpdated | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-succeeded"}` | Processed |
+| 23 | guarantor | Main | confirmTransactionDetailsUpdated | `{"type":"PaymentInstruction/Payment Control Input","requestId":"details-succeeded"}` | Processed; `{"/payment/details/merchantReference":"shop-1"}` |
+| 24 | customer | Main | requestFinalAmountResolution | `{"type":"PaymentInstruction/Payment Request Input","requestId":"finalAmount-declined","finalAmount":9000,"reason":"Actual total"}` | Processed |
+| 25 | guarantor | Main | rejectFinalAmountResolution | `{"type":"PaymentInstruction/Payment Control Input","requestId":"finalAmount-declined","reason":"Provider declined"}` | Processed |
+| 26 | guarantor | Main | rejectFinalAmountResolution | `{"type":"PaymentInstruction/Payment Control Input","requestId":"finalAmount-declined","reason":"Provider declined"}` | Processed |
+| 27 | guarantor | Main | resolveFinalAmount | `{"type":"PaymentInstruction/Payment Control Input","requestId":"finalAmount-declined"}` | Rejected; no state change |
+| 28 | customer | Main | requestFinalAmountResolution | `{"type":"PaymentInstruction/Payment Request Input","requestId":"finalAmount-succeeded","finalAmount":9000,"reason":"Actual total"}` | Processed |
+| 29 | guarantor | Main | resolveFinalAmount | `{"type":"PaymentInstruction/Payment Control Input","requestId":"finalAmount-succeeded"}` | Processed |
+| 30 | guarantor | Main | resolveFinalAmount | `{"type":"PaymentInstruction/Payment Control Input","requestId":"finalAmount-succeeded"}` | Processed; `{"/payment/targetMinor":9000}` |
+| 31 | customer | Main | requestPaymentCompletionLock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"completionLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/capture":false}` |
+| 32 | guarantor | Main | failPaymentCompletionLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/capture":false}` |
+| 33 | guarantor | Main | failPaymentCompletionLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionLock-failed","reason":"Operator failed"}` | Processed |
+| 34 | customer | Main | requestPaymentCompletionLock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"completionLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/capture":false}` |
+| 35 | guarantor | Main | lockPaymentCompletion | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionLock-ok"}` | Processed; `{"/payment/locks/capture":true}` |
+| 36 | guarantor | Main | lockPaymentCompletion | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionLock-ok"}` | Processed |
+| 37 | customer | Main | requestPaymentCompletionUnlock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"completionUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/capture":true}` |
+| 38 | guarantor | Main | failPaymentCompletionLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/capture":true}` |
+| 39 | guarantor | Main | failPaymentCompletionLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionUnlock-failed","reason":"Operator failed"}` | Processed |
+| 40 | customer | Main | requestPaymentCompletionUnlock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"completionUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/capture":true}` |
+| 41 | guarantor | Main | unlockPaymentCompletion | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionUnlock-ok"}` | Processed; `{"/payment/locks/capture":false}` |
+| 42 | guarantor | Main | unlockPaymentCompletion | `{"type":"PaymentInstruction/Payment Control Input","requestId":"completionUnlock-ok"}` | Processed |
+| 43 | customer | Main | requestPaymentReversalLock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"reversalLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/refund":false}` |
+| 44 | guarantor | Main | failPaymentReversalLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/refund":false}` |
+| 45 | guarantor | Main | failPaymentReversalLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalLock-failed","reason":"Operator failed"}` | Processed |
+| 46 | customer | Main | requestPaymentReversalLock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"reversalLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/refund":false}` |
+| 47 | guarantor | Main | lockPaymentReversal | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalLock-ok"}` | Processed; `{"/payment/locks/refund":true}` |
+| 48 | guarantor | Main | lockPaymentReversal | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalLock-ok"}` | Processed |
+| 49 | customer | Main | requestPaymentReversalUnlock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"reversalUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/refund":true}` |
+| 50 | guarantor | Main | failPaymentReversalLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/refund":true}` |
+| 51 | guarantor | Main | failPaymentReversalLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalUnlock-failed","reason":"Operator failed"}` | Processed |
+| 52 | customer | Main | requestPaymentReversalUnlock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"reversalUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/refund":true}` |
+| 53 | guarantor | Main | unlockPaymentReversal | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalUnlock-ok"}` | Processed; `{"/payment/locks/refund":false}` |
+| 54 | guarantor | Main | unlockPaymentReversal | `{"type":"PaymentInstruction/Payment Control Input","requestId":"reversalUnlock-ok"}` | Processed |
+| 55 | customer | Main | requestTransactionDetailsUpdateLock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"detailsUpdateLock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/details":false}` |
+| 56 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateLock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/details":false}` |
+| 57 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateLock-failed","reason":"Operator failed"}` | Processed |
+| 58 | customer | Main | requestTransactionDetailsUpdateLock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"detailsUpdateLock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/details":false}` |
+| 59 | guarantor | Main | lockTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateLock-ok"}` | Processed; `{"/payment/locks/details":true}` |
+| 60 | guarantor | Main | lockTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateLock-ok"}` | Processed |
+| 61 | customer | Main | requestTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Request Input","requestId":"while-locked","transactionDetails":{"merchantReference":"bad"}}` | Processed |
+| 62 | guarantor | Main | confirmTransactionDetailsUpdated | `{"type":"PaymentInstruction/Payment Control Input","requestId":"while-locked"}` | Rejected; no state change; `{"/payment/details/merchantReference":"shop-1"}` |
+| 63 | customer | Main | requestTransactionDetailsUpdateUnlock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"detailsUpdateUnlock-failed","reason":"Review control"}` | Processed; `{"/payment/locks/details":true}` |
+| 64 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateUnlock-failed","reason":"Operator failed"}` | Processed; `{"/payment/locks/details":true}` |
+| 65 | guarantor | Main | failTransactionDetailsUpdateLockChange | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateUnlock-failed","reason":"Operator failed"}` | Processed |
+| 66 | customer | Main | requestTransactionDetailsUpdateUnlock | `{"type":"PaymentInstruction/Payment Request Input","requestId":"detailsUpdateUnlock-ok","reason":"Review control"}` | Processed; `{"/payment/locks/details":true}` |
+| 67 | guarantor | Main | unlockTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateUnlock-ok"}` | Processed; `{"/payment/locks/details":false}` |
+| 68 | guarantor | Main | unlockTransactionDetailsUpdate | `{"type":"PaymentInstruction/Payment Control Input","requestId":"detailsUpdateUnlock-ok"}` | Processed |
 | 69 | guarantor | Main | recordTransactionInitiationFailed | `{"requestId":"attempt-1","reason":"Provider unavailable"}` | Processed |
 | 70 | guarantor | Main | recordTransactionInitiationFailed | `{"requestId":"attempt-1","reason":"Provider unavailable"}` | Processed |
-| 71 | guarantor | Main | recordTransactionInitiated | `{"transactionId":"eventual-transaction"}` | Processed |
+| 71 | guarantor | Main | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"eventual-transaction"}` | Processed |
 
 ### 29-payment-rejection
 
@@ -5184,7 +5102,434 @@ Walkthrough: [`29-payment-rejection.case.yaml`](../examples/apps/29-payment-reje
 | 4 | guarantor | Main | approve_guarantor | `{"revision":1}` | Processed |
 | 5 | guarantor | Main | rejectPaymentInstruction | `{"reason":"Unsupported instruction"}` | Processed; `{"/payment/rejected":true}` |
 | 6 | guarantor | Main | acceptPaymentInstruction | `{}` | Rejected; no state change |
-| 7 | guarantor | Main | recordTransactionInitiated | `{"transactionId":"forbidden"}` | Rejected; no state change |
+| 7 | guarantor | Main | recordTransactionInitiated | `{"type":"PaymentInstruction/Transaction Initiation Input","transactionId":"forbidden"}` | Rejected; no state change |
+
+### 30-commission-a2a-payout
+
+Source: [`30-commission-a2a-payout.blue`](../examples/apps/30-commission-a2a-payout.blue).
+
+```yaml
+name: Reseller commission settled by a MyOS account-to-account payout
+type: Agreements/Agreement with Clauses
+terms:
+  commissionBps: 1000
+  currency: USD
+  payoutOperator: test
+  payoutFeePolicy: myos-commission-fee-v1
+  payoutFeeBps: 2000
+  payoutOperatorAccountId: test-guarantor
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: MyOS/MyOS Party
+          displayName: Seller
+          myosAccountId: test-seller
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: seller
+        partner:
+          type: MyOS/MyOS Party
+          displayName: Partner
+          myosAccountId: test-partner
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: partner
+      required:
+      - seller
+      - partner
+  commission:
+    type: Reseller/Commission Clause
+    bindings:
+      state: /commission
+      orders: /orders
+      payouts: /payouts
+      rate: /terms/commissionBps
+  payouts:
+    type: Reseller/Commission Account Payouts Clause
+    bindings:
+      template: /payoutTemplate
+      collection: /payouts
+      commission: /commission
+      parties:
+        seller: seller
+        partner: partner
+      preparePayout:
+        startPayout:
+          'on': workflow
+          party: seller
+      provide:
+        providePayout:
+          'on': workflow
+          party: seller
+      cancel:
+        cancelPayout:
+          'on': workflow
+          party: seller
+orders: {}
+commission:
+  targets:
+    o1: 1000
+    o2: 1000
+  accrued: 2000
+  paid: 0
+  reserved: 0
+  settlements: {}
+payouts: {}
+payoutTemplate:
+  name: Partner commission payout
+  type: MyOS/MyOS Test Account to Account Payment Instruction
+  paymentTerms:
+    amountMinor:
+      type: Integer
+    limitMinor:
+      type: Integer
+    currency: USD
+    payerChannel: seller
+    payeeChannel: partner
+    guarantorChannel: guarantor
+    allowedPayees:
+    - partner
+    captureGate: ''
+    recipientApprovalRequired: false
+  paymentDetails:
+    method: myos-account-to-account
+    payoutTerms: {}
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: MyOS/MyOS Party
+          partner:
+            type: MyOS/MyOS Party
+          guarantor:
+            type: MyOS/MyOS Party
+        required:
+        - seller
+    payment:
+      type: PaymentInstruction/Payment Request Actions
+      bindings:
+        requestAuthorize:
+          securePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-secure
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Secures the complete frozen partner transfer; no input fields.
+        requestCapture:
+          capturePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-capture
+              amountMinor:
+                $document: /paymentTerms/amountMinor
+            request:
+              description: Transfers the complete frozen partner amount; no input fields.
+        requestVoid:
+          voidPayout:
+            'on': workflow
+            party: seller
+            params:
+              requestId: payout-void
+              amountMinor:
+                $document: /payment/secured
+            request:
+              description: Returns the complete secured debit to the seller before the partner transfer; no input
+                fields.
+    method:
+      type: MyOS/Payment Method Events
+    accountSettlement:
+      type: Reseller/Commission Payout Settlement Clause
+      bindings:
+        confirm:
+          confirmAccountSettlement:
+            'on': workflow
+            party: guarantor
+            params:
+              debitReference:
+                $var:
+                  name: trigger
+                  path: /debitReference
+              transferReference:
+                $var:
+                  name: trigger
+                  path: /transferReference
+    payoutProfile:
+      type: Reseller/Commission Payout Profile Clause
+```
+
+Walkthrough: [`30-commission-a2a-payout.case.yaml`](../examples/apps/30-commission-a2a-payout.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | seller | Main | approve_seller | `{"revision":1}` | Processed |
+| 2 | partner | Main | approve_partner | `{"revision":1}` | Processed |
+| 3 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000,"accountContext":{"payerBinding":"test-seller-binding","payeeBinding":"test-partner-binding","platformAccountId":"test-guarantor","environment":"TEST"}}` | Processed; `{"/commission/reserved":1000,"/commission/paid":0}` |
+| 4 | seller | Main | startPayout | `{"key":"p1","amountMinor":1000,"accountContext":{"payerBinding":"test-seller-binding","payeeBinding":"test-partner-binding","platformAccountId":"test-guarantor","environment":"TEST"}}` | Processed; `{"/commission/reserved":1000}` |
+| 5 | seller | Main | startPayout | `{"key":"p2","amountMinor":1000,"feeMinor":0,"accountContext":{"payerBinding":"test-seller-binding","payeeBinding":"test-partner-binding","platformAccountId":"test-guarantor","environment":"TEST"}}` | Rejected; no state change |
+| 6 | seller | Main | startPayout | `{"key":"p2","amountMinor":500,"accountContext":{"payerBinding":"test-seller-binding","payeeBinding":"test-partner-binding","platformAccountId":"test-guarantor","environment":"TEST"}}` | Rejected; no state change |
+| 7 | seller | Main | cancelPayout | `{"key":"p1"}` | Processed; `{"/commission/reserved":0,"/commission/paid":0,"/commission/settlements/p1/status":"closed","/commission/settlements/p1/paidMinor":0,"/commission/settlements/p1/feeMinor":0}` |
+| 8 | seller | Main | cancelPayout | `{"key":"p1"}` | Processed; `{"/commission/reserved":0}` |
+| 9 | seller | Main | startPayout | `{"key":"p2","amountMinor":500,"accountContext":{"payerBinding":"test-seller-binding","payeeBinding":"test-partner-binding","platformAccountId":"test-guarantor","environment":"TEST"}}` | Processed; `{"/commission/reserved":500}` |
+| 10 | partner | Main | cancelPayout | `{"key":"p2"}` | Rejected; no state change |
+
+### 31-current-payment-preparation
+
+Source: [`31-current-payment-preparation.blue`](../examples/apps/31-current-payment-preparation.blue).
+
+```yaml
+name: Prepare one independent Payment Instruction
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+        guarantor:
+          type: Parties/Party
+          displayName: Payment institution
+      required: []
+      allowNewParties: true
+  instruction:
+    type: Payment/Payment Clause
+    parameters:
+      obtain: create
+      suppliedBy: customer
+      template:
+        name: Service payment
+        type: PaymentInstruction/Payment Instruction with Clauses
+        clauses:
+          activation:
+            type: Activation/Activation Clause
+            parameters:
+              parties:
+                customer:
+                  type: Parties/Party
+                  displayName: Customer
+                seller:
+                  type: Parties/Party
+                  displayName: Merchant
+                reviewer:
+                  type: Parties/Party
+                  displayName: Reviewer
+                guarantor:
+                  type: Parties/Party
+                  displayName: Payment institution
+              required: []
+              allowNewParties: true
+        sources: {}
+        paymentTerms:
+          currency: EUR
+          amountMinor: 200
+          limitMinor: 200
+          payerChannel: customer
+          payeeChannel: seller
+          guarantorChannel: guarantor
+          allowedPayees:
+          - seller
+          recipientApprovalRequired: false
+    bindings:
+      instruction: /instruction
+      prepare:
+        preparePayment:
+          'on': workflow
+          party: customer
+          request:
+            description: Prepare this singleton payment from explicitly configured fields and values.
+              This binding maps no request fields.
+      resume:
+        resumePayment:
+          'on': workflow
+          party: customer
+          request:
+            description: Resume the existing payment preparation. No request fields are required.
+      parties:
+        customer: customer
+        seller: seller
+        reviewer: reviewer
+        guarantor: guarantor
+```
+
+Walkthrough: [`31-current-payment-preparation.case.yaml`](../examples/apps/31-current-payment-preparation.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | preparePayment | `{}` | Processed |
+| 2 | customer | Main | resumePayment | `{}` | Processed |
+
+### 32-current-two-payment-obligations
+
+Source: [`32-current-two-payment-obligations.blue`](../examples/apps/32-current-two-payment-obligations.blue).
+
+```yaml
+name: Prepare independent deposit and balance Payment Instructions
+type: Agreements/Agreement with Clauses
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        customer:
+          type: Parties/Party
+          displayName: Customer
+        seller:
+          type: Parties/Party
+          displayName: Merchant
+        reviewer:
+          type: Parties/Party
+          displayName: Reviewer
+        guarantor:
+          type: Parties/Party
+          displayName: Payment institution
+      required: []
+      allowNewParties: true
+  deposit:
+    type: Payment/Payment Clause
+    parameters:
+      obtain: create
+      suppliedBy: customer
+      template:
+        name: Deposit instruction
+        type: PaymentInstruction/Payment Instruction with Clauses
+        clauses:
+          activation:
+            type: Activation/Activation Clause
+            parameters:
+              parties:
+                customer:
+                  type: Parties/Party
+                  displayName: Customer
+                seller:
+                  type: Parties/Party
+                  displayName: Merchant
+                reviewer:
+                  type: Parties/Party
+                  displayName: Reviewer
+                guarantor:
+                  type: Parties/Party
+                  displayName: Payment institution
+              required: []
+              allowNewParties: true
+        sources: {}
+        paymentTerms:
+          currency: EUR
+          amountMinor: 50
+          limitMinor: 50
+          payerChannel: customer
+          payeeChannel: seller
+          guarantorChannel: guarantor
+          allowedPayees:
+          - seller
+          recipientApprovalRequired: false
+    bindings:
+      instruction: /deposit
+      prepare:
+        prepareDeposit:
+          'on': workflow
+          party: customer
+          request:
+            description: Prepare this singleton payment from explicitly configured fields and values.
+              This binding maps no request fields.
+      resume:
+        resumeDeposit:
+          'on': workflow
+          party: customer
+          request:
+            description: Resume the existing payment preparation. No request fields are required.
+      parties:
+        customer: customer
+        seller: seller
+        reviewer: reviewer
+        guarantor: guarantor
+  balance:
+    type: Payment/Payment Clause
+    parameters:
+      obtain: create
+      suppliedBy: customer
+      template:
+        name: Balance instruction
+        type: PaymentInstruction/Payment Instruction with Clauses
+        clauses:
+          activation:
+            type: Activation/Activation Clause
+            parameters:
+              parties:
+                customer:
+                  type: Parties/Party
+                  displayName: Customer
+                seller:
+                  type: Parties/Party
+                  displayName: Merchant
+                reviewer:
+                  type: Parties/Party
+                  displayName: Reviewer
+                guarantor:
+                  type: Parties/Party
+                  displayName: Payment institution
+              required: []
+              allowNewParties: true
+        sources: {}
+        paymentTerms:
+          currency: EUR
+          amountMinor: 150
+          limitMinor: 150
+          payerChannel: customer
+          payeeChannel: seller
+          guarantorChannel: guarantor
+          allowedPayees:
+          - seller
+          recipientApprovalRequired: false
+    bindings:
+      instruction: /balance
+      prepare:
+        prepareBalance:
+          'on': workflow
+          party: customer
+          request:
+            description: Prepare this singleton payment from explicitly configured fields and values.
+              This binding maps no request fields.
+      resume:
+        resumeBalance:
+          'on': workflow
+          party: customer
+          request:
+            description: Resume the existing payment preparation. No request fields are required.
+      parties:
+        customer: customer
+        seller: seller
+        reviewer: reviewer
+        guarantor: guarantor
+```
+
+Walkthrough: [`32-current-two-payment-obligations.case.yaml`](../examples/apps/32-current-two-payment-obligations.case.yaml). Targets are relative to the main document; open the named child before invoking its operation.
+
+| Step | Actor | Document | Operation or signal | Input | Expected result |
+|---|---|---|---|---|---|
+| 1 | customer | Main | prepareDeposit | `{}` | Processed |
+| 2 | customer | Main | prepareBalance | `{}` | Processed |
+| 3 | customer | Main | resumeDeposit | `{}` | Processed |
+| 4 | customer | Main | resumeBalance | `{}` | Processed |
 
 ## 10. Source of truth and compatibility
 

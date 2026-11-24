@@ -1,0 +1,82 @@
+name: Reservation Clause
+description: Apply reviewed booking proposals and operational decisions through named roles.
+type: Clauses/Clause
+hookAbi: document-context-1
+hookDefinition:
+  type: Schedule/Reservation Plan
+actionDefinition:
+  type: Schedule/Reservation Functions
+bindingTypes:
+  state: pointer
+  snapshot: pointer
+  requests: pointer
+  wholeReservation: pointer
+  customerAccount: pointer
+optionalBindings:
+- wholeReservation
+- customerAccount
+defaultBindings:
+  state: /reservations
+  snapshot: /orderSnapshot
+  requests: /reservationRequests
+actions:
+  type: Dictionary
+  valueType: {type: Connections/Action Declaration}
+  initialize:
+    automatic:
+      'on': initialized
+      once: true
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: initializeOrder, args: {}}}}
+  confirm:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: confirmProposal, args: {input: {$var: params}}}}}
+  alternative:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: proposeAlternative, args: {input: {$var: params}}}}}
+  accept:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: acceptProposal, args: {input: {$var: params}}}}}
+  deadline:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: setResponseDeadline, args: {input: {$var: params}}}}}
+  fulfil:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: fulfilGroup, args: {input: {$var: params}}}}}
+  close:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr:
+          $call:
+            function: closeReservation
+            args:
+              groupId: {$var: {name: params, path: /groupId}}
+              reason: {$var: {name: params, path: /reason}}
+  cancel:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: endReservation, args: {action: cancel, input: {$var: params}}}}}
+  supplierCancel:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: endReservation, args: {action: supplierCancel, input: {$var: params}}}}}
+  noShow:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: endReservation, args: {action: noShow, input: {$var: params}}}}}
+  decline:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: endReservation, args: {action: decline, input: {$var: params}}}}}
+  expire:
+    resultContract: outcome-v1
+    do:
+    - $set: {name: actionResult, expr: {$call: {function: endReservation, args: {action: expire, input: {$var: params}}}}}

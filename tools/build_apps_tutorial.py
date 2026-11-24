@@ -2,7 +2,7 @@
 """Render the current tutorial from its prose and exact public package/example sources."""
 import json
 from pathlib import Path
-from check_clause_tutorial import load
+from check_clause_tutorial import historical_payment_examples, load
 ROOT=Path(__file__).resolve().parents[1]
 def code(path):
     return '```yaml\n'+(ROOT/path).read_text().rstrip()+'\n```'
@@ -11,6 +11,7 @@ def cell(value):
 def build():
     intro=(ROOT/'docs/clauses-guide-source.md').read_text()
     families=json.loads((ROOT/'PUBLIC-CLAUSES.json').read_text())['families']
+    historical = historical_payment_examples()
     def types(value):
         if isinstance(value,dict):
             result={value['type']} if isinstance(value.get('type'),str) else set()
@@ -21,13 +22,16 @@ def build():
     sources=[(p,types(load(p))) for p in sorted((ROOT/'examples/apps').glob('*.blue'))]
     rows=[]
     for family in families:
-        matches=[p for p,used in sources if used.intersection(family['types'])]
+        matches=[p for p,used in sources if p.stem not in historical and used.intersection(family['types'])]
         links=', '.join('['+p.stem+'](#'+p.stem+')' for p in matches[:4])
         rows.append('| '+family['name']+' | '+', '.join('`'+t+'`' for t in family['types'])+' | '+family['purpose']+' | '+links+' |')
     table='| Family | Public types | Purpose | Complete examples in this guide |\n|---|---|---|---|\n'+'\n'.join(rows)
     examples=[]
     for p in sorted((ROOT/'examples/apps').glob('*.blue')):
-        text='### '+p.stem+'\n\nSource: [`'+p.name+'`](../examples/apps/'+p.name+').\n\n'+code(p.relative_to(ROOT))
+        heading='### '+p.stem+'\n\n'
+        if p.stem in historical:
+            heading+='Historical payment edition. Use the retained catalogue and exact Payment type in the [examples README](../examples/apps/README.md#historical-payment-edition).\n\n'
+        text=heading+'Source: [`'+p.name+'`](../examples/apps/'+p.name+').\n\n'+code(p.relative_to(ROOT))
         case=p.with_suffix('.case.yaml')
         if not case.exists():case=p.with_suffix('.native.yaml')
         if case.exists():
@@ -40,6 +44,6 @@ def build():
             time=p.with_suffix('.time.yaml')
             if time.exists():text+='\n\nSigned-time walkthrough:\n\n'+code(time.relative_to(ROOT))
         examples.append(text)
-    text=intro.replace('{{HELLO_SOURCE}}',code('clause-connections/types/hello-clause.blue')).replace('{{PAYMENT_SOURCE}}',code('clause-payment/types/payment-clause.blue')+'\n\nIts complete shared base:\n\n'+code('clause-payment/types/conditional-base.blue')).replace('{{PI_HOST_SOURCE}}',code('payment-instruction/types/host-with-clauses.blue')).replace('{{FAMILY_TABLE}}',table).replace('{{EXAMPLES}}','\n\n'.join(examples))
+    text=intro.replace('{{HELLO_SOURCE}}',code('clause-connections/types/hello-clause.blue')).replace('{{PAYMENT_SOURCE}}',code('clause-payment/types/payment-clause.blue')).replace('{{PI_HOST_SOURCE}}',code('payment-instruction/types/host-with-clauses.blue')).replace('{{FAMILY_TABLE}}',table).replace('{{EXAMPLES}}','\n\n'.join(examples))
     (ROOT/'docs/clauses-tutorial.md').write_text(text)
 if __name__=='__main__':build()

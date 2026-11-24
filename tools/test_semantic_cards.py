@@ -254,6 +254,16 @@ class SourceTests(unittest.TestCase):
         context = sources.evidence(B, {**DEFINITIONS, B: {'defaultBindings': {'inline': {}}}})
         self.assertEqual([dict(name='inline', defaultPath=None)], context['bindings'])
 
+    def test_evidence_does_not_infer_written_fields_from_a_computed_operation(self):
+        definitions = deepcopy(DEFINITIONS)
+        definitions[C]['actions'] = {'change': {'$appendChange': {
+            'op': {'$choose': {'cond': True, 'then': 'add', 'else': 'replace'}},
+            'path': '/computedResult', 'val': {'status': 'ready'},
+        }}}
+        paths = sources.evidence(C, definitions)['documentPaths']
+        self.assertNotIn('/computedResult', paths)
+        self.assertNotIn('/computedResult/status', paths)
+
     def test_executable_inheritance_is_kept_before_incidental_dependencies(self):
         definitions = deepcopy(DEFINITIONS)
         definitions[B] = {'actionDefinition': {'type': {'blueId': E}}, 'unrelated': {'blueId': D}}

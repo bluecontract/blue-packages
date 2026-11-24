@@ -1,0 +1,81 @@
+{
+  "blueId": "5U5SxmYQF6Ghg7qX5vCCzcafAKeHPXYwYxYjYa47ALL7",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "6858mvwf3mU1WH3C62hU8r4FZbE4tadErY19wp9QuyJY",
+      "6JxhnzsB1jAFtuth47x3pz5ctnjicWmYsBtHHGwTCwxB"
+    ],
+    "displayLabel": "Payment Method Events",
+    "limitations": [],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Method Events.announce and request",
+        "id": "method",
+        "meaning": "Method code used to select the initialization notice and execution relay.",
+        "path": "/paymentDetails/method",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "An empty value means no transaction is attached.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.attestTransferBreakdown",
+        "id": "transactionId",
+        "meaning": "Attached transaction identity required for the account settlement report.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.attestTransferBreakdown",
+        "id": "accepted",
+        "meaning": "Whether the instruction was accepted, a prerequisite for reporting.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No fixed net amount recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.validateFixedTransfer",
+        "id": "fixedNet",
+        "meaning": "Frozen net transfer in payoutTerms.currency for the fixed transfer profile.",
+        "path": "/paymentDetails/payoutTerms/netMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No fixed payee recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Account Settlement Functions.validateFixedTransfer",
+        "id": "fixedPayee",
+        "meaning": "Frozen payee channel checked by the fixed account transfer profile.",
+        "path": "/paymentDetails/payoutTerms/payeeChannel",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Payment Method Events\n\nRelays payment method requests and provides an account-transfer settlement action inside the executing Payment Instruction. On initialization it emits Customer Payment Session Requested when `/paymentDetails/method` equals `myos-customer`, or Account Payment Instruction Created otherwise. A Payment Requested event is relayed as MyOS Execution Requested with the method, triggering request and payment details. These announcements ask the integration to act.\n\nWhen configured for a fixed account transfer, `validateAccountTransfer` checks the payout profile against the frozen net amount and payee. It permits only full-amount secure, capture and void requests with their prescribed payout request identities. It rejects changes to payee, amount or transaction details and disallows reversals for this profile.\n\n`confirmAccountSettlement` uses the caller allowed by the configured connection. It requires an accepted instruction with a transaction and nonempty debit and transfer references. It records a report at `/accountSettlement` with the frozen gross, fee and net amounts, currency and instruction and transaction identities. An exact retry is a duplicate and a conflicting report fails. A new report emits Account Settlement Confirmed. The separate Payment Instruction protocol records confirmed transfer effects."
+}
