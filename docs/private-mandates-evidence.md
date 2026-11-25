@@ -42,19 +42,19 @@ comparisons of texts. A statement is a signed assertion and no more.
 
 | Item | Version | BlueId |
 | --- | --- | --- |
-| Coordination Evidence package | 0.1.0-preview.3 | `DdLJ1RHrbn4JtXeuw8mmUPZwrNu8fhSGXBtZ2H2mWpBP` |
-| Coordination Evidence protocol | | `2aAzqDvFz4mLoodvaA7W2Ux4LgUYg6sLmio2wHPGnjnK` |
-| Coordination Evidence rules | | `3jqDTr9drjzfCfmU6S2n6A6xxotrLN3VkyEDqxT74htn` |
-| `Timeline Channel with Evidence` | | `2Mz2pBFHtbDKd5X7TsRHXmkF8PFHTYjwugYeMVpcV5BT` |
-| `Evidence Profile` | | `J953pmbnmRGRZjTxVk5NAhR2JH3YuTzNkmkTQSRqqYZ1` |
-| `Proof Entry` | | `DE7juVeqT7ExyMFVrLPmcoGXryixmSy3ycUPisw2vkzJ` |
-| `Rejection Entry` | | `3h37NoCGodeYGkpnknHUVihWVh9R3w1fGaKvycJS7PAL` |
-| Private Mandates package | 0.1.0-preview.3 | `2WmkdmyCnaDWU4yUQb33S4mcZg5393YH5EmB34j7r8Ay` |
-| Private Mandates protocol | | `8gnH28xxMXgjyoSLJLx14QzTGYk3v92tH3LBmybCEgWM` |
+| Coordination Evidence package | 0.1.0-preview.3 | `53rkuPoxH2foGDuyL6Zoq96KgJ5ZG3SLksJhLNNAHyCQ` |
+| Coordination Evidence protocol | | `D9QhgSVPURfiU9VKewBoJzPaGKA8kyYxk5h8Mx1CYRkh` |
+| Coordination Evidence rules | | `ZVHP4CPfKkgaDaBZKKQwPxnvncBxXxmj3fYivJxhqSa` |
+| `Timeline Channel with Evidence` | | `AoTzWY1kACtohymhHP5b2kc7X2Mvbn76FKkxk4LRf9cX` |
+| `Evidence Profile` | | `49NnPS6kQNMWBGvvtnhAqdc3hAZhV3g8eBWHuG5q9txd` |
+| `Proof Entry` | | `8WKss4s4XJtApitTqEBoTkebsXsa1tV8GmjEoU5sPKw5` |
+| `Rejection Entry` | | `5dkRVFMaqxSDdwnPhdbfSjuNcaRi9XrPrFS9ScP4nuDW` |
+| Private Mandates package | 0.1.0-preview.3 | `61F69f2qnZoxotaKuhn5dZZPEcThMJSE6BpMj27f89MT` |
+| Private Mandates protocol | | `B47TSj777huXRaKdE5NryhaZFh2vUBffmo9P7wj8uRcT` |
 | Private Mandates rules | | `d6DE97S9R3TBnX6ySJPN7bXnTmGMVwWTmWS8oiGgDMS` |
 | `Mandate Commitment Authority` | | `8gKiaKNLYmEWjwXc1z2g23z3cPr74MHaiyaJ2DsaK7e5` |
 | `Mandate State Attestation` | | `7NLZYq1CkiCj9RbJZ7njxy9nHRs4NNTAn72kK38p7ECc` |
-| `Signed Statement Profile` | | `CChxsNBLiWmcvzFByEhoMpMumwk6Cn5CiKJAwACKXUHh` |
+| `Signed Statement Profile` | | `FFpQ9diLQj6VVQPmPEzL18y1f9YQEaWYGwu4zgon2GnA` |
 | Coordination package (required, unchanged) | 0.2.0-access-events.1 | `4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA` |
 | Coordination protocol (unchanged) | | `4YRV74QByZidyvspvbhZvx9Mfod16dHNCqCVbkKditGc` |
 | Coordination rules (unchanged) | | `26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG` |

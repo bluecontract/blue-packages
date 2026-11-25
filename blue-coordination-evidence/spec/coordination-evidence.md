@@ -118,12 +118,10 @@ Rules:
    about changing the fields or the type of a channel. A channel's fields or type
    change only through the document's own program, which its participants
    accepted, and Contracts and the Language decide whether such a change is
-   valid. A patch must leave a valid document (Contracts section 15, C25): by
-   default a patch that removes a required field of the channel's type fails
-   with its attempt, and under a `nearest-valid-ancestor` generalization policy
-   the channel is retyped to its nearest valid ancestor, such as a plain
-   `Coordination/Timeline Channel`, and is then no evidence channel (rule 3). A
-   changed field takes effect from the state in which it changed (rule 2).
+   valid and what follows from it. When, in the state on which an operation is
+   evaluated, the channel is no evidence channel (rule 3), the operation is
+   rejected at once (section 6). A changed field takes effect from the state in
+   which it changed (rule 2).
 7. An evidence timeline serves exactly one document. It MUST NOT be named by a
    channel of another document. A reader of another document could not obtain the
    content its entries name (section 5), and would learn from it that a mandate
@@ -343,7 +341,7 @@ outside the open schemas: whether it is Blue content is decided by its own type.
 reading T, when at the position of E:
 
 - the channel E is performed on is not an evidence channel (section 3 rule 3), for
-  example a plain `Timeline Channel`, also one retyped from an evidence channel;
+  example a plain `Timeline Channel`;
 - the channel's three fields are not well formed (section 3), unless the host does
   not implement the channel's profile type, in which case it refuses instead;
 - the authority claim of E is malformed under the rules of its own protocol.
