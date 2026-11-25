@@ -1,0 +1,112 @@
+name: Rivermill Packaging and Alder Street Café Supply Agreement
+type: Agreements/Agreement with Clauses
+description: >
+  Rivermill Packaging supplies takeaway packaging to Alder Street Café under a
+  standing catalogue. The café can save a quote for each restock. Both parties
+  approve catalogue changes. Each saved quote retains its original prices and
+  catalogue revision. Prices are in euro cents.
+
+catalog:
+  revision: 1
+  supplierId: supplier
+  currency: EUR
+  entries:
+    cups-12oz:
+      label: 12 oz takeaway cups
+      description: One carton of 500 paper cups.
+      pricingUnit: per_unit
+      dateRequired: false
+      unitAmountMinor: 2400
+    lids-12oz:
+      label: Lids for 12 oz cups
+      description: One carton of 500 lids.
+      pricingUnit: per_unit
+      dateRequired: false
+      unitAmountMinor: 1250
+quotes: {}
+
+# Local demo channels and accounts stand in for the parties' bound transports.
+contracts:
+  supplier:
+    type: Contracts/External Channel
+    event:
+      source: supplier
+  buyer:
+    type: Contracts/External Channel
+    event:
+      source: buyer
+
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        supplier:
+          type: Parties/Party
+          business:
+            type: Parties/Business
+            displayName: Rivermill Packaging
+          myosAccountId: local-rivermill
+          readerKeys: [local-rivermill-reader]
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: supplier
+        buyer:
+          type: Parties/Party
+          business:
+            type: Parties/Business
+            displayName: Alder Street Café
+          myosAccountId: local-alder-street
+          readerKeys: [local-alder-street-reader]
+          lead:
+            channel:
+              type: Contracts/External Channel
+              event:
+                source: buyer
+      required: [supplier, buyer]
+      preActivationConnections:
+        - clause: catalog
+          action: validate
+          automatic: true
+
+  catalog:
+    type: Commerce/Catalog Clause
+    bindings:
+      state: /catalog
+      quotes: /quotes
+      quote:
+        saveQuote:
+          'on': workflow
+          party: buyer
+          input: true
+
+  catalogueChanges:
+    type: Amendments/Amendments Clause
+    parameters:
+      approvers: [supplier, buyer]
+      paths: [/catalog]
+      replacementValidator:
+        definition:
+          type: Commerce/Catalog Functions
+        function: validateCatalogReplacement
+    bindings:
+      state: /catalogueChanges
+      editable: /activation/active
+      propose:
+        proposeCatalogue:
+          'on': workflow
+          party: supplier
+          input: true
+      approve:
+        supplierApproveCatalogue:
+          'on': workflow
+          party: supplier
+          requireExactDocumentVersion: true
+          input: true
+        buyerApproveCatalogue:
+          'on': workflow
+          party: buyer
+          requireExactDocumentVersion: true
+          input: true
