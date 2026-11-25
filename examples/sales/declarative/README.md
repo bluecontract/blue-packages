@@ -356,7 +356,7 @@ process.stdout.write(`${JSON.stringify(JSON.parse(source), null, 2)}\n`);
 JS
 ```
 
-From the Blue Packages root, render the tracked automatic example with Polish role
+From the Blue Packages root, render the tracked automatic example with English role
 comments using Python and PyYAML. The renderer names the active package exports
 beside their literal BlueIds and compares the loaded YAML to the source before
 printing it.

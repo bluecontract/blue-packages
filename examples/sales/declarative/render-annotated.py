@@ -19,41 +19,44 @@ PAYOUT = ('payoutTemplate',)
 
 ROLES = {
     (): {
-        'activation': 'Ustala wymagane role i zatwierdzenia aktualnych warunków umowy.',
-        'catalog': 'Wycenia wybór klienta na aktualnej rewizji katalogu.',
-        'quoteCommission': 'Ustala obowiązującą stawkę prowizji przy pierwszej aktywacji.',
-        'orders': 'Przygotowuje osobne zamówienie i przypisuje mu obowiązującą stawkę prowizji.',
-        'receipts': 'Sumuje potwierdzone pobrania, zwroty i wpływy po zwrotach.',
-        'commission': 'Aktualizuje należną prowizję z wpływów i przypisanej stawki zamówienia.',
-        'payouts': 'Przygotowuje oddzielną instrukcję wypłaty prowizji partnerowi.',
-        'catalogAmendments': 'Zbiera zatwierdzenia obu stron dla nowej rewizji katalogu.',
-        'commissionAmendments': 'Zbiera zatwierdzenia obu stron dla zmiany stawki prowizji.',
+        'activation': 'Sets the roles and approvals required for the current agreement terms.',
+        'catalog': 'Prices the customer’s selection against the current catalog revision.',
+        'quoteCommission': 'Sets the commission rate on first activation.',
+        'orders': 'Prepares a separate Order and assigns it the current commission rate.',
+        'receipts': 'Totals confirmed captures, refunds, and net receipts after refunds.',
+        'commission': 'Updates the commission due using net receipts and the rate assigned to the Order.',
+        'payouts': 'Prepares a separate Payment Instruction to pay the partner’s commission.',
+        'catalogAmendments': 'Collects approval from both parties for a new catalog revision.',
+        'commissionAmendments': 'Collects approval from both parties for a commission rate change.',
     },
     ORDER: {
-        'activation': 'Ustala role i dostęp zamówienia oraz wymaga potwierdzenia sprzedawcy, gdy jest skonfigurowane.',
-        'orderDecision': 'Wskazuje operacje aktywacji blokowane po odrzuceniu zamówienia przez sprzedawcę.',
-        'reservation': 'Obsługuje zweryfikowane propozycje rezerwacji i udostępnia potwierdzony termin usługi.',
-        'windowStart': 'Zapamiętuje pierwszy prawidłowy czas w ścieżce result. Brak wartości oznacza, że początek okna nie został jeszcze zapisany.',
-        'cancellation': 'Rozstrzyga anulowanie całego zamówienia i emituje Order Cancellation Accepted.',
-        'payment': 'Przygotowuje i dołącza jedną instrukcję płatności z uzgodnioną kwotą, walutą i rolami.',
+        'activation': 'Sets Order roles and access and requires seller confirmation when configured.',
+        'orderDecision': 'Specifies which activation operations are blocked after the seller rejects the Order.',
+        'reservation': 'Handles reviewed reservation proposals and exposes the confirmed service time.',
+        'windowStart': (
+            'Records the first valid timestamp at the result path. '
+            'If the value is absent, the window start is still unset.'
+        ),
+        'cancellation': 'Decides cancellation for the entire Order and emits Order Cancellation Accepted.',
+        'payment': 'Prepares and attaches one Payment Instruction with the agreed amount, currency, and roles.',
     },
     PAYMENT: {
-        'activation': 'Oddzielnie ustala role i dostęp kupującego, sprzedawcy i gwaranta.',
-        'method': 'Przekazuje operatorowi zdarzenia sesji i dyspozycji płatniczych.',
-        'payment': 'Składa natywne dyspozycje płatnicze. Gwarant potwierdza wyniki.',
-        'securedTime': 'Zapisuje czas pierwszej pełnej autoryzacji i identyfikator żądania secureFunds.',
+        'activation': 'Sets separate roles and access for the buyer, seller, and guarantor.',
+        'method': 'Relays payment session and action events to the operator.',
+        'payment': 'Issues native payment requests. The guarantor confirms the outcomes.',
+        'securedTime': 'Records the time of the first full authorization and the secureFunds request ID.',
     },
     PAYOUT: {
-        'activation': 'Oddzielnie ustala role i dostęp do instrukcji wypłaty prowizji.',
-        'payment': 'Zleca wypłatę prowizji po spełnieniu warunków instrukcji.',
-        'method': 'Sprawdza przelew i zapisuje referencje obciążenia i przelewu od operatora.',
+        'activation': 'Sets roles and access separately for the commission payout instruction.',
+        'payment': 'Requests the commission payout once the instruction’s conditions are met.',
+        'method': 'Checks the transfer and records the operator’s charge and transfer references.',
     },
 }
 
 SECTION_ROLES = {
-    ORDER: 'Osobny dokument zamówienia klienta.',
-    PAYMENT: 'Szablon osobnej instrukcji płatności klienta.',
-    PAYOUT: 'Szablon osobnej instrukcji wypłaty prowizji.',
+    ORDER: 'Separate customer Order document.',
+    PAYMENT: 'Template for the separate customer Payment Instruction.',
+    PAYOUT: 'Template for the separate commission payout instruction.',
 }
 
 
@@ -89,8 +92,8 @@ def role_comments(source, aliases):
             section = section[key]
         if path == ORDER and 'orderOpen' in section.get('contracts', {}):
             comments[path + ('contracts', 'orderOpen')] = (
-                'Typ zamówienia stosuje reguły zamknięcia. Tutaj podajemy stan anulowania '
-                'i akcje rezerwacji, jeśli występują w tej ofercie.'
+                'The Order type enforces closure rules. This configuration supplies the cancellation state '
+                'and any reservation actions configured for the offer.'
             )
         for clause in (section, *section['clauses'].values()):
             declared = clause.get('type')
@@ -100,39 +103,48 @@ def role_comments(source, aliases):
             text = roles[name]
             bindings = clause.get('bindings', {})
             if path == () and name == 'catalogAmendments' and clause.get('parameters', {}).get('replacementValidator'):
-                text += ' Wskazana funkcja Commerce porównuje bieżący i proponowany katalog.'
+                text += ' The referenced Commerce function compares the current and proposed catalogs.'
             if path == ORDER and name == 'activation' and clause.get('parameters', {}).get('reviewedApprovals'):
-                text += ' Activation sprawdza podpisane zdarzenie wybranej rezerwacji i zatwierdza warunki wskazanej roli.'
+                text += (
+                    ' Activation checks the signed event for the selected reservation '
+                    'and approves the terms for the specified role.'
+                )
             if path == ORDER and name == 'activation' and any(
                 grant.get('observations')
                 for grant in clause.get('parameters', {}).get('preActivationConnections', [])
             ):
                 comments[path + ('clauses', name, 'parameters', 'preActivationConnections')] = (
-                    'Jeden wpis pozwala akcji odświeżać dostępność anulowania przed aktywacją. '
-                    'Obejmuje automatyczne odświeżenie i obserwacje zadeklarowane przez akcję.'
+                    'A single entry lets the action refresh cancellation availability before activation. '
+                    'It covers automatic refresh and the observations declared by the action.'
                 )
             if path == ORDER and name == 'reservation':
-                text += ' Po zatwierdzeniu dokładnej wersji emituje zdarzenie Reservation Reviewed dla tej grupy.'
+                text += ' After approval of the exact version, it emits Reservation Reviewed for that group.'
             if path == ORDER and name == 'windowStart' and 'unavailable' in bindings:
-                text += ' Po zgłoszeniu braku czasu aktywacji można odczytać pełną autoryzację wybranej instrukcji.'
+                text += (
+                    ' If the activation time is reported missing, '
+                    'the selected instruction can supply the time of full authorization.'
+                )
             if path == PAYMENT and name == 'payment':
                 parameters = clause.get('parameters', {})
                 adjustments = parameters.get('adjustments', {})
                 if 'cancellation' in adjustments:
-                    text += ' Powiązana decyzja wyznacza kwotę zatrzymaną. Instrukcja może zlecić zwrot lub zwolnienie blokady.'
+                    text += (
+                        ' The linked decision sets the amount to retain. '
+                        'The instruction can request a refund or release the hold.'
+                    )
                 elif 'rejection' in adjustments:
-                    text += ' Odrzucenie zamówienia może zlecić zwolnienie autoryzacji.'
+                    text += ' Order rejection can trigger a request to release the authorization.'
                 if 'selectedPayment' in parameters:
                     comments[path + ('clauses', name, 'parameters', 'selectedPayment')] = (
-                        'Wspólne wskazanie zamówienia i jego wybranej instrukcji dla reguł korekty.'
+                        'Links the Order and its selected instruction for the adjustment rules.'
                     )
                 if 'afterPaymentSelected' in bindings.get('adjust', {}):
                     comments[path + ('clauses', name, 'bindings', 'adjust', 'afterPaymentSelected')] = (
-                        'Po wyborze tej instrukcji sprawdza wcześniejszą decyzję, np. anulowanie '
-                        'podczas oczekiwania na płatność, i może zwolnić istniejącą blokadę.'
+                        'After this instruction is selected, checks for an earlier decision, such as cancellation '
+                        'while payment was pending, and can release an existing hold.'
                     )
                 if 'method' not in parameters and 'method' in section.get('paymentDetails', {}):
-                    comments[path + ('paymentDetails', 'method')] = 'Jedno ustawienie metody płatności klienta.'
+                    comments[path + ('paymentDetails', 'method')] = 'The single setting for the customer’s payment method.'
             comments[path + ('clauses', name)] = text
     return comments
 
@@ -174,10 +186,10 @@ def main():
         raise ValueError('A required role comment could not be placed')
     header = [
         '# ' + source['name'],
-        '# Nazwy pakietowe podano w komentarzach obok dokładnych identyfikatorów Blue.',
-        '# SHA-256 źródła: ' + digest(source_bytes),
-        '# SHA-256 katalogu: ' + digest(catalogue),
-        '# SHA-256 dokumentu (kanoniczny JSON): ' + digest(canonical(source)),
+        '# Comments show package aliases next to their exact BlueIds.',
+        '# Source SHA-256: ' + digest(source_bytes),
+        '# Catalogue SHA-256: ' + digest(catalogue),
+        '# Document SHA-256 (canonical JSON): ' + digest(canonical(source)),
         '',
     ]
     for index, line in enumerate(lines):
