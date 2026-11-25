@@ -1,0 +1,81 @@
+document: agreement.blue
+initial:
+  expect:
+    /activation/active: false
+steps:
+  - operation: approve_studio
+    channel: studio
+    request: {revision: 1}
+    requireExactDocumentVersion: true
+  - operation: approve_caterer
+    channel: caterer
+    request: {revision: 1}
+    requireExactDocumentVersion: true
+    expect: {/activation/active: false}
+  - operation: approve_organizer
+    channel: organizer
+    request: {revision: 1}
+    requireExactDocumentVersion: true
+    expect: {/activation/active: true}
+  - operation: quoteStudio
+    channel: organizer
+    request:
+      key: spring-concert
+      catalogRevision: 1
+      lines:
+        - {itemId: rehearsal, quantity: 1, serviceDate: '2027-03-20', durationHours: 4}
+    requireExactDocumentVersion: true
+    expect:
+      /studioQuotes/spring-concert/totalMinor: 30000
+      /studioQuotes/spring-concert/supplierId: studio
+      /cateringQuotes: {}
+  - operation: quoteCatering
+    channel: organizer
+    request:
+      key: spring-concert
+      catalogRevision: 1
+      lines:
+        - {itemId: lunch, quantity: 12, serviceDate: '2027-03-20'}
+    requireExactDocumentVersion: true
+    expect:
+      /cateringQuotes/spring-concert/supplierId: caterer
+      /cateringQuotes/spring-concert/subtotalMinor: 18000
+      /cateringQuotes/spring-concert/discountMinor: 1800
+      /cateringQuotes/spring-concert/totalMinor: 16200
+      /studioQuotes/spring-concert/totalMinor: 30000
+  - operation: quoteStudio
+    channel: organizer
+    status: FAILED
+    eventCount: 0
+    request:
+      key: catering-through-studio
+      catalogRevision: 1
+      lines:
+        - {itemId: lunch, quantity: 12, serviceDate: '2027-03-20'}
+    requireExactDocumentVersion: true
+    expect:
+      /studioQuotes/spring-concert/totalMinor: 30000
+      /cateringQuotes/spring-concert/totalMinor: 16200
+  - operation: quoteStudio
+    channel: organizer
+    status: FAILED
+    eventCount: 0
+    request:
+      key: invalid-duration
+      catalogRevision: 1
+      lines:
+        - {itemId: rehearsal, quantity: 1, serviceDate: '2027-03-20', durationHours: 3}
+    requireExactDocumentVersion: true
+    expect: {/studioQuotes/spring-concert/totalMinor: 30000}
+  - operation: quoteStudio
+    eventCount: 0
+    channel: organizer
+    request:
+      key: spring-concert
+      catalogRevision: 1
+      lines:
+        - {itemId: rehearsal, quantity: 1, serviceDate: '2027-03-20', durationHours: 4}
+    requireExactDocumentVersion: true
+    expect:
+      /studioQuotes/spring-concert/totalMinor: 30000
+      /cateringQuotes/spring-concert/totalMinor: 16200

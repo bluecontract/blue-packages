@@ -1,0 +1,208 @@
+name: Marigold Print Shop — direct sales catalogue
+type: Agreements/Agreement with Clauses
+description: Order finished prints directly from Marigold Print Shop for collection at the counter. The shop confirms each order before the selected payment can be captured.
+
+catalog:
+  revision: 1
+  supplierId: seller
+  currency: USD
+  entries:
+    botanical-poster:
+      label: Botanical poster
+      description: An A3 botanical art print on uncoated paper.
+      pricingUnit: per_unit
+      dateRequired: false
+      unitAmountMinor: 1850
+      maxQuantity: 6
+    postcard-set:
+      label: Set of five illustrated postcards
+      description: Five assorted cards sold as one boxed set.
+      pricingUnit: per_unit
+      dateRequired: false
+      unitAmountMinor: 675
+quotes: {}
+orders: {}
+
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type: MyOS/MyOS Party
+          displayName: Marigold Print Shop
+      required: [seller]
+      preActivationConnections:
+        - clause: catalog
+          action: validate
+          automatic: true
+  catalog:
+    type: Commerce/Catalog Clause
+    bindings:
+      quote:
+        quoteBasket:
+          'on': workflow
+          party: seller
+          inputParams:
+            /key: /key
+            /catalogRevision: /catalogRevision
+            /lines: /lines
+  orders:
+    type:
+      type: Documents/Documents Clause
+      bindingTypes:
+        catalog: pointer
+    parameters:
+      suppliedBy: seller
+      suppliedParties: [customer]
+      prepareFor: bootstrap
+      obtain: provide
+      preparationDefinition:
+        type: Orders/Order Preparation Functions
+      selectBeforeActivation: true
+      allowedFields: [orderDescription, customerAccountId, customerEmail, amountMinor, currency, quote, quoteBlueId]
+    bindings:
+      catalog: /catalog
+      template: /orderTemplate
+      collection: /orders
+      parties:
+        seller: seller
+      prepare:
+        prepareOrder:
+          'on': workflow
+          party: seller
+          request:
+            type: Documents/Preparation Input
+          inputParams:
+            /key: /key
+            /requestId: /requestId
+            /fields: /fields
+            /values: /values
+      provide:
+        provideOrder:
+          'on': workflow
+          party: seller
+
+orderTemplate:
+  name: Marigold Print Shop order
+  type: Orders/Order with Seller Decision
+  description: Finished print goods for counter collection.
+  clauses:
+    activation:
+      type: Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type: MyOS/MyOS Party
+          customer:
+            type: MyOS/MyOS Party
+        required: [seller]
+        preActivationOperations: [preparePayment, providePayment]
+        readers:
+          guarantor:
+            myosAccountId: guarantor
+            readerKeys: [GUARANTOR_READER_KEY]
+    payment:
+      type: Payment/Payment Clause
+      parameters:
+        obtain: provide
+        prepareFor: bootstrap
+        suppliedBy: seller
+        suppliedParties: [guarantor]
+        sourcePaths:
+          order: ''
+        fieldPaths:
+          amountMinor: /paymentTerms/amountMinor
+          limitMinor: /paymentTerms/limitMinor
+          currency: /paymentTerms/currency
+          orderOrigin: /businessContext/orderOrigin
+          orderRevision: /businessContext/orderRevision
+          orderTermsRef: /businessContext/orderTermsRef
+        template:
+          name: Marigold Print Shop customer payment
+          type: MyOS/MyOS Test Customer Payment Instruction
+          businessContext:
+            orderOrigin:
+              schema: {required: true}
+            orderRevision:
+              type: Integer
+              schema: {minimum: 1, required: true}
+            orderTermsRef:
+              schema: {required: true}
+          paymentDetails:
+            method: myos-customer
+            customerPaymentTerms:
+              paymentWindowDays: 30
+              recipientPaymentAccountId: marigold-test-payment-account
+          paymentTerms:
+            allowedPayees: [payee]
+            amountMinor: {type: Integer}
+            limitMinor: {type: Integer}
+            currency: {type: Text}
+            payerChannel: payer
+            payeeChannel: payee
+            guarantorChannel: guarantor
+            recipientApprovalRequired: false
+          clauses:
+            activation:
+              type: Activation/Activation Clause
+              parameters:
+                parties:
+                  payer: {type: MyOS/MyOS Party}
+                  payee: {type: MyOS/MyOS Party}
+                  guarantor:
+                    type: MyOS/MyOS Party
+                    myosAccountId: guarantor
+                    readerKeys:
+                      type: List
+                      itemType: Text
+                      items: [GUARANTOR_READER_KEY]
+                      schema: {minItems: 1, maxItems: 1, uniqueItems: true}
+                required: []
+            method:
+              type: MyOS/Payment Method Events
+            payment:
+              type: Payment/Payment Process Clause
+              parameters:
+                sources:
+                  order: {}
+                selectedPayment:
+                  source: /sources/order
+                  expectedSourceOrigin: /businessContext/orderOrigin
+                  entries: /sources/order/process_payment/entries
+                  path: /payment
+                  key: single
+                capture:
+                  type: Payment/Selected Order Capture
+                  requestId: print-order-capture
+              bindings:
+                requestAuthorize:
+                  authorize:
+                    'on': workflow
+                    party: guarantor
+                    input: true
+      bindings:
+        instruction: /payment
+        parties:
+          payer: customer
+          payee: seller
+        observe:
+          selectedInstruction:
+            'on': embedded
+            path: /payment
+            embed: false
+        prepare:
+          preparePayment:
+            'on': workflow
+            party: seller
+            documentParams:
+              /values/amountMinor: /amountMinor
+              /values/limitMinor: /amountMinor
+              /values/currency: /currency
+              /values/orderOrigin: /contracts/initialized/document
+              /values/orderRevision: /activation/revision
+              /values/orderTermsRef: /activation/terms/ref
+        provide:
+          providePayment:
+            'on': workflow
+            party: seller

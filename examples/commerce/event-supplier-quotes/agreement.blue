@@ -1,0 +1,53 @@
+name: Event services purchasing agreement
+type: Agreements/Agreement with Clauses
+description: Harbor Arts can obtain separate quotes for studio time from North Room and lunches from Field Kitchen for the same event.
+studioCatalogue:
+  supplierId: studio
+  revision: 1
+  currency: EUR
+  entries:
+    rehearsal:
+      label: Rehearsal studio
+      pricingUnit: per_selected_hour
+      dateRequired: true
+      allowedDurationHours: [2, 4, 8]
+      unitAmountMinor: 7500
+cateringCatalogue:
+  supplierId: caterer
+  revision: 1
+  currency: EUR
+  entries:
+    lunch:
+      label: Boxed lunch
+      pricingUnit: per_unit
+      dateRequired: true
+      unitAmountMinor: 1500
+      guestDiscountPercent: 10
+studioQuotes: {}
+cateringQuotes: {}
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      parties:
+        organizer: {type: Parties/Party, displayName: Harbor Arts}
+        studio: {type: Parties/Party, displayName: North Room}
+        caterer: {type: Parties/Party, displayName: Field Kitchen}
+      required: [organizer, studio, caterer]
+      preActivationConnections:
+        - {clause: studioRates, action: validate, automatic: true}
+        - {clause: cateringRates, action: validate, automatic: true}
+  studioRates:
+    type: Commerce/Catalog Clause
+    bindings:
+      state: /studioCatalogue
+      quotes: /studioQuotes
+      quote:
+        quoteStudio: {'on': workflow, party: organizer, input: true}
+  cateringRates:
+    type: Commerce/Catalog Clause
+    bindings:
+      state: /cateringCatalogue
+      quotes: /cateringQuotes
+      quote:
+        quoteCatering: {'on': workflow, party: organizer, input: true}

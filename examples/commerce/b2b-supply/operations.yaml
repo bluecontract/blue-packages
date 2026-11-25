@@ -1,0 +1,183 @@
+# The runner resolves named review versions from native state.
+steps:
+  - id: supplier-accepts
+    party: supplier
+    operation: approve_supplier
+    request:
+      revision: 1
+    expect:
+      activation: false
+
+  - id: buyer-accepts
+    party: buyer
+    operation: approve_buyer
+    request:
+      revision: 1
+    expect:
+      activation: true
+
+  - id: first-quote
+    party: buyer
+    operation: saveQuote
+    request:
+      key: restock-01
+      catalogRevision: 1
+      lines:
+        - itemId: cups-12oz
+          quantity: 3
+        - itemId: lids-12oz
+          quantity: 2
+    expect:
+      quote: restock-01
+      totalMinor: 9700
+      unitAmountsMinor: [2400, 1250]
+      lineTotalsMinor: [7200, 2500]
+      events: [Quote Created]
+
+  - id: supplier-proposes-price
+    party: supplier
+    operation: proposeCatalogue
+    request:
+      type: Amendments/Amendment Input
+      proposalId: cup-price-update
+      expectedRevision: 1
+      path: /catalog
+      replacement:
+        revision: 2
+        supplierId: supplier
+        currency: EUR
+        entries:
+          cups-12oz:
+            label: 12 oz takeaway cups
+            description: One carton of 500 paper cups.
+            pricingUnit: per_unit
+            dateRequired: false
+            unitAmountMinor: 2650
+          lids-12oz:
+            label: Lids for 12 oz cups
+            description: One carton of 500 lids.
+            pricingUnit: per_unit
+            dateRequired: false
+            unitAmountMinor: 1250
+    expect:
+      catalogueRevision: 1
+      cupPriceMinor: 2400
+      amendmentRevision: 1
+      pendingApprovals: {}
+      events: [Amendment Proposed]
+
+  - id: supplier-approves
+    party: supplier
+    operation: supplierApproveCatalogue
+    request:
+      proposalId: cup-price-update
+    expect:
+      catalogueRevision: 1
+      cupPriceMinor: 2400
+      amendmentRevision: 1
+      pendingApprovals: {supplier: true}
+
+  - id: wrong-role-approval
+    party: supplier
+    operation: buyerApproveCatalogue
+    request:
+      proposalId: cup-price-update
+    expect:
+      rejection: wrong-role
+      diagnostic: INVALID_TARGET_OPERATION
+      catalogueRevision: 1
+      cupPriceMinor: 2400
+      amendmentRevision: 1
+      pendingApprovals: {supplier: true}
+
+  - id: stale-document-approval
+    party: buyer
+    operation: buyerApproveCatalogue
+    documentVersionAfter: supplier-proposes-price
+    request:
+      proposalId: cup-price-update
+    expect:
+      rejection: stale-document
+      diagnostic: STALE_DOCUMENT_PRECONDITION
+      catalogueRevision: 1
+      cupPriceMinor: 2400
+      amendmentRevision: 1
+      pendingApprovals: {supplier: true}
+
+  - id: buyer-approves
+    party: buyer
+    operation: buyerApproveCatalogue
+    request:
+      proposalId: cup-price-update
+    expect:
+      catalogueRevision: 2
+      cupPriceMinor: 2650
+      amendmentRevision: 2
+      events: [Amendment Applied]
+      appliedAmendment: cup-price-update
+
+  - id: stale-catalogue-quote
+    party: buyer
+    operation: saveQuote
+    request:
+      key: stale-restock
+      catalogRevision: 1
+      lines:
+        - itemId: cups-12oz
+          quantity: 3
+        - itemId: lids-12oz
+          quantity: 2
+    expect:
+      rejection: STALE_CATALOG_REVISION
+      absentQuote: stale-restock
+
+  - id: second-quote
+    party: buyer
+    operation: saveQuote
+    request:
+      key: restock-02
+      catalogRevision: 2
+      lines:
+        - itemId: cups-12oz
+          quantity: 3
+        - itemId: lids-12oz
+          quantity: 2
+    expect:
+      quote: restock-02
+      totalMinor: 10450
+      unitAmountsMinor: [2650, 1250]
+      lineTotalsMinor: [7950, 2500]
+      events: [Quote Created]
+
+  - id: replay-first-quote
+    party: buyer
+    operation: saveQuote
+    request:
+      key: restock-01
+      catalogRevision: 1
+      lines:
+        - itemId: cups-12oz
+          quantity: 3
+        - itemId: lids-12oz
+          quantity: 2
+    expect:
+      quote: restock-01
+      totalMinor: 9700
+      unitAmountsMinor: [2400, 1250]
+      lineTotalsMinor: [7200, 2500]
+      events: []
+      preservesQuotes: true
+
+  - id: conflict-on-old-key
+    party: buyer
+    operation: saveQuote
+    request:
+      key: restock-01
+      catalogRevision: 2
+      lines:
+        - itemId: cups-12oz
+          quantity: 3
+        - itemId: lids-12oz
+          quantity: 2
+    expect:
+      rejection: QUOTE_KEY_CONFLICT

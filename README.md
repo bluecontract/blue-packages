@@ -4,6 +4,8 @@ One current package set lives at the repository root. `PACKAGE-SOURCES.json` sel
 
 The tutorial introduces Activation and reusable clauses. The example guide identifies native walkthroughs and pins historical payment sources. Current Payment preparation uses Documents, and authoritative payment outcomes belong to the Payment Instruction. [Clause tutorial](docs/clauses-tutorial.md) · [Application examples](examples/apps/README.md)
 
+Three commercial agreements show the Catalog Clause in a direct sale, a standing supply agreement and an event with two suppliers. [Commercial agreement examples](examples/commerce/README.md)
+
 The [package usage guide](docs/using-packages.md) covers catalogue selection and the supported mapping for Connections before activation.
 
 The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,000 maximum), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
