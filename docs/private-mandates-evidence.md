@@ -108,7 +108,12 @@ attestation was handed over.
 - **An entry on T that cannot be admitted** (an unresolvable or invalid reference)
   blocks T until timeline import can skip an entry it cannot read.
 - **Ed25519 on the host.** A host that implements the protocol needs a working
-  Ed25519 routine; without one every classification stays unfinished.
+  Ed25519 routine. A host without one does not start with the protocol; it does not
+  run documents under it and leave their operations waiting. Core's Java host
+  checks for the JDK's Ed25519 (provider `SunEC`) when it starts. A routine that
+  fails at run time on bytes that passed every check of §10.2 is a failure of the
+  host, not of the bytes: the processor's step fails, decides nothing and is
+  repeated when the host works again (§8.4, *unfinished*).
 
 ## What the schemas enforce
 
