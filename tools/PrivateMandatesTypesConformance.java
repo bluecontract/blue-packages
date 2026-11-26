@@ -2,12 +2,12 @@ import blue.language.next.*;
 import java.nio.file.*;
 import java.util.*;
 
-/** Native Language conformance for the Coordination evidence types and the private-mandates schemas; Core qualifies execution. */
+/** Native Language conformance for the private-mandates schemas; Core qualifies execution. */
 public final class PrivateMandatesTypesConformance {
   /**
-   * Identities of the default (Access Events) edition. The evidence packages are additive: the
-   * Coordination and Mandates publications they require must still carry exactly these, so a document
-   * with an evidence channel consumes the same signed timelines as every other document.
+   * Identities of the default (Access Events) edition. The package is additive: the Coordination and
+   * Mandates publications it requires must still carry exactly these, so a document with an evidence
+   * channel consumes the same signed timelines as every other document.
    */
   static final Map<String, String> DEFAULT = Map.ofEntries(
       Map.entry("Coordination", "4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA"),
@@ -23,11 +23,10 @@ public final class PrivateMandatesTypesConformance {
       Map.entry("Coordination/Timeline Range Evidence", "Hh9pViBbBJw3zP7a19oJDwG9pZVCoGNqF6MYHmRfpjXo"),
       Map.entry("Coordination/Timeline Successor Evidence", "HKipW4hQAiDPfDX6oMH25LERWurv9vDnTbywQ2siDvcz"),
       Map.entry("Coordination/Ed25519 Public Key", "4QJmKi3QsZcU5MmoScSdruB5fayT8ykSNdZ3C3jKJx9e"),
-      Map.entry("Coordination/Order Key", "FenCaravyQuwz4aT1LfX6i8nkbWPEhcFZ4fYbg2GijgJ"),
       Map.entry("Mandates", "4kaMxybWTTeTpkzUtoYVUPk8dUo3HxKM5MG5joxN6LFL"),
       Map.entry("Mandates/Authority", "AypmNprcDHuFc293hkDJFJ91GKtwbH7mDiCii8hmUBjP"),
       Map.entry("Mandates/Mandate Authority", "2YnsAG44Sg9Q9XrzUe9Yz5PNXkHuxDcpvv4Wv4QNysTe"));
-  /** BlueIds of content no mounted package holds (the withdrawn rebuilt Coordination and Mandates candidates). */
+  /** BlueIds of content that no mounted package holds. */
   static final String UNHELD = "HHsCUAybKPWQJesQCSrpk6dpppjiii7tyz9vaWavMdP5", UNHELD_MANDATE = "CGJTGJvfh4TTFeawShQyeTXa3xzwNxz3UnQmSnwJEtTC";
   static final String HEX = "ab".repeat(32);
 
@@ -72,16 +71,15 @@ public final class PrivateMandatesTypesConformance {
     Path root = Path.of(args[0]);
     var open = new TreeMap<String, BluePackage>();
     for (var mount : Map.of("Language", "blue-language", "BEX", "blue-bex", "Contracts", "blue-contracts",
-        "Coordination", "blue-coordination", "CoordinationEvidence", "blue-coordination-evidence",
-        "Mandates", "blue-mandates", "PrivateMandates", "blue-private-mandates").entrySet())
+        "Coordination", "blue-coordination", "Mandates", "blue-mandates",
+        "PrivateMandates", "blue-private-mandates").entrySet())
       open.put(mount.getKey(), BluePackage.open(root.resolve(mount.getValue() + "/dist/package.bluepkg")));
     var coordination = open.get("Coordination");
-    var evidence = open.get("CoordinationEvidence");
     var mandates = open.get("Mandates");
     var privateMandates = open.get("PrivateMandates");
-    // Private Mandates has one profile, the signed statement, and no other evidence form.
-    require(privateMandates.exports().keySet().equals(Set.of("Mandate Commitment Authority", "Mandate State Attestation",
-        "Signed Statement Profile")), "Private Mandates exports changed: " + privateMandates.exports().keySet());
+    require(privateMandates.exports().keySet().equals(Set.of("Timeline Channel with Evidence", "Statement Entry",
+        "Rejection Entry", "Mandate Commitment Authority", "Mandate State Attestation")),
+        "Private Mandates exports changed: " + privateMandates.exports().keySet());
     // The required publications are the default edition's, with their exact identities.
     for (var row : DEFAULT.entrySet()) {
       String[] name = row.getKey().split("/", 2);
@@ -89,24 +87,18 @@ public final class PrivateMandatesTypesConformance {
       String actual = name.length == 1 ? publication.blueId() : publication.exportId(name[1]);
       require(row.getValue().equals(actual), "Default-edition identity changed: " + row.getKey() + " is " + actual);
     }
-    // The evidence package adds exactly its four types and redefines nothing of Coordination.
-    require(evidence.exports().keySet().equals(Set.of("Timeline Channel with Evidence", "Evidence Profile", "Proof Entry",
-        "Rejection Entry")), "Evidence package exports changed: " + evidence.exports().keySet());
-    for (String name : evidence.exports().keySet())
-      require(!coordination.exports().containsKey(name), "Evidence type must not be a Coordination export: " + name);
+    // The package redefines nothing of Coordination or Mandates.
     for (String name : privateMandates.exports().keySet())
-      require(!mandates.exports().containsKey(name) && !evidence.exports().containsKey(name),
+      require(!mandates.exports().containsKey(name) && !coordination.exports().containsKey(name),
           "Extension must not redefine a required export: " + name);
 
     var bundle = PackageBundle.builder();
     open.forEach(bundle::mount);
     try (Blue blue = Blue.builder().packages(bundle.build()).build()) {
-      descends(blue, "Timeline Channel with Evidence", evidence.exportId("Timeline Channel with Evidence"),
+      descends(blue, "Timeline Channel with Evidence", privateMandates.exportId("Timeline Channel with Evidence"),
           coordination.exportId("Timeline Channel"));
       descends(blue, "Mandate Commitment Authority", privateMandates.exportId("Mandate Commitment Authority"),
           mandates.exportId("Authority"));
-      descends(blue, "Signed Statement Profile", privateMandates.exportId("Signed Statement Profile"),
-          evidence.exportId("Evidence Profile"));
       require(!NativeRuntime.ancestry(privateMandates.exportId("Mandate Commitment Authority"), new NativeRuntime(blue))
           .contains(mandates.exportId("Mandate Authority")), "The commitment claim must not be a Mandate Authority");
 
@@ -116,19 +108,17 @@ public final class PrivateMandatesTypesConformance {
           "endpoint", "https://provider.example", "publicKey", HEX);
       Map<String, Object> timeline = Map.of("type", "Coordination/Signed Timeline", "provider", provider,
           "publicRead", false, "url", "https://provider.example/timelines/operations");
-      Map<String, Object> proofs = with(timeline, "url", "https://provider.example/timelines/proofs");
-      Map<String, Object> profile = Map.of("type", "PrivateMandates/Signed Statement Profile",
+      Map<String, Object> evidenceTimeline = with(timeline, "url", "https://provider.example/timelines/evidence");
+      Map<String, Object> channel = Map.of("type", "PrivateMandates/Timeline Channel with Evidence",
+          "actor", actor, "timeline", timeline, "evidenceTimeline", evidenceTimeline,
           "statementSignerKey", "cd".repeat(32), "mandateProcessorKey", "ef".repeat(32));
-      Map<String, Object> channel = Map.of("type", "CoordinationEvidence/Timeline Channel with Evidence",
-          "actor", actor, "timeline", timeline, "evidenceTimeline", proofs, "evidenceProfile", profile);
       Map<String, Object> authority = Map.of("type", "PrivateMandates/Mandate Commitment Authority",
           "actor", actor, "mandateCommitment", HEX);
       // References by content BlueId. These two targets are content the mounted packages provide.
       Map<String, Object> document = Map.of("blueId", coordination.exportId("Timeline Channel"));
       Map<String, Object> operationEntry = Map.of("blueId", coordination.exportId("Timeline Entry"));
-      Map<String, Object> proof = Map.of("type", "CoordinationEvidence/Proof Entry", "receipt", "AAECAw==",
-          "document", document, "operationEntry", operationEntry);
-      Map<String, Object> rejection = Map.of("type", "CoordinationEvidence/Rejection Entry",
+      Map<String, Object> statement = Map.of("type", "PrivateMandates/Statement Entry", "statement", "AAECAw==");
+      Map<String, Object> rejection = Map.of("type", "PrivateMandates/Rejection Entry",
           "document", document, "operationEntry", operationEntry);
 
       final String ADMITTED = "Admitted", SCHEMA = "Invalid/SchemaViolation", TYPE = "Invalid/TypeCompatibilityViolation",
@@ -137,34 +127,21 @@ public final class PrivateMandatesTypesConformance {
       Map<String, Object> typeOnlyMandate = Map.of("type", "Mandates/Operation Mandate");
 
       var ids = new TreeMap<String, Object>();
-      ids.put("profile", admitted(blue, "profile", profile));
       ids.put("channel", admitted(blue, "channel", channel));
       ids.put("authority", admitted(blue, "authority", authority));
-      ids.put("proofEntry", admitted(blue, "proof entry", proof));
+      ids.put("statementEntry", admitted(blue, "statement entry", statement));
       ids.put("rejectionEntry", admitted(blue, "rejection entry", rejection));
       admitted(blue, "plain timeline channel",
           Map.of("type", "Coordination/Timeline Channel", "actor", actor, "timeline", timeline));
 
       // 1. What the schemas reject, with the exact failure kind.
       var schema = new TreeMap<String, Object>();
-      for (String field : List.of("evidenceTimeline", "evidenceProfile", "timeline", "actor"))
+      // The channel: three required fields beside the inherited ones, two keys of fixed length.
+      for (String field : List.of("evidenceTimeline", "statementSignerKey", "mandateProcessorKey", "timeline", "actor"))
         expect(blue, schema, "channel without " + field, with(channel, field, null), SCHEMA);
-      expect(blue, schema, "channel with a text profile", with(channel, "evidenceProfile", "latest"), TYPE);
-      expect(blue, schema, "channel with an integer profile", with(channel, "evidenceProfile", 7), TYPE);
-      expect(blue, schema, "channel with a list profile", with(channel, "evidenceProfile", List.of(profile)), SCHEMA);
-      expect(blue, schema, "channel with a bare base profile",
-          with(channel, "evidenceProfile", Map.of("type", "CoordinationEvidence/Evidence Profile")), SCHEMA);
-      expect(blue, schema, "channel with a type-only specialisation as profile", with(channel, "evidenceProfile",
-          Map.of("type", "PrivateMandates/Signed Statement Profile")), SCHEMA);
-      // The profile: two required keys of fixed length, at most two fields with a value.
-      expect(blue, schema, "profile without statementSignerKey", with(profile, "statementSignerKey", null), SCHEMA);
-      expect(blue, schema, "profile without mandateProcessorKey", with(profile, "mandateProcessorKey", null), SCHEMA);
-      expect(blue, schema, "profile with a short key", with(profile, "statementSignerKey", "ef"), SCHEMA);
-      expect(blue, schema, "profile with a short mandate processor key", with(profile, "mandateProcessorKey", "ef"), SCHEMA);
-      expect(blue, schema, "profile with an integer key", with(profile, "statementSignerKey", 7), TYPE);
-      expect(blue, schema, "profile with a provider list (a third valued field)",
-          with(profile, "allowedProviders", List.of("01".repeat(32))), SCHEMA);
-      expect(blue, schema, "profile with a further valued field", with(profile, "note", "x"), SCHEMA);
+      expect(blue, schema, "channel with a short signer key", with(channel, "statementSignerKey", "ef"), SCHEMA);
+      expect(blue, schema, "channel with a short mandate processor key", with(channel, "mandateProcessorKey", "ef"), SCHEMA);
+      expect(blue, schema, "channel with an integer signer key", with(channel, "statementSignerKey", 7), TYPE);
       expect(blue, schema, "authority without commitment", with(authority, "mandateCommitment", null), SCHEMA);
       expect(blue, schema, "authority without holder", with(authority, "actor", null), SCHEMA);
       expect(blue, schema, "authority with a short commitment", with(authority, "mandateCommitment", "ab"), SCHEMA);
@@ -180,25 +157,7 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, schema, "timeline entry whose commitment authority has a valued mandate",
           with(operationTimelineEntry, "onBehalfOf", with(authority, "mandate", "someMandateBlueId")), SCHEMA);
 
-      // 2. The profile field is not typed by the schema: typing is structural. These values are admitted,
-      // and only the native rule (exact type is a supported specialisation of Evidence Profile) excludes them.
-      var profileNative = new TreeMap<String, Object>();
-      expect(blue, profileNative, "untyped object with the profile fields", with(channel, "evidenceProfile",
-          with(profile, "type", null)), ADMITTED);
-      expect(blue, profileNative, "untyped object with arbitrary content",
-          with(channel, "evidenceProfile", Map.of("anything", "x")), ADMITTED);
-      expect(blue, profileNative, "base Evidence Profile with a field", with(channel, "evidenceProfile",
-          Map.of("type", "CoordinationEvidence/Evidence Profile", "anything", "x")), ADMITTED);
-      expect(blue, profileNative, "a Signed Timeline", with(channel, "evidenceProfile", timeline), ADMITTED);
-      expect(blue, profileNative, "a Timeline Provider", with(channel, "evidenceProfile", provider), ADMITTED);
-      expect(blue, profileNative, "a plain Timeline Channel", with(channel, "evidenceProfile",
-          Map.of("type", "Coordination/Timeline Channel", "actor", actor, "timeline", timeline)), ADMITTED);
-      expect(blue, profileNative, "a commitment authority", with(channel, "evidenceProfile", authority), ADMITTED);
-      // Not evidence of typing: some unrelated typed values happen to be refused. Recorded as observed.
-      expect(blue, profileNative, "a Principal Actor (refused, unlike the values above)",
-          with(channel, "evidenceProfile", actor), TYPE);
-
-      // 3. The commitment authority schema limits valued fields but does not close the field set.
+      // 2. The commitment authority schema limits valued fields but does not close the field set.
       // These claims are admitted; the processor rule (fields exactly actor and mandateCommitment) rejects them.
       var authorityNative = new TreeMap<String, Object>();
       expect(blue, authorityNative, "mandate carrying only a type", with(authority, "mandate", typeOnlyMandate), ADMITTED);
@@ -212,96 +171,81 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, authorityNative, "mandate as a reference whose content is unavailable",
           with(authority, "mandate", Map.of("blueId", UNHELD_MANDATE)), INCOMPLETE);
 
-      // 4. Proof Entry and Rejection Entry have open schemas: every malformed entry below is admitted as
+      // 3. Statement Entry and Rejection Entry have open schemas: every malformed entry below is admitted as
       // Blue content. The processor skips it.
       var skipped = new TreeMap<String, Object>();
-      expect(blue, skipped, "proof entry with an extra field", with(proof, "note", "x"), ADMITTED);
-      expect(blue, skipped, "proof entry without receipt", with(proof, "receipt", null), ADMITTED);
-      expect(blue, skipped, "proof entry with an integer receipt", with(proof, "receipt", 7), ADMITTED);
-      expect(blue, skipped, "proof entry with an empty receipt", with(proof, "receipt", ""), ADMITTED);
-      expect(blue, skipped, "proof entry with a list receipt", with(proof, "receipt", List.of("AAECAw==")), ADMITTED);
-      expect(blue, skipped, "proof entry with a receipt that is not canonical base64",
-          with(proof, "receipt", "not base64 !!"), ADMITTED);
-      expect(blue, skipped, "proof entry with a text document", with(proof, "document", "someDocumentId"), ADMITTED);
-      expect(blue, skipped, "proof entry with an integer operationEntry", with(proof, "operationEntry", 7), ADMITTED);
-      expect(blue, skipped, "proof entry with only its type", Map.of("type", "CoordinationEvidence/Proof Entry"), ADMITTED);
-      expect(blue, skipped, "proof entry with only an unknown field",
-          Map.of("type", "CoordinationEvidence/Proof Entry", "note", "x"), ADMITTED);
+      expect(blue, skipped, "statement entry with an extra field", with(statement, "note", "x"), ADMITTED);
+      expect(blue, skipped, "statement entry with a document field", with(statement, "document", document), ADMITTED);
+      expect(blue, skipped, "statement entry without statement", with(statement, "statement", null), ADMITTED);
+      expect(blue, skipped, "statement entry with an integer statement", with(statement, "statement", 7), ADMITTED);
+      expect(blue, skipped, "statement entry with an empty statement", with(statement, "statement", ""), ADMITTED);
+      expect(blue, skipped, "statement entry with a list statement",
+          with(statement, "statement", List.of("AAECAw==")), ADMITTED);
+      expect(blue, skipped, "statement entry with a statement that is not canonical base64",
+          with(statement, "statement", "not base64 !!"), ADMITTED);
+      expect(blue, skipped, "statement entry with only its type", Map.of("type", "PrivateMandates/Statement Entry"), ADMITTED);
       expect(blue, skipped, "rejection with an extra field", with(rejection, "reason", "x"), ADMITTED);
       expect(blue, skipped, "rejection without document", with(rejection, "document", null), ADMITTED);
       expect(blue, skipped, "rejection without operationEntry", with(rejection, "operationEntry", null), ADMITTED);
-      expect(blue, skipped, "rejection with only its type", Map.of("type", "CoordinationEvidence/Rejection Entry"), ADMITTED);
-      expect(blue, skipped, "rejection with the earlier text fields",
-          Map.of("type", "CoordinationEvidence/Rejection Entry", "documentId", "x", "operationEntry", "y"), ADMITTED);
+      expect(blue, skipped, "rejection with only its type", Map.of("type", "PrivateMandates/Rejection Entry"), ADMITTED);
       expect(blue, skipped, "rejection with an object that names nothing as document",
           with(rejection, "document", Map.of("id", "x")), ADMITTED);
 
-      // Well formed since only receipt is required: a Proof Entry without the optional advisory hint.
-      var hintless = new TreeMap<String, Object>();
-      expect(blue, hintless, "proof entry without document", with(proof, "document", null), ADMITTED);
-      expect(blue, hintless, "proof entry without operationEntry", with(proof, "operationEntry", null), ADMITTED);
-      expect(blue, hintless, "proof entry with receipt only",
-          Map.of("type", "CoordinationEvidence/Proof Entry", "receipt", "AAECAw=="), ADMITTED);
-
-      // 5. Naming is by BlueId, never by wire form: a reference and the same content written in full
+      // 4. Naming is by BlueId, never by wire form: a reference and the same content written in full
       // give the same entry BlueId, so no rule can ask whether a field "is a reference".
       var records = map(WireData.json(Files.readString(root.resolve("blue-coordination/dist/package-records.json"))));
-      String target = coordination.exportId("Order Key");
+      String target = coordination.exportId("Signed Timeline");
       Object inline = WireData.json(map(records.get(target)).get("text").toString());
       String byReference = admitted(blue, "rejection naming by reference", with(rejection, "document", Map.of("blueId", target)));
       String byContent = admitted(blue, "rejection naming by content", with(rejection, "document", inline));
       require(byReference.equals(byContent), "A reference and its inlined content must give the same BlueId");
       require(!byReference.equals(ids.get("rejectionEntry")), "Another named document must give another entry BlueId");
 
-      // 6. The known limit. A {blueId} value is opened by Language admission wherever it stands in an entry,
+      // 5. The known limit. A {blueId} value is opened by Language admission wherever it stands in an entry,
       // as for the free document field of an Operation Request. The entry schemas cannot change that.
       var references = new TreeMap<String, Object>();
       expect(blue, references, "operation request, document content unavailable", Map.of("type", "Contracts/Operation Request",
           "channel", "c", "operation", "o", "document", unavailable), INCOMPLETE);
-      expect(blue, references, "proof entry, document content unavailable", with(proof, "document", unavailable), INCOMPLETE);
-      expect(blue, references, "proof entry, operationEntry content unavailable",
-          with(proof, "operationEntry", unavailable), INCOMPLETE);
-      expect(blue, references, "proof entry, receipt is an unavailable reference", with(proof, "receipt", unavailable), INCOMPLETE);
-      expect(blue, references, "proof entry, unknown extra field holds an unavailable reference",
-          with(proof, "note", unavailable), INCOMPLETE);
-      expect(blue, references, "proof entry, unavailable reference nested in an extra field",
-          with(proof, "note", Map.of("inner", List.of(unavailable))), INCOMPLETE);
+      expect(blue, references, "statement entry, statement is an unavailable reference",
+          with(statement, "statement", unavailable), INCOMPLETE);
+      expect(blue, references, "statement entry, unknown extra field holds an unavailable reference",
+          with(statement, "note", unavailable), INCOMPLETE);
+      expect(blue, references, "statement entry, unavailable reference nested in an extra field",
+          with(statement, "note", Map.of("inner", List.of(unavailable))), INCOMPLETE);
       expect(blue, references, "rejection, document content unavailable", with(rejection, "document", unavailable), INCOMPLETE);
       expect(blue, references, "rejection, operationEntry content unavailable",
           with(rejection, "operationEntry", unavailable), INCOMPLETE);
-      expect(blue, references, "evidence timeline entry whose proof names unavailable content",
-          Map.of("type", "Coordination/Timeline Entry", "actor", actor, "timeline", proofs, "timestamp", 201,
-              "message", with(proof, "document", unavailable)), INCOMPLETE);
-      expect(blue, references, "proof entry, document blueId is not a BlueId",
-          with(proof, "document", Map.of("blueId", "not-a-blue-id")), "Invalid/InvalidBlueId");
-      expect(blue, references, "proof entry, document reference with other content",
-          with(proof, "document", Map.of("blueId", target, "extra", 1)), "Invalid/InvalidReferenceShape");
+      expect(blue, references, "evidence timeline entry whose rejection names unavailable content",
+          Map.of("type", "Coordination/Timeline Entry", "actor", actor, "timeline", evidenceTimeline, "timestamp", 201,
+              "message", with(rejection, "document", unavailable)), INCOMPLETE);
+      expect(blue, references, "rejection, document blueId is not a BlueId",
+          with(rejection, "document", Map.of("blueId", "not-a-blue-id")), "Invalid/InvalidBlueId");
+      expect(blue, references, "rejection, document reference with other content",
+          with(rejection, "document", Map.of("blueId", target, "extra", 1)), "Invalid/InvalidReferenceShape");
 
-      // 7. Admitted as data; decided by the native rules stated in the two specifications.
+      // 6. Admitted as data; decided by the native rules of the specification.
       var nativeRules = new TreeMap<String, Object>();
-      expect(blue, nativeRules, "mandate processor key not lower-case hex", with(profile, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32)), ADMITTED);
-      expect(blue, nativeRules, "signer key not lower-case hex", with(profile, "statementSignerKey", "CD".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "signer key not lower-case hex", with(channel, "statementSignerKey", "CD".repeat(32)), ADMITTED);
       // Key well-formedness beyond the length is a native rule: a small-order key, a non-canonical encoding
       // and bytes that are no curve point are all admitted by the schema.
       final String IDENTITY = "01" + "00".repeat(31), ORDER8 = "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
           Y_IS_P = "ed" + "ff".repeat(30) + "7f", NO_POINT = "02" + "00".repeat(31);
-      expect(blue, nativeRules, "mandate processor key of small order (identity)", with(profile, "mandateProcessorKey", IDENTITY), ADMITTED);
-      expect(blue, nativeRules, "mandate processor key of small order (order 8)", with(profile, "mandateProcessorKey", ORDER8), ADMITTED);
-      expect(blue, nativeRules, "mandate processor key not canonically encoded (y = p)", with(profile, "mandateProcessorKey", Y_IS_P), ADMITTED);
-      expect(blue, nativeRules, "mandate processor key that is no curve point (y = 2)", with(profile, "mandateProcessorKey", NO_POINT), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key of small order (identity)", with(channel, "mandateProcessorKey", IDENTITY), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key of small order (order 8)", with(channel, "mandateProcessorKey", ORDER8), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key not canonically encoded (y = p)", with(channel, "mandateProcessorKey", Y_IS_P), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key that is no curve point (y = 2)", with(channel, "mandateProcessorKey", NO_POINT), ADMITTED);
       // Typing of evidenceTimeline is structural; "by ancestry a Signed Timeline" is a native rule.
       expect(blue, nativeRules, "channel whose evidence timeline is typed as a plain Timeline",
-          with(channel, "evidenceTimeline", with(proofs, "type", "Coordination/Timeline")), ADMITTED);
-      // A receipt written as a reference to content that is not a Text is admitted; the native rule skips it.
-      expect(blue, nativeRules, "proof entry whose receipt is a reference to content that is not a text",
-          with(proof, "receipt", document), ADMITTED);
-      expect(blue, nativeRules, "signer key of small order", with(profile, "statementSignerKey", IDENTITY), ADMITTED);
-      expect(blue, nativeRules, "signer key that is no curve point (y = 2)", with(profile, "statementSignerKey", NO_POINT), ADMITTED);
-      expect(blue, nativeRules, "profile with a further field carrying only a type",
-          with(profile, "note", Map.of("type", "Text")), ADMITTED);
+          with(channel, "evidenceTimeline", with(evidenceTimeline, "type", "Coordination/Timeline")), ADMITTED);
+      // A statement written as a reference to content that is not a Text is admitted; the native rule skips it.
+      expect(blue, nativeRules, "statement entry whose statement is a reference to content that is not a text",
+          with(statement, "statement", document), ADMITTED);
+      expect(blue, nativeRules, "signer key of small order", with(channel, "statementSignerKey", IDENTITY), ADMITTED);
+      expect(blue, nativeRules, "signer key that is no curve point (y = 2)", with(channel, "statementSignerKey", NO_POINT), ADMITTED);
 
-      // 8. Mandate State Attestation: the document the mandate processor signs (its BlueId is signed).
+      // 7. Mandate State Attestation: the document the mandate processor signs (its BlueId is signed).
       var attestationCases = new TreeMap<String, Object>();
       // The referenced documents are written in full here: this tool holds no mandate, and a reference and
       // its content written in full are the same Blue content (case 5). ref1 and ref2 stand for a timeline
@@ -310,7 +254,7 @@ public final class PrivateMandatesTypesConformance {
       Map<String, Object> ref2 = with(operationTimelineEntry, "onBehalfOf", null);
       Map<String, Object> attestation = new TreeMap<>(Map.of("type", "PrivateMandates/Mandate State Attestation",
           "mandate", actor, "state", provider,
-          "authorityPackage", mandates.blueId(), "mandateProgram", "sha256:" + HEX, "approvedProgram", "sha256:" + HEX,
+          "authorityPackage", mandates.blueId(),
           "position", List.of(Map.of("timeline", ref1), Map.of("timeline", ref2, "lastEntry", ref2)),
           "sequence", 0));
       ids.put("attestation", admitted(blue, "attestation", attestation));
@@ -336,9 +280,8 @@ public final class PrivateMandatesTypesConformance {
       expect(blue, attestationCases, "timer bound whose timestamp is a text",
           with(attestation, "nextTimerFiring", with(firing, "timestamp", "soon")), TYPE);
       expect(blue, attestationCases, "timer bound that is a text", with(attestation, "nextTimerFiring", "soon"), TYPE);
-      for (String field : List.of("mandate", "state", "authorityPackage", "mandateProgram", "position", "sequence"))
+      for (String field : List.of("mandate", "state", "authorityPackage", "position", "sequence"))
         expect(blue, attestationCases, "without " + field, with(attestation, field, null), SCHEMA);
-      expect(blue, attestationCases, "without approvedProgram (none approved)", with(attestation, "approvedProgram", null), ADMITTED);
       expect(blue, attestationCases, "negative sequence", with(attestation, "sequence", -1), SCHEMA);
       expect(blue, attestationCases, "sequence that is not a number", with(attestation, "sequence", "first"), TYPE);
       // A BlueId is the base58 text of 32 bytes: 32 to 44 characters.
@@ -392,21 +335,17 @@ public final class PrivateMandatesTypesConformance {
 
       var result = new TreeMap<String, Object>();
       result.put("coordinationPackage", coordination.blueId());
-      result.put("coordinationEvidencePackage", evidence.blueId());
       result.put("mandatesPackage", mandates.blueId());
       result.put("privateMandatesPackage", privateMandates.blueId());
       var typeIds = new TreeMap<String, Object>();
       for (String name : List.of("Timeline Channel", "Signed Timeline", "Timeline Entry"))
         typeIds.put("Coordination/" + name, coordination.exportId(name));
-      for (String name : evidence.exports().keySet()) typeIds.put("CoordinationEvidence/" + name, evidence.exportId(name));
       for (String name : privateMandates.exports().keySet()) typeIds.put("PrivateMandates/" + name, privateMandates.exportId(name));
       result.put("typeBlueIds", typeIds);
       result.put("sampleBlueIds", ids);
       result.put("schemaDecisions", schema);
-      result.put("profileAdmittedBySchemaExcludedByNativeRule", profileNative);
       result.put("authorityAdmittedBySchemaRejectedByProcessorRule", authorityNative);
       result.put("entriesAdmittedBySchemaSkippedByProcessor", skipped);
-      result.put("proofEntriesWellFormedWithoutHint", hintless);
       result.put("referenceAndInlinedContentSameBlueId", byReference.equals(byContent));
       result.put("referenceAdmissionOutcomes", references);
       result.put("leftToNativeRules", nativeRules);
