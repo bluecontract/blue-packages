@@ -14,7 +14,7 @@ no support for this package.
 - [Specification](spec/coordination-evidence.md): the channel, the evidence timeline
   and how a processor decides an operation from it.
 - `Timeline Channel with Evidence`: a `Coordination/Timeline Channel` that also
-  names `evidenceTimeline`, `mandateProcessorKey` and `evidenceProfile`.
+  names `evidenceTimeline` and `evidenceProfile`.
 - `Evidence Profile`: base type of the profile a channel declares; concrete
   profiles are specialisations published by other packages.
 - `Proof Entry` and `Rejection Entry`: the two defined messages on an evidence
@@ -24,8 +24,8 @@ no support for this package.
 - A rejection decided from the evidence timeline has one of two durable reasons,
   the same on every processor: `AUTHORITY_EVIDENCE_DENIED` for verified evidence
   that denies and `AUTHORITY_EVIDENCE_REJECTED` for a Rejection Entry.
-- `mandateProcessorKey` must be a well-formed Ed25519 key: canonical encoding of a
-  curve point that is not of small order.
+- Everything decidable from the document state, the ordinary validation of the
+  operation included, is decided before the evidence timeline is read.
 
 The package's protocol identity is the capability a host must support for a
 document that declares the new channel. A host without it must refuse such a

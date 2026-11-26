@@ -117,10 +117,10 @@ public final class PrivateMandatesTypesConformance {
       Map<String, Object> timeline = Map.of("type", "Coordination/Signed Timeline", "provider", provider,
           "publicRead", false, "url", "https://provider.example/timelines/operations");
       Map<String, Object> proofs = with(timeline, "url", "https://provider.example/timelines/proofs");
-      Map<String, Object> profile = Map.of("type", "PrivateMandates/Signed Statement Profile", "statementSignerKey", "cd".repeat(32));
+      Map<String, Object> profile = Map.of("type", "PrivateMandates/Signed Statement Profile",
+          "statementSignerKey", "cd".repeat(32), "mandateProcessorKey", "ef".repeat(32));
       Map<String, Object> channel = Map.of("type", "CoordinationEvidence/Timeline Channel with Evidence",
-          "actor", actor, "timeline", timeline, "evidenceTimeline", proofs,
-          "mandateProcessorKey", "ef".repeat(32), "evidenceProfile", profile);
+          "actor", actor, "timeline", timeline, "evidenceTimeline", proofs, "evidenceProfile", profile);
       Map<String, Object> authority = Map.of("type", "PrivateMandates/Mandate Commitment Authority",
           "actor", actor, "mandateCommitment", HEX);
       // References by content BlueId. These two targets are content the mounted packages provide.
@@ -147,9 +147,8 @@ public final class PrivateMandatesTypesConformance {
 
       // 1. What the schemas reject, with the exact failure kind.
       var schema = new TreeMap<String, Object>();
-      for (String field : List.of("evidenceTimeline", "mandateProcessorKey", "evidenceProfile", "timeline", "actor"))
+      for (String field : List.of("evidenceTimeline", "evidenceProfile", "timeline", "actor"))
         expect(blue, schema, "channel without " + field, with(channel, field, null), SCHEMA);
-      expect(blue, schema, "channel with a short key", with(channel, "mandateProcessorKey", "ef"), SCHEMA);
       expect(blue, schema, "channel with a text profile", with(channel, "evidenceProfile", "latest"), TYPE);
       expect(blue, schema, "channel with an integer profile", with(channel, "evidenceProfile", 7), TYPE);
       expect(blue, schema, "channel with a list profile", with(channel, "evidenceProfile", List.of(profile)), SCHEMA);
@@ -157,11 +156,13 @@ public final class PrivateMandatesTypesConformance {
           with(channel, "evidenceProfile", Map.of("type", "CoordinationEvidence/Evidence Profile")), SCHEMA);
       expect(blue, schema, "channel with a type-only specialisation as profile", with(channel, "evidenceProfile",
           Map.of("type", "PrivateMandates/Signed Statement Profile")), SCHEMA);
-      // The profile: one required key of fixed length, at most one field with a value.
+      // The profile: two required keys of fixed length, at most two fields with a value.
       expect(blue, schema, "profile without statementSignerKey", with(profile, "statementSignerKey", null), SCHEMA);
+      expect(blue, schema, "profile without mandateProcessorKey", with(profile, "mandateProcessorKey", null), SCHEMA);
       expect(blue, schema, "profile with a short key", with(profile, "statementSignerKey", "ef"), SCHEMA);
+      expect(blue, schema, "profile with a short mandate processor key", with(profile, "mandateProcessorKey", "ef"), SCHEMA);
       expect(blue, schema, "profile with an integer key", with(profile, "statementSignerKey", 7), TYPE);
-      expect(blue, schema, "profile with a provider list (a second valued field)",
+      expect(blue, schema, "profile with a provider list (a third valued field)",
           with(profile, "allowedProviders", List.of("01".repeat(32))), SCHEMA);
       expect(blue, schema, "profile with a further valued field", with(profile, "note", "x"), SCHEMA);
       expect(blue, schema, "authority without commitment", with(authority, "mandateCommitment", null), SCHEMA);
@@ -278,17 +279,23 @@ public final class PrivateMandatesTypesConformance {
 
       // 7. Admitted as data; decided by the native rules stated in the two specifications.
       var nativeRules = new TreeMap<String, Object>();
-      expect(blue, nativeRules, "channel key not lower-case hex", with(channel, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key not lower-case hex", with(profile, "mandateProcessorKey", "EF".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "commitment not lower-case hex", with(authority, "mandateCommitment", "zz".repeat(32)), ADMITTED);
       expect(blue, nativeRules, "signer key not lower-case hex", with(profile, "statementSignerKey", "CD".repeat(32)), ADMITTED);
       // Key well-formedness beyond the length is a native rule: a small-order key, a non-canonical encoding
       // and bytes that are no curve point are all admitted by the schema.
       final String IDENTITY = "01" + "00".repeat(31), ORDER8 = "26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05",
           Y_IS_P = "ed" + "ff".repeat(30) + "7f", NO_POINT = "02" + "00".repeat(31);
-      expect(blue, nativeRules, "channel key of small order (identity)", with(channel, "mandateProcessorKey", IDENTITY), ADMITTED);
-      expect(blue, nativeRules, "channel key of small order (order 8)", with(channel, "mandateProcessorKey", ORDER8), ADMITTED);
-      expect(blue, nativeRules, "channel key not canonically encoded (y = p)", with(channel, "mandateProcessorKey", Y_IS_P), ADMITTED);
-      expect(blue, nativeRules, "channel key that is no curve point (y = 2)", with(channel, "mandateProcessorKey", NO_POINT), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key of small order (identity)", with(profile, "mandateProcessorKey", IDENTITY), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key of small order (order 8)", with(profile, "mandateProcessorKey", ORDER8), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key not canonically encoded (y = p)", with(profile, "mandateProcessorKey", Y_IS_P), ADMITTED);
+      expect(blue, nativeRules, "mandate processor key that is no curve point (y = 2)", with(profile, "mandateProcessorKey", NO_POINT), ADMITTED);
+      // Typing of evidenceTimeline is structural; "by ancestry a Signed Timeline" is a native rule.
+      expect(blue, nativeRules, "channel whose evidence timeline is typed as a plain Timeline",
+          with(channel, "evidenceTimeline", with(proofs, "type", "Coordination/Timeline")), ADMITTED);
+      // A receipt written as a reference to content that is not a Text is admitted; the native rule skips it.
+      expect(blue, nativeRules, "proof entry whose receipt is a reference to content that is not a text",
+          with(proof, "receipt", document), ADMITTED);
       expect(blue, nativeRules, "signer key of small order", with(profile, "statementSignerKey", IDENTITY), ADMITTED);
       expect(blue, nativeRules, "signer key that is no curve point (y = 2)", with(profile, "statementSignerKey", NO_POINT), ADMITTED);
       expect(blue, nativeRules, "profile with a further field carrying only a type",

@@ -33,7 +33,8 @@ same way gives the same text. `||` joins byte strings with nothing between them.
 is the byte 0x0A. All texts named here are ASCII and are compared byte for byte.
 
 **Final ids.** A *final id* is the text under which the Language identifies a node
-as final content. It has one of two forms (LANG-ID-ENCODING, Language section 12):
+as final content. It has one of two forms (LANG-ID-ENCODING, Language section 4.4;
+member ids, Language section 12.3):
 
 - a plain id; or
 - a *member id*, the id of a member of a finalized cyclic set: the plain id of
@@ -119,10 +120,11 @@ statement shows that the verdict is the one the mandate gives.
   the mandate is later disclosed in an inquiry. `statementCommitment` ties a
   statement to the exact bytes the mandate processor signed, so the responsibility
   can be split between the two afterwards (§7).
-- The other participants accept the signer by accepting the document: the profile
-  of the represented party's channel names the signer's key, and the channel's
-  fields change only through the document's own program, which they accepted
-  (Coordination Evidence section 3).
+- The other participants accept the signer and the mandate processor by accepting
+  the document: the profile of the represented party's channel names the signer's
+  key and the mandate processor's key, and the channel's fields change only
+  through the document's own program, which they accepted (Coordination Evidence
+  section 3).
 
 This package makes no claim of cryptographic soundness of the evaluation. A signer
 that signs a wrong verdict, or a mandate processor that attests a wrong state, is
@@ -148,9 +150,10 @@ found out only by an inquiry that reads the mandate.
 5. *A channel without evidence.* An operation whose authority claim is a
    `Mandate Commitment Authority` and which is performed on a channel without
    evidence, that is a channel whose type is not, by ancestry, a
-   `Timeline Channel with Evidence`, such as a plain `Timeline Channel`, or an
-   evidence channel whose fields are not well formed, is rejected from the
-   document state, without reading any evidence timeline, and the document
+   `Timeline Channel with Evidence`, such as a plain `Timeline Channel`, an
+   evidence channel whose fields are not well formed, or an evidence channel whose
+   profile is not, by ancestry, a `Signed Statement Profile` (§4), is rejected from
+   the document state, without reading any evidence timeline, and the document
    continues with the next input (Coordination Evidence section 6).
 6. *Cyclic sets.* A mandate, a mandate state, a target state and an operation
    entry may be members of cyclic sets; each is named by its final id (Conventions).
@@ -287,14 +290,18 @@ unchanged, and a failure has the same outcome as it has for `Mandate Authority`:
    (the delegate participant);
 4. the target document's actor policy admits E as a delegated action.
 
-Ordinary operation validation and protection against executing E twice also remain
-with the processor. Everything that needs the mandate is the signer's (§7).
+The ordinary validation of the operation also remains with the processor and is
+decided from the document state as well: exact-version and request validation,
+protection against executing E twice, and every other check of the target
+document that is decidable from the document state. All of it runs before T is
+read, and an operation that fails it is rejected at once. T is read only for an
+operation that passed it. Everything that needs the mandate is the signer's (§7).
 
-An outcome under one of these four checks, a rejection for a claim that is
-malformed or is not of the exact type, and a rejection for a channel that is not
-an evidence channel or whose fields are not well formed are decided from the
-document state without consulting T.
-None of them carries `AUTHORITY_EVIDENCE_DENIED` or `AUTHORITY_EVIDENCE_REJECTED`;
+An outcome under one of these four checks or under the ordinary validation, a
+rejection for a claim that is malformed or is not of the exact type, and a
+rejection for a channel that is not an evidence channel, whose fields are not well
+formed or whose profile is not, by ancestry, a `Signed Statement Profile` (§4) are
+decided from the document state without consulting T. None of them carries `AUTHORITY_EVIDENCE_DENIED` or `AUTHORITY_EVIDENCE_REJECTED`;
 those two reasons belong to an operation that T decided (Coordination Evidence
 section 6).
 
@@ -308,20 +315,48 @@ the operation.
 
 | Field | Content |
 |---|---|
-| `statementSignerKey` | The Ed25519 public key under which statements for this channel are verified: a `Coordination/Ed25519 Public Key` that is a well-formed key as section 3 of the Coordination Evidence specification defines it |
+| `statementSignerKey` | The Ed25519 public key under which statements for this channel are verified: a `Coordination/Ed25519 Public Key` that is a well-formed key (below) |
+| `mandateProcessorKey` | The Ed25519 public key whose signature on a mandate state attestation (§5) the participant accepts: a `Coordination/Ed25519 Public Key` that is a well-formed key (below) |
 
-The value has exactly this one field. The well-formed key rule is that of the
-Coordination Evidence specification and is used here by reference: its four
-conditions and its eight refused encodings apply to `statementSignerKey` as they
-apply to the channel's `mandateProcessorKey`.
+The value has exactly these two fields. Both keys are read from the document state
+strictly before K, as every field of the channel is (Coordination Evidence section
+3): the signer verifies an attestation under the `mandateProcessorKey` in force in
+the document strictly before K (§7), and a processor verifies a statement under
+the `statementSignerKey` in force strictly before K (§8).
+
+**Well-formed key.** An Ed25519 public key of the profile is well formed only if
+all four hold:
+
+1. it is 32 bytes written as 64 characters `0-9a-f` (lower case), the first byte
+   first;
+2. the bytes decode to a point of edwards25519 as RFC 8032 section 5.1.3 states;
+3. the encoding is canonical: the 255-bit little-endian y is below 2^255 − 19, and
+   the sign bit (bit 255) is clear when x = 0. RFC 8032 decoding already fails in
+   these two cases; they are stated because common libraries decode leniently;
+4. the point is not of small order. Given 3, exactly these eight encodings are
+   refused:
+
+       0100000000000000000000000000000000000000000000000000000000000000
+       ecffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff7f
+       0000000000000000000000000000000000000000000000000000000000000000
+       0000000000000000000000000000000000000000000000000000000000000080
+       26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc05
+       26e8958fc2b227b045c3f489f2ef98f0d5dfac05d3c63339b13802886d53fc85
+       c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac037a
+       c7176a703d4dd84fba3c0b760d10670f2a2053fa2c39ccc64ec7fd7792ac03fa
+
+A point that is the sum of a point of prime order and a point of small order is
+not refused. The rule is decided from the key alone, so every processor decides
+it alike. It concerns the two keys of this profile; it changes nothing in how
+Coordination verifies a provider's signature.
 
 The profile has no list of providers. A processor that verifies a statement
 compares nothing with such a list, so a list would bind nothing. Which timeline
 providers the mandate's history rests on is checked by the signer and is part of
 what the signer answers for (§7).
 
-`statementSignerKey` and the channel's `mandateProcessorKey` name two roles. The
-rules do not require the two keys to differ. The two kinds of signature can never
+`statementSignerKey` and `mandateProcessorKey` name two roles. The rules do not
+require the two keys to differ. The two kinds of signature can never
 be taken for one another, because their signed bytes begin with different domain
 texts (§5, §6).
 
@@ -329,24 +364,32 @@ texts (§5, §6).
 Evidence specification states, from the exact type alone:
 
 1. The exact type of the channel's `evidenceProfile` is not
-   `Signed Statement Profile` of this package: this text does not apply. A type
-   that extends `Signed Statement Profile` is another exact type and is not this
-   profile.
+   `Signed Statement Profile` of this package: this text does not decide the
+   profile. A type that extends `Signed Statement Profile` is another exact type
+   and is not this profile.
 2. It is, and the host does not implement this protocol: the host refuses the
-   document where the channel is declared. A refusal finalises nothing.
+   document where the channel is declared or where its profile is changed to this
+   type. A refusal finalises nothing.
 3. It is, and the host implements this protocol: the host checks the content. The
    value is well formed only if its fields are exactly `statementSignerKey` and
-   that key is a well-formed key. The Language schema enforces the required
-   field, at most one field with a value and the length of the key; it admits a
-   further field that carries only a type, so the processor checks the exact
-   field set and the rest of the key rule itself. A value that is not well formed
-   makes the channel's fields not well formed, with the consequence the
-   Coordination Evidence specification states: every operation with a
-   `Mandate Commitment Authority` on that channel is rejected from the document
-   state, without reading T, and the document continues.
+   `mandateProcessorKey` and both keys are well formed. The Language schema
+   enforces the two required fields, at most two fields with a value and the
+   length of the keys; it admits a further field that carries only a type, so the
+   processor checks the exact field set and the rest of the key rule itself. A
+   value that is not well formed makes the channel's fields not well formed, with
+   the consequence the Coordination Evidence specification states: every
+   operation with a `Mandate Commitment Authority` on that channel is rejected
+   from the document state, without reading T, and the document continues.
 
 Support depends on nothing but the exact type: no installed file, no
 configuration and no platform.
+
+**A claim and a profile of another type.** An operation with a
+`Mandate Commitment Authority` on an evidence channel whose profile type is not,
+by ancestry, `Signed Statement Profile` is rejected at once from the document
+state, without reading T, and the document continues. A host that does not
+implement that profile type refuses the document before (Coordination Evidence
+section 6), so this rejection applies on a host that implements it.
 
 ## 5. The attestation
 
@@ -412,7 +455,7 @@ every id has a form the table above allows, and that `documents` and `position`
 are in the stated order.
 
 **What the mandate processor signs.** It signs the BlueId of the attestation with
-the key that is `mandateProcessorKey` of the channel:
+the key that is `mandateProcessorKey` of the channel's profile:
 
     attestation signed bytes = UTF8( "blue.private-mandates.mandate-state-attestation" ) || LF || UTF8( BlueId of the attestation )
     signature                = Ed25519( attestation signed bytes )
@@ -424,7 +467,7 @@ form and the hash are the BlueId of the Language.
 
 **Which signatures are accepted.** This one rule holds for the signature of an
 attestation and for the signature of a statement (§6). The key must be a
-well-formed key (Coordination Evidence section 3). A signature is 64 bytes, R
+well-formed key (§4). A signature is 64 bytes, R
 followed by S, over a message under the key A. It is accepted only if all hold:
 
 1. S, read as a little-endian integer, is below the group order L;
@@ -437,14 +480,20 @@ This is the equation without the cofactor, compared on encodings. A signature ma
 by a signer that follows RFC 8032 passes.
 
 **Not in the attestation, on purpose:** the mandate processor key (the statement
-carries it and a processor compares it with the channel's); D, E and the salt (an
+carries it and a processor compares it with the profile's); D, E and the salt (an
 attestation is about S alone and serves every operation decided on that state).
 
 **Position completeness.** `position` covers every timeline S depends on through a
 channel. For S and for every document of `documents`, every contract of that
 document whose type is, by ancestry, a Coordination `Timeline Channel` or
-`Public Timeline Channel` names a timeline, and each such timeline is a row of
-`position`.
+`Public Timeline Channel` names a timeline in its `timeline` (for a
+`Public Timeline Channel`, the timeline its `provider` and `url` denote), and each
+such timeline is a row of `position`. These are the input sources of the document
+in Coordination (its sections 5 and 12). The `evidenceTimeline` of an evidence
+channel is not an input source and takes no part in completeness (Coordination
+Evidence section 4), so this rule does not require it as a row. Unless it is also
+the `timeline` of such a contract, what it held for the decisions in S is trusted
+to the mandate processor (below).
 
 **The chain.** `sequence` and `previous` link the attestations of one mandate by one
 mandate processor into a hash chain. There is no timeline of the mandate processor.
@@ -463,7 +512,8 @@ every attestation was handed over.
 - `documents`: nothing shows the list complete;
 - dependencies that are not a channel contract of S or of a listed document:
   documents S refers to without embedding them, sources reached through another
-  channel type, and anything a contract reads when it runs;
+  channel type, the evidence timelines of evidence channels, and anything a
+  contract reads when it runs;
 - the two timer bounds;
 - `authorityPackage` and the two program identities.
 
@@ -479,14 +529,14 @@ A statement has seven values:
 | `targetState` | The final id of D | Plain id or member id |
 | `entry` | The final id of E | Plain id or member id |
 | `mandateCommitment` | M, exactly the text of `mandateCommitment` in E's authority claim | 64 hex characters |
-| `mandateProcessorKey` | The key under which the signer verified the attestation, exactly the text of `mandateProcessorKey` of the channel | 64 hex characters, and nothing more is required of it here |
+| `mandateProcessorKey` | The key under which the signer verified the attestation, exactly the text of `mandateProcessorKey` of the channel's profile | 64 hex characters, and nothing more is required of it here |
 | `statementCommitment` | The salted commitment to the bytes the mandate processor signed (§7) | 64 hex characters |
 | `verdict` | Whether the mandate admits E | `true` or `false` |
 
 `mandateProcessorKey` inside a statement is checked for its form only: 64 hex
 characters. It is not checked there as a well-formed key. Comparison 5 of §8
-requires it to equal the channel's value, and T is read only for a channel whose
-key is well formed (Coordination Evidence section 6).
+requires it to equal the profile's value, and T is read only for a channel whose
+profile is well formed (§4).
 
 `targetState` and `entry` are final ids. A processor compares them with the final
 id of its own state D before E and of the operation entry E, as "Which id names a
@@ -609,7 +659,8 @@ exists asserts all of them.
 1. *The attestation.* The signer holds a document of the exact type
    `Mandate State Attestation` with exactly the fields §5 lists, and a signature
    over its attestation signed bytes that the rule of §5 accepts under the
-   channel's `mandateProcessorKey` as in force in the document strictly before K.
+   `mandateProcessorKey` of the channel's profile as in force in the document
+   strictly before K.
 2. *The commitment.* The signer holds the salt, it is 32 bytes, and M of E's
    authority claim equals `hex( SHA-256( salt || id ) )` for the attestation's
    `mandate`, byte for byte as §3 defines.
@@ -651,7 +702,7 @@ target names the channel and the operation of E and, if it pins an initial
 document, that document is the target document. A grant has a document validation
 (`target.documentValidation`), a request validation (`validation`), both or
 neither. Each validation is a predicate, evaluated as Mandates defines (its
-section 6), with its own fresh gas ledger. A grant *passes* when every validation
+section 4), with its own fresh gas ledger of 10,000,000 gas. A grant *passes* when every validation
 it has passes. A grant that has a request validation does not pass when E carries
 no request payload.
 
@@ -672,7 +723,8 @@ no request payload.
    and the other grants are still tried, when one of its predicates ends in an
    execution error, meets an invalid operand, completes with a result that is not
    the Boolean true, or is statically inadmissible, or when a validation node is
-   not an object.
+   not an object. Exhausting the gas ledger is not an execution error here; it
+   has the one outcome of step 5.
 4. If, for any grant that applies, an evaluation that step 3 calls for cannot be
    completed, there is no verdict and the signer signs nothing, whatever the other
    grants give. This covers a validation node that is not well formed under the
@@ -680,13 +732,16 @@ no request payload.
    not compatible, a type it uses is on its own inheritance chain, which the
    Language rejects as LANG-TYPE-CYCLE, or its content is invalid in another way
    the Language defines), and content the evaluation needs and the signer does
-   not hold. A node whose evaluation is never reached, because of step 1 or 2 or
-   because the document validation of its grant did not pass, does not remove the
-   verdict.
+   not hold. An evaluation that exhausts its gas ledger is completed in this
+   sense; step 5 gives its outcome. A node whose evaluation is never reached,
+   because of step 1 or 2 or because the document validation of its grant did not
+   pass, does not remove the verdict.
 5. Otherwise the verdict is `true` when some grant passes and no grant before the
-   first passing grant, in key order, exhausted its gas ledger. It is `false` in
-   every other case: no grant passes, or a grant that exhausted its gas comes
-   before the first grant that passes.
+   first passing grant, in key order, exhausted a gas ledger. It is `false` in
+   every other case: no grant passes, or a grant that exhausted a gas ledger comes
+   before the first grant that passes. A grant that exhausted a gas ledger does
+   not pass. This is the only outcome of gas exhaustion, and it is consistent with
+   Mandates, under which exhausted gas never confers authority (its section 4).
 
 For one S, D and E these rules give at most one verdict.
 
@@ -745,9 +800,9 @@ program, no installed file and nothing that differs between hosts. Its inputs ar
 the decoded bytes of `receipt` and the `statementSignerKey` of the channel's
 profile as in force in the document strictly before K. That key is a well-formed
 key: T is not read for a channel whose profile is not well formed, because the
-operation is rejected from the document state before (§4). Verification ends in exactly one of three results, which are the
-three results the Coordination Evidence specification names (verified, not
-evidence, unfinished):
+operation is rejected from the document state before (§4). Verification ends in
+exactly one of three results, which are the three results the Coordination
+Evidence specification names (verified, not evidence, unfinished):
 
 | Result | Meaning | When |
 |---|---|---|
@@ -779,7 +834,7 @@ of the statement with its own values, each as a text, byte for byte:
 | 2 | `entry` | The final id of the operation entry the processor is deciding |
 | 3 | `mandateCommitment` | The text of `mandateCommitment` in E's authority claim |
 | 4 | `targetState` | The final id of the processor's own state D before E |
-| 5 | `mandateProcessorKey` | The text of `mandateProcessorKey` of the channel |
+| 5 | `mandateProcessorKey` | The text of `mandateProcessorKey` of the channel's profile |
 
 `statementCommitment` and `verdict` are compared with nothing. The values a
 processor compares with MUST come from its own accepted state before K, the
@@ -802,7 +857,8 @@ reason `AUTHORITY_EVIDENCE_REJECTED`; with no considered entry the processor wai
 
 **Which outcome applies when several could** is stated in section 6 of the
 Coordination Evidence specification: a host that does not implement the profile
-refuses; then an outcome from the document state (§3 here); then T. For a Proof
+refuses; then every outcome from the document state, the ordinary validation of
+the operation included (§3, §4 here); then T. For a Proof
 Entry under this profile the checks on T are, in this order and stopping at the
 first that fails: attribution to the channel's actor; the field set of the entry;
 the canonical base64 form of `receipt`; verification; the five comparisons.
@@ -890,9 +946,10 @@ Documents that use `Mandates/Mandate Authority` keep their rules, and every earl
 publication is unchanged and remains selectable. This package and its protocol are
 unused unless a document declares a channel whose `evidenceProfile` has the exact
 type `Signed Statement Profile`, or an operation carries a
-`Mandate Commitment Authority`. On a channel that is not an evidence channel, or
-whose fields are not well formed, an operation with this claim is rejected from
-the document state and the document continues (§1).
+`Mandate Commitment Authority`. On a channel that is not an evidence channel,
+whose fields are not well formed or whose profile is not, by ancestry, a
+`Signed Statement Profile`, an operation with this claim is rejected from the
+document state and the document continues (§1).
 
 ## 11. Not decided in this preview
 
@@ -919,9 +976,9 @@ the document state and the document continues (§1).
   at any range it cannot read; no rule of this text applies to it. Whether such
   an entry should be skipped instead is open, for a change of the import rules
   and of this text together.
-- Whether position rows are typed; whether `previous` must be absent exactly when
-  `sequence` is 0; binding each row's last entry to the mandate's own checkpoint,
-  which would remove one item from what stays trusted to the mandate processor.
+- Whether position rows are typed; binding each row's last entry to the mandate's
+  own checkpoint, which would remove one item from what stays trusted to the
+  mandate processor.
 - The retention period of what the signer keeps, and the procedure of an inquiry.
 - A second signer that can write when the first is unavailable; the duty to reject
   an operation whose M matches no mandate.

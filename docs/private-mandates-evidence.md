@@ -16,7 +16,7 @@ under its own rules, `spec/coordination-evidence.md`. It is neutral about the fo
 of the evidence:
 
 - `Timeline Channel with Evidence`: a `Coordination/Timeline Channel` with
-  `evidenceTimeline`, `mandateProcessorKey` and `evidenceProfile`;
+  `evidenceTimeline` and `evidenceProfile`;
 - `Evidence Profile`: base type of the profile a channel declares;
 - `Proof Entry` (`receipt` required; `document` and `operationEntry` optional) and
   `Rejection Entry` (`document`, `operationEntry`): the two messages on an evidence
@@ -31,8 +31,8 @@ and three types:
 - `Mandate State Attestation`: the document a mandate processor signs about one
   state of a mandate; its BlueId is signed, and the attestations of one mandate form
   a hash chain;
-- `Signed Statement Profile`: a `CoordinationEvidence/Evidence Profile` with the one
-  field `statementSignerKey`. Under it the `receipt` of a `Proof Entry` is a fixed
+- `Signed Statement Profile`: a `CoordinationEvidence/Evidence Profile` with the
+  two fields `statementSignerKey` and `mandateProcessorKey`. Under it the `receipt` of a `Proof Entry` is a fixed
   ASCII statement followed by a 64-byte Ed25519 signature of the represented
   party's document processor.
 
@@ -42,19 +42,19 @@ comparisons of texts. A statement is a signed assertion and no more.
 
 | Item | Version | BlueId |
 | --- | --- | --- |
-| Coordination Evidence package | 0.1.0-preview.3 | `53rkuPoxH2foGDuyL6Zoq96KgJ5ZG3SLksJhLNNAHyCQ` |
-| Coordination Evidence protocol | | `D9QhgSVPURfiU9VKewBoJzPaGKA8kyYxk5h8Mx1CYRkh` |
-| Coordination Evidence rules | | `ZVHP4CPfKkgaDaBZKKQwPxnvncBxXxmj3fYivJxhqSa` |
-| `Timeline Channel with Evidence` | | `AoTzWY1kACtohymhHP5b2kc7X2Mvbn76FKkxk4LRf9cX` |
-| `Evidence Profile` | | `49NnPS6kQNMWBGvvtnhAqdc3hAZhV3g8eBWHuG5q9txd` |
-| `Proof Entry` | | `8WKss4s4XJtApitTqEBoTkebsXsa1tV8GmjEoU5sPKw5` |
-| `Rejection Entry` | | `5dkRVFMaqxSDdwnPhdbfSjuNcaRi9XrPrFS9ScP4nuDW` |
-| Private Mandates package | 0.1.0-preview.3 | `61F69f2qnZoxotaKuhn5dZZPEcThMJSE6BpMj27f89MT` |
-| Private Mandates protocol | | `B47TSj777huXRaKdE5NryhaZFh2vUBffmo9P7wj8uRcT` |
-| Private Mandates rules | | `d6DE97S9R3TBnX6ySJPN7bXnTmGMVwWTmWS8oiGgDMS` |
-| `Mandate Commitment Authority` | | `8gKiaKNLYmEWjwXc1z2g23z3cPr74MHaiyaJ2DsaK7e5` |
-| `Mandate State Attestation` | | `7NLZYq1CkiCj9RbJZ7njxy9nHRs4NNTAn72kK38p7ECc` |
-| `Signed Statement Profile` | | `FFpQ9diLQj6VVQPmPEzL18y1f9YQEaWYGwu4zgon2GnA` |
+| Coordination Evidence package | 0.1.0-preview.3 | `h3fEuEfhBYT7zos6S3vHcnCYw66dMCFU83DpoyuSkRT` |
+| Coordination Evidence protocol | | `329QqnEM7eHbGVZwYXEUxMyK8bYocQURE88iZxDMG7k7` |
+| Coordination Evidence rules | | `5qMz44n8Pw2FntXMb15oSSJBu6NUKeWFv6ha57Sn8Cxw` |
+| `Timeline Channel with Evidence` | | `44zSwFFsmhNqhVM983hPdcCj5kQyiSPKKb4Av9pqG5fR` |
+| `Evidence Profile` | | `AuL7uxDpMkJASfTVAYSyA2vnpds33AKGeXVJCbDd7Rfy` |
+| `Proof Entry` | | `DVJfLRb9RV5ngBmub2rZCs589u6zfighjhR2YALNtLMv` |
+| `Rejection Entry` | | `GyJE8zJqDVFXdXfCxeW9wY8U6bQKcdyVPM8FyT2tQcm8` |
+| Private Mandates package | 0.1.0-preview.3 | `8Cr8GxnDN2p2u7RaBgc1BrLMnYr8WxKBuLootzmB1Qrd` |
+| Private Mandates protocol | | `GWrcHmSaSdjPb6LJ9pkRoSBUY6xJRi3DN5dpwTUtGzrJ` |
+| Private Mandates rules | | `6ydZG9j6ENCw82coeu3UeWsJsirZULCbbeKjnT4RZRdF` |
+| `Mandate Commitment Authority` | | `2CHjYRUwXhbZZwsyoFMiSdiSS1CMCR7qHNAjBnMdmTcF` |
+| `Mandate State Attestation` | | `7Aza2MqkDzybxDiHV6yUfqMvkPN1zJrHETfYJXnbz97t` |
+| `Signed Statement Profile` | | `99iQxFhQUYYzop8H3WhjkUCwXvv5TEsoRUQvdoDffKwt` |
 | Coordination package (required, unchanged) | 0.2.0-access-events.1 | `4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA` |
 | Coordination protocol (unchanged) | | `4YRV74QByZidyvspvbhZvx9Mfod16dHNCqCVbkKditGc` |
 | Coordination rules (unchanged) | | `26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG` |
@@ -106,14 +106,15 @@ Mandates rules, and the package manifests name the protocol identities the host
 must support natively. No separate capability declaration was added. Installing the
 data grants no native support. Whether a host implements a profile depends on the
 profile's exact type alone. A host that does not implement it refuses the document
-where the channel is declared and finalises nothing; a host with it processes a
+where the channel is declared, or where its profile is changed to such a type, and
+finalises nothing; a host with it processes a
 document that declares no such channel as the Coordination specification states.
 
 ## What the schemas enforce and what the processor decides
 
-Enforced by the Language schema: on the channel, the three required fields and the
-key length; on a value whose exact type is the Signed Statement Profile, the one
-required field, at most one field with a value and the key length; on the
+Enforced by the Language schema: on the channel, the two required fields; on a
+value whose exact type is the Signed Statement Profile, the two required fields, at
+most two fields with a value and the key lengths; on the
 commitment authority, the two required fields, at most two fields with a value (so
 a `mandate` with a value is rejected) and the commitment length; on the attestation,
 the required fields, the lengths of the id texts, a position of at least one row
@@ -122,19 +123,26 @@ and the three parts of a timer bound.
 Not enforced by the schema, and therefore native rules a Core implementation must
 apply:
 
-- **The profile and the key are not fully checked by the schema.** The schema makes
-  a channel without one of its three fields invalid content. What it does not check
-  is native: the key rule, the evidence timeline at the channel's provider, and the
-  profile. Typing of `evidenceProfile` is structural: an untyped object, a `Signed
+- **The profile and the keys are not fully checked by the schema.** The schema makes
+  a channel without one of its two fields invalid content. What it does not check
+  is native: the evidence timeline (by ancestry a `Signed Timeline`, at the
+  channel's provider, providers compared by BlueId), the profile and the key rule
+  for the two keys of the profile. Typing of `evidenceProfile` is structural: an untyped object, a `Signed
   Timeline` or a channel is admitted there. The native rule has three cases, decided
   from the exact type first: no profile type (not well formed), a profile type the
   host does not implement (the host refuses), a profile type the host implements
   (the content is checked). A document may hold a channel whose fields are not well
   formed; an operation on it with a commitment authority is rejected from the
-  document state and the document continues.
+  document state and the document continues. So is such an operation on a channel
+  whose profile is not, by ancestry, a `Signed Statement Profile`.
+- **The document state decides first.** The ordinary validation of an operation
+  (exact-version and request validation, protection against executing it twice,
+  every other check decidable from the document state) runs before the evidence
+  timeline is read; an operation that fails it is rejected at once.
 - **Changes of a channel are the document's own.** This package adds no rule about
   changing a channel's fields or type. A change happens only through the document's
-  program, and Contracts decides whether the resulting document is valid (C25).
+  program, and Contracts decides whether the resulting document is valid and whether
+  a retyping is permitted (C25, C26).
 - **The field sets are not closed.** The authority, the profile and the attestation
   admit a further field that carries only a type or is a reference that resolves.
   The processor requires the exact field set; for the authority a wrong field set is
@@ -158,10 +166,13 @@ records these outcomes with their exact failure kinds.
 | `mandateProcessorKey` or `statementSignerKey` that is not a well-formed key: not 64 characters `0-9a-f`, not a point of edwards25519, not canonically encoded, or one of the eight small-order encodings | An operation with a commitment authority on that channel is rejected from the document state, without reading the evidence timeline; the document continues |
 | A profile with a further field | Same |
 | `evidenceProfile` with no profile type | Same |
-| `evidenceProfile` whose exact type is a profile the host does not implement | The host refuses the document where the channel is declared and finalises nothing |
+| `evidenceProfile` whose exact type is a profile the host does not implement | The host refuses the document where the channel is declared, or where its profile is changed to such a type, and finalises nothing |
+| A commitment authority on a channel whose profile the host implements but is not, by ancestry, a `Signed Statement Profile` | The operation is rejected from the document state, without reading the evidence timeline |
 | A commitment authority whose fields are not exactly `actor` and `mandateCommitment`, or whose `mandateCommitment` is not 64 characters `0-9a-f`; a claim whose exact type is not `Mandate Commitment Authority` | The operation is rejected from the document state, without reading the evidence timeline |
 | An entry of one of the two types that is not well formed; a Rejection Entry that does not name this document and the operation | The entry is skipped |
-| A Proof Entry whose `document` or `operationEntry` names something else, or that has neither | Decided by its statement like every other; the hint changes nothing |
+| A Proof Entry whose `document` or `operationEntry` names something else, or that has neither | Decided by its statement like every other; the hint changes no classification. Written as a reference, the hint is opened at admission, and one that cannot be resolved blocks the evidence timeline (known limit); written as id texts it needs no resolution |
+| A `receipt` whose content is not a Text value, also when written as a reference to such content | The entry is not well formed and is skipped. A reference to a Text value is that Text and gives the same entry identity |
+| A Rejection Entry | Names the document and the operation by final id: a member id `MASTER#i` for a member of a cyclic set, the plain id otherwise |
 | A `receipt` whose bytes are not a statement in the fixed layout, or whose signature the rule does not accept | Not a statement: the entry is skipped, never retried, the same on every host |
 | A statement whose `profile`, `entry`, `mandateCommitment`, `targetState` or `mandateProcessorKey` differs from the processor's own value | Skipped as mismatching; never a denial |
 | A matching statement with `verdict` `false`; a considered Rejection Entry | The operation is rejected with the reason `AUTHORITY_EVIDENCE_DENIED`, respectively `AUTHORITY_EVIDENCE_REJECTED`, the same on every processor. A rejection decided from the document state carries neither |

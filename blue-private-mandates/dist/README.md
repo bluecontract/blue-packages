@@ -20,7 +20,9 @@ Mandates type has a new identity.
   hash chain through `sequence` and `previous`). It names the two timer bounds of
   the state by timestamp, Timer Source id and Timer Entry id.
 - `Signed Statement Profile`: the `CoordinationEvidence/Evidence Profile` of this
-  package, with one field, `statementSignerKey`.
+  package, with two fields, `statementSignerKey` and `mandateProcessorKey`. Both
+  must be well-formed Ed25519 keys: canonical encodings of curve points that are
+  not of small order.
 
 A statement is a signed assertion, not a demonstration. The mandate processor
 answers for the attested state and the signer for the evaluation; the signatures
