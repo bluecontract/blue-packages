@@ -13,7 +13,8 @@ _spec = importlib.util.spec_from_file_location(
     'portable_fixture_run', ROOT.parent/'verification/reference/blue-language/python/tools/run.py')
 run = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(run)
-CASES = {c['id']: c for c in map(json.loads, (ROOT/'conformance/language-regression-cases.jsonl').read_text().splitlines())}
+_LINES = [json.loads(line) for line in (ROOT/'conformance/language-regression-cases.jsonl').read_text().splitlines() if line.strip()]
+CASES = {c['id']: c for c in _LINES}
 
 FACTS = {
     'regression-cycle-local-index-beyond-int32': {'detail': 'local target'},
@@ -25,6 +26,11 @@ FACTS = {
         'detail': 'list payload required', 'path': '',
         'expected': {'present': True, 'kind': 'List'}, 'actual': {'present': False}},
 }
+
+
+def test_case_ids_unique_and_facts_bound():
+    assert len(CASES) == len(_LINES)
+    assert set(FACTS) <= set(CASES)
 
 
 @pytest.mark.parametrize('case_id', list(CASES))
