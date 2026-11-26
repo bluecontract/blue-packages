@@ -45,6 +45,7 @@ def main():
     commands=[
         [sys.executable,str(ROOT.parent/'verification/reference/blue-language/python/tools/run.py'),str(ROOT/'conformance/language-cases.jsonl')],
         [sys.executable,str(ROOT.parent/'verification/reference/blue-language/python/tools/run.py'),str(ROOT/'conformance/language-edge-cases.jsonl')],
+        [sys.executable,str(ROOT.parent/'verification/reference/blue-language/python/tools/run.py'),str(ROOT/'conformance/language-regression-cases.jsonl')],
         [sys.executable,'-m','pytest','-q',str(ROOT.parent/'verification/reference/blue-language/python/tests/metadata/test_specification_metadata.py')],
         [sys.executable,'-m','pytest','-q',str(ROOT.parent/'verification/reference/blue-language/python/tests/language')],
         [sys.executable,'-m','pytest','-q',str(ROOT/'tests')],
