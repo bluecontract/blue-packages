@@ -1,0 +1,88 @@
+{
+  "blueId": "6XyqZBMDJZcAMwhxLejFhpz4XA2xSBqGH6Fqb8anSiVv",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS",
+      "Eur9JE31qGM32GpfiXhjQGxt5tiiimjB9QATvs1dpZsP",
+      "BS4XZrpkhY6KCLyzpMVcm8Jd1nu8Ly5BpvYmZCcns6Yu",
+      "BQBpJwjtVtsezFYRPSJzMSvv3STqrZAWB5MURqLUMXzL",
+      "8HupLmUz3vEeLYV9NpjyptBb1ffrAB3qA5JmeH1XL9hx",
+      "HmhqaiVjDCJJ14XENbC9gLfZWyXWCc8EPFx9Y9rC762a",
+      "HAYZzdfW2dxGxf7Rekrd3WpbgSZcE5tQZSDnCU3YAxvK",
+      "BS3cF43nDoNAH19xe8ZjYrKTGPYVaJJz8R2SJpUSdCaC",
+      "DNwGduVN5nmZJs7yEbbftzxFdwnCZBGzPoxb2yCHYx8q",
+      "3bbm5qZdE5gMGc9EiuaAaKMCsnTRnKN5qwTUyH1VCmcb",
+      "4eXqJSUQ1dBU9SmzEJZJ5y654KVPYbnr21ffMk4R3uxc",
+      "6eZpmRGDjjqw4cSKZMSVKQ1mCy4Jwk73BD3gfDYL68eU",
+      "7AeMHi9XT5TdEzQWhDGp6Tp5aqYP4sxumfYoPk1B6fVi",
+      "48rAXDUhvooYspwSnsdJ88kPGP43QZ3nA7fZbQ9J9RWB",
+      "4ZnurEGHYxic5gSaKXX7r32rHnqhBQWh8pPh3jLMbiW7",
+      "omW4Z5JFe8rMs2EgSKc6zxnFBzhAxxYL3Xe97VcgYUq"
+    ],
+    "displayLabel": "Order with Lifecycle Guards",
+    "limitations": [
+      "The evidence reads /orderDecision/status but does not define its writer, full status vocabulary or any awaited decision actor."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; absence does not establish an open order.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Dispatch Functions.guard: sellerDecision and /orderDecision/status check.",
+        "id": "orderDecisionStatus",
+        "meaning": "REJECTED activates the separate rejection guard when sellerDecision is enabled; other statuses are not defined here.",
+        "path": "/orderDecision/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; installation is not established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Initialize Clauses Step.do; Commit Amendment Step.do: configId and runtime write.",
+        "id": "configurationId",
+        "meaning": "Identity of committed normalized clauses; setup uses an empty string. Rejections and no-ops preserve it.",
+        "path": "/clauseRuntime/configurationId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; do not substitute the setup value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Initialize Clauses Step.do; Commit Amendment Step.do: revision increment/no-op.",
+        "id": "configurationRevision",
+        "meaning": "Integer revision: setup 0, successful initialization 1; advances only for subsequent material accepted amendments.",
+        "path": "/clauseRuntime/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; absence does not mean zero clauses.",
+        "aggregate": {
+          "operation": "count",
+          "over": "/clauses entries; installed configuration after successful initialization",
+          "unit": "clauses"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order with Clauses.clauses; Commit Amendment Step.do: /clauses write.",
+        "id": "clauseCount",
+        "meaning": "Number of configured clauses; after successful initialization these comprise the installed configuration.",
+        "path": "/clauses",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      }
+    ]
+  },
+  "semanticText": "# Order with Lifecycle Guards\n\nExtends `Order with Clauses` with the read-only `orderOpen` dispatch policy. It restricts selected deliveries when configured document values indicate a closing decision. It does not itself record that decision or create a universal order lifecycle status.\n\n## Closing rules\n\n`orderOpen` invokes `Order Dispatch Functions.guard`. Its inherited constants are `closedStates: {}`, `actions: {}`, `operations: []`, and `sellerDecision: false`. With these defaults, this policy denies no deliveries.\n\n- **`closedStates`**: each entry's `val` supplies a text `path` and a present `equals` value. A selector applies when the current document value at that path equals `equals`. Its optional `reason` defaults to `ORDER_CLOSED`. Its `approvals` may be a list of role names or `\"all\"`; when omitted, it defaults to `[\"seller\"]` if `sellerDecision` is enabled, otherwise `[]`. Its optional `actions` adds clause actions to the global selection.\n- **`operations` and `actions`**: `operations` lists operation names. `actions` maps clause keys to action names. An action selects an operation only when its effective binding contains that operation with `on: \"workflow\"`. The guard uses `clauses.<key>.bindings.<action>` when present, otherwise the clause type's `defaultBindings.<action>`; an explicit binding does not receive per-operation fallback.\n- **`sellerDecision`**: for a matching selector, enabling this also selects the workflow-bound `orderDecision.reject` action. Separately, if `/orderDecision/status` is exactly `REJECTED`, it blocks all recognized approval roles, global `actions`, and operations listed in either `operations` or `/clauses/orderDecision/parameters/activationOperations`, with reason `ORDER_REJECTED`. This separate branch does not automatically select `orderDecision.reject`. Selectors are checked before this branch.\n\nOnly `EXTERNAL` and `TRIGGERED` deliveries are considered. Operation and action restrictions apply only to `EXTERNAL` deliveries with a nonempty operation name. Approval restrictions require a nonempty text role: external operations obtain it from their first step's `constants.activationApprovalRole`; triggered deliveries obtain it from `contracts.activationDispatch.constants.reviewedApprovalRoles`, keyed by channel. Thus `approvals: \"all\"` covers recognized approval routes, not every delivery. Other delivery kinds pass this guard.\n\nAll installed dispatch policies are evaluated. Any denial skips every handler for that delivery. External inputs are still consumed and checkpointed; changing policy later does not replay them. Decisions are recorded in local completion evidence. The policy cannot mutate state, emit events or terminate processing, so a dispatch denial does not itself emit `Amendment Rejected`. Embedded documents process independently, with their installed updates preceding parent delivery.\n\n## Clauses and amendments\n\nThe inherited `clauses` configuration defaults to `{}`. Each clause requires a nonempty key without `/` or `~`, a `type`, and object-valued `parameters` and `bindings`, including when empty. Its type must provide `validateConfiguration`, `validateTransition` and `plan`, directly or through `hookDefinition`. Normalization retains optional `name` and `description` alongside those configuration fields.\n\n`Document Processing Initiated` starts clause installation. A pre-existing `/clauseRuntime` causes failure. Setup initializes `revision` to `0` and `configurationId` to an empty string; these are provisional values. Successful installation validates and reconciles the plans, records revision `1` and the normalized configuration identity, and emits `Clauses Initialized`. Initialization validation errors fail processing.\n\n`Amendment Requested` and trusted `Clause Change Requested` initiate amendment validation. The calling operation supplies `actorChannel`; request content does not establish the actor or amendment authority.\n\nA batch request has exactly `requestId`, `expectedRevision`, `expectedConfigurationId` and `changes`. `requestId` must be nonempty text; `expectedRevision` must be an integer matching the current revision, and `expectedConfigurationId` must match the current identity. Otherwise the request is rejected, including `STALE_CONFIGURATION` for mismatched expectations. Each change has `action`, `key`, and—except for `remove`—`clause`. Actions are `add`, `update`, `replace` or `remove`; keys cannot repeat within a batch. `add` requires an absent key; the other actions require an existing key. Both `update` and `replace` supply a complete replacement clause.\n\nA single-change request containing `action` is normalized into a batch. Only this form defaults an omitted `requestId` to `clause-change` and omitted configuration expectations to current values.\n\nSubsequent amendments require all applicable existing-clause transition checks to allow the proposal and at least one checked clause to declare `governsAmendments`; otherwise they receive `NO_AMENDMENT_AUTHORITY`. `transitionUnconditional` skips a clause's transition check and does not supply that authority. Candidate configuration hooks and plans are evaluated; the non-legacy hook supports `configurationUnconditional` while still running `plan`. Hooks must not emit events or state changes. Material installations also reject invalid state claims, ownership or contract conflicts, incompatible state types, missing dependencies and missing handler channels. An overlapping amendment fails with `REENTRANT_AMENDMENT`.\n\nAn authorized unchanged normalized configuration emits `Amendment Unchanged` without advancing the revision. A material successful installation atomically reconciles configuration, planned state and contracts, advances the revision, and emits `Amendment Accepted` with `requestId`, `changedKeys`, previous and new configuration identities, and revision. Business validation refusals emit `Amendment Rejected` with a code and preserve effective configuration and state. A request or prepared candidate therefore does not establish installation.\n\nExisting state is normally retained and checked against its declared kind. A plan can initialize missing state or explicitly replace state during initialization or when its clause changes. Removing a clause retracts its managed contracts and embedding contributions but does not automatically delete its state. Missing runtime values do not establish initialization, an open order or a successful amendment."
+}

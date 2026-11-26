@@ -1,0 +1,43 @@
+type: Payment/Payment Process Clause
+parameters:
+  sources: {order: {}}
+  capture:
+    type: Payment/Selected Order Capture
+    mode: when
+    requestId: ordinary-capture
+    blockedBy: correction
+    requires: {path: /sources/order/serviceStatus, equals: confirmed}
+    whenAlso: {$eq: [{$document: /sources/order/ordinaryReview}, approved]}
+  adjustments:
+    correction:
+      decision:
+        path: /sources/order/priceCorrection
+        when: {field: status, equals: accepted}
+        retainMinorFrom: retainedMinor
+      selectedPayment:
+        source: /sources/order
+        expectedSourceOrigin: /businessContext/orderOrigin
+        entries: /sources/order/process_payment/entries
+        path: /payment
+        key: single
+      requestIds: {refund: correction-refund, void: correction-void}
+bindings:
+  requestAuthorize:
+    authorize: {on: workflow, party: guarantor, input: true}
+  requestCapture:
+    pay: {on: workflow, party: guarantor, input: true}
+  requestRefund:
+    requestRefund: {on: workflow, party: seller, input: true}
+  adjust:
+    afterCorrection:
+      'on': embedded
+      path: /sources/order
+      event: {type: Events/Event, name: Price correction accepted}
+    afterSelection:
+      'on': embedded
+      path: /sources/order
+      event: {type: Events/Event, name: Original payment selected}
+      embed: false
+    afterPaymentResponse:
+      'on': event
+      event: {type: PaymentInstruction/Payment Response}

@@ -1,0 +1,48 @@
+name: Secure Timestamp Projection
+type: Connections/Connected Clause
+bindingTypes:
+  fact: pointer
+actions:
+  record:
+    do:
+    - $let:
+        vars:
+          requestId: {$pointerGet: {object: {$var: trigger}, path: /requestId, default: ''}}
+          time: {$binding: timestamp}
+          amount: {$document: /paymentTerms/amountMinor}
+          path: {$const: {name: bindings, path: /fact}}
+          cause:
+            $choose:
+              cond: {$exists: {$binding: processingEvent/operation/operation}}
+              then: {$binding: processingEvent/operation}
+              else: {$binding: processingEvent}
+    - $if:
+        cond:
+          $or:
+          - {$not: {$isKind: {val: {$var: requestId}, kind: text}}}
+          - {$eq: [{$var: requestId}, '']}
+          - {$exists: {$document: {$var: path}}}
+          - {$ne: [{$var: {name: cause, path: /operation}}, secureFunds]}
+          - {$ne: [{$var: {name: cause, path: /channel}}, {$document: /paymentTerms/guarantorChannel}]}
+          - {$ne: [{$var: {name: cause, path: /request/requestId}}, {$var: requestId}]}
+          - {$not: {$isKind: {val: {$var: time}, kind: integer}}}
+        then:
+        - $return: {}
+    - $let:
+        name: request
+        expr: {$get: {object: {$document: /payment/requests}, key: {$var: requestId}}}
+    - $if:
+        cond:
+          $and:
+          - {$gt: [{$var: time}, 0]}
+          - {$gt: [{$var: amount}, 0]}
+          - {$eq: [{$var: {name: request, path: /status}}, succeeded]}
+          - {$eq: [{$var: {name: request, path: /response/outcome}}, succeeded]}
+          - {$eq: [{$var: {name: request, path: /intent/action}}, secure]}
+          - {$eq: [{$var: {name: request, path: /intent/amountMinor}}, {$var: amount}]}
+          - {$eq: [{$var: {name: trigger, path: /amountSecured}}, {$var: amount}]}
+        then:
+        - $appendChange:
+            op: add
+            path: {$var: path}
+            val: {timestampMicros: {$var: time}, requestId: {$var: requestId}}

@@ -1,0 +1,57 @@
+name: Order with Seller Decision
+type: Orders/Order with Lifecycle Guards
+description: An Order the seller can reject at the current activation revision. A rejected Order cannot be activated.
+clauses:
+  orderDecision:
+    type:
+      name: Order Rejection
+      type: Connections/Connected Clause
+      bindingTypes:
+        orderDecision: pointer
+      defaultBindings:
+        orderDecision: /orderDecision
+      initialState:
+        orderDecision:
+          status: PENDING
+      actions:
+        reject:
+          do:
+          - $failIf:
+              cond: {$ne: [{$binding: call/channel}, seller]}
+              message: SELLER_DECISION_REQUIRED
+          - $failIf:
+              cond: {$ne: [{$var: {name: params, path: /revision}}, {$document: /activation/revision}]}
+              message: ORDER_REVISION_CHANGED
+          - $failIf:
+              cond: {$eq: [{$document: /activation/approved/seller}, true]}
+              message: ORDER_ALREADY_ACCEPTED
+          - $if:
+              cond: {$eq: [{$document: /orderDecision/status}, REJECTED]}
+              then:
+              - $return: {}
+          - $appendChange:
+              op: add
+              path: /orderDecision
+              val:
+                revision: {$document: /activation/revision}
+                status: REJECTED
+                termsRef: {$document: /activation/terms/ref}
+          - $appendEvent:
+              type: Events/Event
+              name: Order rejected
+              revision: {$document: /orderDecision/revision}
+              termsRef: {$document: /orderDecision/termsRef}
+    bindings:
+      reject:
+        rejectOrder:
+          'on': workflow
+          party: seller
+          input: true
+          requireExactDocumentVersion: true
+          request:
+            revision:
+              type: Integer
+contracts:
+  orderOpen:
+    constants:
+      sellerDecision: true

@@ -1,0 +1,114 @@
+{
+  "blueId": "B3ArDeBBKQgEHRmLHLLpMG1ZSqt9mHKPh61F3t1Z3MeD",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "Gnapmmo9vFSTSMppJs3y4KDwQWsNUn4nMVWmCnBFtPfV",
+      "erwD9m2PC6DPwmRDaoJBo88WbC7ox13u1Cr1gmvjeeq",
+      "BPMByZokSM9z9aVJWWzmEdPwa45uRvvAWjMWuRnkWWnV",
+      "DNQ2ijWsMCtL3qpup86kPxTYc3rgSsiEp2v3Hxiv61q5",
+      "GC1f7VcC1XfdCpQuTv9H22KnXLzqSwtyadKQkETnWi1y",
+      "4f1aDeGNe2WmiMYgVfDYiWJqKg2A4sp9Yztg7YBt4tu3",
+      "7gjcSjrbHT6av8FR27nhY2xLRX18jBRqC255dCjDX82d",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "69Vz15WWecriPLjyRD2wBQQ46BUBKuY1WXLZ1bg9dxVC",
+      "2EFyWFQupE2XRGEuaeiEw5JKMQzXNKmje8b4cAEXLdq5",
+      "BvWwLyCfDRf1dAMfFK8KmEAWZS745EkRnz7J8jQQKMmc",
+      "7jaXgGUFvBfyXFNqCnY82orCcvn8c7xoBvqAHFY94gZj",
+      "9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj",
+      "3WukTexA1Nex951RDHoA6S6QfNgFmdiBpigfRUzi9YMh",
+      "8enHPJFVRpaR4TbBT6PVY6bg49L4Vuj9hZSgGUB4seid",
+      "HW7dw1gGvAMknFW6HXvHc432TZfzCut2mW4KCk4rj8o1",
+      "GCd3gAEibsaZi1vdhFhTSfRch1HPruFcE1pgm9eAMKwy",
+      "HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9"
+    ],
+    "displayLabel": "Factory Functions",
+    "limitations": [
+      "Created documents reside under the caller's collection binding; its concrete path and default are not supplied, so child creationIntent and instanceKey have no established fixed state location here.",
+      "connectionConfiguration and connectionSnapshots have no executable bodies here. configuredSources and sourceDeclarationMatches require compiled replacements for their failing base implementations.",
+      "Bootstrap normalization calls normalizeSlots and candidateClausePolicy, whose implementations are not supplied; their additional slot checks are unspecified."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; absence does not prove never activated.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.commitState: preserves prior everActivated or next active.",
+        "id": "everActivated",
+        "meaning": "Whether this document has ever been active; remains true through later loss of access.",
+        "path": "/activation/everActivated",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no current revision is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.approve, updateParty and admitApprovedParties.",
+        "id": "activationRevision",
+        "meaning": "Activation revision used to reject stale approvals and admissions; advances on party changes.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; terms may not yet be initialized.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, commitState and approve.",
+        "id": "termsReference",
+        "meaning": "Identity of the current terms definition and agreed fields, used when checking acceptance.",
+        "path": "/activation/terms/ref",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization has not been established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms and commitState.",
+        "id": "termsRevision",
+        "meaning": "Terms revision, initialized to one and advanced when roster or required-approver changes alter terms.",
+        "path": "/activation/termsRevision",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; absence does not establish editability.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms and approveCurrentTerms.",
+        "id": "negotiationEditable",
+        "meaning": "Negotiation editability marker; initialized true and closed when acceptance activates the document.",
+        "path": "/activation/negotiation/editable",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown until readiness is evaluated and recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Source Functions.namedSourcesReady and refreshSourceReadiness.",
+        "id": "sourcesReady",
+        "meaning": "All required sources meet origin, activation, roster and selection checks; separate from own activation.",
+        "path": "/sourceLinks/ready",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Factory Functions\n\nA shared executable function library for checking creation requests, preparing child documents and inserting them into a configured collection. It does not declare a creation workflow, trigger or authorized caller. Its helpers have distinct effects: checking accepts an intent, construction returns a prepared document, and creation appends a document change and event. Preparation alone does not establish initialization, activation or participant consent.\n\n## Creation and identity\n\n`checkCreation(input)` requires `key` to be nonempty text containing neither `/` nor `~`. The destination is the `collection` binding followed by that key; no collection default is defined here. Optional `fields` and `values` default to `{}`, and `requestId` defaults to `key`.\n\nThe recorded `creationIntent` contains `requestId`, `fields`, `values`, `templateBlueId`, `partyBindings`, `sourcePaths` and `inheritChannels`. The latter configuration values default to `{}`, `{}` and `[]`, respectively. If the destination exists, its stored intent must match exactly: a match returns `duplicate`, while a mismatch fails with `DOCUMENT_KEY_CONFLICT`. This compares the recorded intent, not every configuration setting. A free destination returns `acceptedNew` with `key`, `path` and `intent`; it has not yet created anything.\n\n`constructDocument(checked, input)` prepares and returns the child without appending it. `create(checked, input)` calls construction, appends an `add` at the checked path, and emits a Domain Event with `kind: Document Started`, the factory `clause`, `entityId` equal to the key, and `path`. It returns `acceptedNew`, `key` and `path`. It does not repeat `checkCreation` or call `configureSources`. The appended effects describe creation when committed; they do not confirm the child's later activation or business outcome.\n\nThe child receives a deterministic `instanceKey` derived from the parent's initialized original document, or `/clauseRuntime/initialDocument` when that original is unavailable, together with the factory clause key and document key. Each path in `identityChildren` must identify an existing, uninitialized child template; it receives a related `instanceKey` incorporating that path.\n\n## Template and participant preparation\n\n`configurationParameters()` reads the connection configuration's `parameters`, defaulting to `{}`. `configuredTemplate()` uses `parameters.template` when present, otherwise the connection's `template` snapshot. `configuredTemplateValue(path)` instead reads the corresponding live document location: `/clauses/{clauseKey}/parameters/template` or the `template` binding, followed by `path`.\n\nParticipant preparation has two branches:\n\n- With a nonempty `parties` binding, child roles are resolved from explicit mappings. A mapping may select a parent role or supply a Party value satisfying the child's declaration. `suppliedParties`, defaulting to `[]`, identifies declared roles left for later supply and cannot overlap mapped roles. Every parent main identity must remain represented. Main identity checks require matching lead channels and matching, nonempty sets of unique reader keys. Ordinary mapped preparation requires an uninitialized template with the exact Activation Clause, copies parent access evidence and installs resolved transports without conflicting with existing channels.\n- Without that mapping, `parameters.parties` selects same-named parent roles; an empty list selects all parent parties. `readers` selects named parent reader groups, defaulting to none. Unknown roles or readers fail. When parent activation exists, this branch copies access publications, sets child activation `frozen` to `false`, and preserves the template's `required` list, defaulting that list to `[]`. Without parent activation, this helper leaves the template unchanged.\n\nFor mapped preparation, absent `prepareFor` selects `inherited` mode. The only explicit alternative is `prepareFor: bootstrap`, which requires `obtain: provide`; `obtain` otherwise defaults to `create` for this check. Bootstrap preparation forbids `inheritChannels` and templates already containing `timelineAccess` or activation `accessPaths`. It removes mapped parties' lead and representative transports, except for supplied slots, for later provisioning. Its validation helpers compare actor identities, primary reader keys and representatives, and check initialized access publications and roster coverage. Pinned reader declarations using `myosAccountId` and `readerKeys` require exactly one nonempty reader key. These helpers do not themselves bootstrap a document.\n\n`inheritChannels` explicitly copies named parent contracts. Names must be nonempty and contain neither `/` nor `~`; the contract must match External Channel or Timeline Channel. A different channel already declared by the child is rejected. Construction also rejects any template containing `contracts.initialized`.\n\n## Supplied fields and values\n\n`fields` replaces top-level child fields only when each name appears in `allowedFields`. The following remain forbidden even if listed: `contracts`, `clauses`, `type`, `itemType`, `keyType`, `valueType`, `value`, `items`, `blueId`, `blue`, `schema`, `constraints`, `mergePolicy`, `properties`, `$previous`, `$previousItems`, `$pos`, `$replace`, `$empty` and `instanceKey`.\n\n`values` uses named entries in `fieldPaths`, whose lookup defaults to `{}`. Each entry must resolve to a text JSON pointer and an existing template constraint slot. The supplied value is validated against that constraint before replacement. Paths cannot target the root or begin with `contracts`, `clauses`, `activation`, `clauseRuntime`, `sources`, `type`, `blueId`, `instanceKey`, `creationIntent` or `preparationContext`. Unknown names, reserved paths and missing slots fail.\n\n## Sources and access\n\nConstruction replaces the child's `sources` with publication references taken from `sourcePaths`, or an empty object when none are configured. Each referenced document must contain `contracts.initialized`.\n\n`configureSources(checked, prepared)` is a separate preparation helper. It first adds a Document Access Clause, reserving the name `documentAccess`, with `registerAccess_<role>` workflows for the prepared activation parties. Registration requires exact document-version review by a party lead and one to sixteen initialized Timeline Access publications. Inherited validation checks their provider, history and executable policy. Registration retains publications by original identity; already registered identities are duplicates. Registering evidence does not change provider-owned permissions or confer consent.\n\nSource configuration supports two exclusive forms:\n\n- Nonempty `sourcePaths` cannot coexist with legacy `sources` bindings. Every declared source alias must have a path, resolve to an initialized process origin and satisfy its declaration. An observation clause is added for each declared source, embedding its child-local `/sources` entry; conflicting observation clause names fail.\n- Legacy `sources` bindings must exactly cover the declared aliases. Each binding is text selecting a source document, with `self` selecting the parent. Sources must be initialized, active and declaration-compatible. The helper records their original identities, clears the prepared `sources`, and installs a Source Binding Clause with `bindSource_<role>` workflows. For `self`, the requirement also records the checked child path. A preexisting `documentSources` clause is rejected.\n\n`configuredSources` and `sourceDeclarationMatches` are compilation hooks whose supplied base bodies fail with `SOURCE_VALIDATOR_NOT_COMPILED`. Source configuration therefore needs compiled replacements. Later source binding validates the configured origin, active state and coverage of the receiving document's main parties; it cannot substitute another origin. Binding does not change commercial approval requirements.\n\n## Inherited lifecycle state\n\nInherited helpers operate on the document in which they execute, including a child document's own state. They are not automatic guards around every factory call.\n\nActivation helpers distinguish `WAITING_FOR_ACCESS`, `SUSPENDED_ACCESS`, `AWAITING_ACCEPTANCE`, `ACTIVE` and `CLOSED`. Activation requires valid participant access, all required approvals, unchanged agreed terms and an open document. `everActivated` records whether activation has ever occurred, independently of current access. Approval requires a party lead, exact document-version review, the current revision, valid access and a matching terms reference when required. Direct party replacement respects freezing, restricts management of existing parties to their own leads, and clears approvals while advancing the revision.\n\nTerms initialization establishes `terms.ref`, starts `termsRevision` at one and marks negotiation editable. Roster or required-approver changes update the terms identity and invalidate pending negotiations. Acceptance that activates the document closes negotiation editing. Inherited amendment helpers separately require the current revision, an allowed editable path, valid replacement data and the configured approvers before applying a proposal; recording a proposal is not application.\n\n`refreshSourceReadiness` maintains `/sourceLinks/ready`. Readiness requires every configured source to retain its original identity, be initialized and active, and cover the receiving roster. A configured selection path must also identify this receiving document's initialized origin within the source. With no requirements, the evaluated result is ready. This flag is separate from activation. Missing state remains unknown; initialization and refresh defaults describe values only after those helpers run."
+}

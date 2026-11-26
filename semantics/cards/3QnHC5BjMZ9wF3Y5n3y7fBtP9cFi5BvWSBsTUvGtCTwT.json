@@ -1,0 +1,109 @@
+{
+  "blueId": "3QnHC5BjMZ9wF3Y5n3y7fBtP9cFi5BvWSBsTUvGtCTwT",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "CnnnxY4uLqpDDFgdnyQycAK7qcxtypw3L28WaxaT4qp7",
+      "DS6ymVn7CighY7uzRbnUTdJ373bACafJCVRVHD6BFZj8",
+      "2SQFowME2uE7mwpsbqbFvQdDYACm4vGVnLZZ46Q26NW3",
+      "4f1aDeGNe2WmiMYgVfDYiWJqKg2A4sp9Yztg7YBt4tu3"
+    ],
+    "displayLabel": "Activation Clause",
+    "limitations": [],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.approve and commitState",
+        "id": "revision",
+        "meaning": "Activation roster revision used to reject stale actions.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Negotiation Functions.activate",
+        "id": "termsRevision",
+        "meaning": "Revision of accepted terms, advanced by an applied proposal.",
+        "path": "/activation/termsRevision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms and Negotiation Functions.activate",
+        "id": "termsRef",
+        "meaning": "Exact reference for the document terms currently in force.",
+        "path": "/activation/terms/ref",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.commitState",
+        "id": "everActivated",
+        "meaning": "Whether the document has been active at least once.",
+        "path": "/activation/everActivated",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No open proposal ID recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Negotiation Functions.proposeChanges",
+        "id": "proposalId",
+        "meaning": "Identifier of the open negotiation proposal.",
+        "path": "/activation/negotiation/proposal/id",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No proposed terms reference recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Negotiation Functions.proposeChanges",
+        "id": "proposedTermsRef",
+        "meaning": "Exact reference for the proposed terms undergoing review.",
+        "path": "/activation/negotiation/proposal/termsRef",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No proposal base reference recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Negotiation Functions.proposeChanges",
+        "id": "proposalBaseTermsRef",
+        "meaning": "The current terms reference against which a proposal was created.",
+        "path": "/activation/negotiation/proposal/baseTermsRef",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Activation Clause\n\nDefines a document's party roster, access checks and acceptance of current terms. The clause reads its configured `parties`, the roles required to approve, and access configuration. A party has a lead channel and can have representatives. Hosted bootstrap resolves account locators into authenticated transports before the clause is initialized. An account locator alone provides no party approval.\n\nThe activation state records the roster, current terms reference and revision, and approval by required role. Current access must satisfy the configured roster, readers and access paths. The document is active when access is functional, required acceptance covers current terms and the document is open. The state distinguishes WAITING_FOR_ACCESS, AWAITING_ACCEPTANCE, ACTIVE, SUSPENDED_ACCESS after an earlier activation, and CLOSED. `everActivated` records historical activation. It can remain true while access is suspended or the document is closed.\n\nWhere negotiation is configured, permitted actors propose changes to allowed term paths against the current exact terms reference. A proposal has its own identifier, base reference, proposed reference and approvals. The configured negotiation workflow can accept, reject or withdraw a proposal or withdraw acceptance under its guards. Accepted changes to terms advance the terms revision. Approval applies to the referenced terms and roster revision. Source approval and access evidence determine eligibility for activation.\n\nAn optional `parameters.reviewedApprovals.<role>` entry requires an exact signed decision from one local reviewed source for that required role. The event selector contains the published type and its `clause` and `subject`. Standard Contracts event matching includes subtypes. Use distinct source and subject combinations for independently approved roles. `source` points to the current reviewed record. `basis` points to the value that must match the decision's basis. For offers, `acceptanceBy` identifies a different declared role that can accept. A direct approval source can omit it. Activation checks the original operation actor and request digest, saved source digest, review basis and current access before applying the decision.\n\nA direct `approve` must come from the configured approver. An `offer` from that role records a scoped grant. The configured acceptance role can accept only a grant for the current approver, initialized document, revision, terms, source, subject, exact proposal, basis and acceptance role. Activation consumes the grant when approving current terms. Direct `approve`, `activate` and `proposeAndActivate` for this configured role cannot bypass the selected review. Other roles keep their own approval paths."
+}

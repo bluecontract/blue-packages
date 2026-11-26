@@ -1,0 +1,291 @@
+name: Whole Order Cancellation Functions
+description: Compute the inclusive cancellation cutoff and record the reviewed decision.
+type: Contracts/Compute Definition
+functions:
+  roundBps:
+    $blue:functionFrom: {definition: {type: Money/Rounding}, function: roundBps}
+  roundedRetention:
+    args:
+      basis: {type: Integer}
+    expr:
+      $call:
+        function: roundBps
+        args:
+          basis: {$var: basis}
+          bps: {$multiply: [{$const: {name: parameters, path: /lateCancellationChargePercent}}, 100]}
+  boundValue:
+    args:
+      bindingKey: {type: Text}
+    do:
+    - $let: {name: path, expr: {$get: {object: {$const: bindings}, key: {$var: bindingKey}}}}
+    - $if:
+        cond: {$exists: {$var: path}}
+        then:
+        - $return: {$document: {$var: path}}
+    - $return: {}
+  cancellationAvailability:
+    args: {}
+    do:
+    - $let:
+        vars:
+          elapsedHours: {$const: {name: parameters, path: /freeCancellationHoursAfterStart}}
+          serviceHours: {$const: {name: parameters, path: /freeCancellationHoursBeforeStart}}
+          beforeWindowStarts: {$const: {name: parameters, path: /beforeWindowStarts}}
+          chargePercent: {$const: {name: parameters, path: /lateCancellationChargePercent}}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$or: [{$exists: {$var: elapsedHours}}, {$exists: {$var: serviceHours}}]}
+            - {$is: {node: {$var: chargePercent}, pattern: {type: Integer, schema: {minimum: 0, maximum: 100}}}}
+            - {$or: [{$not: {$exists: {$var: beforeWindowStarts}}}, {$eq: [{$var: beforeWindowStarts}, free]}]}
+        message: INVALID_CANCELLATION_POLICY
+    - $forEach:
+        in: [freeCancellationHoursAfterStart, freeCancellationHoursBeforeStart]
+        item: field
+        do:
+        - $let: {name: hours, expr: {$get: {object: {$const: parameters}, key: {$var: field}}}}
+        - $failIf:
+            cond:
+              $and:
+              - {$exists: {$var: hours}}
+              - {$not: {$is: {node: {$var: hours}, pattern: {type: Integer, schema: {minimum: 0, maximum: 2501999}}}}}
+            message: INVALID_CANCELLATION_WINDOW
+    - $failIf:
+        cond:
+          $or:
+          - {$and: [{$exists: {$var: elapsedHours}}, {$not: {$exists: {$const: {name: bindings, path: /windowStart}}}}]}
+          - {$and: [{$exists: {$var: serviceHours}}, {$not: {$exists: {$const: {name: bindings, path: /serviceStart}}}}]}
+        message: CANCELLATION_TIME_BINDING_REQUIRED
+    - $if:
+        cond:
+          $and:
+          - {$exists: {$const: {name: bindings, path: /orderStatus}}}
+          - $includes:
+              list: {$pointerGet: {object: {$const: parameters}, path: /closedOrderStatuses, default: []}}
+              val: {$call: {function: boundValue, args: {bindingKey: orderStatus}}}
+        then:
+        - $return: {status: unavailable, reason: order_closed}
+    - $let:
+        vars:
+          basis: {$call: {function: boundValue, args: {bindingKey: amount}}}
+          retentionBasis: {$call: {function: boundValue, args: {bindingKey: retentionBasis}}}
+          windowStart: {$call: {function: boundValue, args: {bindingKey: windowStart}}}
+          serviceStart: {$call: {function: boundValue, args: {bindingKey: serviceStart}}}
+          confirmed: {$call: {function: boundValue, args: {bindingKey: confirmation}}}
+    - $let:
+        vars:
+          hasWindowStart: {$is: {node: {$var: windowStart}, pattern: {type: Integer, schema: {minimum: 1, maximum: 9007199254740991}}}}
+          hasServiceStart: {$is: {node: {$var: serviceStart}, pattern: {type: Integer, schema: {minimum: 1, maximum: 9007199254740991}}}}
+          beforeConfirmation:
+            $and:
+            - {$exists: {$const: {name: bindings, path: /confirmation}}}
+            - {$ne: [{$var: confirmed}, true]}
+    - $let:
+        vars:
+          basisValid: {$is: {node: {$var: basis}, pattern: {type: Integer, schema: {minimum: 0, maximum: 1000000000000}}}}
+          retentionReady:
+            $or:
+            - {$not: {$exists: {$const: {name: bindings, path: /retentionBasis}}}}
+            - {$and: [{$isKind: {val: {$var: basis}, kind: integer}}, {$eq: [{$var: basis}, {$var: retentionBasis}]}]}
+    - $let:
+        name: state
+        expr:
+          status: available
+          beforeConfirmation: {$var: beforeConfirmation}
+          awaitingWindowStart: {$and: [{$exists: {$var: elapsedHours}}, {$not: {$var: hasWindowStart}}]}
+          retentionReady: {$var: retentionReady}
+          lateCancellationAwaitingCapture:
+            $and:
+            - {$var: basisValid}
+            - {$not: {$var: retentionReady}}
+            - {$gt: [{$call: {function: roundedRetention, args: {basis: {$var: basis}}}}, 0]}
+    - $if:
+        cond: {$var: beforeConfirmation}
+        then:
+        - $return: {$var: state}
+    - $if:
+        cond:
+          $and:
+          - {$var: {name: state, path: /awaitingWindowStart}}
+          - $or:
+            - {$ne: [{$var: beforeWindowStarts}, free]}
+            - {$exists: {$const: {name: bindings, path: /confirmation}}}
+        then:
+        - $return: {$merge: [{$var: state}, {status: awaiting_window_start}]}
+    - $if:
+        cond: {$and: [{$exists: {$var: serviceHours}}, {$not: {$var: hasServiceStart}}]}
+        then:
+        - $return: {$merge: [{$var: state}, {status: awaiting_service_start}]}
+    - $let: {name: cutoff, expr: 9007199254740991}
+    - $if:
+        cond: {$and: [{$exists: {$var: elapsedHours}}, {$var: hasWindowStart}]}
+        then:
+        - $set: {name: cutoff, expr: {$add: [{$var: windowStart}, {$multiply: [{$var: elapsedHours}, 3600000000]}]}}
+        - $failIf:
+            cond: {$gt: [{$var: cutoff}, 9007199254740991]}
+            message: INVALID_CANCELLATION_WINDOW
+        - $set: {name: state, expr: {$merge: [{$var: state}, {windowStartMicros: {$var: windowStart}, freeCancellationUntilMicros: {$var: cutoff}}]}}
+    - $if:
+        cond: {$var: hasServiceStart}
+        then:
+        - $set:
+            name: state
+            expr:
+              $merge:
+              - {$var: state}
+              - serviceStartMicros: {$var: serviceStart}
+                lastCancellationMicros:
+                  $choose:
+                    cond: {$eq: [{$var: serviceHours}, 0]}
+                    then: {$var: serviceStart}
+                    else: {$subtract: [{$var: serviceStart}, 1]}
+        - $if:
+            cond: {$exists: {$var: serviceHours}}
+            then:
+            - $let: {name: serviceCutoff, expr: {$subtract: [{$var: serviceStart}, {$multiply: [{$var: serviceHours}, 3600000000]}]}}
+            - $if:
+                cond: {$lte: [{$var: serviceCutoff}, {$var: cutoff}]}
+                then:
+                - $set: {name: state, expr: {$merge: [{$var: state}, {freeCancellationUntilMicros: {$var: serviceCutoff}}]}}
+    - $return: {$var: state}
+  writeAvailability:
+    args:
+      state: {}
+    do:
+    - $let: {name: path, expr: {$const: {name: bindings, path: /availability}}}
+    - $if:
+        cond: {$not: {$exists: {$var: path}}}
+        then:
+        - $return: {outcome: duplicate}
+    - $let: {name: current, expr: {$document: {$var: path}}}
+    - $if:
+        cond: {$eq: [{$var: current}, {$var: state}]}
+        then:
+        - $return: {outcome: duplicate}
+    - $appendChange:
+        path: {$var: path}
+        op: {$choose: {cond: {$exists: {$var: current}}, then: replace, else: add}}
+        val: {$var: state}
+    - $return: {outcome: acceptedNew}
+  refreshAvailability:
+    args: {}
+    do:
+    - $let: {name: decision, expr: {$call: {function: boundValue, args: {bindingKey: decision}}}}
+    - $let: {name: state, expr: {$call: {function: cancellationAvailability, args: {}}}}
+    - $return:
+        $call:
+          function: writeAvailability
+          args:
+            state:
+              $choose:
+                cond: {$eq: [{$var: {name: decision, path: /status}}, accepted]}
+                then: {status: cancelled}
+                else: {$var: state}
+  acceptCancellation:
+    args:
+      input: {}
+      feeWaived: {type: Boolean}
+    do:
+    - $let:
+        vars:
+          actor: {$binding: call/channel}
+          now: {$binding: timestamp}
+          prior: {$call: {function: boundValue, args: {bindingKey: decision}}}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$binding: call/requireExactDocumentVersion}, true]}
+            - {$is: {node: {$var: actor}, pattern: {type: Text, schema: {minLength: 1}}}}
+        message: EXACT_REVIEW_REQUIRED
+    - $failIf:
+        cond:
+          $some:
+            in: {$keys: {$var: input}}
+            item: field
+            where: {$not: {$includes: {list: [key, reason], val: {$var: field}}}}
+        message: INVALID_WHOLE_ORDER_CANCELLATION_INPUT
+    - $if:
+        cond: {$eq: [{$var: {name: prior, path: /status}}, accepted]}
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$eq: [{$var: {name: prior, path: /key}}, {$var: {name: input, path: /key}}]}
+                - {$eq: [{$var: {name: prior, path: /reason}}, {$var: {name: input, path: /reason}}]}
+                - {$eq: [{$var: {name: prior, path: /actor}}, {$var: actor}]}
+                - {$eq: [{$var: {name: prior, path: /feeWaived}}, {$var: feeWaived}]}
+            message: ORDER_CANCELLED
+        - $return: {outcome: duplicate}
+    - $let: {name: state, expr: {$call: {function: cancellationAvailability, args: {}}}}
+    - $failIf:
+        cond: {$eq: [{$var: {name: state, path: /reason}}, order_closed]}
+        message: ORDER_CLOSED
+    - $let: {name: basis, expr: {$call: {function: boundValue, args: {bindingKey: amount}}}}
+    - $failIf:
+        cond: {$not: {$is: {node: {$var: basis}, pattern: {type: Integer, schema: {minimum: 0, maximum: 1000000000000}}}}}
+        message: INVALID_CANCELLATION_AMOUNT
+    - $failIf:
+        cond: {$not: {$is: {node: {$var: now}, pattern: {type: Integer, schema: {minimum: 1, maximum: 9007199254740991}}}}}
+        message: CANCELLATION_TIMESTAMP_REQUIRED
+    - $if:
+        cond: {$and: [{$not: {$var: feeWaived}}, {$not: {$var: {name: state, path: /beforeConfirmation}}}]}
+        then:
+        - $failIf:
+            cond:
+              $or:
+              - {$eq: [{$var: {name: state, path: /status}}, awaiting_window_start]}
+              - $and:
+                - {$exists: {$var: {name: state, path: /windowStartMicros}}}
+                - {$gt: [{$var: {name: state, path: /windowStartMicros}}, {$var: now}]}
+            message: CANCELLATION_WINDOW_START_REQUIRED
+        - $failIf:
+            cond: {$eq: [{$var: {name: state, path: /status}}, awaiting_service_start]}
+            message: CONFIRMED_FULFILMENT_TIME_REQUIRED
+        - $failIf:
+            cond:
+              $and:
+              - {$exists: {$var: {name: state, path: /lastCancellationMicros}}}
+              - {$gt: [{$var: now}, {$var: {name: state, path: /lastCancellationMicros}}]}
+            message: ORDINARY_CANCELLATION_AFTER_START
+    - $let:
+        name: retained
+        expr:
+          $choose:
+            cond:
+              $and:
+              - {$not: {$var: feeWaived}}
+              - {$exists: {$var: {name: state, path: /freeCancellationUntilMicros}}}
+              - {$gt: [{$var: now}, {$var: {name: state, path: /freeCancellationUntilMicros}}]}
+            then: {$call: {function: roundedRetention, args: {basis: {$var: basis}}}}
+            else: 0
+    - $failIf:
+        cond: {$and: [{$gt: [{$var: retained}, 0]}, {$not: {$var: {name: state, path: /retentionReady}}}]}
+        message: CANCELLATION_AWAITING_CAPTURE
+    - $appendChange:
+        op: replace
+        path: {$const: {name: bindings, path: /decision}}
+        val:
+          status: accepted
+          key: {$var: {name: input, path: /key}}
+          reason: {$var: {name: input, path: /reason}}
+          actor: {$var: actor}
+          timestampMicros: {$var: now}
+          basisMinor: {$var: basis}
+          retainedMinor: {$var: retained}
+          releasedMinor: {$subtract: [{$var: basis}, {$var: retained}]}
+          feeWaived: {$var: feeWaived}
+          beforeConfirmation: {$var: {name: state, path: /beforeConfirmation}}
+          awaitingWindowStart: {$var: {name: state, path: /awaitingWindowStart}}
+          windowStartMicros: {$var: {name: state, path: /windowStartMicros}}
+          serviceStartMicros: {$var: {name: state, path: /serviceStartMicros}}
+          freeCancellationUntilMicros: {$var: {name: state, path: /freeCancellationUntilMicros}}
+    - $call: {function: writeAvailability, args: {state: {status: cancelled}}}
+    - $appendEvent:
+        $merge:
+        - {type: Commerce/Domain Event, kind: Order Cancellation Accepted}
+        - clause: {$const: clauseKey}
+          entityId: {$var: {name: input, path: /key}}
+    - $return: {outcome: acceptedNew}

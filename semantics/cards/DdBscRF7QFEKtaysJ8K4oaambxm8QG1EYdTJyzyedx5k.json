@@ -1,0 +1,131 @@
+{
+  "blueId": "DdBscRF7QFEKtaysJ8K4oaambxm8QG1EYdTJyzyedx5k",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "6XyqZBMDJZcAMwhxLejFhpz4XA2xSBqGH6Fqb8anSiVv",
+      "DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS",
+      "AQYBeAoK4e5gGb37kjb4dTGzdEwLg8YJYgAB6gLetpQf",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "Eur9JE31qGM32GpfiXhjQGxt5tiiimjB9QATvs1dpZsP",
+      "BS4XZrpkhY6KCLyzpMVcm8Jd1nu8Ly5BpvYmZCcns6Yu",
+      "8HupLmUz3vEeLYV9NpjyptBb1ffrAB3qA5JmeH1XL9hx",
+      "HAYZzdfW2dxGxf7Rekrd3WpbgSZcE5tQZSDnCU3YAxvK",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Order with Seller Decision",
+    "limitations": [
+      "The supplied behavior reads activation revision, seller approval and terms reference but does not define their initialization, approval workflow or activation completion.",
+      "The generated handler checks the exact-document-version flag; native version matching and channel authentication details are not supplied.",
+      "Terms references are copied opaquely; their format and resolution rules are not established."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; PENDING applies only after initialization.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Rejection.initialState.orderDecision; actions.reject",
+        "id": "sellerDecisionStatus",
+        "meaning": "PENDING is initialized without rejection; REJECTED records seller rejection. Approval is tracked separately.",
+        "path": "/orderDecision/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No recorded rejection revision is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Rejection.actions.reject: /orderDecision write",
+        "id": "rejectedRevision",
+        "meaning": "Activation revision copied when rejection is recorded; distinct from the clause configuration revision.",
+        "path": "/orderDecision/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Rejected terms reference is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Rejection.actions.reject: termsRef assignment",
+        "id": "rejectedTermsReference",
+        "meaning": "Terms reference copied from /activation/terms/ref when the seller rejection is recorded.",
+        "path": "/orderDecision/termsRef",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Current activation revision is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Rejection.actions.reject: ORDER_REVISION_CHANGED check",
+        "id": "activationRevision",
+        "meaning": "Current activation revision that the seller's rejection request must match.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Unknown; absence does not establish false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Rejection.actions.reject: ORDER_ALREADY_ACCEPTED check",
+        "id": "sellerApproval",
+        "meaning": "A true seller approval prevents rejection with ORDER_ALREADY_ACCEPTED; it does not prove full activation.",
+        "path": "/activation/approved/seller",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Current activation terms reference is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order Rejection.actions.reject: /activation/terms/ref read",
+        "id": "activationTermsReference",
+        "meaning": "Activation terms reference used as the source of the recorded rejection's termsRef.",
+        "path": "/activation/terms/ref",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Clause configuration revision is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commit Amendment Step.do: revision increment, unchanged branch; reject",
+        "id": "clauseConfigurationRevision",
+        "meaning": "Installed clause configuration revision; advances on material installation, unchanged on refusal or no-op.",
+        "path": "/clauseRuntime/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Installed configuration identity is unknown.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Commit Amendment Step.do: configId; Begin Amendment Step.do",
+        "id": "clauseConfigurationIdentity",
+        "meaning": "Identity of installed clauses, checked with expectedRevision before an amendment proceeds.",
+        "path": "/clauseRuntime/configurationId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Order with Seller Decision\n\nAn Order with a seller rejection decision tied to its activation revision and terms reference. It installs the `orderDecision` clause and enables `contracts.orderOpen.constants.sellerDecision`. Rejection blocks the activation approval routes recognized by the lifecycle guard; it does not stop all document processing.\n\n## Seller rejection\n\nThe `rejectOrder` workflow connects the clause’s `reject` action to the `seller` channel. Its request declares an integer `revision`, and `input: true` passes request fields into action parameters. The connection sets `requireExactDocumentVersion: true`; the generated handler fails with `EXACT_REVIEW_REQUIRED` if the call does not carry that flag. The supplied definitions do not establish the native document-version comparison mechanism.\n\nThe action checks, in order:\n\n- The calling channel is `seller`, otherwise `SELLER_DECISION_REQUIRED`.\n- The supplied `revision` equals `/activation/revision`, otherwise `ORDER_REVISION_CHANGED`.\n- `/activation/approved/seller` is not `true`, otherwise `ORDER_ALREADY_ACCEPTED`.\n\nAfter these checks, an already `REJECTED` decision is a no-op. Otherwise, the action writes `/orderDecision` with `status: REJECTED`, the current activation `revision`, and `termsRef` copied from `/activation/terms/ref`, then emits an Event named `Order rejected` carrying those recorded references. A submitted request alone does not establish rejection; the recorded decision distinguishes the outcome. Repeated requests still face the preceding checks.\n\nThe clause declares the pointer binding `orderDecision`, defaulting to `/orderDecision`, with initial state `{status: PENDING}`. Initialization supplies this state only when the claimed state is absent; existing object state is preserved. `PENDING` means no rejection has been recorded by this action, not that seller approval is absent. Although initialization uses the binding, the rejection action and lifecycle guard explicitly use `/orderDecision`; changing the binding does not redirect those accesses.\n\n## Effect on subsequent operations\n\nWhen `/orderDecision/status` is `REJECTED`, the guard returns `ORDER_REJECTED` for recognized activation approval routes and selected external workflow operations. These include operation names in `/clauses/orderDecision/parameters/activationOperations`, plus those selected through the guard’s `operations` and `actions` constants. Both constants default to empty collections. The rejection-specific branch does not itself block another `rejectOrder` request.\n\nThe inherited `closedStates` constant defaults to an empty collection. Configured entries match a document `path` against `equals` and can restrict additional actions and approvals. With `sellerDecision` enabled, omitted `approvals` defaults to `[\"seller\"]`; `\"all\"` selects all recognized approval roles. Their default refusal reason is `ORDER_CLOSED`.\n\nThese checks apply to external and triggered deliveries; other delivery kinds pass this guard. A denied delivery skips its handlers, and consumed external input is not deferred for later replay. Seller approval and activation completion are supplied by other behavior; this type does not define an acceptance action.\n\nThe inherited clause host installs validated clause plans atomically. Amendment requests are distinct from accepted configuration changes: refusals preserve effective configuration and state, unchanged configurations retain their revision, and material installations advance `/clauseRuntime/revision`. Later amendments require an amendment-governing clause; the supplied `orderDecision` clause supplies no such authority and requires its installed configuration to remain unchanged."
+}

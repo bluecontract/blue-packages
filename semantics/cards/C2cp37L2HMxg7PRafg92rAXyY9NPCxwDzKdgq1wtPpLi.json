@@ -1,0 +1,41 @@
+{
+  "blueId": "C2cp37L2HMxg7PRafg92rAXyY9NPCxwDzKdgq1wtPpLi",
+  "metadata": {
+    "covers": [],
+    "dependencies": [],
+    "displayLabel": "Reservation functions",
+    "limitations": [
+      "The calling clause supplies the state bindings and connects the allowed roles and actions."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "No Order amount available.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Reservation Functions.reviewedSellerScope and requireReviewedSellerDecision",
+        "id": "orderAmount",
+        "meaning": "The whole Order amount in its Order currency, checked for reviewed seller confirmation.",
+        "path": "/amountMinor",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No Order currency available.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Reservation Functions.reviewedSellerScope and requireReviewedSellerDecision",
+        "id": "orderCurrency",
+        "meaning": "Currency that the reviewed Order and Payment Instruction must share.",
+        "path": "/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      }
+    ]
+  },
+  "semanticText": "# Reservation Functions\n\nValidates frozen Order quotes and group selections, creates group proposals, reviews them through the configured reservation actions, and calculates the settlement target of the approved group scope. The calling clause supplies the Order's snapshot, group state, request records and cancellation timing bindings.\n\nThe frozen snapshot ties each group to its reviewed quote lines. Reviews check the current exact proposal identity and record the request, action and actor for retries. With reviewed seller activation enabled, confirmation or an alternative and customer acceptance require the exact Order version, the matching admitted instruction, active access, matching commercial terms and enough confirmed secured funds. A seller alternative can grant the proposed terms for the customer's review. Final confirmation records the matching seller approval.\n\nCustomer cancellation observes configured elapsed and service-relative windows. The elapsed condition uses the first recorded actual Order activation when available. An explicit fallback may supply the original instruction's authorization time for eligible automatic initialization without a timestamp. Each configured cutoff is inclusive and a decision outside either applicable window is late under the policy's group-state guards. The explicit service-relative rule requires a confirmed future service start at cancellation. The decision records its agreed charge, amount designated for release and pending payment evidence in the quote currency.\n\n`approvedSettlementTarget` checks exact frozen quote coverage, group identities and proposal references. It validates each terminal decision against the group, proposal, currency and reviewed basis amount. It returns the total covered amount, currency, terminal decision references, and a target made up of approved terminal charges plus the full amounts of remaining groups. Pending groups leave the scope unresolved. A target is a calculation from Order evidence. The Payment Instruction controls whether a financial request may proceed and records each confirmed outcome.\n\n`publishWholeOrderReservation` maintains the one-group projection used by an optional capture policy when the frozen terms include cancellation and the single group matches the snapshot.\n\n`rememberCancellationActivation` writes the first qualifying actual activation time to `/activatedAtMicros` below the caller's timing binding. Missing time means no recorded start for an activation-based elapsed window. With `sellerConfirmationRequired`, recording waits for seller approval. With that flag, customer cancellation before both seller approval and a recorded activation time is free and records `beforeSellerConfirmation`.\n\n`requireCapturedCancellationFee` checks the selected instruction and full confirmed capture before a positive cancellation charge when `cancellationRequiresCapture` is enabled.\n\n`automaticAuthorizationClock` can read `/payment/authorizationTiming` when the caller explicitly binds that path and recorded untimestamped automatic initialization. The Order must be active with access ready and no required approval. It verifies the original selected instruction, matching amount and currency, and the full successful secure request named by the receipt. While selection or authorization is pending, it defers the elapsed comparison and keeps any service-relative condition applicable. It requires valid timing evidence when a successful full secure request is already recorded. A genuine recorded activation time has priority.\n"
+}

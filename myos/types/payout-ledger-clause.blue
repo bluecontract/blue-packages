@@ -1,0 +1,15 @@
+name: Payout Ledger Clause
+type: Ledger/Ledger Clause
+description: Maintain a payout ledger and optionally recover settlements from admitted MyOS transfers when the agreement is active again.
+actionDefinition:
+  type: MyOS/Payout Ledger Functions
+actions:
+  reconcilePayouts:
+    resultContract: outcome-v1
+    automatic:
+      'on': event
+      event: {type: Events/Event, kind: MyOS Payout Settlement Ready}
+    do:
+    - $set:
+        name: actionResult
+        expr: {$call: {function: reconcilePayouts, args: {}}}

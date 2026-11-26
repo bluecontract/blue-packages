@@ -1,0 +1,123 @@
+{
+  "blueId": "F7z5KC3ZbS4WmvZaE7Cti66BifXfyptbGw4PRbXj9GF5",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "2k7MQ291qEdAa6sRWnxXq8ZJw5K9tJ5ZcdUSFcY6bHdw",
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh"
+    ],
+    "displayLabel": "Cancellation Settlement Clause",
+    "limitations": [
+      "An unchanged or absent observation does not establish the outcome of an external payment.",
+      "The settlement observation belongs to the verified original Order and Payment Instruction pair."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "No settlement status has been established for this observation.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "reconcileCancellationPayment records its status and observeCancellationSettlement copies verified state.",
+        "id": "status",
+        "meaning": "Observed settlement progress for the selected Payment Instruction and decision set.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/status",
+        "type": "string"
+      },
+      {
+        "absent": "The settlement currency is unavailable.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "cancellationPlan uses immutable Payment Instruction terms and validates the quote currency.",
+        "id": "settlementCurrency",
+        "meaning": "Currency of the instruction and the settlement amounts.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "This observation has no captured-amount evidence.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "cancellationPlan reads the Payment Instruction ledger completed amount.",
+        "id": "capturedMinor",
+        "meaning": "Cumulative confirmed captured funds, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/capturedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no confirmed refund amount.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "cancellationPlan reads the Payment Instruction ledger reversed amount.",
+        "id": "refundedMinor",
+        "meaning": "Cumulative confirmed refunded funds, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/refundedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no remaining authorization amount.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "cancellationPlan reads the Payment Instruction ledger secured amount.",
+        "id": "authorizedMinor",
+        "meaning": "Remaining secured authorization, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/authorizedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no confirmed net paid amount.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "cancellationPlan records the net from completed less reversed.",
+        "id": "netPaidMinor",
+        "meaning": "Confirmed captured funds less confirmed refunds, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/netPaidMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "This observation has no measured outstanding refund.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "cancellationPlan compares the net paid funds and the retained target.",
+        "id": "refundDueMinor",
+        "meaning": "Confirmed net paid above the retained target, still due back, in minor units of the adjacent currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/refundDueMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No correlated payment request identifier is available.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/paymentSettlement",
+        "evidence": "reconcileCancellationPayment preserves and updates lastRequestId.",
+        "id": "lastRequestId",
+        "meaning": "Identifier of the last payment request correlated by the settlement functions. An empty value records no identifier.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/lastRequestId",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Cancellation Settlement Clause\n\nObserves settlement from the original Order's linked Payment Instruction. The `instruction` binding defaults to `/payment`, `settlement` to `/payment/cancellationSettlement` and the recorded Order `state` to `/paymentSettlement`. When the instruction updates or is linked, the action checks the instruction type and matches the settlement's `orderOrigin` to this Order's initialized identity. It recomputes settlement from this Order's reservations and snapshot and the instruction's terms and ledger, then saves only a matching observation. An absent origin or stale amounts do not update the Order.\n\nThe observation copies progress and the accompanying currency and amounts. Provider-confirmed cumulative captures and refunds appear as separate fields. The last request ID correlates a pending or recorded payment action; its presence does not establish that it succeeded. The clause updates the settlement observation without changing reservation decisions or requesting money movements."
+}

@@ -1,0 +1,245 @@
+name: Receipts Clause
+type: Connections/Connected Clause
+description: Project confirmed captures and refunds from Payment Instructions on usable orders into cumulative receipt totals.
+bindingTypes:
+  orders: pointer
+  instruction: pointer
+  state: pointer
+  currency: pointer
+  entries: pointer
+defaultBindings:
+  orders: /orders
+  instruction: /payment
+  state: /receipts
+  currency: /terms/currency
+  entries: /process_orders/entries
+initialState:
+  state:
+    type:
+      grossConfirmedMinor:
+        name: Confirmed Customer Captures
+        description: Total confirmed customer captures in minor units before refunds.
+        type: Integer
+      refundsMinor:
+        name: Confirmed Customer Refunds
+        description: Total confirmed customer refunds in the same minor units.
+        type: Integer
+      netReceivedMinor:
+        name: Net Customer Receipts
+        description: Confirmed customer captures less confirmed refunds in the same minor units.
+        type: Integer
+    grossConfirmedMinor: 0
+    refundsMinor: 0
+    netReceivedMinor: 0
+    targets: {}
+actionDefinition:
+  type:
+    type: Contracts/Compute Definition
+    functions:
+      namedSourcesReady:
+        $blue:functionFrom:
+          definition: {type: Documents/Source Functions}
+          function: namedSourcesReady
+      processOrigin:
+        $blue:functionFrom:
+          definition: {type: Documents/Source Functions}
+          function: processOrigin
+      rosterCovers:
+        $blue:functionFrom:
+          definition: {type: Documents/Source Functions}
+          function: rosterCovers
+      collectionItemKey:
+        $blue:functionFrom:
+          definition: {type: Documents/Source Functions}
+          function: collectionItemKey
+      usableCollectionEntry:
+        $blue:functionFrom:
+          definition: {type: Documents/Source Functions}
+          function: usableCollectionEntry
+      usableAttachedEntry:
+        $blue:functionFrom:
+          definition: {type: Documents/Source Functions}
+          function: usableAttachedEntry
+      planConfirmedReceipt:
+        $blue:functionFrom:
+          definition: {type: Payment/Payment Setup}
+          function: planConfirmedReceipt
+      project:
+        args: {key: {type: Text}, order: {}}
+        do:
+        - $if:
+            cond: {$ne: [{$var: {name: order, path: /activation/active}}, true]}
+            then:
+            - $return: {}
+        - $let:
+            vars:
+              instruction: {$pointerGet: {object: {$var: order}, path: {$const: {name: bindings, path: /instruction}}, default: {}}}
+              statePath: {$const: {name: bindings, path: /state}}
+        - $let:
+            name: result
+            expr:
+              $call:
+                function: planConfirmedReceipt
+                args:
+                  instruction: {$var: instruction}
+                  key: {$var: key}
+                  statePath: {$var: statePath}
+                  currencyExpectation:
+                    currency: {$document: {$const: {name: bindings, path: /currency}}}
+                    projected: {$document: {$concat: [{$var: statePath}, /currency]}}
+        - $if:
+            cond: {$eq: [{$var: {name: result, path: /outcome}}, acceptedNew]}
+            then:
+            - $appendChanges: {$var: {name: result, path: /changes}}
+            - $call: {function: addTotals, args: {delta: {$var: {name: result, path: /delta}}}}
+            - $call: {function: reportReceiptTarget, args: {key: {$var: key}}}
+        - $return: {}
+      addTotals:
+        args:
+          delta: {}
+        do:
+        - $forEach:
+            key: field
+            item: amount
+            in: {$var: delta}
+            do:
+            - $let: {name: path, expr: {$concat: [{$const: {name: bindings, path: /state}}, /, {$var: field}]}}
+            - $appendChange: {op: replace, path: {$var: path}, val: {$add: [{$document: {$var: path}}, {$var: amount}]}}
+      reportReceiptTarget:
+        args:
+          key: {type: Text}
+        do:
+        - $appendEvent:
+            $merge:
+            - {type: Events/Event, kind: Confirmed Receipts Changed}
+            - {receiptState: {$const: {name: bindings, path: /state}}, key: {$var: key}}
+actions:
+  confirmed:
+    automatic:
+      'on': collection
+      pathBinding: orders
+      event: {type: Payment/Payment Event Received}
+    do:
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$event: /event/instructionPath}, {$const: {name: bindings, path: /instruction}}]}
+            - $or:
+              - {$is: {node: {$event: /event}, pattern: {type: Payment/Payment Event Received, event: {type: PaymentInstruction/Payment Completed}}}}
+              - {$is: {node: {$event: /event}, pattern: {type: Payment/Payment Event Received, event: {type: PaymentInstruction/Payment Reversed After Completion}}}}
+        then:
+        - $return: {}
+    - $let:
+        name: linked
+        expr:
+          $call:
+            function: usableCollectionEntry
+            args:
+              collection: {$const: {name: bindings, path: /orders}}
+              entries: {$const: {name: bindings, path: /entries}}
+              key:
+                $call:
+                  function: collectionItemKey
+                  args: {collection: {$const: {name: bindings, path: /orders}}, sourcePath: {$event: /sourcePath}}
+    - $if:
+        cond: {$exists: {$var: {name: linked, path: /key}}}
+        then:
+        - $call: {function: project, args: {key: {$var: {name: linked, path: /key}}, order: {$var: {name: linked, path: /document}}}}
+  reconcile:
+    do:
+    - $if:
+        cond: {$ne: [{$document: /activation/active}, true]}
+        then:
+        - $return: {}
+    - $let:
+        vars:
+          statePath: {$const: {name: bindings, path: /state}}
+          expectedCurrency: {$document: {$const: {name: bindings, path: /currency}}}
+          totals: {}
+    - $let: {name: projected, expr: {$document: {$concat: [{$var: statePath}, /currency]}}}
+    - $forEach:
+        key: entryId
+        item: entry
+        in: {$object: {$document: {$const: {name: bindings, path: /entries}}}}
+        do:
+        - $let: {name: key, expr: {$var: {name: entry, path: /key}}}
+        - $if:
+            cond:
+              $and:
+              - {$eq: [{$var: {name: entry, path: /status}}, usable]}
+              - {$isKind: {val: {$var: key}, kind: text}}
+              - {$eq: [{$var: entryId}, {$nodeBlueId: {$var: key}}]}
+            then:
+            - $let:
+                name: linked
+                expr:
+                  $call:
+                    function: usableCollectionEntry
+                    args:
+                      collection: {$const: {name: bindings, path: /orders}}
+                      entries: {$const: {name: bindings, path: /entries}}
+                      key: {$var: key}
+            - $if:
+                cond:
+                  $and:
+                  - {$exists: {$var: {name: linked, path: /key}}}
+                  - {$eq: [{$var: {name: linked, path: /document/activation/active}}, true]}
+                  - {$call: {function: namedSourcesReady, args: {document: {$var: {name: linked, path: /document}}}}}
+                then:
+                - $let:
+                    name: instruction
+                    expr: {$pointerGet: {object: {$var: {name: linked, path: /document}}, path: {$const: {name: bindings, path: /instruction}}, default: {}}}
+                - $if:
+                    cond: {$gt: [{$pointerGet: {object: {$var: instruction}, path: /payment/completed, default: 0}}, 0]}
+                    then:
+                    - $let:
+                        name: receipt
+                        expr:
+                          $call:
+                            function: planConfirmedReceipt
+                            args:
+                              instruction: {$var: instruction}
+                              key: {$var: key}
+                              statePath: {$var: statePath}
+                              currencyExpectation: {currency: {$var: expectedCurrency}, projected: {$var: projected}}
+                    - $if:
+                        cond: {$eq: [{$var: {name: receipt, path: /outcome}}, acceptedNew]}
+                        then:
+                        - $set: {name: projected, expr: {$var: {name: receipt, path: /currency}}}
+                        - $appendChanges: {$var: {name: receipt, path: /changes}}
+                        - $forEach:
+                            key: field
+                            item: amount
+                            in: {$var: {name: receipt, path: /delta}}
+                            do:
+                            - $set:
+                                name: totals
+                                expr:
+                                  $objectSet:
+                                    object: {$var: totals}
+                                    key: {$var: field}
+                                    val: {$add: [{$var: amount}, {$pointerGet: {object: {$var: totals}, path: {$pointerJoin: [{$var: field}]}, default: 0}}]}
+                        - $call: {function: reportReceiptTarget, args: {key: {$var: key}}}
+    - $call: {function: addTotals, args: {delta: {$var: totals}}}
+  attached:
+    automatic:
+      'on': event
+      event: {type: Documents/Document Attached}
+    do:
+    - $let:
+        name: linked
+        expr:
+          $call:
+            function: usableAttachedEntry
+            args:
+              collection: {$const: {name: bindings, path: /orders}}
+              entries: {$const: {name: bindings, path: /entries}}
+              event: {$event: ''}
+    - $if:
+        cond:
+          $and:
+          - {$exists: {$var: {name: linked, path: /key}}}
+          - {$call: {function: namedSourcesReady, args: {document: {$var: {name: linked, path: /document}}}}}
+        then:
+        - $call: {function: project, args: {key: {$var: {name: linked, path: /key}}, order: {$var: {name: linked, path: /document}}}}

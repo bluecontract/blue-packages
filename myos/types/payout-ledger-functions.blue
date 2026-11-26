@@ -1,0 +1,233 @@
+name: Payout Ledger Functions
+type: Ledger/Balance Functions
+description: Recognize verified terminal MyOS account transfers or recipient-confirmed payout instructions.
+functions:
+  collectionItemKey:
+    $blue:functionFrom: {definition: {type: Documents/Source Functions}, function: collectionItemKey}
+  usableAttachedEntry:
+    $blue:functionFrom: {definition: {type: Documents/Source Functions}, function: usableAttachedEntry}
+  usableCollectionEntry:
+    $blue:functionFrom: {definition: {type: Documents/Source Functions}, function: usableCollectionEntry}
+  accountTransferResult:
+    $blue:functionFrom: {definition: {type: MyOS/Payment Setup}, function: accountTransferResult}
+  unresolvedFinancialRequests:
+    $blue:functionFrom: {definition: {type: Payment/Payment Setup}, function: unresolvedFinancialRequests}
+  recipientPaymentResult:
+    $blue:functionFrom: {definition: {type: Payment/Payment Setup}, function: recipientPaymentResult}
+  observePayout:
+    args: {}
+    do:
+    - $let:
+        name: key
+        expr:
+          $call:
+            function: collectionItemKey
+            args:
+              collection: {$const: {name: bindings, path: /payouts}}
+              sourcePath: {$event: /sourcePath}
+    - $if:
+        cond: {$eq: [{$var: key}, '']}
+        then:
+        - $return: {outcome: skipped}
+    - $return:
+        $call:
+          function: reportSettlement
+          args: {key: {$var: key}, payout: {$document: {$event: /sourcePath}}, attachment: false}
+  catchUpPayout:
+    args: {}
+    do:
+    - $let:
+        name: linked
+        expr:
+          $call:
+            function: usableAttachedEntry
+            args:
+              collection: {$const: {name: bindings, path: /payouts}}
+              entries: {$const: {name: bindings, path: /payoutEntries}}
+              event: {$event: ''}
+    - $if:
+        cond: {$not: {$exists: {$var: {name: linked, path: /key}}}}
+        then:
+        - $return: {outcome: skipped}
+    - $return:
+        $call:
+          function: reportSettlement
+          args:
+            key: {$var: {name: linked, path: /key}}
+            payout: {$var: {name: linked, path: /document}}
+            attachment: true
+  reconcilePayouts:
+    args: {}
+    do:
+    - $let:
+        vars:
+          clause: {$const: clauseKey}
+          statePath: {$const: {name: bindings, path: /state}}
+          collection: {$const: {name: bindings, path: /payouts}}
+          entries: {$const: {name: bindings, path: /payoutEntries}}
+    - $if:
+        cond:
+          $or:
+          - {$ne: [{$document: /activation/active}, true]}
+          - {$not: {$exists: {$var: collection}}}
+          - {$not: {$exists: {$var: entries}}}
+          - {$eq: [{$document: {$concat: [{$var: statePath}, /reserved]}}, 0]}
+        then:
+        - $return: {outcome: skipped}
+    - $if:
+        cond: {$eq: [{$const: connectionKey}, _automatic]}
+        then:
+        - $let: {name: key, expr: {$event: /key}}
+        - $if:
+            cond:
+              $or:
+              - {$ne: [{$event: /clause}, {$var: clause}]}
+              - {$not: {$isKind: {val: {$var: key}, kind: text}}}
+            then:
+            - $return: {outcome: skipped}
+        - $let:
+            name: routes
+            expr:
+              $merge:
+              - {$object: {$document: {$pointerJoin: [clauses, {$var: clause}, type, defaultBindings]}}}
+              - {$object: {$document: {$pointerJoin: [clauses, {$var: clause}, bindings]}}}
+        - $if:
+            cond: {$eq: [{$size: {$object: {$var: {name: routes, path: /reconcilePayouts}}}}, 0]}
+            then:
+            - $return: {outcome: skipped}
+        - $let:
+            name: reservation
+            expr: {$object: {$document: {$concat: [{$var: statePath}, {$pointerJoin: [settlements, {$var: key}]}]}}}
+        - $let:
+            name: candidate
+            expr: {$call: {function: payoutCandidate, args: {key: {$var: key}, reservation: {$var: reservation}}}}
+        - $if:
+            cond:
+              $or:
+              - {$not: {$exists: {$var: {name: candidate, path: /result/paidMinor}}}}
+              - {$ne: [{$event: /instructionOrigin}, {$var: {name: candidate, path: /origin}}]}
+            then:
+            - $return: {outcome: skipped}
+        - $return:
+            $call:
+              function: recordSettlement
+              args: {key: {$var: key}, result: {$var: {name: candidate, path: /result}}}
+    - $let: {name: queued, expr: false}
+    - $forEach:
+        key: key
+        item: reservation
+        in: {$object: {$document: {$concat: [{$var: statePath}, /settlements]}}}
+        do:
+        - $let:
+            name: candidate
+            expr: {$call: {function: payoutCandidate, args: {key: {$var: key}, reservation: {$var: reservation}}}}
+        - $if:
+            cond: {$exists: {$var: {name: candidate, path: /result/paidMinor}}}
+            then:
+            - $appendEvent:
+                $merge:
+                - {type: Events/Event, kind: MyOS Payout Settlement Ready}
+                - clause: {$var: clause}
+                  key: {$var: key}
+                  instructionOrigin: {$var: {name: candidate, path: /origin}}
+            - $set: {name: queued, expr: true}
+    - $return:
+        outcome: {$choose: {cond: {$var: queued}, then: acceptedNew, else: skipped}}
+  payoutCandidate:
+    args:
+      key: {type: Text}
+      reservation: {}
+    do:
+    - $if:
+        cond: {$ne: [{$var: {name: reservation, path: /status}}, reserved]}
+        then:
+        - $return: {}
+    - $let:
+        name: linked
+        expr:
+          $call:
+            function: usableCollectionEntry
+            args:
+              collection: {$const: {name: bindings, path: /payouts}}
+              entries: {$const: {name: bindings, path: /payoutEntries}}
+              key: {$var: key}
+    - $if:
+        cond: {$not: {$exists: {$var: {name: linked, path: /key}}}}
+        then:
+        - $return: {}
+    - $return:
+        origin: {$var: {name: linked, path: /entry/documentOrigin}}
+        result:
+          $call:
+            function: settlementResult
+            args:
+              key: {$var: key}
+              payout: {$var: {name: linked, path: /document}}
+              reservation: {$var: reservation}
+              attachment: true
+  reportSettlement:
+    args:
+      key: {type: Text}
+      payout: {}
+      attachment: {type: Boolean}
+    do:
+    - $let:
+        name: reservation
+        expr:
+          $document: {$concat: [{$const: {name: bindings, path: /state}}, {$pointerJoin: [settlements, {$var: key}]}]}
+    - $if:
+        cond: {$not: {$exists: {$var: reservation}}}
+        then:
+        - $return: {outcome: skipped}
+    - $let:
+        name: result
+        expr:
+          $call:
+            function: settlementResult
+            args: {key: {$var: key}, payout: {$var: payout}, reservation: {$var: reservation}, attachment: {$var: attachment}}
+    - $return:
+        $call:
+          function: recordSettlement
+          args: {key: {$var: key}, result: {$var: result}}
+  settlementResult:
+    args:
+      key: {type: Text}
+      payout: {}
+      reservation: {}
+      attachment: {type: Boolean}
+    do:
+    - $let: {name: amount, expr: {$var: {name: reservation, path: /amountMinor}}}
+    - $let:
+        name: result
+        expr:
+          $call:
+            function: accountTransferResult
+            args:
+              instruction: {$var: payout}
+              key: {$var: key}
+              reservedMinor: {$var: amount}
+              receiptPath: /accountSettlement
+              requestPrefix: payout-
+    - $if:
+        cond: {$eq: [{$var: {name: result, path: /accountTransfer}}, true]}
+        then:
+        - $if:
+            cond: {$ne: [{$var: {name: reservation, path: /status}}, reserved]}
+            then:
+            - $return: {}
+        - $return: {$var: result}
+    - $if:
+        cond:
+          $or:
+          - {$var: attachment}
+          - {$ne: [{$event: /event/instructionPath}, /payment]}
+          - {$not: {$is: {node: {$event: /event}, pattern: {type: Payment/Payment Event Received}}}}
+        then:
+        - $return: {}
+    - $return:
+        $call:
+          function: recipientPaymentResult
+          args:
+            instruction: {$pointerGet: {object: {$var: payout}, path: /payment, default: {}}}
+            retired: {$eq: [{$var: {name: payout, path: /payment/settlementOpen}}, false]}
+            reservedMinor: {$var: amount}

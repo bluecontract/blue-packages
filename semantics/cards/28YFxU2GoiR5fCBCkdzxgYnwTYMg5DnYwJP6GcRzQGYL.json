@@ -1,0 +1,158 @@
+{
+  "blueId": "28YFxU2GoiR5fCBCkdzxgYnwTYMg5DnYwJP6GcRzQGYL",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "SmMG3hq46SvpHmCxTD2mj2WoPEu9NRLDaE1EYNYRDde"
+    ],
+    "displayLabel": "Reservation settlement functions",
+    "limitations": [
+      "The linked Order supplies authoritative reservation decisions, while the instruction and guarantor outcomes supply authoritative payment details."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Instruction.paymentTerms",
+        "id": "currency",
+        "meaning": "Currency used by this instruction for its minor-unit amounts.",
+        "path": "/paymentTerms/currency",
+        "scope": "document",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and accept",
+        "id": "accepted",
+        "meaning": "Guarantor acceptance of the instruction.",
+        "path": "/payment/accepted",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "An empty value means no transaction has been attached.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize and initiate",
+        "id": "transactionId",
+        "meaning": "Attached transaction identity.",
+        "path": "/payment/transactionId",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Current secured funds after confirmed effects",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "secured",
+        "meaning": "Remaining confirmed secured funds in the instruction currency.",
+        "path": "/payment/secured",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed captures",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "completed",
+        "meaning": "Cumulative confirmed captures before refunds in the instruction currency.",
+        "path": "/payment/completed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed post-capture reversals",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reversed",
+        "meaning": "Cumulative confirmed post-capture refunds in the instruction currency.",
+        "path": "/payment/reversed",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open capture reservations",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reservedCapture",
+        "meaning": "Capture requests currently reserved, in the instruction currency.",
+        "path": "/payment/reserved/capture",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open refund reservations",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reservedRefund",
+        "meaning": "Refund requests currently reserved, in the instruction currency.",
+        "path": "/payment/reserved/refund",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Open void reservations",
+          "unit": "minor currency units"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payment Functions.initialize, request and confirm",
+        "id": "reservedVoid",
+        "meaning": "Void requests currently reserved, in the instruction currency.",
+        "path": "/payment/reserved/void",
+        "scope": "document",
+        "suffix": "",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Reservation Settlement Functions\n\nReconciles cancellation decisions from the admitted Order against the executing Payment Instruction. It inherits Payment Protocol Functions.\n\n`isSelectedOrderPayment` checks both directions of the Order and instruction lineage, the retained preparation requirement and the selected or usable provision record. `cancellationPlan` checks the linked Order's exact group proposal and decision evidence, the frozen quote, covered terms amount and currency. The target includes approved terminal charges and the obligation for still-live groups. The maintained state records remaining confirmed authorization, cumulative confirmed captures and refunds, net paid and any amount still due for capture, refund or authorization release. Amounts use the instruction currency in minor units.\n\n`reconcileCancellationPayment` skips when the linked policy or required evidence is absent. Exact selection can establish the source before the Order activates, allowing a verified free cancellation to request release under the instruction's guards. The helper may request a refund before all groups resolve. It waits for resolved group scope to capture an amount due or void a remaining hold. A pending or unknown financial request makes it wait. The stock payment guards, active accepted instruction, transaction, sufficient secured funds and configured capture gate still apply. Requests are keyed from the decision scope, action, amount and confirmed ledger state. A failed or declined identical request is reported as failed. An update emits Cancellation Settlement Changed. Guarantor outcome operations establish confirmed effects.\n\nFor the `myos-customer` method, the helper marks a partial capture as blocked. Refunds and authorization releases follow their own native guards."
+}

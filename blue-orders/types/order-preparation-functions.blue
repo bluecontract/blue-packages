@@ -1,0 +1,281 @@
+name: Order Preparation Functions
+description: Compute catalogue terms for an independent Order using the generic Documents lifecycle.
+type: Contracts/Compute Definition
+functions:
+  $blue:membersFrom:
+    definition: {type: Documents/Document Preparation Functions}
+    field: functions
+  validateFields:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateFields
+  validateIdentifier:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateIdentifier
+  validatePositiveInteger:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validatePositiveInteger
+  priceSelections:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: priceSelections
+  priceLine:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: priceLine
+  validateInteger:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateInteger
+  validatePricingAmount:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validatePricingAmount
+  validateCalendarDate:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: validateCalendarDate
+  baseConstructDocument:
+    $blue:functionFrom:
+      definition: {type: Documents/Factory Functions}
+      function: constructDocument
+  roundBps:
+    $blue:functionFrom:
+      definition: {type: Money/Rounding}
+      function: roundBps
+  customerRole:
+    args: {}
+    expr: {$pointerGet: {object: {$call: {function: configurationParameters, args: {}}}, path: /customerRole, default: customer}}
+  customerAccountPath:
+    args: {}
+    expr: {$concat: [/activation/parties/, {$call: {function: customerRole, args: {}}}, /myosAccountId]}
+  catalogueQuote:
+    args:
+      input: {}
+    do:
+    - $if:
+        cond: {$hasKey: {object: {$var: input}, key: quoteKey}}
+        then:
+        - $failIf:
+            cond: {$or: [{$hasKey: {object: {$var: input}, key: lines}}, {$hasKey: {object: {$var: input}, key: catalogRevision}}]}
+            message: EXACTLY_ONE_ORDER_PRICE_SOURCE_REQUIRED
+        - $call:
+            function: validateIdentifier
+            args: {candidate: {$var: {name: input, path: /quoteKey}}, error: INVALID_QUOTE_KEY}
+        - $let:
+            name: quotes
+            expr: {$pointerGet: {object: {$const: bindings}, path: /quotes, default: /quotes}}
+        - $let:
+            name: quote
+            expr: {$get: {object: {$document: {$var: quotes}}, key: {$var: {name: input, path: /quoteKey}}}}
+        - $failIf: {cond: {$not: {$exists: {$var: quote}}}, message: UNKNOWN_QUOTE}
+        - $return: {$var: quote}
+    - $call:
+        function: validatePositiveInteger
+        args: {candidate: {$var: {name: input, path: /catalogRevision}}, error: INVALID_CATALOG_REVISION}
+    - $let: {name: catalog, expr: {$document: {$const: {name: bindings, path: /catalog}}}}
+    - $failIf:
+        cond: {$ne: [{$var: {name: input, path: /catalogRevision}}, {$var: {name: catalog, path: /revision}}]}
+        message: STALE_CATALOG_REVISION
+    - $return:
+        $call:
+          function: priceSelections
+          args:
+            input:
+              catalogRevision: {$var: {name: input, path: /catalogRevision}}
+              lines: {$var: {name: input, path: /lines}}
+            catalogState: {$var: catalog}
+  # Catalogue validation and pricing are shared by the base and any booking extension.
+  prepareCatalogDetails:
+    args:
+      input: {}
+    do:
+    - $call:
+        function: validateFields
+        args:
+          candidate: {$var: input}
+          allowed: [key, requestId, description, customer, customerEmail, quoteKey, catalogRevision, lines, groups]
+          required: [key, requestId]
+          error: UNKNOWN_ORDER_INPUT
+    - $call:
+        function: validateIdentifier
+        args: {candidate: {$var: {name: input, path: /key}}, error: INVALID_ORDER_KEY}
+    - $call:
+        function: validateIdentifier
+        args: {candidate: {$var: {name: input, path: /requestId}}, error: INVALID_ORDER_REQUEST_ID}
+    - $let: {name: hasAccount, expr: {$hasKey: {object: {$var: input}, key: customer}}}
+    - $let: {name: hasEmail, expr: {$hasKey: {object: {$var: input}, key: customerEmail}}}
+    - $failIf:
+        cond:
+          $or:
+          - {$and: [{$var: hasAccount}, {$var: hasEmail}]}
+          - {$and: [{$not: {$hasKey: {object: {$var: input}, key: quoteKey}}}, {$not: {$var: hasAccount}}, {$not: {$var: hasEmail}}]}
+        message: EXACTLY_ONE_CUSTOMER_REQUIRED
+    - $if:
+        cond: {$var: hasAccount}
+        then:
+        - $failIf:
+            cond: {$not: {$is: {node: {$var: {name: input, path: /customer}}, pattern: {type: Text, schema: {minLength: 1, maxLength: 256}}}}}
+            message: CUSTOMER_REQUIRED
+        - $forEach:
+            key: childRole
+            item: parentParty
+            in: {$object: {$const: {name: bindings, path: /parties}}}
+            do:
+            - $let:
+                name: parentAccount
+                expr:
+                  $choose:
+                    cond: {$isKind: {val: {$var: parentParty}, kind: text}}
+                    then: {$document: {$concat: [/activation/parties/, {$var: parentParty}, /myosAccountId]}}
+                    else: {$pointerGet: {object: {$var: parentParty}, path: /myosAccountId}}
+            - $failIf:
+                cond: {$eq: [{$var: {name: input, path: /customer}}, {$var: parentAccount}]}
+                message: CUSTOMER_MUST_BE_DISTINCT
+    - $if:
+        cond: {$var: hasEmail}
+        then:
+        - $failIf:
+            cond: {$not: {$is: {node: {$var: {name: input, path: /customerEmail}}, pattern: {type: Text, schema: {minLength: 1, maxLength: 320}}}}}
+            message: INVALID_CUSTOMER_EMAIL
+    - $let: {name: orderDescription, expr: {$pointerGet: {object: {$var: input}, path: /description, default: Order}}}
+    - $failIf:
+        cond: {$not: {$is: {node: {$var: orderDescription}, pattern: {type: Text, schema: {minLength: 1}}}}}
+        message: INVALID_ORDER_DESCRIPTION
+    - $let: {name: quote, expr: {$call: {function: catalogueQuote, args: {input: {$var: input}}}}}
+    - $let:
+        name: fields
+        expr:
+          orderDescription: {$var: orderDescription}
+          customerAccountId: {$var: {name: input, path: /customer}}
+          customerEmail: {$var: {name: input, path: /customerEmail}}
+          amountMinor: {$var: {name: quote, path: /totalMinor}}
+          currency: {$var: {name: quote, path: /currency}}
+          quote: {$var: quote}
+          quoteBlueId: {$nodeBlueId: {$var: quote}}
+    - $return: {fields: {$var: fields}}
+  # Read-only entry point shared by native checkout preview and Documents preparation.
+  prepareDetails:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: details
+        expr: {$call: {function: prepareCatalogDetails, args: {input: {$var: input}}}}
+    - $failIf:
+        cond:
+          $or:
+          - {$exists: {$pointerGet: {object: {$const: bindings}, path: /fulfilment}}}
+          - {$exists: {$pointerGet: {object: {$call: {function: configuredTemplate, args: {}}}, path: /reservationPolicy}}}
+        message: BOOKING_PREPARATION_REQUIRED
+    - $failIf: {cond: {$exists: {$var: {name: input, path: /groups}}}, message: BOOKING_CLAUSE_REQUIRED}
+    - $return: {$var: details}
+  constructDocument:
+    args:
+      input: {}
+      checked: {}
+    do:
+    # The stock preflight already compared the unchanged caller intent before
+    # reading live commercial state. Caller fields can never replace prices.
+    - $failIf:
+        cond: {$ne: [{$pointerGet: {object: {$var: input}, path: /fields, default: {}}}, {}]}
+        message: ORDER_FIELDS_COME_FROM_CATALOG
+    - $failIf:
+        cond: {$ne: [{$call: {function: preparationMode, args: {}}}, bootstrap]}
+        message: ORDER_BOOTSTRAP_REQUIRED
+    - $failIf:
+        cond:
+          $not:
+            $includes:
+              list: {$pointerGet: {object: {$call: {function: configurationParameters, args: {}}}, path: /suppliedParties, default: []}}
+              val: {$call: {function: customerRole, args: {}}}
+        message: ORDER_CUSTOMER_SLOT_REQUIRED
+    - $let:
+        name: selection
+        expr:
+          $merge:
+          - {$pointerGet: {object: {$var: input}, path: /values, default: {}}}
+          - key: {$var: {name: checked, path: /key}}
+            requestId: {$var: {name: checked, path: /requestId}}
+    - $let: {name: details, expr: {$call: {function: prepareDetails, args: {input: {$var: selection}}}}}
+    - $let:
+        name: child
+        expr:
+          $call:
+            function: baseConstructDocument
+            args:
+              input: {fields: {$var: {name: details, path: /fields}}, values: {}}
+              checked: {$var: checked}
+    - $let:
+        name: omitClauseForZeroAmount
+        expr: {$pointerGet: {object: {$call: {function: configurationParameters, args: {}}}, path: /omitClauseForZeroAmount}}
+    - $if:
+        cond: {$and: [{$eq: [{$var: {name: child, path: /amountMinor}}, 0]}, {$exists: {$var: omitClauseForZeroAmount}}]}
+        then:
+        - $call:
+            function: validateIdentifier
+            args: {candidate: {$var: omitClauseForZeroAmount}, error: INVALID_OPTIONAL_CLAUSE}
+        - $return:
+            $pointerSet:
+              object: {$var: child}
+              path: {$concat: [/clauses/, {$var: omitClauseForZeroAmount}]}
+              op: remove
+    - $return: {$var: child}
+  domainPrepare:
+    args:
+      prepared: {}
+    do:
+    - $return:
+        request: {$merge: [{$var: {name: prepared, path: /creationIntent/values}}, {requestId: {$var: {name: prepared, path: /creationIntent/requestId}}}]}
+        quote: {$var: {name: prepared, path: /quote}}
+        quoteBlueId: {$var: {name: prepared, path: /quoteBlueId}}
+        amountMinor: {$var: {name: prepared, path: /amountMinor}}
+        currency: {$var: {name: prepared, path: /currency}}
+        customerEmail: {$var: {name: prepared, path: /customerEmail}}
+        customerAccountId: {$var: {name: prepared, path: /customerAccountId}}
+        orderSnapshot: {$pointerGet: {object: {$var: prepared}, path: /orderSnapshot, default: {}}}
+  domainValidateCandidate:
+    args:
+      frozenTerms: {}
+      candidate: {}
+    do:
+    - $let: {name: accountPath, expr: {$call: {function: customerAccountPath, args: {}}}}
+    - $let: {name: account, expr: {$pointerGet: {object: {$var: candidate}, path: {$var: accountPath}}}}
+    - $let: {name: accountCopy, expr: {$var: {name: candidate, path: /customerAccountId}}}
+    - $failIf:
+        cond: {$not: {$is: {node: {$var: account}, pattern: {type: Text, schema: {minLength: 1, maxLength: 256}}}}}
+        message: CUSTOMER_BINDING_REQUIRED
+    - $failIf:
+        cond:
+          $or:
+          - {$and: [{$exists: {$var: accountCopy}}, {$ne: [{$var: account}, {$var: accountCopy}]}]}
+          - $ne:
+            - {$var: account}
+            - $pointerGet:
+                object: {$var: candidate}
+                path: {$concat: [/contracts/initialized/document/clauses/activation/parameters/parties/, {$call: {function: customerRole, args: {}}}, /myosAccountId]}
+        message: CUSTOMER_ORDER_IDENTITY_CHANGED
+    - $forEach:
+        item: parentRole
+        key: role
+        in: {$object: {$const: {name: bindings, path: /parties}}}
+        do:
+        - $failIf:
+            cond: {$eq: [{$var: account}, {$pointerGet: {object: {$var: candidate}, path: {$concat: [/activation/parties/, {$var: role}, /myosAccountId]}}}]}
+            message: CUSTOMER_MUST_BE_DISTINCT
+    - $forEach:
+        item: field
+        in: [/quote, /quoteBlueId, /amountMinor, /currency, /customerEmail]
+        do:
+        - $failIf:
+            cond: {$ne: [{$pointerGet: {object: {$var: candidate}, path: {$var: field}}}, {$pointerGet: {object: {$var: frozenTerms}, path: {$var: field}}}]}
+            message: CUSTOMER_ORDER_COMMERCIAL_TERMS_CHANGED
+    - $failIf:
+        cond:
+          $or:
+          - {$and: [{$exists: {$var: {name: frozenTerms, path: /customerAccountId}}}, {$ne: [{$var: account}, {$var: {name: frozenTerms, path: /customerAccountId}}]}]}
+          - {$ne: [{$var: {name: frozenTerms, path: /orderSnapshot}}, {$pointerGet: {object: {$var: candidate}, path: /orderSnapshot, default: {}}}]}
+        message: CUSTOMER_ORDER_COMMERCIAL_TERMS_CHANGED
+    - $return: true

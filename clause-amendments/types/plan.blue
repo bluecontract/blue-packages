@@ -1,0 +1,272 @@
+name: Amendments Plan
+description: Bind an optional, exact replacement validator into the stock amendment actions.
+type: Connections/Connection Plan
+functions:
+  plan:
+    expr: {$call: {function: planAmendments, args: {}}}
+  planAmendments:
+    args: {}
+    do:
+    - $let: {name: plan, expr: {$call: {function: planConnections, args: {}}}}
+    - $let:
+        name: validatorPath
+        expr: {$pointerJoin: [clauseRuntime, work, candidate, {$const: clauseKey}, parameters, replacementValidator]}
+    - $if:
+        cond: {$not: {$exists: {$document: {path: {$var: validatorPath}, view: definition}}}}
+        then:
+        - $return: {$var: plan}
+    - $let:
+        name: definitionPath
+        expr: {$concat: [{$var: validatorPath}, /definition/type]}
+    - $let:
+        name: definition
+        expr: {$document: {path: {$var: definitionPath}, view: definition}}
+    - $let:
+        name: functionName
+        expr: {$document: {$concat: [{$var: validatorPath}, /function]}}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$is: {node: {$var: definition}, pattern: {type: Contracts/Compute Definition}}}
+            - {$isKind: {val: {$var: functionName}, kind: text}}
+            - {$exists: {$document: {path: {$concat: [{$var: definitionPath}, {$pointerJoin: [functions, {$var: functionName}]}]}, view: definition}}}
+        message: AMENDMENT_VALIDATOR_FUNCTION_REQUIRED
+    - $let:
+        name: validate
+        expr:
+          $call:
+            function: replacementValidationStep
+            args:
+              definition: {$var: definition}
+              definitionPath: {$var: definitionPath}
+              functionName: {$var: functionName}
+    - $let:
+        name: validationInput
+        expr: {$call: {function: amendmentValidationInputStep, args: {}}}
+    - $let:
+        name: apply
+        expr:
+          $merge:
+          - type: Contracts/Compute
+          - name: applyAmendment
+            expr: {$literal: {$steps: {step: prepareAmendment, path: /staged}}}
+    - $let: {name: evaluateName, expr: evaluateAmendmentAction}
+    - $forEach:
+        item: functionKey
+        in:
+          $keys:
+            $document:
+              $pointerJoin: [clauseRuntime, work, candidate, {$const: clauseKey}, type, actionDefinition, type, functions]
+        do:
+        # Keys are visited in order. Extending the current key advances past
+        # all names already visited while retaining a valid function name.
+        - $if:
+            cond: {$startsWith: [{$var: functionKey}, {$var: evaluateName}]}
+            then:
+            - $set: {name: evaluateName, expr: {$concat: [{$var: functionKey}, _]}}
+    - $forEach:
+        key: contributionKey
+        item: contribution
+        in: {$var: {name: plan, path: /contracts}}
+        do:
+        - $if:
+            cond: {$exists: {$var: {name: contribution, path: /contract/steps/0/definition}}}
+            then:
+            - $set:
+                name: plan
+                expr:
+                  $pointerSet:
+                    object: {$var: plan}
+                    path: {$concat: [{$pointerJoin: [contracts, {$var: contributionKey}]}, /contract/steps]}
+                    val:
+                    - $call:
+                        function: amendmentPreparationStep
+                        args:
+                          step: {$var: {name: contribution, path: /contract/steps/0}}
+                          evaluateName: {$var: evaluateName}
+                    - $var: validationInput
+                    - $var: validate
+                    - $var: apply
+    - $return: {$var: plan}
+  amendmentPreparationStep:
+    args:
+      step: {}
+      evaluateName: {type: Text}
+    do:
+    # Keep the original Connections body (including its early returns and
+    # author callbacks), but hold its native effects until validation passes.
+    - $return:
+        $merge:
+        - {$var: step}
+        - name: prepareAmendment
+          functions:
+            $objectSet:
+              object: {$var: {name: step, path: /functions}}
+              key: {$var: evaluateName}
+              val:
+                args: {}
+                do: {$var: {name: step, path: /do}}
+          do:
+            $pointerSet:
+              path: /0/$let/expr/$call/function
+              val: {$var: evaluateName}
+              object:
+                $literal:
+                - $let: {name: result, expr: {$call: {function: '', args: {}}}}
+                - $return:
+                    changeset: []
+                    events: []
+                    statePath: {$const: {name: bindings, path: /state}}
+                    staged:
+                      changeset: {$pointerGet: {object: {$var: result}, path: /changeset, default: {$changeset: true}}}
+                      events: {$pointerGet: {object: {$var: result}, path: /events, default: {$events: true}}}
+  amendmentValidationInputStep:
+    args: {}
+    expr:
+      $merge:
+      - type: Contracts/Compute
+      - name: collectAmendmentValidation
+        functions:
+          $literal:
+            touches:
+              args: {patchPath: {type: Text}, target: {type: Text}}
+              expr:
+                $or:
+                - {$eq: [{$var: patchPath}, /]}
+                - {$eq: [{$var: patchPath}, {$var: target}]}
+                - {$startsWith: [{$var: patchPath}, {$concat: [{$var: target}, /]}]}
+                - {$startsWith: [{$var: target}, {$concat: [{$var: patchPath}, /]}]}
+            replacementArguments:
+              args: {proposal: {}}
+              expr:
+                current: {$document: {$var: {name: proposal, path: /path}}}
+                replacement: {$var: {name: proposal, path: /replacement}}
+        do:
+          $literal:
+          - $let: {name: stagedChanges, expr: {$steps: {step: prepareAmendment, path: /staged/changeset}}}
+          - $if:
+              cond: {$eq: [{$size: {$var: stagedChanges}}, 0]}
+              then:
+              - $return: {candidates: []}
+          # Keep only amendment-state patches in this native preview. Read
+          # transitions in effective C15 order so a follow-up proposal can be
+          # validated after the one completed in the same handler.
+          - $let: {name: statePath, expr: {$steps: {step: prepareAmendment, path: /statePath}}}
+          - $let:
+              vars:
+                proposalPath: {$concat: [{$var: statePath}, /proposal]}
+                revisionPath: {$concat: [{$var: statePath}, /revision]}
+                candidates: []
+          - $let:
+              vars:
+                pending: {$document: {$var: proposalPath}}
+                pendingRevision: {$document: {$var: revisionPath}}
+          - $forEach:
+              in: {$var: stagedChanges}
+              item: patch
+              do:
+              - $let:
+                  name: patchPath
+                  expr:
+                    $choose:
+                      cond: {$startsWith: [{$var: {name: patch, path: /path}}, /]}
+                      then: {$var: {name: patch, path: /path}}
+                      else: {$concat: [/, {$var: {name: patch, path: /path}}]}
+              - $if:
+                  cond: {$call: {function: touches, args: {patchPath: {$var: patchPath}, target: {$var: statePath}}}}
+                  then:
+                  - $appendChanges: [{$var: patch}]
+                  - $if:
+                      cond: {$call: {function: touches, args: {patchPath: {$var: patchPath}, target: {$var: proposalPath}}}}
+                      then:
+                      - $let: {name: proposed, expr: {$resultValue: {$var: proposalPath}}}
+                      - $let:
+                          vars:
+                            pendingId: {$var: {name: pending, path: /id}}
+                            proposedId: {$var: {name: proposed, path: /id}}
+                      - $if:
+                          cond:
+                            $or:
+                            - {$ne: [{$var: pendingId}, {$var: proposedId}]}
+                            - {$ne: [{$var: {name: pending, path: /path}}, {$var: {name: proposed, path: /path}}]}
+                            - {$ne: [{$var: {name: pending, path: /replacement}}, {$var: {name: proposed, path: /replacement}}]}
+                          then:
+                          - $let: {name: revision, expr: {$resultValue: {$var: revisionPath}}}
+                          - $if:
+                              cond:
+                                $and:
+                                - {$exists: {$var: pendingId}}
+                                - {$eq: [{$var: revision}, {$add: [{$var: pendingRevision}, 1]}]}
+                                - $eq:
+                                  - {$resultValue: {$concat: [{$var: statePath}, {$pointerJoin: [history, {$var: pendingId}]}]}}
+                                  - true
+                              then:
+                              - $set:
+                                  name: candidates
+                                  expr:
+                                    $listConcat:
+                                    - {$var: candidates}
+                                    - [{$call: {function: replacementArguments, args: {proposal: {$var: pending}}}}]
+                          - $if:
+                              cond: {$exists: {$var: proposedId}}
+                              then:
+                              - $set:
+                                  name: candidates
+                                  expr:
+                                    $listConcat:
+                                    - {$var: candidates}
+                                    - [{$call: {function: replacementArguments, args: {proposal: {$var: proposed}}}}]
+                          - $set: {name: pending, expr: {$var: proposed}}
+                          - $set: {name: pendingRevision, expr: {$var: revision}}
+          - $return: {changeset: [], events: [], candidates: {$var: candidates}}
+  replacementValidationStep:
+    args:
+      definition: {}
+      definitionPath: {type: Text}
+      functionName: {type: Text}
+    do:
+    # Contracts compiles all functions in the selected definition. Supply the
+    # standard context slots used by unrelated Commerce functions only when the
+    # selected library does not already declare them.
+    - $let:
+        name: contextDefaults
+        expr:
+          $filter:
+            in: {bindings: {}, clauseKey: '', parameters: {}}
+            key: contextKey
+            item: contextValue
+            where:
+              $not:
+                $exists:
+                  $document:
+                    path: {$concat: [{$var: definitionPath}, {$pointerJoin: [constants, {$var: contextKey}]}]}
+                    view: definition
+    - $return:
+        $merge:
+        - type: Contracts/Compute
+        - name: validateAmendmentReplacement
+          definition: {$var: definition}
+          constants: {$var: contextDefaults}
+          do:
+          - $pointerSet:
+              object:
+                $literal:
+                  $forEach:
+                    in: {$steps: {step: collectAmendmentValidation, path: /candidates}}
+                    item: candidate
+                    do:
+                    - $failIf:
+                        cond:
+                          $eq:
+                          - $call:
+                              function: ''
+                              args:
+                                current: {$var: {name: candidate, path: /current}}
+                                replacement: {$var: {name: candidate, path: /replacement}}
+                          - false
+                        message: INVALID_AMENDMENT_REPLACEMENT
+              path: /$forEach/do/0/$failIf/cond/$eq/0/$call/function
+              val: {$var: functionName}
+          - $literal:
+              $return: {changeset: [], events: []}

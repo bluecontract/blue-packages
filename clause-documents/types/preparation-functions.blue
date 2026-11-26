@@ -1,6 +1,10 @@
 name: Preparation Functions
 type: Documents/Admission Functions
 functions:
+  snapshotDocumentFields:
+    $blue:functionFrom:
+      definition: {type: Commerce/Catalog Functions}
+      function: snapshotDocumentFields
   processStatePath:
     args: {}
     do:
@@ -174,6 +178,27 @@ functions:
         intent:
           $var: intent
         outcome: acceptedNew
+  # Resolve a retry by its original request before recalculating domain terms.
+  checkPreparationRetry:
+    args:
+      key: {type: Text}
+      witnessPath: {type: Text}
+      witness: {}
+    do:
+    - $let:
+        name: existing
+        expr: {$document: {$call: {function: itemPath, args: {key: {$var: key}}}}}
+    - $if:
+        cond: {$not: {$exists: {$var: existing}}}
+        then:
+        - $return: {}
+    - $failIf:
+        cond: {$ne: [{$pointerGet: {object: {$var: existing}, path: {$var: witnessPath}}}, {$var: witness}]}
+        message: PREPARATION_OBLIGATION_CONFLICT
+    - $return:
+        outcome: duplicate
+        key: {$var: {name: existing, path: /key}}
+        path: {$var: {name: existing, path: /path}}
   checkPreparation:
     args:
       input: {}
@@ -309,6 +334,19 @@ functions:
             args:
               prepared:
                 $var: prepared
+    - $if:
+        cond: {$exists: {$var: {name: parameters, path: /privateTerms}}}
+        then:
+        - $set:
+            name: domainTerms
+            expr:
+              $merge:
+              - {$var: domainTerms}
+              - $call:
+                  function: freezePrivateTerms
+                  args:
+                    input: {$var: input}
+                    declarations: {$var: {name: parameters, path: /privateTerms}}
     - $let:
         name: slots
         expr:
@@ -1154,6 +1192,61 @@ functions:
   domainNextActions:
     args:
       documentRef: {}
+  freezePrivateTerms:
+    args:
+      input: {}
+      declarations: {}
+    do:
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: declarations}, kind: object}}}
+        message: PREPARATION_PRIVATE_TERMS_REQUIRED
+    - $let: {name: terms, expr: {}}
+    - $forEach:
+        key: termName
+        item: declaration
+        in: {$var: declarations}
+        do:
+        - $let:
+            name: termValue
+            expr:
+              $call:
+                function: freezePrivateTerm
+                args: {input: {$var: input}, declaration: {$var: declaration}}
+        - $set:
+            name: terms
+            expr: {$objectSet: {object: {$var: terms}, key: {$var: termName}, val: {$var: termValue}}}
+    - $return: {$var: terms}
+  freezePrivateTerm:
+    args:
+      input: {}
+      declaration: {}
+    do:
+    - $let: {name: stored, expr: {$var: {name: declaration, path: /stored}}}
+    - $if:
+        cond: {$exists: {$var: stored}}
+        then:
+        - $let: {name: collection, expr: {$var: {name: stored, path: /collection}}}
+        - $let: {name: keyPath, expr: {$var: {name: stored, path: /key}}}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$isKind: {val: {$var: collection}, kind: text}}
+                - {$isKind: {val: {$var: keyPath}, kind: text}}
+            message: PREPARATION_PRIVATE_SNAPSHOT_SOURCE_REQUIRED
+        - $let: {name: key, expr: {$pointerGet: {object: {$var: input}, path: {$var: keyPath}}}}
+        - $if:
+            cond: {$exists: {$var: key}}
+            then:
+            - $let: {name: snapshot, expr: {$get: {object: {$document: {$var: collection}}, key: {$var: key}}}}
+            - $failIf:
+                cond: {$not: {$isKind: {val: {$var: snapshot}, kind: object}}}
+                message: PREPARATION_PRIVATE_SNAPSHOT_REQUIRED
+            - $return: {$var: snapshot}
+    - $return:
+        $call:
+          function: snapshotDocumentFields
+          args: {fields: {$var: {name: declaration, path: /fields}}}
   checkedDomainPrepare:
     args:
       prepared: {}

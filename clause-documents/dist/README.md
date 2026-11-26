@@ -44,6 +44,33 @@ retains a prepared requirement and accepts an independently initialized instance
 Provision requires its exact `inResponseTo` request ID and `requirementRef`.
 The instance's native origin and execution history are preserved.
 
+Set `parameters.selectBeforeActivation` to `true` on the authored clause to
+select a verified document while it awaits commercial approval. Documents
+still requires the prepared source, exact identity, access, and any
+participant admission approvals and consent. First provision can select
+the document and emit `Document Selected`. Later observed activation and
+source readiness make that same instance usable and emit `Document Attached`.
+Omitting the option or setting it to `false` waits for activation before
+selection. The provision caller supplies the document and request identifiers.
+
+A package with its own input adapter can compose the Documents functions and
+actions at build time using `$blue:membersFrom`. The marker selects an imported
+definition and its `functions` or `actions` map. The package builder takes
+unchanged function references and canonical action definitions from the import,
+then applies local overrides and optional aliases. This allows an adapter to use
+the same preparation, provision and resume code while keeping its input schema
+and document-specific validation. An adapter that prices or derives terms
+before construction can use `checkPreparationRetry` against its stored request
+witness to recover the original preparation before recalculating those terms.
+
+An agreement author can also keep the stock clause and select a published
+compute definition at `parameters.preparationDefinition` using its exact type.
+The definition supplies the functions used by the stock preparation actions.
+Role and connection bindings, prepared requirement identity, and the
+`/process_<clause>/entries` contract still belong to Documents. Omitting this
+parameter keeps the built-in definition. Operation requests do not select a
+compute definition.
+
 ### Preparation for independent bootstrap
 
 The explicit `parameters.prepareFor: bootstrap` variant was qualified locally on

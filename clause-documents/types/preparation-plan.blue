@@ -27,6 +27,44 @@ constants:
   admissionCanonicalDefinition:
     type: Documents/Admission Functions
 functions:
+  # An author may supply an exact preparation module without defining a
+  # second clause. Prepare/provide callers still use the stock actions.
+  prepareDefinitionPath:
+    args:
+      clauseKey: {type: Text}
+    do:
+    - $let: {name: path, expr: {$concat: [/clauseRuntime/work/candidate/, {$var: clauseKey}]}}
+    - $if:
+        cond: {$exists: {$document: {$concat: [{$var: path}, /parameters/preparationDefinition]}}}
+        then:
+        - $return: {$concat: [{$var: path}, /parameters/preparationDefinition/type]}
+    - $return: {$concat: [{$var: path}, /type/actionDefinition/type]}
+  configurePreparationActions:
+    args:
+      plan: {}
+      definition: {}
+    do:
+    - $let: {name: plannedContracts, expr: {$var: {name: plan, path: /contracts}}}
+    - $forEach:
+        in: {$var: plannedContracts}
+        key: key
+        item: contribution
+        do:
+        - $if:
+            cond: {$exists: {$var: {name: contribution, path: /contract/steps/0/definition}}}
+            then:
+            - $set:
+                name: plannedContracts
+                expr:
+                  $objectSet:
+                    object: {$var: plannedContracts}
+                    key: {$var: key}
+                    val:
+                      $pointerSet:
+                        object: {$var: contribution}
+                        path: /contract/steps/0/definition
+                        val: {$var: definition}
+    - $return: {$pointerSet: {object: {$var: plan}, path: /contracts, val: {$var: plannedContracts}}}
   refreshDefinition:
     args:
       definition: {}
@@ -249,17 +287,24 @@ functions:
             key:
               $var: destinationBinding
     - $let:
+        name: definitionPath
+        expr: {$call: {function: prepareDefinitionPath, args: {clauseKey: {$const: clauseKey}}}}
+    - $let:
         name: definition
-        expr:
-          $objectFromEntries:
-          - key: blueId
-            val:
-              $nodeBlueId:
-                $document:
-                  $concat:
-                  - /clauseRuntime/work/candidate/
-                  - $const: clauseKey
-                  - /type/actionDefinition/type
+        expr: {$objectFromEntries: [{key: blueId, val: {$nodeBlueId: {$document: {$var: definitionPath}}}}]}
+    - $if:
+        cond: {$exists: {$var: {name: clause, path: /parameters/preparationDefinition}}}
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $is:
+                  node: {$document: {$var: definitionPath}}
+                  pattern: {type: Contracts/Compute Definition}
+            message: PREPARATION_DEFINITION_REQUIRED
+        - $set:
+            name: plan
+            expr: {$call: {function: configurePreparationActions, args: {plan: {$var: plan}, definition: {$var: definition}}}}
     - $let:
         name: refreshDefinition
         expr:
@@ -267,8 +312,7 @@ functions:
             function: refreshDefinition
             args:
               definition: {$var: definition}
-              definitionPath:
-                $concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}, /type/actionDefinition/type]
+              definitionPath: {$var: definitionPath}
     - $set:
         name: plan
         expr:

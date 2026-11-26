@@ -1,0 +1,230 @@
+name: Payment Process Functions
+type: PaymentInstruction/Payment Protocol Functions
+description: Reconcile resolved retained targets against the original selected instruction and its confirmed ledger.
+functions:
+  withSharedSelection:
+    args:
+      adjustments: {}
+      sharedSelection: {}
+    do:
+    - $if:
+        cond:
+          $or:
+          - {$eq: [{$var: sharedSelection}, {}]}
+          - {$not: {$isKind: {val: {$var: adjustments}, kind: object}}}
+        then:
+        - $return: {$var: adjustments}
+    - $let: {name: configured, expr: {$var: adjustments}}
+    - $forEach:
+        key: adjustmentId
+        item: definition
+        in: {$var: adjustments}
+        do:
+        - $if:
+            cond:
+              $and:
+              - {$isKind: {val: {$var: definition}, kind: object}}
+              - {$not: {$hasKey: {object: {$var: definition}, key: selectedPayment}}}
+            then:
+            - $set:
+                name: configured
+                expr:
+                  $objectSet:
+                    object: {$var: configured}
+                    key: {$var: adjustmentId}
+                    val: {$objectSet: {object: {$var: definition}, key: selectedPayment, val: {$var: sharedSelection}}}
+    - $return: {$var: configured}
+  applyAdjustments:
+    args:
+      adjustment: {type: Text}
+      adjustments: {}
+    do:
+    - $forEach:
+        key: adjustmentId
+        item: definition
+        in: {$var: adjustments}
+        do:
+        - $if:
+            cond:
+              $or:
+              - {$eq: [{$var: adjustment}, '']}
+              - {$eq: [{$var: adjustment}, {$var: adjustmentId}]}
+            then:
+            - $let:
+                name: result
+                expr: {$call: {function: applyAdjustment, args: {definition: {$var: definition}}}}
+            - $if:
+                cond: {$eq: [{$var: {name: result, path: /created}}, true]}
+                then:
+                - $return: {outcome: acceptedNew}
+    - $return: {outcome: duplicate}
+  applyAdjustment:
+    args:
+      definition: {}
+    do:
+    - $let:
+        vars:
+          decisionSource: {$var: {name: definition, path: /decision}}
+          selection: {$var: {name: definition, path: /selectedPayment}}
+    - $let:
+        name: decision
+        expr: {$document: {$var: {name: decisionSource, path: /path}}}
+    - $if:
+        cond:
+          $or:
+          - {$ne: [{$get: {object: {$var: decision}, key: {$var: {name: decisionSource, path: /when/field}}}}, {$var: {name: decisionSource, path: /when/equals}}]}
+          - $not:
+              $call:
+                function: isSelectedPayment
+                args:
+                  input:
+                    source: {$document: {$var: {name: selection, path: /source}}}
+                    expectedSourceOrigin: {$document: {$var: {name: selection, path: /expectedSourceOrigin}}}
+                    obligations: {$document: {$var: {name: selection, path: /entries}}}
+                    path: {$var: {name: selection, path: /path}}
+                    key: {$var: {name: selection, path: /key}}
+        then:
+        - $return: {}
+    - $let:
+        name: targetMinor
+        expr:
+          $choose:
+            cond: {$exists: {$var: {name: decisionSource, path: /retainMinorFrom}}}
+            then: {$get: {object: {$var: decision}, key: {$var: {name: decisionSource, path: /retainMinorFrom}}}}
+            else: {$var: {name: decisionSource, path: /retainMinor}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$isKind: {val: {$var: targetMinor}, kind: integer}}
+            - {$gte: [{$var: targetMinor}, 0]}
+        then:
+        - $return: {}
+    - $let:
+        name: action
+        expr:
+          $choose:
+            cond:
+              $and:
+              - {$eq: [{$var: targetMinor}, 0]}
+              - {$eq: [{$document: /payment/completed}, {$document: /payment/reversed}]}
+            then: void
+            else: refund
+    - $let:
+        name: requestId
+        expr: {$get: {object: {$var: {name: definition, path: /requestIds}}, key: {$var: action}}}
+    - $if:
+        cond:
+          $or:
+          - {$not: {$exists: {$var: requestId}}}
+          - {$exists: {$get: {object: {$document: /payment/requests}, key: {$var: requestId}}}}
+        then:
+        - $return: {}
+    - $let:
+        name: amountMinor
+        expr:
+          $choose:
+            cond: {$eq: [{$var: action}, void]}
+            then: {$call: {function: voidableFunds, args: {}}}
+            else: {$call: {function: refundAbove, args: {targetMinor: {$var: targetMinor}}}}
+    - $if:
+        cond: {$lte: [{$var: amountMinor}, 0]}
+        then:
+        - $return: {}
+    - $return:
+        $call:
+          function: request
+          args:
+            action: {$var: action}
+            input: {requestId: {$var: requestId}, amountMinor: {$var: amountMinor}}
+  isSelectedPayment:
+    # The source operands can be absent while the instruction is being linked.
+    args:
+      input: {}
+    do:
+    - $let:
+        vars:
+          obligations: {$var: {name: input, path: /obligations}}
+          source: {$var: {name: input, path: /source}}
+          expectedSourceOrigin: {$var: {name: input, path: /expectedSourceOrigin}}
+          path: {$var: {name: input, path: /path}}
+          key: {$var: {name: input, path: /key}}
+    - $if:
+        cond:
+          $not:
+            $and:
+            - {$exists: {$var: obligations}}
+            - {$exists: {$var: source}}
+            - {$exists: {$var: expectedSourceOrigin}}
+            - {$isKind: {val: {$var: path}, kind: text}}
+            - {$isKind: {val: {$var: key}, kind: text}}
+        then:
+        - $return: false
+    - $let:
+        name: origin
+        expr: {$document: /contracts/initialized/document}
+    - $let:
+        vars:
+          sourceOrigin: {$var: {name: source, path: /contracts/initialized/document}}
+          selected:
+            $pointerGet: {object: {$var: source}, path: {$var: path}}
+          obligation:
+            $get: {object: {$var: obligations}, key: {$nodeBlueId: {$var: key}}}
+    - $return:
+        $and:
+        - {$exists: {$var: origin}}
+        - {$exists: {$var: sourceOrigin}}
+        - {$exists: {$var: {name: selected, path: /contracts/initialized/document}}}
+        - {$eq: [{$nodeBlueId: {$var: sourceOrigin}}, {$nodeBlueId: {$var: expectedSourceOrigin}}]}
+        - {$eq: [{$nodeBlueId: {$var: {name: selected, path: /contracts/initialized/document}}}, {$nodeBlueId: {$var: origin}}]}
+        - {$includes: {list: [selected, usable], val: {$var: {name: obligation, path: /status}}}}
+        - {$eq: [{$var: {name: obligation, path: /path}}, {$var: path}]}
+        - {$eq: [{$var: {name: obligation, path: /key}}, {$var: key}]}
+        - {$eq: [{$var: {name: obligation, path: /candidateOrigin}}, {$nodeBlueId: {$var: origin}}]}
+        - {$eq: [{$var: {name: obligation, path: /documentOrigin}}, {$nodeBlueId: {$var: origin}}]}
+        - {$exists: {$var: {name: obligation, path: /requirementRef}}}
+        - {$exists: {$var: {name: obligation, path: /prepared}}}
+        - {$eq: [{$var: {name: obligation, path: /requirementRef}}, {$nodeBlueId: {$var: {name: obligation, path: /prepared}}}]}
+  refundAbove:
+    args:
+      targetMinor: {type: Integer}
+    do:
+    - $if:
+        cond:
+          $or:
+          - {$lt: [{$var: targetMinor}, 0]}
+          - {$not: {$call: {function: adjustmentReady, args: {action: refund}}}}
+        then:
+        - $return: 0
+    - $let:
+        name: amount
+        expr: {$subtract: [{$document: /payment/completed}, {$document: /payment/reversed}, {$var: targetMinor}]}
+    - $return:
+        $choose:
+          cond: {$gt: [{$var: amount}, 0]}
+          then: {$var: amount}
+          else: 0
+  voidableFunds:
+    args: {}
+    expr:
+      $choose:
+        cond:
+          $and:
+          - {$eq: [{$document: /payment/closed}, false]}
+          - {$call: {function: adjustmentReady, args: {action: void}}}
+        then: {$document: /payment/secured}
+        else: 0
+  adjustmentReady:
+    args:
+      action: {type: Text}
+    expr:
+      $and:
+      - {$eq: [{$document: /payment/accepted}, true]}
+      - {$isKind: {val: {$document: /payment/transactionId}, kind: text}}
+      - {$ne: [{$document: /payment/transactionId}, '']}
+      - {$eq: [{$document: /payment/cancellationPending}, false]}
+      - {$eq: [{$document: /payment/reserved/secure}, 0]}
+      - {$eq: [{$document: /payment/reserved/capture}, 0]}
+      - {$eq: [{$document: /payment/reserved/refund}, 0]}
+      - {$eq: [{$document: /payment/reserved/void}, 0]}
+      - {$ne: [{$get: {object: {$document: /payment/locks}, key: {$var: action}}}, true]}

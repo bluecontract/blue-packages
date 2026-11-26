@@ -1,0 +1,55 @@
+name: Payment Instruction observing an approved commercial credit
+type: PaymentInstruction/Payment Instruction with Clauses
+paymentTerms:
+  amountMinor: 10000
+  limitMinor: 10000
+  currency: USD
+  payerChannel: customer
+  payeeChannel: seller
+  guarantorChannel: guarantor
+  allowedPayees: [seller]
+  recipientApprovalRequired: false
+# Filled with the independently initialized Order's exact reference in the runner.
+sources:
+  order: {}
+contracts:
+  guarantor: {type: Contracts/External Channel, event: {source: guarantor}}
+clauses:
+  activation:
+    type: Activation/Activation Clause
+    parameters:
+      required: []
+      parties:
+        customer:
+          type: Parties/Party
+          myosAccountId: customer-account
+          readerKeys: [customer-reader]
+          lead:
+            channel: {type: Contracts/External Channel, event: {source: customer}}
+        seller:
+          type: Parties/Party
+          myosAccountId: seller-account
+          readerKeys: [seller-reader]
+          lead:
+            channel: {type: Contracts/External Channel, event: {source: seller}}
+        guarantor:
+          type: Parties/Party
+          myosAccountId: guarantor-account
+          readerKeys: [guarantor-reader]
+          lead:
+            channel: {type: Contracts/External Channel, event: {source: guarantor}}
+  requests:
+    type: PaymentInstruction/Payment Request Actions
+    bindings:
+      requestAuthorize:
+        authorize: {on: workflow, party: guarantor, input: true}
+      requestCapture:
+        pay: {on: workflow, party: guarantor, input: true}
+      requestRefund:
+        approvedCredit:
+          on: embedded
+          path: /sources/order
+          event: {type: Commerce/Domain Event, kind: Credit Approved, clause: credit}
+          params:
+            requestId: {$var: {name: trigger, path: /entityId}}
+            amountMinor: {$var: {name: trigger, path: /amountMinor}}

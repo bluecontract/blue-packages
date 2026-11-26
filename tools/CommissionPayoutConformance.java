@@ -29,20 +29,23 @@ public final class CommissionPayoutConformance {
     return m("source",channel,"operation",m("type","Contracts/Operation Request","channel",channel,"operation",operation,
         "document",m("blueId",document),"request",request,"requireExactDocumentVersion",true));
   }
-  Contracts.Result run(String channel,String operation,Object document,Object request) {
-    if (operation.equals("startPayout")) {
+  Object operationEvent(String channel,String operation,Object document,Object request) {
+    if (operation.equals("startPayout") && "myos-account-to-account".equals(read("/payoutTemplate/paymentDetails/method"))) {
       var withContext = new LinkedHashMap<>(o(request));
       withContext.putIfAbsent("accountContext",m("payerBinding","test-seller-binding","payeeBinding","test-partner-binding",
           "platformAccountId","test-guarantor","environment","TEST"));
       request = withContext;
     }
-    return p.process(host,event(channel,operation,document,request),++sequence);
+    return event(channel,operation,document,request);
+  }
+  Contracts.Result run(String channel,String operation,Object document,Object request) {
+    return p.process(host,operationEvent(channel,operation,document,request),++sequence);
   }
   void apply(String channel,String operation,Object document,Object request) {
     var result=run(channel,operation,document,request);
     if(!result.commits()) {
       String cause;
-      try{ClauseGasProbe.diagnose(p,host,event(channel,operation,document,request),sequence);cause="no exception";}
+      try{ClauseGasProbe.diagnose(p,host,operationEvent(channel,operation,document,request),sequence);cause="no exception";}
       catch(Throwable failure){cause=failure.toString();}
       throw new AssertionError(operation+" must apply: "+cause);
     }
@@ -54,7 +57,12 @@ public final class CommissionPayoutConformance {
   }
   void root(String channel,String operation,Object request){apply(channel,operation,host.blueId(),request);}
   Contracts.Document init(Map<String,Object> source) {
-    var result=p.initialize(source);
+    Contracts.Result result;
+    try {
+      result=p.initialize(source);
+    } catch(ContractException failure) {
+      throw new AssertionError(failure.code()+" "+failure.diagnosticPath()+" "+failure.context(),failure);
+    }
     if(!result.commits()) {
       String cause;try{ClauseGasProbe.diagnose(p,source);cause="no exception";}catch(Throwable failure){cause=failure.toString();}
       throw new AssertionError("Document must initialize: "+cause);
@@ -97,23 +105,114 @@ public final class CommissionPayoutConformance {
     apply("guarantor","confirmAccountSettlement",embedded("/payouts/"+key),m("debitReference",debit,"transferReference","test-transfer-"+key));
   }
 
+  void approveAgreement() {
+    if (read("/clauses/activation/parameters/negotiation/allowedPaths") instanceof List<?> paths
+        && !paths.isEmpty()) {
+      var selection=m("type","Activation/Terms Selection Input","termsRef",read("/activation/terms/ref"));
+      root("seller","activate_seller",selection);
+      root("partner","activate_partner",selection);
+    } else {
+      root("seller","approve_seller",m("revision",1));
+      root("partner","approve_partner",m("revision",1));
+    }
+  }
+
   static CommissionPayoutConformance activeAgreement(Contracts processor,Map<String,Object> source) {
     var template=WireData.json(WireData.write(source.get("payoutTemplate")));ClauseAppsExamples.wire(source);source.put("payoutTemplate",template);
     channels(source,List.of("seller","partner"));var test=new CommissionPayoutConformance(processor);test.host=test.init(source);
-    test.root("seller","approve_seller",m("revision",1));test.root("partner","approve_partner",m("revision",1));return test;
+    test.approveAgreement();return test;
+  }
+
+  static void verifyStripePreparation(Contracts processor,Map<String,Object> source) {
+    var stripe=activeAgreement(processor,source);
+    stripe.root("seller","startPayout",m("key","stripe","amountMinor",1000));
+    String preparedPath=stripe.entry("stripe").get("itemPath")+"/prepared";
+    var values=processor.execution().values();
+    var expected=values.source(m("type","MyOS/MyOS Stripe Account to Account Payment Instruction"));
+    var type=values.select(new Exact.Ref(stripe.host.blueId()),preparedPath+"/type");
+    check(NativeRuntime.identity(values.exact(values.select(expected,"/type"))).equals(NativeRuntime.identity(values.exact(type))),
+        "Frozen payout uses the exact Stripe Payment Instruction type");
+    check("stripe".equals(stripe.read(preparedPath+"/paymentDetails/payoutTerms/operator"))
+        && stripe.number(preparedPath+"/paymentDetails/payoutTerms/grossMinor")==1000
+        && stripe.number(preparedPath+"/paymentDetails/payoutTerms/feeMinor")==200
+        && stripe.number(preparedPath+"/paymentDetails/payoutTerms/netMinor")==800
+        && stripe.number("/commission/reserved")==1000,
+        "Stripe preparation freezes gross, fee and net and reserves gross");
+    System.out.println("PASS configured Stripe payout and exact instruction type without external financial calls");
+  }
+
+  static CompositionPackages declarativePackages(Path root) throws Exception {
+    var mounts=o(o(CompositionPackages.yaml(root.resolve("PACKAGES.json"))).get("mounts"));
+    mounts.keySet().retainAll(Set.of("Activation","Agreements","Amendments","BEX","Commerce",
+        "Connections","Contracts","Coordination","DefinitionRead","Dispatch","Documents","Events",
+        "Features","Language","Ledger","Money","MyOS","Orders","Parties","Payment","PaymentInstruction",
+        "Schedule","Time"));
+    var selection=Files.createTempFile("declarative-reseller-", ".json");
+    try {
+      Files.writeString(selection,WireData.write(m("mounts",mounts)));
+      return CompositionPackages.published(root,selection);
+    } finally {
+      Files.deleteIfExists(selection);
+    }
+  }
+
+  static Map<String,Object> declarativeAgreement(Path root) throws Exception {
+    var source=o(WireData.parse(Files.readString(root.resolve(
+        "examples/sales/declarative/bicycle-rental-agreement.blue")),"yaml"));
+    return bindLocalAccounts(source);
+  }
+
+  static Map<String,Object> bindLocalAccounts(Map<String,Object> source) {
+    var parties=o(o(o(o(source.get("clauses")).get("activation")).get("parameters")).get("parties"));
+    for(var entry:parties.entrySet()) {
+      var party=o(entry.getValue());
+      party.put("myosAccountId","test-"+entry.getKey());
+      party.put("readerKeys",List.of("test-key-"+entry.getKey()));
+    }
+
+    // Fill the same native provider slots as Business before it launches this editable Go source.
+    var orderClauses=o(o(source.get("orderTemplate")).get("clauses"));
+    var activation=o(o(orderClauses.get("activation")).get("parameters"));
+    var reader=o(o(activation.get("readers")).get("guarantor"));
+    var instruction=o(o(o(orderClauses.get("payment")).get("parameters")).get("template"));
+    var instructionActivation=o(o(o(instruction.get("clauses")).get("activation")).get("parameters"));
+    var guarantor=o(o(instructionActivation.get("parties")).get("guarantor"));
+    var keys=List.of("ab".repeat(32));
+    reader.put("myosAccountId","test-guarantor");
+    reader.put("readerKeys",keys);
+    guarantor.put("myosAccountId","test-guarantor");
+    o(guarantor.get("readerKeys")).put("items",keys);
+    o(o(instruction.get("paymentDetails")).get("customerPaymentTerms"))
+        .put("recipientPaymentAccountId","acct_test_seller");
+    o(source.get("terms")).put("payoutOperatorAccountId","test-guarantor");
+    return source;
   }
 
   public static void main(String[] args) throws Exception {
-    var root=Path.of(args[0]).toAbsolutePath();var packages=CompositionPackages.published(root,root.resolve("PACKAGES.json"));
+    var root=Path.of(args[0]).toAbsolutePath();
+    String mode=args.length>1?args[1]:"";
+    boolean declarative=mode.equals("--declarative") || mode.equals("--declarative-stripe-preparation");
+    var packages=declarative?declarativePackages(root):CompositionPackages.published(root,root.resolve("PACKAGES.json"));
     try(var blue=packages.language();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
       var t=new CommissionPayoutConformance(runtime.processor(blue));
-      var source=o(WireData.parse(Files.readString(root.resolve("examples/apps/30-commission-a2a-payout.blue")),"yaml"));
-      if(args.length>1 && args[1].equals("--manual-only")) {
+      var source=declarative?declarativeAgreement(root)
+          :o(WireData.parse(Files.readString(root.resolve("examples/apps/30-commission-a2a-payout.blue")),"yaml"));
+      if(declarative) {
+        var terms=o(source.get("terms"));
+        source.put("commission",m("targets",m("eligible",2000),"accrued",2000,"paid",0,"reserved",0,"settlements",m()));
+        if(mode.equals("--declarative-stripe-preparation")) {
+          verifyStripePreparation(t.p,source);
+          return;
+        }
+        terms.put("payoutOperator","test");
+        o(source.get("payoutTemplate")).put("type","MyOS/MyOS Test Account to Account Payment Instruction");
+      }
+      if(mode.equals("--manual-only")) {
         var legacy=o(WireData.parse(Files.readString(root.resolve("examples/reseller/massage-preview.blue")),"yaml"));
         source.put("payoutTemplate",legacy.get("payoutTemplate"));
         o(source.get("clauses")).put("payouts",o(legacy.get("clauses")).get("payouts"));
         ClauseAppsExamples.wire(source);channels(source,List.of("seller","partner"));
-        t.host=t.init(source);t.root("seller","approve_seller",m("revision",1));t.root("partner","approve_partner",m("revision",1));
+        t.host=t.init(source);t.approveAgreement();
         // Native inline preparation installs the manual wrapper and emits Document Attached before startPayment.
         var r=t.p.process(t.host,t.event("seller","startPayout",t.host.blueId(),m("key","manual","amountMinor",1000)),++t.sequence);
         check(r.commits(),"Manual startPayout must attach before payment exists: "+ClauseGasProbe.diagnostic(r));t.host=r.document();
@@ -201,7 +300,7 @@ public final class CommissionPayoutConformance {
       ClauseAppsExamples.wire(source);source.put("payoutTemplate",template);channels(source,List.of("seller","partner"));
       t.host=t.init(source);
       check(!o(t.read("/clauses/activation/parameters/parties")).containsKey("guarantor"),"The MyOS operator is not an Agreement party");
-      t.root("seller","approve_seller",m("revision",1));t.root("partner","approve_partner",m("revision",1));
+      t.approveAgreement();
 
       t.root("seller","startPayout",m("key","p1","amountMinor",1000));
       check(t.number("/commission/reserved")==1000,"G is reserved once");
@@ -214,23 +313,40 @@ public final class CommissionPayoutConformance {
       check("test-guarantor".equals(split.get("operatorAccountId"))&&t.embedded("/contracts/initialized/document").equals(split.get("agreementOrigin")),"The payout names the operator and this Agreement: "+split);
       t.root("seller","startPayout",m("key","p1","amountMinor",1000));
       check(t.number("/commission/reserved")==1000,"A repeated preparation is idempotent");
+      if(declarative) {
+        var replay=o(t.operationEvent("seller","startPayout",t.host.blueId(),m("key","p1","amountMinor",1000)));
+        o(replay.get("operation")).put("requireExactDocumentVersion",false);
+        check(t.p.process(t.host,replay,++t.sequence).commits(),"Payout replay keeps its existing non-exact version policy");
+        t.deny("seller","startPayout",t.host.blueId(),m("key","p1","amountMinor",1000,"fields",m()));
+        t.deny("seller","startPayout",t.host.blueId(),m("key","p1","amountMinor",1000,"values",m("netMinor",1)));
+        check(t.number("/commission/reserved")==1000,"Caller-supplied Documents fields cannot change payout accounting");
+      }
       t.deny("seller","startPayout",t.host.blueId(),m("key","p2","amountMinor",500));
       t.deny("seller","startPayout",t.host.blueId(),m("key","p2","amountMinor",500,"feeMinor",0));
       System.out.println("PASS prepare freezes G=1000 F=200 N=800, reserves G once and guards a second unresolved payout");
       t.deny("seller","startPayout",t.host.blueId(),m("key","p1","amountMinor",1000,"accountContext",m("payerBinding","other","payeeBinding","test-partner-binding","platformAccountId","test-guarantor","environment","TEST")));
       var rounding=new CommissionPayoutConformance(t.p);rounding.host=rounding.init(source);
-      rounding.root("seller","approve_seller",m("revision",1));rounding.root("partner","approve_partner",m("revision",1));
+      rounding.approveAgreement();
       rounding.root("seller","startPayout",m("key","rounding","amountMinor",3));
       var rounded=rounding.literal(rounding.entry("rounding").get("itemPath")+"/prepared/paymentDetails/payoutTerms");
       check(((Number)rounded.get("feeMinor")).longValue()==1&&((Number)rounded.get("netMinor")).longValue()==2,"Money rounding is applied to G=3");
-      rounding.root("seller","cancelPayout",m("key","rounding"));rounding.root("seller","cancelPayout",m("key","rounding"));
-      check(rounding.number("/commission/reserved")==0,"Duplicate cancel releases gross once");
+      if(declarative) {
+        rounding.deny("seller","cancelPayout",rounding.host.blueId(),m("key","rounding"));
+        rounding.deny("seller","cancelPayout",rounding.host.blueId(),m("key","rounding"));
+        check(rounding.number("/commission/reserved")==3
+            && "awaiting_provider".equals(rounding.entry("rounding").get("status")),
+            "Unlinked payout cancellation retains its reservation and provision path");
+      } else {
+        rounding.root("seller","cancelPayout",m("key","rounding"));
+        rounding.root("seller","cancelPayout",m("key","rounding"));
+        check(rounding.number("/commission/reserved")==0,"Duplicate cancel releases gross once");
+      }
 
       // A template whose instruction the payer would not approve cannot be prepared.
       var unconsented=o(WireData.json(WireData.write(source)));
       o(o(o(o(unconsented.get("payoutTemplate")).get("clauses")).get("activation")).get("parameters")).put("required",List.of());
       var u=new CommissionPayoutConformance(t.p);u.host=u.init(unconsented);
-      u.root("seller","approve_seller",m("revision",1));u.root("partner","approve_partner",m("revision",1));
+      u.approveAgreement();
       u.deny("seller","startPayout",u.host.blueId(),m("key","p1","amountMinor",1000));
       check(u.number("/commission/reserved")==0,"Nothing is reserved for an unconsented payout");
       System.out.println("PASS a payout instruction the seller would not approve is rejected at preparation");
@@ -253,11 +369,11 @@ public final class CommissionPayoutConformance {
       o(o(o(approved.get("clauses")).get("activation")).get("parameters")).put("required",List.of());
       var provided=o(WireData.json(WireData.write(source)));provided.put("commission",commission);provided.put("payouts",m("p1",approved));
       var b=new CommissionPayoutConformance(t.p);b.host=b.init(provided);
-      b.root("seller","approve_seller",m("revision",1));b.root("partner","approve_partner",m("revision",1));
+      b.approveAgreement();
       check(b.number("/commission/reserved")==1000&&b.number("/commission/paid")==0,"Provision alone settles nothing");
       // Activate and initiate, then exercise generic inherited requests against the same profile.
       var guard=new CommissionPayoutConformance(t.p);guard.host=guard.init(provided);
-      guard.root("seller","approve_seller",m("revision",1));guard.root("partner","approve_partner",m("revision",1));
+      guard.approveAgreement();
       guard.apply("guarantor","acceptPaymentInstruction",guard.embedded("/payouts/p1"),m());
       guard.apply("guarantor","recordTransactionInitiated",guard.embedded("/payouts/p1"),m("type","PaymentInstruction/Transaction Initiation Input","transactionId","guard-p1","railType","myos-account-to-account","attachmentPoint","instruction","providerReference","test"));
       guard.deny("guarantor","probeSecure",guard.embedded("/payouts/p1"),m("requestId","payout-secure","amountMinor",400));
@@ -276,6 +392,10 @@ public final class CommissionPayoutConformance {
       b.deny("guarantor","confirmAccountSettlement",b.embedded("/payouts/p1"),m("debitReference","other-debit","transferReference","test-transfer-p1"));
       b.apply("guarantor","completePayment",b.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-capture","amountCompleted",800));
       check(b.number("/commission/paid")==1000&&b.number("/commission/reserved")==0,"Report plus completion settles G exactly once");
+      if(declarative) {
+        check(b.number("/receipts/grossConfirmedMinor")==0&&o(b.read("/receipts/targets")).isEmpty(),
+            "A completed payout does not enter customer receipts");
+      }
       b.deny("seller","probeRefund",b.embedded("/payouts/p1"),m("requestId","payout-refund","amountMinor",800));
       var settlement=o(b.read("/commission/settlements/p1"));
       check(Long.valueOf(200).equals(((Number)settlement.get("feeMinor")).longValue())
@@ -286,7 +406,7 @@ public final class CommissionPayoutConformance {
       b.deny("seller","startPayout",b.host.blueId(),m("key","p3","amountMinor",1001));
       System.out.println("PASS operator split report plus completion settles G=1000 once; MyOS F=200, partner N=800; 1001 exceeds the rest");
       var completionFirst=new CommissionPayoutConformance(t.p);completionFirst.host=completionFirst.init(provided);
-      completionFirst.root("seller","approve_seller",m("revision",1));completionFirst.root("partner","approve_partner",m("revision",1));
+      completionFirst.approveAgreement();
       completionFirst.initiate("p1");
       completionFirst.apply("guarantor","secureFunds",completionFirst.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","amountSecured",800));
       completionFirst.apply("guarantor","capturePayout",completionFirst.embedded("/payouts/p1"),m());
@@ -298,14 +418,14 @@ public final class CommissionPayoutConformance {
       System.out.println("PASS completion first retains G until a matching split receipt arrives");
 
       var c=new CommissionPayoutConformance(t.p);c.host=c.init(provided);
-      c.root("seller","approve_seller",m("revision",1));c.root("partner","approve_partner",m("revision",1));
+      c.approveAgreement();
       c.apply("guarantor","rejectPaymentInstruction",c.embedded("/payouts/p1"),m("reason","payment_insufficient_funds"));
       check(c.number("/commission/reserved")==0&&c.number("/commission/paid")==0,"Operator rejection releases G");
       check(Long.valueOf(0).equals(((Number)o(c.read("/commission/settlements/p1")).get("paidMinor")).longValue()),"A rejected payout pays nothing");
       System.out.println("PASS operator rejection releases G without settlement");
 
       var d=new CommissionPayoutConformance(t.p);d.host=d.init(provided);
-      d.root("seller","approve_seller",m("revision",1));d.root("partner","approve_partner",m("revision",1));
+      d.approveAgreement();
       d.initiate("p1");
       check(d.number("/commission/reserved")==1000,"A pending secure keeps G reserved");
       d.apply("guarantor","declineSecureFunds",d.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","reason","payment_insufficient_funds"));
@@ -318,7 +438,7 @@ public final class CommissionPayoutConformance {
 
       // Void before the partner transfer: only the whole secured debit, only with no capture pending.
       var e=new CommissionPayoutConformance(t.p);e.host=e.init(provided);
-      e.root("seller","approve_seller",m("revision",1));e.root("partner","approve_partner",m("revision",1));
+      e.approveAgreement();
       e.initiate("p1");
       e.deny("seller","voidPayout",e.embedded("/payouts/p1"),m());
       e.apply("guarantor","secureFunds",e.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","amountSecured",800));
@@ -331,7 +451,7 @@ public final class CommissionPayoutConformance {
       check(e.number("/commission/reserved")==0&&e.number("/commission/paid")==0&&"closed".equals(voided.get("status"))
           &&Long.valueOf(0).equals(((Number)voided.get("feeMinor")).longValue()),"A confirmed void releases G without a fee: "+voided);
       var f=new CommissionPayoutConformance(t.p);f.host=f.init(provided);
-      f.root("seller","approve_seller",m("revision",1));f.root("partner","approve_partner",m("revision",1));
+      f.approveAgreement();
       f.initiate("p1");
       f.apply("guarantor","secureFunds",f.embedded("/payouts/p1"),m("type","PaymentInstruction/Payment Outcome Input","requestId","payout-secure","amountSecured",800));
       f.apply("guarantor","capturePayout",f.embedded("/payouts/p1"),m());

@@ -128,101 +128,52 @@ The lead can replace its own party definition through `updateParty_<party>`, usi
 
 When a child is created, its selected parties and readers are a snapshot. Payment Instructions freeze that roster. Changes in an agreement do not silently expand the PI's membership or reader set. A new PI or an explicitly designed migration is required when its frozen membership must change.
 
-## 5. Payment is one family; the instruction owns the protocol
+## 5. Prepare a Payment Instruction and run its protocol
 
-A Payment clause represents one payment obligation. Its `start` action creates and embeds one Payment Instruction. Repeating the same creation intent is idempotent; a conflicting payment at the same destination is rejected.
+The current `Payment/Payment Clause` represents one payment obligation. It
+specializes the Documents lifecycle for a single Payment Instruction. The Order
+prepares the instruction from its configured template and inputs. Depending on
+`obtain`, Documents initializes or requests a separate document. Provision and
+admission check the selected instruction and its reviewed terms. A repeated
+preparation or provision uses the original intent and identity.
 
-The generic `Payment/Payment Clause` uses the provider-neutral protocol. `MyOS/MyOS Customer Payment`, `MyOS/MyOS Account to Account Payment`, `ACME/ACME Bank Payment` and `ManualPayments/Manual Bank Payment` specialize how that payment is initialized and confirmed. They share the same request-connection model.
+The current Payment clause delegates the protocol to the instruction. The
+instruction's payer, payee and guarantor have distinct authority. `requestCapture`
+requests capture. Only the guarantor's `completePayment` operation establishes a
+confirmed capture. The same distinction applies to authorization, refund and
+release. [One-obligation walkthrough](../examples/apps/31-current-payment-preparation.blue) · [Two-obligation walkthrough](../examples/apps/32-current-two-payment-obligations.blue) · [Payment package](../clause-payment/README.md)
 
-**The Payment clause does not expose guarantor confirmations.** `requestCapture` requests capture. `completePayment` is an authoritative operation on the PI, available to its guarantor. An agreement cannot prove that money moved by emitting its own success event.
+### The current Payment clause source
 
-`PaymentInstruction/Payment Instruction` owns the payment state, correlated request ledger and named response operations. `PaymentInstruction/Payment Instruction with Clauses` extends it and adds the ordinary clause host. Clause support does not replace the standard protocol.
-
-### The actual Payment clause source
-
-The public Payment type selects a setup implementation. Its shared base creates the child, declares the embedded dependency and echoes typed events. The list of child actions contains requests, not the guarantor's result operations.
+This declaration uses the shared Documents base for collaboration and linking.
+[Documents base](../clause-documents/types/base.blue)
 
 {{PAYMENT_SOURCE}}
 
-The setup implementation is [Payment Setup](../clause-payment/types/conditional-setup.blue). It validates roles and terms, selects the party snapshot, separates local and agreement-sourced connections, and assembles the child before publishing it. It uses BEX throughout. It never edits a running child's type to turn it into another payment method.
-
-Here is the complete host declaration that adds clauses to the standard PI:
+The standard Payment Instruction with Clauses retains the native request and
+outcome protocol:
 
 {{PI_HOST_SOURCE}}
 
-### Requests, responses and the event hierarchy
+### Correlation and authority
 
-Every concrete payment request inherits `PaymentInstruction/Payment Request`, which inherits `Events/Request`, which inherits `Events/Event`. Concrete payment responses inherit `PaymentInstruction/Payment Response` → `Events/Response` → `Events/Event`. Shipping follows the same pattern with its own domain request and response bases.
+Native request types inherit `PaymentInstruction/Payment Request`; confirmations
+inherit `PaymentInstruction/Payment Response`. The request ID correlates one
+attempt. Repeating an identical intent reserves no additional amount. Conflicting
+reuse is rejected. Capture and refund reservations protect the current available
+amount. Reconcile an unknown outcome against the original request before creating
+another attempt.
 
-For example, a capture request is represented by the protocol's `PaymentInstruction/Complete Payment Requested`. The public clause action is named `requestCapture`; the guarantor answers through `completePayment`, producing `PaymentInstruction/Payment Completed`. The protocol also distinguishes rejection, failure and an unknown result. An unknown external outcome must be reconciled; it is not safe to issue a second independent charge merely because a timeout occurred.
+Put request logic in the PI. Where a PI action requires an Order fact, configure
+an explicit native source binding for that fact. A parent that needs to observe an
+admitted PI may bind `Payment/Payment Observation Clause`; the resulting event
+identifies the observed PI event. An observer can project confirmed amounts under
+its own business rules. [Payment protocol](payment-protocol.md)
 
-The request ID correlates the entire attempt. Repeating the same request does not reserve the amount twice. Reusing an ID for a conflicting amount is rejected. Capture and refund reservations protect against concurrent requests exceeding the available authorized or refundable amount. The ledger advances only on the corresponding authoritative response.
-
-```mermaid
-flowchart LR
-  A[Agreement or Order: Payment clause] -->|embeds| PI[Payment Instruction with Clauses]
-  U[Customer workflow or agreed signal] -->|requestCapture / requestRefund| PI
-  PI -->|typed request with requestId| G[Guarantor adapter]
-  G -->|authenticated response operation| PI
-  PI -->|Payment Event Received| A
-```
-
-The arrow to the adapter is a protocol request, not a synchronous network call inside BEX. The adapter performs external work and submits the correlated result. The document can therefore distinguish requested, pending, failed, unknown and confirmed outcomes.
-
-### Where the request logic runs
-
-By default, request connections execute **inside the PI**. A customer workflow belongs there if it only needs the PI's state and the supplied request. The Payment clause observes the PI and emits `Payment/Payment Event Received` with the clause name, instruction path, original event reference and event kind. Other agreement clauses listen to that observation.
-
-```yaml
-payment:
-  type: Payment/Payment Clause
-  parameters:
-    amountMinor: 10000
-    currency: EUR
-  bindings:
-    instruction: /payment
-    start:
-      startPayment: {on: workflow, party: customer}
-    requestCapture:
-      confirmSatisfaction:
-        on: workflow
-        party: customer
-        params: {requestId: capture-1, amountMinor: 10000}
-        before:
-          - $failIf:
-              cond: {$ne: [{$var: {name: trigger, path: /satisfied}}, true]}
-              message: SATISFACTION_REQUIRED
-        after:
-          - $appendEvent:
-              $merge:
-                - type: Events/Event
-                - {kind: Customer Satisfaction, satisfied: true}
-```
-
-`confirmSatisfaction` is a PI workflow. The customer supplies `satisfied: true`. The action requests capture; it does not confirm capture. Its completion event is visible to the agreement through the Payment clause's observation. The agreement can update a satisfaction indicator without pretending that payment is complete.
-
-When the condition comes from the agreement, add `in: agreement` to the connection. The PI embeds the agreement under `/sources/order` and observes it. The agreement already embeds the PI, so this is a deliberate cycle. The guarantor must therefore have visibility of the agreement's input domain. The selected Activation roster and access rules make this requirement explicit.
-
-```yaml
-requestCapture:
-  acceptedDelivery:
-    in: agreement
-    on: event
-    event: {type: Events/Event, kind: Delivery Accepted}
-    params: {requestId: delivery-capture, amountMinor: 10000}
-```
-
-A local embedded path is similarly resolved through the agreement. A smart-home or Shipping event can request capture, and a collection of Orders can produce signals used by a parent payment policy. No mandatory third “proof document” is inserted between the agreement and the PI. Use an independent source document only when it already represents an actual subsystem or business fact.
-
-### Common payment options
-
-`amountMinor` and `currency` define the amount and denomination. Alternatively bind `amount` to a document property, such as `/product/totalMinor`; the creation action snapshots it. `payer`, `payee` and `guarantor` select party roles. `recipientApprovalRequired` adds recipient approval. `parties` and `readers` select the roster copied from Activation; an empty party selection reuses the current roster. `instructionClauses` allows additional explicit PI features.
-
-Request actions include authorization, capture, refund, void/cancellation, recipient approval, payee assignment, transaction details updates, final amount resolution, and completion/reversal/details lock or unlock requests. They use the same `params`, `before`, `after` and trigger vocabulary. A requested lock does not become effective until the guarantor confirms it.
-
-MyOS payment methods accept selected MyOS parties or matching account IDs. An ID must resolve to a declared party; it does not bypass Activation. A customer payment can request a payment session and record funding through its PI's provider operations. An account-to-account payment selects the payer and recipient accounts. These package examples define and test the protocol; connecting actual financial services remains an adapter responsibility.
-
-Manual bank payment uses the recipient as the confirming authority. The payer can report a transfer, but that report does not mark the payment complete. ACME Bank illustrates a separate bank guarantor without coupling the family to a named commercial provider.
+Earlier application examples used a start-and-observe facade. The current edition
+keeps `Payment/Legacy Payment Clause` for explicit compatibility. The historical
+examples with the earlier symbolic name require the retained package selection.
+[Historical payment edition](../examples/apps/README.md#historical-payment-edition)
 
 ## 6. Other selected families
 
@@ -286,7 +237,7 @@ Every example here is provider-neutral unless its type says otherwise. Test guar
 
 ## 8. Running and auditing the examples
 
-Each source below lives in `examples/apps/` beside a `.case.yaml` scenario, a `.native.yaml` scenario for native mandate authority, or a `.time.yaml` signed-time walkthrough. Scenarios specify the actor, target document, operation, request, expected state and rejected cases. The Java runner executes those sources and compares replay gas, receipt and snapshot identities. Selected cases also export/import a snapshot before replay.
+The sources in `examples/apps/` have `.case.yaml` scenarios, `.native.yaml` scenarios for native mandate authority, or `.time.yaml` signed-time walkthroughs. The native runner executes the cases named in its command and checks replay. Historical examples use the retained selection identified below. [Application examples and commands](../examples/apps/README.md)
 
 The local Contracts runner uses explicit test transports. It tests business semantics and deterministic replay. The authenticated bootstrap integration separately verifies account lookup, reader-key grants, provider access documents and account routing. Timers require the native Time service; changing an operating-system clock or injecting a look-alike event is not an equivalent test.
 
@@ -300,20 +251,20 @@ The example launcher displays complete source and a step-by-step operation list.
 
 ## 9. Complete application documents
 
-Applications 01–10 adapt the scenarios from the supplied `myos-examples.zip`. That archive identifies its blueprints as a design interchange format, not executable Blue. The table below states the scope of each executable adaptation; it is not a claim that every proposed feature in the archive is complete. Document 00 introduces Hello, and documents 11–29 isolate additional behaviors and payment methods.
+Applications 01–10 adapt scenarios from `myos-examples.zip`. The table describes the demonstrated scope and selected historical edition. Documents 11–30 illustrate reusable clauses and payment methods. Examples 31 and 32 use the current Payment preparation API for one or two obligations.
 
 | Archive scenario | Executable adaptation | Scope |
 |---|---|---|
-| Order and payment | 01 | Delivery, customer satisfaction in the PI, authorization and confirmed capture; the order observes the PI event. |
-| Reseller and ledger | 02 | Commission from confirmed net collection, corrections after refunds and settlement of the resulting obligation. |
-| Milestone payments | 03 | Separate acceptance and payment for design and delivery, with explicit agreement observation. |
-| Bundle order | 04 | Independent child orders and payments; activity on an unrelated role does not satisfy another order. |
-| Smart home | 05 | Matching check-in requests capture; bounded temperature requests and separate provider confirmation. |
-| Membership | 06 | Trial attendance, explicit membership opt-in, independent paid periods and termination. |
+| Order and payment | 01 (historical) | Delivery, customer satisfaction in the PI, authorization and confirmed capture; the order observes the PI event. |
+| Reseller and ledger | 02 (historical) | Commission from confirmed net collection, corrections after refunds and settlement of the resulting obligation. |
+| Milestone payments | 03 (historical) | Separate acceptance and payment for design and delivery, with explicit agreement observation. |
+| Bundle order | 04 (historical) | Independent child orders and payments; activity on an unrelated role does not satisfy another order. |
+| Smart home | 05 (historical) | Matching check-in requests capture; bounded temperature requests and separate provider confirmation. |
+| Membership | 06 (historical) | Trial attendance, explicit membership opt-in, independent paid periods and termination. |
 | Booking amendment | 07 | Exact two-party amendment approval; an existing PI retains its original amount. |
 | Participants and agents | 08 | Predeclared representative actions and lead-only actions. Post-start representative provisioning is still a separate integration task. |
 | Evidence and mandate | 09 | Delivered-evidence validation and native fixed-scope mandate creation/approval. The archive's broader multi-evidence refund budget/freeze design and hosted delegated invocation are not implemented here. |
-| Net settlement | 10 | Material statement revisions and settlement against the selected statement, with confirmed payment accounting. |
+| Net settlement | 10 (historical) | Material statement revisions and settlement against the selected statement, with confirmed payment accounting. |
 
 {{EXAMPLES}}
 

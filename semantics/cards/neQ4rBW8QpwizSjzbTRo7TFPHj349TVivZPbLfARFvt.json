@@ -1,0 +1,25 @@
+{
+  "blueId": "neQ4rBW8QpwizSjzbTRo7TFPHj349TVivZPbLfARFvt",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "5F8CAS5wXyETFCFowUdyfQachUiVSvzbPZcUSWBjCNk8",
+      "27WsCFhXj41q6qD1aFwcDj5879XnBYzGFpwKUiGEjXmr",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "7cyVzwkZY5VUfK7eUdNfgpxiUFRt6L4PuwBzVH1ZmzQB",
+      "4dHcKJRA9zrc9kuf2wCWFZrCCJz6rS3RgLhSHAWuGT2R",
+      "esKQ3oN2qmkpX9yQRqFe3fCnruPGXmpCCfLm43aHJE3",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq"
+    ],
+    "displayLabel": "Payment Observation Clause",
+    "limitations": [
+      "The supplied evidence does not define the selected instruction's event kinds or their payment-outcome semantics."
+    ],
+    "parameterRefs": [
+      "bindings.instruction"
+    ],
+    "stateFacts": []
+  },
+  "semanticText": "# Payment Observation Clause\n\nRelays native events from a selected Payment Instruction to observers of the containing document.\n\n`bindings.instruction` is required and has no default. It must be a non-root JSON Pointer beginning with `/`, relative to the document containing this clause. The automatic `observe` connection uses this path as its embedded-event source and includes it in embedded processing.\n\n## Relay behavior\n\n`observe` relays a delivery only when all three checks pass:\n\n- The outer message is an `Embedded Event Delivery`.\n- Its `sourcePath` exactly equals `bindings.instruction`.\n- Its inner `event` conforms to `Event`.\n\nOther deliveries produce no relay event. The action does not check a specific Payment Instruction type or restrict the inner event's `kind`.\n\nA matching delivery emits `Payment Event Received` with:\n\n- `clause`: this clause's key.\n- `instructionPath`: the bound instruction path.\n- `event`: an exact BlueId reference to the original inner event.\n- `kind`: copied from the original inner event's `kind`, without a required value or enumerated set established by this action.\n\nAutomatic observation is not configured as one-shot. Inherited `parameters.conditions.observe` and applicable `parameters.conditionGroups` gate execution; failed action conditions reject with `ACTION_CONDITION_FAILED`. The individual condition defaults to `true`; an applicable group's omitted `condition` defaults to `false`. Additional named `bindings.observe` connections retain the action's delivery checks; `_automatic` is reserved. Changing an installed clause's configuration requires a new clause key under the inherited transition rule.\n\nThe observation action only appends the relay event; it maintains no payment status or balance. Receipt establishes that an event was relayed, not that a payment succeeded. The referenced event retains its own meaning as a fact or intention, and a relayed request is not confirmation of its external outcome."
+}

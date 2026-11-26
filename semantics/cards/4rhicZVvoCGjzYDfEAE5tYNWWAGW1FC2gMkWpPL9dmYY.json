@@ -1,0 +1,44 @@
+{
+  "blueId": "4rhicZVvoCGjzYDfEAE5tYNWWAGW1FC2gMkWpPL9dmYY",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "9uaNLT6DfnQ8EXeozaJQZgCy84P3m8E1fkb3YekMUieb"
+    ],
+    "displayLabel": "Order Functions with explicit cancellation timing",
+    "limitations": [
+      "The function consumes its activation anchor. The host attaches and qualifies the first-activation listener separately.",
+      "This helper neither authorizes the invoking party nor executes a payment."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "The function cannot evaluate an activation-based window without a valid positive anchor.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "cancelGroupWithTiming reads the activation path, requires an integer and checks the native cancellation entry timestamp.",
+        "id": "activationInstant",
+        "meaning": "The Order activation instant used to measure the explicit elapsed window.",
+        "path": "/cancellationTiming/activatedAtMicros",
+        "scope": "document",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Absence does not provide a service date. The explicit activation-only pending branch excludes a stored true value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "The timed charge guard checks this exact accepted snapshot path and also checks proposedStartMicros.",
+        "id": "requiresServiceDate",
+        "meaning": "Whether accepted terms require a service date.",
+        "path": "/orderSnapshot/terms/dateRequired",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Order Functions with explicit cancellation timing\n\nExtends the native reseller Order Functions with `cancelGroupWithTiming`. An invoking clause supplies the reservation request and its configured snapshot, reservation, request and payment bindings. The inherited request guard matches the exact current proposal and makes identical retries idempotent. The function accepts a pending or confirmed group and requires a nonempty reason of up to 1,000 characters.\n\nWhen `/cancellationTiming/policy` is present, it must contain at least one recognized field. `freeCancellationHoursAfterActivation` is a maximum duration since `/cancellationTiming/activatedAtMicros`. The host must record that Order's first native activation instant. `freeCancellationHoursBeforeStart` is the minimum time until the group's confirmed start and must equal the advance-hours limit in the accepted snapshot. Hours are integers from 0 to 8,760. Comparisons use the native cancellation entry's timestamp. Exact thresholds qualify. When both limits are configured, the free window is their intersection. A missing required instant rejects the operation. An enabled activation window cannot use a time earlier than its activation instant.\n\nWhen a confirmed start exists, the inherited start-time guard permits cancellation before the start and at the start only when the accepted advance-hours limit is zero. A confirmed group that misses a configured free window uses the accepted `lateCancellationChargePercent` against the current proposal amount, rounded half up to minor units. A pending group normally has zero charge. An activation-only group with no required service date and no proposed start also applies the accepted late rate after the window, provided the cancellation is otherwise allowed. With no explicit timing policy the original date-based rules apply.\n\nThe function saves a cancelled group with an immutable decision and proposal identifier. The decision carries the policy, execution timestamp, basis, charge, difference between basis and charge, quote currency and `payment_evidence_required`. The explicit branch also copies its timing conditions and the activation anchor when supplied. The inherited function definition still provides quoting, confirmation and the other reservation transitions."
+}

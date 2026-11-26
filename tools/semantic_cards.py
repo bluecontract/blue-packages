@@ -12,10 +12,11 @@ import tempfile
 from jsonschema import Draft202012Validator
 
 from release import ROOT, digest, local, require, wire
-from semantic_sources import context_wire, definition_digest, evidence, inventory, pointer
+from semantic_sources import context_wire, definition_digest, evidence, inventory, pointer, within_path
 from semantic_s3 import MAX_CARD_BYTES, Store, card_key
 
 ASSETS = Path(__file__).resolve().parents[1] / 'semantics'
+MAX_REQUEST_BYTES = 1_000_000
 OUTPUT_SCHEMA = json.loads((ASSETS / 'output.schema.json').read_text())
 GENERATED_VALIDATOR = Draft202012Validator(OUTPUT_SCHEMA)
 # Existing public cards may predate metadata or explicit fact scope/aggregate.
@@ -30,6 +31,10 @@ def read_json(path, limit=MAX_CARD_BYTES):
     require(not path.is_symlink(), 'Symlink is not a semantic artifact: ' + str(path))
     require(path.stat().st_size <= limit, 'Semantic artifact exceeds its size limit: ' + str(path))
     return json.loads(path.read_bytes())
+
+
+def read_request(path):
+    return read_json(path, MAX_REQUEST_BYTES)
 
 
 def validate_output(value, context=None):
@@ -65,6 +70,10 @@ def validate_metadata(metadata, context):
             require(fact['binding'] is None and fact['defaultPath'] is None and fact['suffix'] == '',
                     'Document/clause facts cannot use a binding or suffix')
             path = fact['path']
+            require(not pointer(path) or not any(
+                within_path(path, item['defaultPath'])
+                for item in context.get('configurablePathDefaults', [])
+            ), 'State fact fixed path is configurable: ' + str(path))
             if fact['scope'] == 'document':
                 require(pointer(path) and path in context['documentPaths'],
                         'State fact document path is not established by the source: ' + str(path))
@@ -137,7 +146,11 @@ def prepare(root, output, store=None, refresh=()):
         context = evidence(blue_id, definitions)
         request = dict(context=context, definitionDigest=definition_digest(blue_id, definitions),
                        sourceDigest=digest(context_wire(context)), package=subjects[blue_id]['package'], generator=generator)
-        (requests / (blue_id + '.json')).write_bytes(wire(request))
+        # Bound the same artifact that local and CI acceptance read. Indentation
+        # can exceed the limit even when the compact model evidence fits.
+        data = context_wire(request)
+        require(len(data) <= MAX_REQUEST_BYTES, 'Semantic request exceeds its size limit: ' + blue_id)
+        (requests / (blue_id + '.json')).write_bytes(data)
         (requests / (blue_id + '.txt')).write_text(prompt + '\n\nEvidence (JSON):\n' + context_wire(context).decode('utf-8'), encoding='utf-8')
     report = dict(format='blue-semantic-plan/1', subjects=list(subjects.values()),
                   ready=sorted(subjects.keys() & cards.keys()), restored=sorted(restored), missing=missing,
@@ -181,6 +194,7 @@ def generate(root, output, jobs, store=None, refresh=()):
             require(not refresh, 'Refresh candidate already exists; use a new output directory: ' + blue_id)
             validate_card(read_json(destination / (blue_id + '.json')), blue_id)
             return
+        request = read_request(output / 'requests' / (blue_id + '.json'))
         with tempfile.TemporaryDirectory(prefix='blue-card-') as tmp:
             responses = output / 'responses'
             responses.mkdir(exist_ok=True)
@@ -194,7 +208,7 @@ def generate(root, output, jobs, store=None, refresh=()):
             if result.returncode != 0:
                 (responses / (blue_id + '.log')).write_text(result.stderr or result.stdout or '')
             require(result.returncode == 0, 'Codex generation failed: ' + blue_id)
-            accept(read_json(output / 'requests' / (blue_id + '.json'), 1_000_000), read_json(response), destination)
+            accept(request, read_json(response), destination)
     failures = []
     with ThreadPoolExecutor(max_workers=jobs) as workers:
         futures = {workers.submit(one, blue_id): blue_id for blue_id in plan['generate']}
@@ -242,7 +256,7 @@ def main():
     root = args.root.resolve()
     if args.command == 'accept':
         require(args.request is not None and args.response is not None, 'accept requires --request and --response')
-        card = accept(read_json(args.request, 1_000_000), read_json(args.response), args.output)
+        card = accept(read_request(args.request), read_json(args.response), args.output)
         print(card['blueId'])
         return
     store = Store(args.bucket) if args.bucket else None

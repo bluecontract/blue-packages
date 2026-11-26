@@ -2,7 +2,9 @@
 
 One current package set lives at the repository root. `PACKAGE-SOURCES.json` selects source directories; `PACKAGES.json` pins the built archives. `PUBLIC-CLAUSES.json` is the public catalogue: 13 feature families, including one payment family with provider-specific variants.
 
-Start with the [complete clause tutorial](docs/clauses-tutorial.md) and the [executable examples](examples/apps). They use Activation and clauses throughout. Raw contracts are implementation details of reusable packages. The Payment clause exposes requests; guarantor operations belong to the Payment Instruction.
+The tutorial introduces Activation and reusable clauses. The example guide identifies native walkthroughs and pins historical payment sources. Current Payment preparation uses Documents, and authoritative payment outcomes belong to the Payment Instruction. [Clause tutorial](docs/clauses-tutorial.md) · [Application examples](examples/apps/README.md)
+
+The [package usage guide](docs/using-packages.md) covers catalogue selection and the supported mapping for Connections before activation.
 
 The foundations are Language, BEX, Contracts (deterministic final gas, 10,000,000 maximum), Coordination, Time and Mandates. **Mandates remains its own package, `blue-mandates`.** Business packages do not redefine native execution, transport or delegation.
 

@@ -88,6 +88,119 @@ functions:
       - /payment
       - /activation
       - /sourceLinks
+  adjustmentPath:
+    args:
+      candidate: {type: Text}
+    expr:
+      $and:
+      - {$startsWith: [{$var: candidate}, /]}
+      - {$ne: [{$var: candidate}, /]}
+  adjustmentField:
+    args:
+      candidate: {type: Text}
+    expr:
+      $and:
+      - {$ne: [{$var: candidate}, '']}
+      - {$eq: [{$size: {$split: {text: {$var: candidate}, separator: /}}}, 1]}
+      - {$eq: [{$size: {$split: {text: {$var: candidate}, separator: '~'}}}, 1]}
+  withSharedSelection:
+    $blue:functionFrom:
+      definition: {type: Payment/Payment Process Functions}
+      function: withSharedSelection
+  validateAdjustments:
+    args:
+      adjustments: {}
+    do:
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: adjustments}, kind: object}}}
+        message: PAYMENT_ADJUSTMENTS_OBJECT_REQUIRED
+    - $let: {name: usedRequestIds, expr: {}}
+    - $forEach:
+        key: adjustmentId
+        item: definition
+        in: {$var: adjustments}
+        do:
+        - $let:
+            vars:
+              decisionPath: {$pointerGet: {object: {$var: definition}, path: /decision/path, default: ''}}
+              decisionField: {$pointerGet: {object: {$var: definition}, path: /decision/when/field, default: ''}}
+              retainedField: {$pointerGet: {object: {$var: definition}, path: /decision/retainMinorFrom}}
+              literalRetention: {$pointerGet: {object: {$var: definition}, path: /decision/retainMinor}}
+              selectorKey: {$pointerGet: {object: {$var: definition}, path: /selectedPayment/key}}
+              requestIds: {$pointerGet: {object: {$var: definition}, path: /requestIds, default: {}}}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$ne: [{$var: adjustmentId}, '']}
+                - {$call: {function: adjustmentPath, args: {candidate: {$var: decisionPath}}}}
+                - {$call: {function: adjustmentField, args: {candidate: {$var: decisionField}}}}
+                - {$exists: {$var: {name: definition, path: /decision/when/equals}}}
+            message: PAYMENT_ADJUSTMENT_DECISION_REQUIRED
+        - $failIf:
+            cond:
+              $not:
+                $choose:
+                  cond: {$exists: {$var: retainedField}}
+                  then:
+                    $and:
+                    - {$call: {function: adjustmentField, args: {candidate: {$var: retainedField}}}}
+                    - {$not: {$exists: {$var: literalRetention}}}
+                  else:
+                    $and:
+                    - {$eq: [{$var: literalRetention}, 0]}
+                    - {$not: {$exists: {$var: {name: requestIds, path: /refund}}}}
+            message: PAYMENT_ADJUSTMENT_RETENTION_REQUIRED
+        - $forEach:
+            item: pointerField
+            in: [/selectedPayment/source, /selectedPayment/expectedSourceOrigin, /selectedPayment/entries, /selectedPayment/path]
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $call:
+                      function: adjustmentPath
+                      args:
+                        candidate: {$pointerGet: {object: {$var: definition}, path: {$var: pointerField}, default: ''}}
+                message: PAYMENT_ADJUSTMENT_SELECTION_PATH_REQUIRED
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$isKind: {val: {$var: selectorKey}, kind: text}}
+                - {$ne: [{$var: selectorKey}, '']}
+                - {$isKind: {val: {$var: requestIds}, kind: object}}
+                - {$gt: [{$size: {$var: requestIds}}, 0]}
+            message: PAYMENT_ADJUSTMENT_SELECTION_OR_REQUEST_REQUIRED
+        - $forEach:
+            key: leg
+            item: requestId
+            in: {$var: requestIds}
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - {$includes: {list: [refund, void], val: {$var: leg}}}
+                    - {$isKind: {val: {$var: requestId}, kind: text}}
+                    - {$ne: [{$var: requestId}, '']}
+                message: PAYMENT_ADJUSTMENT_REQUEST_ID_INVALID
+            - $failIf:
+                cond: {$hasKey: {object: {$var: usedRequestIds}, key: {$var: requestId}}}
+                message: PAYMENT_ADJUSTMENT_REQUEST_ID_REUSED
+            - $set:
+                name: usedRequestIds
+                expr: {$objectSet: {object: {$var: usedRequestIds}, key: {$var: requestId}, val: true}}
+  captureEquality:
+    args:
+      predicate: {}
+    expr:
+      $objectSet:
+        object: {}
+        key: $eq
+        val:
+        - {$objectSet: {object: {}, key: $document, val: {$var: {name: predicate, path: /path}}}}
+        - {$objectSet: {object: {}, key: $literal, val: {$var: {name: predicate, path: /equals}}}}
   requestPolicy:
     args: {}
     do:
@@ -129,6 +242,25 @@ functions:
               $var: policy
             path: /mode
             default: workflow
+    - $let:
+        vars:
+          when: {$pointerGet: {object: {$var: policy}, path: /when}}
+          whenAlso: {$pointerGet: {object: {$var: policy}, path: /whenAlso}}
+          blockedBy: {$pointerGet: {object: {$var: policy}, path: /blockedBy}}
+          requires: {$pointerGet: {object: {$var: policy}, path: /requires}}
+          adjustments: {$pointerGet: {object: {$var: clause}, path: /parameters/adjustments, default: {}}}
+    - $if:
+        cond: {$exists: {$var: {name: clause, path: /parameters/adjustments}}}
+        then:
+        - $call:
+            function: validateAdjustments
+            args:
+              adjustments:
+                $call:
+                  function: withSharedSelection
+                  args:
+                    adjustments: {$var: adjustments}
+                    sharedSelection: {$pointerGet: {object: {$var: clause}, path: /parameters/selectedPayment, default: {}}}
     - $failIf:
         cond:
           $not:
@@ -139,6 +271,12 @@ functions:
               val:
                 $var: mode
         message: PAYMENT_CAPTURE_MODE_UNSUPPORTED
+    - $failIf:
+        cond:
+          $and:
+          - {$ne: [{$var: mode}, when]}
+          - {$or: [{$exists: {$var: blockedBy}}, {$exists: {$var: requires}}]}
+        message: PAYMENT_CAPTURE_REQUIREMENTS_NEED_CONDITIONAL_MODE
     - $if:
         cond:
           $eq:
@@ -147,12 +285,7 @@ functions:
         then:
         - $failIf:
             cond:
-              $not:
-                $exists:
-                  $pointerGet:
-                    object:
-                      $var: policy
-                    path: /when
+              $not: {$exists: {$var: when}}
             message: PAYMENT_CAPTURE_CONDITION_REQUIRED
         - $failIf:
             cond:
@@ -172,5 +305,74 @@ functions:
                       path: /requestId
                   - ''
             message: PAYMENT_CAPTURE_REQUEST_ID_REQUIRED
+        - $let:
+            name: conditions
+            expr: [{$var: when}]
+        - $if:
+            cond: {$exists: {$var: whenAlso}}
+            then:
+            - $set: {name: conditions, expr: {$listConcat: [{$var: conditions}, [{$var: whenAlso}]]}}
+        - $if:
+            cond: {$exists: {$var: blockedBy}}
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - {$isKind: {val: {$var: blockedBy}, kind: text}}
+                    - {$hasKey: {object: {$var: adjustments}, key: {$var: blockedBy}}}
+                message: PAYMENT_CAPTURE_ADJUSTMENT_UNKNOWN
+            - $let:
+                name: blocker
+                expr: {$get: {object: {$var: adjustments}, key: {$var: blockedBy}}}
+            - $let:
+                name: equality
+                expr:
+                  $call:
+                    function: captureEquality
+                    args:
+                      predicate:
+                        path: {$concat: [{$var: {name: blocker, path: /decision/path}}, /, {$var: {name: blocker, path: /decision/when/field}}]}
+                        equals: {$var: {name: blocker, path: /decision/when/equals}}
+            - $set:
+                name: conditions
+                expr:
+                  $listConcat:
+                  - {$var: conditions}
+                  - [{$objectSet: {object: {}, key: $not, val: {$var: equality}}}]
+        - $if:
+            cond: {$exists: {$var: requires}}
+            then:
+            - $let:
+                name: requirementPath
+                expr: {$pointerGet: {object: {$var: requires}, path: /path, default: ''}}
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - {$call: {function: adjustmentPath, args: {candidate: {$var: requirementPath}}}}
+                    - {$exists: {$var: {name: requires, path: /equals}}}
+                message: PAYMENT_CAPTURE_REQUIREMENT_INVALID
+            - $set:
+                name: conditions
+                expr:
+                  $listConcat:
+                  - {$var: conditions}
+                  - - $call:
+                        function: captureEquality
+                        args: {predicate: {$var: requires}}
+        - $if:
+            cond: {$gt: [{$size: {$var: conditions}}, 1]}
+            then:
+            # The authored policy may inherit fixed predicate fields. Leave its
+            # type intact and build the execution policy without that type.
+            - $return:
+                mode: {$var: mode}
+                requestId: {$pointerGet: {object: {$var: policy}, path: /requestId}}
+                when:
+                  $objectSet:
+                    object: {}
+                    key: $and
+                    val: {$var: conditions}
     - $return:
         $var: policy

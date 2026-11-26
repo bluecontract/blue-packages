@@ -1,0 +1,81 @@
+{
+  "blueId": "pQS9obPsKxioLmR9MFc9qfzaNZt8SCpJDZj1UPBShS1",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS",
+      "3bGHkpFUiShn2Mfr9vajr27Hyvdd8w7etTmgiaXndVB4"
+    ],
+    "displayLabel": "Order with Seller Decision",
+    "limitations": [],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown when absent. Initialized to PENDING.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order with Seller Decision.orderDecision.reject",
+        "id": "status",
+        "meaning": "PENDING is the initial rejection record. REJECTED records the seller decision.",
+        "path": "/orderDecision/status",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "No rejection revision recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order with Seller Decision.orderDecision.reject",
+        "id": "rejectionRevision",
+        "meaning": "Activation revision against which the rejection was recorded.",
+        "path": "/orderDecision/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "No rejection terms reference recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order with Seller Decision.orderDecision.reject",
+        "id": "rejectionTerms",
+        "meaning": "Exact terms reference under review when the seller rejected.",
+        "path": "/orderDecision/termsRef",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "The reviewed-seller dispatch restriction applies only to explicit true.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order with Seller Decision.orderDecision dispatch policy",
+        "id": "reviewedSellerActivation",
+        "meaning": "True requires reviewed reservation for seller approval and blocks the named external activation operations.",
+        "path": "/clauses/reservation/parameters/reviewedSellerActivation",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No terminal whole-Order reservation decision reference recorded.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Order with Seller Decision.orderDecision dispatch policy",
+        "id": "wholeOrderDecision",
+        "meaning": "Exact terminal reservation decision reference that prevents the named external seller activation operations.",
+        "path": "/wholeOrderReservation/decisionRef",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Order with Seller Decision\n\nAdds seller rejection to an Order with Clauses. The rejection record at `/orderDecision/status` starts as PENDING. Acceptance uses the configured Activation and reservation workflows.\n\nOnly the seller can call `rejectOrder`. The call references the exact reviewed document version and supplies the current activation revision. A stale revision or already recorded seller approval rejects the call. An already rejected Order makes no further change after those guards pass. A successful rejection records REJECTED with the activation revision and terms reference and emits Order rejected. The dispatch policy blocks external activation approval and applicable negotiation-and-activation operations for a rejected Order.\n\nWhen `/clauses/reservation/parameters/reviewedSellerActivation` is true, the dispatch policy also blocks direct external `approve_seller`, `activate_seller` and `proposeAndActivate_seller` operations. The configured reservation workflow supplies that reviewed seller decision. Orders without that flag continue to use their ordinary Activation operations. Activation records seller approval. The linked Payment Instruction records financial outcomes.\n\nA terminal whole-Order reservation decision also blocks the three external seller activation operations above. The dispatch policy reports `ORDER_CANCELLED` when the decision reference is present. The reservation record supplies the decision details and the Payment Instruction records any resulting financial effect."
+}

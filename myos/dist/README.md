@@ -13,4 +13,32 @@ inherit Payment Instruction with Clauses without customer funding. These identit
 do not implement Stripe transfers, account debits or commission payouts, and add no
 separate provider field or operation permissions.
 
+Choose `Account Transfer Preparation Functions` for a Documents clause that
+prepares one account payout against a ledger. Its parameters name the ledger,
+the transfer terms and the three participant channels. The preparation keeps the
+gross reservation distinct from the net instruction amount and checks the frozen
+terms again when accepting the supplied instruction.
+
+In an account transfer instruction, bind `validateAccountTransfer` and
+`confirmAccountSettlement` on `Payment Method Events`. The ledger can use
+`Payout Ledger Functions` to close the reservation once both a
+verified immutable settlement breakdown and the matching payment outcome exist.
+
+Mount `MyOS/Payout Ledger Clause` to combine that profile with the ordinary
+Ledger actions. To opt into recovery, bind `reconcilePayouts` to the
+Agreement's local readiness events, for example `Parties/Document Access Restored`
+and `Activation/Terms Accepted`. Recovery requires an active Agreement and uses
+the payout collection and Documents admission entries named by `payouts` and
+`payoutEntries`. Recovery uses the frozen terms validated by
+`Account Transfer Preparation Functions`. It checks existing reservations against the same verified
+transfer facts as ordinary settlement. The clause handles each eligible
+reservation separately so Ledger totals include every settled key. Pending
+or missing evidence preserves the reservation.
+A mismatch in the admitted payout key, reserved gross or frozen split rejects
+the triggering update, as it does during ordinary settlement.
+An authored `after` on the readiness connection follows discovery of one or
+more eligible payouts. It can precede the individual Ledger updates in that
+same processing turn. Use the existing `Settlement Closed` event for an action
+that depends on a posted result.
+
 Unpublished candidate. Authored Blue/BEX definitions are authoritative. See ../docs/payment-family.md for the tested package selection and integration boundaries.

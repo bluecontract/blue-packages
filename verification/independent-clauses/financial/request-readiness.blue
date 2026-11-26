@@ -1,0 +1,46 @@
+type: Payment/Payment Process Clause
+parameters:
+  capture:
+    mode: when
+    requestId: fixture-capture
+    when: {$eq: [{$document: /ordinaryCapture}, true]}
+    whenAlso: {$not: {$exists: {$document: /targetMinor}}}
+  connectionProfiles:
+    refundAboveTarget:
+      params:
+        requestId: adjustment-refund
+        amountMinor:
+          $call:
+            function: refundAbove
+            args:
+              targetMinor:
+                $choose:
+                  cond: {$exists: {$document: /targetMinor}}
+                  then: {$document: /targetMinor}
+                  else: -1
+      when:
+        $and:
+        - {$gt: [{$var: {name: params, path: /amountMinor}}, 0]}
+        - {$not: {$exists: {$document: /payment/requests/adjustment-refund}}}
+    releaseHoldAtZero:
+      params:
+        requestId: adjustment-void
+        amountMinor: {$call: {function: voidableFunds, args: {}}}
+      when:
+        $and:
+        - {$eq: [{$document: /targetMinor}, 0]}
+        - {$eq: [{$document: /payment/completed}, {$document: /payment/reversed}]}
+        - {$gt: [{$var: {name: params, path: /amountMinor}}, 0]}
+        - {$not: {$exists: {$document: /payment/requests/adjustment-void}}}
+bindings:
+  requestAuthorize:
+    authorize: {on: workflow, party: guarantor, input: true}
+  requestCapture:
+    pay: {on: workflow, party: guarantor, input: true}
+  requestRefund:
+    refundManually: {on: workflow, party: guarantor, input: true}
+    targetChanged: {on: change, path: /targetMinor, profile: refundAboveTarget}
+    paymentResponse: {on: event, event: {type: PaymentInstruction/Payment Response}, profile: refundAboveTarget}
+  requestVoid:
+    targetChanged: {on: change, path: /targetMinor, profile: releaseHoldAtZero}
+    paymentResponse: {on: event, event: {type: PaymentInstruction/Payment Response}, profile: releaseHoldAtZero}

@@ -1,0 +1,88 @@
+name: Payout Preparation Functions
+type: Contracts/Compute Definition
+description: Prepare a keyed payout from a workflow request and reserve the gross amount against a declared Ledger.
+functions:
+  $blue:membersFrom:
+    definition: {type: Documents/Document Preparation Functions}
+    field: functions
+  stockCheckPreparation:
+    $blue:functionFrom: {definition: {type: Documents/Document Preparation Functions}, function: checkPreparation}
+  stockSharedPrepare:
+    $blue:functionFrom: {definition: {type: Documents/Document Preparation Functions}, function: sharedPrepare}
+  supportsPaymentAmount:
+    $blue:functionFrom: {definition: {type: Payment/Payment Setup}, function: supportsPaymentAmount}
+  payoutPreparationInput:
+    args:
+      input: {}
+    expr:
+      key: {$var: {name: input, path: /key}}
+      values: {amountMinor: {$var: {name: input, path: /amountMinor}}}
+  validatePayoutPreparationInput:
+    args:
+      input: {}
+    do:
+    - $failIf:
+        cond: {$not: {$call: {function: supportsPaymentAmount, args: {terms: {$var: input}}}}}
+        message: INVALID_AMOUNT
+    - $forEach:
+        item: field
+        in: {$keys: {$var: input}}
+        do:
+        - $failIf:
+            cond: {$not: {$includes: {list: [key, amountMinor], val: {$var: field}}}}
+            message: UNKNOWN_INPUT_FIELD
+    - $return: true
+  checkPreparation:
+    args:
+      input: {}
+    do:
+    - $return:
+        $call:
+          function: stockCheckPreparation
+          args:
+            input:
+              $call:
+                function: payoutPreparationInput
+                args:
+                  # Validate the caller's request before applying Documents' child field defaults.
+                  input: {$binding: call/request}
+  sharedPrepare:
+    args:
+      input: {}
+      checked: {}
+    do:
+    - $let: {name: request, expr: {$binding: call/request}}
+    - $let:
+        name: parameters
+        expr: {$call: {function: configurationParameters, args: {}}}
+    - $failIf:
+        cond:
+          $ne:
+          - $document: {$concat: [{$var: {name: parameters, path: /ledger}}, /reserved]}
+          - 0
+        message: PAYOUT_ALREADY_UNRESOLVED
+    - $call:
+        function: validatePayoutPreparationInput
+        args: {input: {$var: request}}
+    - $let:
+        name: prepared
+        expr:
+          $call:
+            function: stockSharedPrepare
+            args:
+              input:
+                key: {$var: {name: checked, path: /key}}
+                requestId: {$var: {name: checked, path: /requestId}}
+                fields: {$var: {name: checked, path: /intent/fields}}
+                values: {$var: {name: checked, path: /intent/values}}
+              checked: {$var: checked}
+    - $if:
+        cond: {$eq: [{$var: {name: prepared, path: /outcome}}, acceptedNew]}
+        then:
+        - $appendEvent:
+            $merge:
+            - {type: Events/Event, kind: Commission Payout Opened}
+            - collection: {$const: {name: bindings, path: /collection}}
+              key: {$var: {name: request, path: /key}}
+              amountMinor: {$var: {name: request, path: /amountMinor}}
+    - $return: {$var: prepared}

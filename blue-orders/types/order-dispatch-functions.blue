@@ -1,0 +1,185 @@
+name: Order Dispatch Functions
+type: Contracts/Compute Definition
+description: Apply documented Order closing decisions to selected approval routes, clause actions, and workflow operations.
+constants:
+  sellerDecision: false
+  actions: {}
+  operations: []
+  closedStates: {}
+functions:
+  guard:
+    args: {}
+    do:
+    - $if:
+        cond:
+          $not:
+            $includes: {list: [EXTERNAL, TRIGGERED], val: {$binding: dispatch/kind}}
+        then:
+        - $return: {allowed: true}
+    - $let:
+        name: operation
+        expr:
+          $choose:
+            cond: {$isKind: {val: {$binding: dispatch/operation}, kind: text}}
+            then: {$binding: dispatch/operation}
+            else: ''
+    - $forEach:
+        in: {$const: closedStates}
+        item: selector
+        do:
+        - $let: {name: state, expr: {$var: {name: selector, path: /val}}}
+        - $let:
+            vars:
+              path: {$var: {name: state, path: /path}}
+              approvals:
+                $pointerGet:
+                  object: {$var: state}
+                  path: /approvals
+                  default:
+                    $choose: {cond: {$const: sellerDecision}, then: [seller], else: []}
+        - $if:
+            cond:
+              $and:
+              - {$isKind: {val: {$var: path}, kind: text}}
+              - {$exists: {$var: {name: state, path: /equals}}}
+              - {$eq: [{$document: {$var: path}}, {$var: {name: state, path: /equals}}]}
+              - $call:
+                  function: blocked
+                  args:
+                    operation: {$var: operation}
+                    scope:
+                      actions: {$const: actions}
+                      extraActions: {$object: {$var: {name: state, path: /actions}}}
+                      operations: {$const: operations}
+                      approvals:
+                        all: {$eq: [{$var: approvals}, all]}
+                        roles:
+                          $choose:
+                            cond: {$isKind: {val: {$var: approvals}, kind: list}}
+                            then: {$var: approvals}
+                            else: []
+                      reject: {$const: sellerDecision}
+            then:
+            - $return:
+                allowed: false
+                reason: {$pointerGet: {object: {$var: state}, path: /reason, default: ORDER_CLOSED}}
+    - $if:
+        cond:
+          $and:
+          - {$const: sellerDecision}
+          - {$eq: [{$document: /orderDecision/status}, REJECTED]}
+          - $call:
+              function: blocked
+              args:
+                operation: {$var: operation}
+                scope:
+                  actions: {$const: actions}
+                  extraActions: {}
+                  operations:
+                    $listConcat:
+                    - {$const: operations}
+                    - {$list: {$document: /clauses/orderDecision/parameters/activationOperations}}
+                  approvals: {all: true, roles: []}
+                  reject: false
+        then:
+        - $return: {allowed: false, reason: ORDER_REJECTED}
+    - $return: {allowed: true}
+  blocked:
+    args:
+      operation: {type: Text}
+      scope: {}
+    expr:
+      $or:
+      - $call:
+          function: approvalBlocked
+          args: {approvals: {$var: {name: scope, path: /approvals}}, operation: {$var: operation}}
+      - $and:
+        - {$eq: [{$binding: dispatch/kind}, EXTERNAL]}
+        - {$ne: [{$var: operation}, '']}
+        - $or:
+          - {$includes: {list: {$var: {name: scope, path: /operations}}, val: {$var: operation}}}
+          - $call:
+              function: actionBlocked
+              args: {actions: {$var: {name: scope, path: /actions}}, operation: {$var: operation}}
+          - $call:
+              function: actionBlocked
+              args: {actions: {$var: {name: scope, path: /extraActions}}, operation: {$var: operation}}
+          - $and:
+            - {$var: {name: scope, path: /reject}}
+            - $call:
+                function: actionBlocked
+                args: {actions: {orderDecision: [reject]}, operation: {$var: operation}}
+  approvalBlocked:
+    args:
+      approvals: {}
+      operation: {type: Text}
+    do:
+    - $if:
+        cond:
+          $and:
+          - {$not: {$var: {name: approvals, path: /all}}}
+          - {$eq: [{$var: {name: approvals, path: /roles}}, []]}
+        then:
+        - $return: false
+    - $let:
+        name: role
+        expr:
+          $choose:
+            cond: {$eq: [{$binding: dispatch/kind}, TRIGGERED]}
+            then:
+              $document:
+                $pointerJoin: [contracts, activationDispatch, constants, reviewedApprovalRoles, {$binding: dispatch/channel}]
+            else:
+              $choose:
+                cond: {$ne: [{$var: operation}, '']}
+                then:
+                  $document:
+                    $pointerJoin: [contracts, {$var: operation}, steps, '0', constants, activationApprovalRole]
+                else: ''
+    - $return:
+        $and:
+        - {$isKind: {val: {$var: role}, kind: text}}
+        - {$ne: [{$var: role}, '']}
+        - $or:
+          - {$var: {name: approvals, path: /all}}
+          - {$includes: {list: {$var: {name: approvals, path: /roles}}, val: {$var: role}}}
+  actionBlocked:
+    args:
+      actions: {}
+      operation: {type: Text}
+    do:
+    - $forEach:
+        in: {$var: actions}
+        key: clause
+        item: names
+        do:
+        - $let:
+            name: clausePath
+            expr: {$pointerJoin: [clauses, {$var: clause}]}
+        - $forEach:
+            in: {$list: {$var: names}}
+            item: action
+            do:
+            - $let:
+                name: bindings
+                expr: {$document: {$concat: [{$var: clausePath}, {$pointerJoin: [bindings, {$var: action}]}]}}
+            - $let:
+                name: connection
+                expr:
+                  $get:
+                    object:
+                      $object:
+                        $choose:
+                          cond: {$exists: {$var: bindings}}
+                          then: {$var: bindings}
+                          else:
+                            $document:
+                              $concat:
+                              - {$var: clausePath}
+                              - {$pointerJoin: [type, defaultBindings, {$var: action}]}
+                    key: {$var: operation}
+            - $if:
+                cond: {$eq: [{$var: {name: connection, path: /on}}, workflow]}
+                then:
+                - $return: true
+    - $return: false

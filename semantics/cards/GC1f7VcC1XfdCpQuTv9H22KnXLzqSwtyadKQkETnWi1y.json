@@ -1,0 +1,117 @@
+{
+  "blueId": "GC1f7VcC1XfdCpQuTv9H22KnXLzqSwtyadKQkETnWi1y",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "erwD9m2PC6DPwmRDaoJBo88WbC7ox13u1Cr1gmvjeeq",
+      "4f1aDeGNe2WmiMYgVfDYiWJqKg2A4sp9Yztg7YBt4tu3",
+      "7gjcSjrbHT6av8FR27nhY2xLRX18jBRqC255dCjDX82d",
+      "5SgC99UJqpLEg3YZwu51UHS7TUZBkffB7LU4ebNftRCa",
+      "BPMByZokSM9z9aVJWWzmEdPwa45uRvvAWjMWuRnkWWnV",
+      "69Vz15WWecriPLjyRD2wBQQ46BUBKuY1WXLZ1bg9dxVC",
+      "9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj",
+      "3WukTexA1Nex951RDHoA6S6QfNgFmdiBpigfRUzi9YMh",
+      "BvtgU3qxEP7vTPD7vTwC1qTdvWSBwwxsaA4j6xkyqbJt",
+      "8Dd12DcFEA1kiGauJwvVHEwJAMKRPKDGDDxgxWgsdyRG",
+      "Ff1CegGgBpYqfdpiZTaETSzodJXf7rh5FNZNJE7KBcdx",
+      "CHH33txN5XNwSjHKMLfEPD2GuH22MNMbc6pKZcqvNufg",
+      "B9RC5kCtzrY331WX4jp9gRVkNmzZSUpdvvSwVXyuXHGT",
+      "26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG"
+    ],
+    "displayLabel": "Document Access Functions",
+    "limitations": [
+      "Registration forwards input.basePath without supplying a default; registerDocumentAccessPublic declares only documents. The calling integration determines the storage destination.",
+      "Inherited generic amendment helpers use caller-provided state bindings and validateReplacement. This definition supplies no executable body for that validation hook."
+    ],
+    "parameterRefs": [],
+    "stateFacts": [
+      {
+        "absent": "Unknown; installation uses an empty append base.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in activation.accessPaths",
+          "unit": "document-path entries, not distinct grants or granted readers"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Timeline Access Functions.installTimelineAccess; Party Access Functions.accessValid",
+        "id": "accessDocumentPaths",
+        "meaning": "Number of access-document path entries consulted by Activation, including newly registered documents.",
+        "path": "/activation/accessPaths",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; installation uses an empty append base.",
+        "aggregate": {
+          "operation": "count",
+          "over": "Entries in activation.registeredAccessChannels",
+          "unit": "registered update-channel entries, not completed updates"
+        },
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Timeline Access Functions.installTimelineAccess: registeredAccessChannels",
+        "id": "registeredAccessChannels",
+        "meaning": "Number of registered channels listening for embedded Timeline Access Updated events.",
+        "path": "/activation/registeredAccessChannels",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; commitState treats missing history as false.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.commitState: everActivated; computeState: status",
+        "id": "everActivated",
+        "meaning": "Whether Activation has ever been active; remains true through later access suspension.",
+        "path": "/activation/everActivated",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; no reviewed revision is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.approve, updateParty, admitApprovedParties",
+        "id": "activationRevision",
+        "meaning": "Activation revision checked for approval and admission; party changes advance it.",
+        "path": "/activation/revision",
+        "scope": "document",
+        "suffix": "",
+        "type": "count"
+      },
+      {
+        "absent": "Unknown; no current terms reference is established.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, commitState, approve",
+        "id": "currentTermsReference",
+        "meaning": "Identity of the published terms definition and agreed field values used for matching reviewed approval.",
+        "path": "/activation/terms/ref",
+        "scope": "document",
+        "suffix": "",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown; initialization has not established a value.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Activation Functions.initializeTerms, approveCurrentTerms",
+        "id": "negotiationEditable",
+        "meaning": "Whether negotiation remains editable; initialized true and set false when approval activates the document.",
+        "path": "/activation/negotiation/editable",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Document Access Functions\n\nA function library for registering existing Timeline Access documents with Activation after exact-version review by a party lead. Registration connects permission evidence to the consuming document; it does not create or change provider permissions, accept terms, or admit participants.\n\n## Registration\n\n`registerDocumentAccessPublic(input)` forwards to `registerDocumentAccess(input)`. Its `documents` field contains **1–16 existing, initialized Timeline Access documents**. Missing or empty input, or more than sixteen documents, fails with `ACCESS_DOCUMENTS_REQUIRED`.\n\nRegistration first requires `call/requireExactDocumentVersion` to be exactly `true`, otherwise it fails with `ACCESS_EXACT_REVIEW_REQUIRED`. Then `call/channel` must be a key in `/activation/parties`, otherwise it fails with `ONLY_PARTY_LEAD_CAN_MANAGE`. This checks the party's lead channel; merely being a listed representative does not satisfy it. These are invocation-context values, not configurable data bindings.\n\nThe inherited `installTimelineAccess` uses `input.basePath` as the destination. Neither registration function supplies a default, and the public argument declaration describes only `documents`. The storage location therefore depends on the calling integration; this type establishes no fixed registration destination.\n\nEvery supplied document, including duplicates, passes `validateAccessDocument`. It must:\n\n- Be a `Timeline Access` document with a `Public Timeline Channel` at `contracts.provider`.\n- Contain its original initialized document at `contracts.initialized.document` and provider history at `contracts.checkpoint.entries.provider`.\n- Preserve the expected executable policy: the provider channel and standard `Update Timeline Access` operation. Both the original contracts and current contracts, excluding current initialization and checkpoint records, are checked.\n\nA wrong document or provider-channel type, missing initialization or history, or altered executable policy causes rejection. The original initialized document's identity is the registration key. Existing keys and repetitions within the input are skipped after validation. Resubmitting a newer executed version of an already registered origin does not replace its stored reference.\n\nIf every origin is already known, the function returns `outcome: \"duplicate\"` without registration changes. Otherwise it stores exact references to the newly supplied documents, preserving existing registrations, and returns `outcome: \"acceptedNew\"`. These are function results, not a persisted registration-status field or confirmation of newly granted access.\n\nFor each new origin, installation creates a `documentAccess_` channel and matching refresh workflow. The channel listens for `Timeline Access Updated` from that document's embedded path; the workflow copies `/contracts/activationInitializedRefresh/steps`. Installation also appends the channel name to `/activation/registeredAccessChannels` and the document path to `/activation/accessPaths`.\n\n## Permission evidence and Activation\n\nIn each access document, every `allowedKeys` entry may read every `allowedTimelines` entry. Permission changes belong to the provider's authenticated public control history. Its standard update atomically replaces both lists and emits `Timeline Access Updated` on successful completion, including unchanged-list updates. The notification directs consumers to executed permission state; it is not an independent grant. Read access conveys no publishing, resharing, owner-management or business-operation authority.\n\nRegistration validates the document's structure and executable policy. It does not itself establish that participant access requirements are satisfied. Activation checks those separately using the documents at `accessPaths`. For each non-public participant transport, the supplied access-checking implementation requires one matching-provider access document containing its timeline and at least one key from **every** reader group. Alternative keys within a group are interchangeable; splitting the required groups across several documents does not satisfy that particular check. Public external transports bypass this grant check.\n\nWhen a registered embedded update event reaches its refresh workflow, Activation reevaluates access and acceptance. Its inherited state distinguishes `WAITING_FOR_ACCESS`, `SUSPENDED_ACCESS` after prior activation, `AWAITING_ACCEPTANCE`, `ACTIVE`, and `CLOSED`. Access alone is insufficient: required approvals and unchanged agreed terms are also necessary. `everActivated` retains the historical distinction after access is lost. Registration does not itself record acceptance or guarantee an immediate transition to `ACTIVE`.\n\n## Inherited helpers\n\nThe library also inherits Activation approval, party-management and child-preparation functions. Approval requires exact review, a party-lead channel, the current Activation revision, valid participant access, and a matching terms reference when required. Party replacement checks roster restrictions and access, advances the revision and clears approvals. Prepared admission and access-update requests remain distinct from completed admission and provider permission changes.\n\n`bindChild` and `prepareChild` prepare an uninitialized child with the exact Activation Clause. They resolve declared receiver roles through explicit party mappings, preserve main-party identity through matching lead channels and reader-key sets, copy access references, and reject conflicting child channels or access destinations. They return a prepared child; they do not initialize it or supply participant consent. The legacy `activateChild` returns the child unchanged when the parent has no Activation state. Otherwise, an empty `roles` list selects all parent parties, `readerNames` selects additional parent reader groups, and the child's `required` list is preserved or defaults to empty for that helper.\n\nInherited amendment helpers record proposals against a current revision, permitted path and editable state, then apply a replacement only after every configured approver has approved. They distinguish new work from duplicates and recheck replacement validity before application. Their state locations and replacement-validation hook depend on the caller; they are not additional registration behavior."
+}

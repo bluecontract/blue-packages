@@ -1,0 +1,74 @@
+name: Whole Order Cancellation Plan
+type: Connections/Connection Planning Functions
+description: Install the cancellation actions, validate closed statuses, and apply the configured veto after acceptance.
+functions:
+  plan:
+    args: {}
+    do:
+    - $let: {name: base, expr: {$call: {function: planConnections, args: {}}}}
+    - $let:
+        name: clause
+        expr: {$document: {$concat: [/clauseRuntime/work/candidate/, {$const: clauseKey}]}}
+    - $let:
+        name: closed
+        expr: {$pointerGet: {object: {$var: clause}, path: /parameters/closedOrderStatuses, default: []}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: closed}, kind: list}}}
+        message: INVALID_CLOSED_ORDER_STATUSES
+    - $failIf:
+        cond:
+          $some:
+            in: {$var: closed}
+            item: status
+            where: {$not: {$is: {node: {$var: status}, pattern: {type: Text, schema: {minLength: 1}}}}}
+        message: INVALID_CLOSED_ORDER_STATUSES
+    - $let:
+        name: operations
+        expr: {$pointerGet: {object: {$var: clause}, path: /parameters/blockedOperationsAfterAcceptance, default: []}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: operations}, kind: list}}}
+        message: INVALID_CANCELLATION_OPERATION_LIST
+    - $forEach:
+        item: operation
+        in: {$var: operations}
+        do:
+        - $failIf:
+            cond: {$not: {$is: {node: {$var: operation}, pattern: {type: Text, schema: {minLength: 1}}}}}
+            message: INVALID_CANCELLATION_OPERATION_LIST
+    - $if:
+        cond: {$eq: [{$size: {$var: operations}}, 0]}
+        then:
+        - $return: {$var: base}
+    - $return:
+        $merge:
+        - {$var: base}
+        - contracts:
+            $objectSet:
+              object: {$var: {name: base, path: /contracts}}
+              key: {$concat: [cx., {$const: clauseKey}, .terminal]}
+              val:
+                kind: policy
+                contract:
+                  type: Dispatch/Document Dispatch Policy
+                  constants:
+                    operations: {$var: operations}
+                    decisionPath: {$var: {name: clause, path: /bindings/decision}}
+                  do:
+                    $literal:
+                    - $if:
+                        cond:
+                          $and:
+                          - {$eq: [{$binding: dispatch/kind}, EXTERNAL]}
+                          - {$includes: {list: {$const: operations}, val: {$binding: dispatch/operation}}}
+                          - {$eq: [{$document: {$concat: [{$const: decisionPath}, /status]}}, accepted]}
+                        then:
+                        - $return: {allowed: false, reason: ORDER_CANCELLED}
+                    - $return: {allowed: true}
+  validateConfiguration:
+    args: {}
+    do:
+    - $return: {$call: {function: validateConnectionsConfiguration, args: {}}}
+  validateTransition:
+    args: {}
+    do:
+    - $return: {$call: {function: validateConnectionsTransition, args: {}}}

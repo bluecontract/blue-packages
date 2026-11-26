@@ -1,0 +1,192 @@
+{
+  "blueId": "Eu7G85oiFYPFkzwYaZ8TBYvuZenBAw1EvhD4Y5rNdmXU",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "41akVDJxkCxTTywN938g3dMNXHde1ohn5PS8juqyZ9KN",
+      "4DWRhGSybAmKPxJnqdDKxwxkERUsr17G5h8nv5LrtEi6",
+      "4t1qR43VeKt6zTyrsnUCivgSTfiEM6hgNiryiED43iz9",
+      "5F8CAS5wXyETFCFowUdyfQachUiVSvzbPZcUSWBjCNk8",
+      "5UMRb3G6CPCKmkQKBLBhntAgaA5qjoJSLBbjS4kjS3VB",
+      "5tqWeWrFPfa2QtdV3onkGPnjGxTe2Ca9Jfz74WKhsnd6",
+      "6sNxToKRLdPYZL7ipXsG1w81vGvJjHzWdSYswLdYHrDA",
+      "9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "C5mHmmM9zaomFrvaWubwi1SR7NGxwrZyBDUVQ2zYHC8p",
+      "CEncw6WKZptEvCRX4NkPtKLwdYdAbTMvvUSL5JS4iXSx",
+      "EBuskkMM84G1os5d9eEvLJesCVi6vt2TeQUAoa2Q44At",
+      "EXZMLDv4TxmYaH7L8yrVKDahRDzM3AeKJv44D8P9WxFC",
+      "2VRjCVXah8NQpo69uGhaMJZobwh36J77t6rz4edzv1ii",
+      "ExAJeNHS8p9eGqcPZyaCC7z3bFN8AHwgnrJaV49j26kh"
+    ],
+    "displayLabel": "Receipts Clause",
+    "limitations": [
+      "Payment Instruction ledger initialization and outcome-validation implementations are omitted; their detailed rules cannot be described from this evidence."
+    ],
+    "parameterRefs": [
+      "bindings.currency",
+      "bindings.entries",
+      "bindings.instruction",
+      "bindings.orders",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; initialized to zero when initialization runs.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "state.targets/*/grossConfirmedMinor",
+          "unit": "minor units of state.currency"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Receipts Clause.initialState; 4DWRhGSybAmKPxJnqdDKxwxkERUsr17G5h8nv5LrtEi6.addTotals",
+        "id": "grossConfirmed",
+        "meaning": "Maintained confirmed captures across recorded order targets, before refunds; minor units of state.currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/grossConfirmedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized to zero when initialization runs.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "state.targets/*/refundsMinor",
+          "unit": "minor units of state.currency"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Receipts Clause.initialState; 4DWRhGSybAmKPxJnqdDKxwxkERUsr17G5h8nv5LrtEi6.addTotals",
+        "id": "confirmedRefunds",
+        "meaning": "Maintained confirmed refunds across recorded order targets; minor units of state.currency. Excludes voids.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/refundsMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; initialized to zero when initialization runs.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "Recorded targets' confirmed captures and refunds",
+          "unit": "minor units of state.currency"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "C5mHmmM9zaomFrvaWubwi1SR7NGxwrZyBDUVQ2zYHC8p.next; Receipts actionDefinition.addTotals",
+        "id": "netReceived",
+        "meaning": "Maintained confirmed captures less confirmed refunds across recorded targets; minor units of state.currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/netReceivedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No receipt currency established at this location.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "C5mHmmM9zaomFrvaWubwi1SR7NGxwrZyBDUVQ2zYHC8p: projected currency change",
+        "id": "receiptsCurrency",
+        "meaning": "Currency copied from the first accepted instruction's paymentTerms.currency; later projections must match.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; no recorded capture snapshot for this target.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed captures recorded by this order's instruction",
+          "unit": "minor units of state.currency"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "C5mHmmM9zaomFrvaWubwi1SR7NGxwrZyBDUVQ2zYHC8p: next.grossConfirmedMinor",
+        "id": "targetGrossConfirmed",
+        "meaning": "Order-keyed snapshot of instruction payment.completed: confirmed captures before refunds, in state.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*/grossConfirmedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no recorded refund snapshot for this target.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Confirmed refunds recorded by this order's instruction",
+          "unit": "minor units of state.currency"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "C5mHmmM9zaomFrvaWubwi1SR7NGxwrZyBDUVQ2zYHC8p: next.refundsMinor",
+        "id": "targetRefunds",
+        "meaning": "Order-keyed snapshot of instruction payment.reversed: confirmed refunds in state.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*/refundsMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no recorded net snapshot for this target.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "This order's recorded confirmed captures and refunds",
+          "unit": "minor units of state.currency"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "C5mHmmM9zaomFrvaWubwi1SR7NGxwrZyBDUVQ2zYHC8p: next.netReceivedMinor",
+        "id": "targetNetReceived",
+        "meaning": "Order-keyed confirmed captures less confirmed refunds at its last accepted projection; state.currency minor units.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*/netReceivedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No expected-currency check from this binding.",
+        "aggregate": null,
+        "binding": "currency",
+        "defaultPath": "/terms/currency",
+        "evidence": "Receipts actionDefinition.project; C5mHmmM9zaomFrvaWubwi1SR7NGxwrZyBDUVQ2zYHC8p",
+        "id": "expectedCurrency",
+        "meaning": "When present, must equal each projected instruction's currency; it does not supply a missing instruction currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown; reconciliation does not proceed.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Receipts Clause.actions.reconcile: initial activation guard",
+        "id": "reconciliationActivation",
+        "meaning": "Executing document activation flag; reconcile proceeds only when exactly true.",
+        "path": "/activation/active",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Unknown; entry does not qualify for projection.",
+        "aggregate": null,
+        "binding": "entries",
+        "defaultPath": "/process_orders/entries",
+        "evidence": "6sNxToKRLdPYZL7ipXsG1w81vGvJjHzWdSYswLdYHrDA: entry.status guard",
+        "id": "orderEntryEligibility",
+        "meaning": "Only usable qualifies, alongside matching key, path and document origin; no other status meanings are established here.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/status",
+        "type": "string"
+      }
+    ]
+  },
+  "semanticText": "# Receipts Clause\n\nProjects confirmed customer captures and refunds from Payment Instructions on usable orders into per-order receipt snapshots and maintained totals. It reads recorded payment outcomes; it does not request or perform payments. Requested amounts, reservations, secured funds and cancellations before completion are not receipts.\n\n## Bindings\n\nAll five bindings require non-root JSON pointers. Overrides change the locations read or maintained:\n\n- `currency` defaults to `/terms/currency`: the expected currency, when present.\n- `entries` defaults to `/process_orders/entries`: the registry used to verify usable order attachments.\n- `orders` defaults to `/orders`: the order-document collection.\n- `instruction` defaults to `/payment`: the Payment Instruction location **inside each order**, not inside the document holding receipt totals.\n- `state` defaults to `/receipts`: the receipt projection in the executing document.\n\nInitialization supplies zero for `grossConfirmedMinor`, `refundsMinor` and `netReceivedMinor`, and an empty `targets` map. It does not initialize a receipt currency. Missing state remains unknown; these defaults apply only after initialization runs.\n\n## Projection triggers and eligibility\n\n`attached` automatically handles `Document Attached`. It verifies the attachment's registry, request correlation and document origin, then requires the order's named sources to be ready. `confirmed` automatically observes `Payment Event Received` from direct members of `orders`, accepting only the configured `instructionPath` and a nested `Payment Completed` or `Payment Reversed After Completion` response. These responses represent authoritative guarantor outcomes. The clause reads the instruction's recorded totals rather than adding the event's amount.\n\nBoth routes require a registry entry with matching key, collection path and initialized document origin, and `status` equal to `usable`. Projection also requires the order's `/activation/active` to be exactly `true`. The `confirmed` route does not repeat the named-source readiness check.\n\n`reconcile` has no automatic trigger declared here; its invocation depends on configured connections. It runs only when the executing document's `/activation/active` is exactly `true`. It scans valid usable registry entries, requiring active orders, ready named sources and positive recorded `/payment/completed` in each selected instruction.\n\nNamed-source readiness requires each declared source to be initialized, have the required origin, be active and cover the order's parties through matching lead channels and nonempty matching reader-key sets. A nonempty `selectionPath` must select an initialized document with the order's origin. With no declared requirements, this check passes.\n\nInherited connection conditions can further gate actions. A configured workflow connection determines its actor channel; declaring an action alone grants no viewer permission. Changing an installed connection configuration requires a new clause key.\n\n## Receipt meaning and updates\n\nFor each accepted Payment Instruction, `targets` stores an entry under the order key:\n\n- `grossConfirmedMinor`: cumulative confirmed captures from the instruction's `/payment/completed`, before refunds.\n- `refundsMinor`: cumulative confirmed refunds from `/payment/reversed`.\n- `netReceivedMinor`: confirmed captures less confirmed refunds.\n\nThe same fields at the root of `state` maintain totals across recorded targets, in integer minor units of `state.currency`. The currency comes from the instruction's `/paymentTerms/currency`; the first accepted projection establishes it. Every projection must match both that established currency and the expected `currency` value when supplied. There is no currency conversion. Missing or empty instruction currency, or a mismatch, fails with `RECEIPT_CURRENCY_MISMATCH`. Noninteger amounts, negative reversals or reversals exceeding completed captures fail with `INVALID_RECEIPT_INPUT`.\n\nAn unchanged target is a duplicate and makes no update. A value that is not a Payment Instruction is also ignored as a duplicate. A changed target replaces its previous snapshot, adjusts the maintained totals by the change, and emits `Confirmed Receipts Changed` with `key` and `receiptState`. Repeated observation therefore does not add the same captured amount again. The planner does not require snapshots to increase, so accepted corrections can reduce totals.\n\nReconciliation updates eligible targets; it does not clear totals or remove previously recorded targets that have become absent or ineligible. Consequently, totals describe recorded receipt projections, not necessarily only orders currently eligible for projection."
+}

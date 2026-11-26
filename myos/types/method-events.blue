@@ -1,5 +1,7 @@
 name: Payment Method Events
 type: Connections/Connected Clause
+actionDefinition:
+  type: MyOS/Account Settlement Functions
 actions:
   announce:
     automatic:
@@ -19,6 +21,15 @@ actions:
               else: Account Payment Instruction Created
           details:
             $document: /paymentDetails
+  validateAccountTransfer:
+    do:
+    - $call: {function: validateFixedTransfer, args: {}}
+  confirmAccountSettlement:
+    resultContract: outcome-v1
+    do:
+    - $set:
+        name: actionResult
+        expr: {$call: {function: confirmAccountSettlement, args: {input: {$var: params}}}}
   request:
     automatic:
       'on': event

@@ -1,7 +1,8 @@
 """Guard the native Documents lifecycle seam used by the reseller constructor."""
-import copy
+import json
 from pathlib import Path
 import unittest
+from zipfile import ZipFile
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,16 +19,23 @@ class ResellerCompositionTest(unittest.TestCase):
         self.assertEqual(expected['do'], actual['do'])
 
     def test_preparation_retains_native_lifecycle(self):
-        native = yaml.safe_load((ROOT / 'clause-documents/types/preparation-functions.blue').read_text())
-        reseller = yaml.safe_load((ROOT / 'clause-reseller/types/customer-orders-clause.blue').read_text())
-        expected = copy.deepcopy(native['functions']['sharedPrepare'])
+        package = ROOT / 'clause-reseller'
+        lock = json.loads((package / 'blue-package.lock.json').read_text())
+        documents = package / lock['imports']['Documents']['path']
+        preparation, documents_records = self.exact_export(documents, 'Documents/Preparation Functions')
+        reseller, reseller_records = self.exact_export(
+            package / 'dist/package.bluepkg', 'Reseller/Customer Orders Clause')
+        action_definition = self.exact_record(reseller_records, reseller['actionDefinition']['type'])
+        expected = self.exact_record(documents_records, preparation['functions']['sharedPrepare'])
+        actual = self.exact_record(reseller_records, action_definition['functions']['sharedPrepareOrder'])
         replacements = 0
 
         def adapt(value):
             nonlocal replacements
             if isinstance(value, dict):
-                if value.get('function') == 'constructDocument':
-                    value['function'] = 'constructOrder'
+                function = value.get('function')
+                if isinstance(function, dict) and function.get('value') == 'constructDocument':
+                    function['value'] = 'constructOrder'
                     replacements += 1
                 for child in value.values():
                     adapt(child)
@@ -37,7 +45,36 @@ class ResellerCompositionTest(unittest.TestCase):
 
         adapt(expected)
         self.assertEqual(1, replacements)
-        self.assertEqual(expected, reseller['actionDefinition']['type']['functions']['sharedPrepareOrder'])
+        self.assertEqual(expected, actual)
+
+    @staticmethod
+    def exact_record(records, node):
+        if set(node) != {'blueId'}:
+            return node
+        record = records[node['blueId']]
+        if record['mode'] != 'exact':
+            raise AssertionError('Expected exact published record')
+        return json.loads(record['text'])
+
+    def exact_export(self, path, alias):
+        with ZipFile(path) as archive:
+            manifest = json.loads(archive.read('package.json'))
+            records = json.loads(archive.read('package-records.json'))
+        export, = [row for row in manifest['exports'] if row['alias'] == alias]
+        return self.exact_record(records, {'blueId': export['blueId']}), records
+
+    def test_current_clause_exports_retire_stored_quote_checkout(self):
+        package = ROOT / 'clause-reseller'
+        manifest = yaml.safe_load((package / 'blue-package.yaml').read_text())
+        exports = {definition['name']: definition['path'] for definition in manifest['exports']}
+        self.assertNotIn('Customer Orders Bootstrap Clause', exports)
+        fulfilment = yaml.safe_load((package / exports['Fulfilment Terms Clause']).read_text())
+        self.assertNotIn('place', fulfilment['actions'])
+        self.assertIn('approveAvailability', fulfilment['actions'])
+        order_functions = yaml.safe_load((package / exports['Order Functions']).read_text())
+        self.assertNotIn('placeOrder', order_functions['functions'])
+        catalogue = yaml.safe_load((package / exports['Catalog Clause']).read_text())
+        self.assertIn('quote', catalogue['actions'])
 
     def test_examples_request_independent_bootstrap_without_customer_approval(self):
         examples = list((ROOT / 'examples/reseller').glob('*-preview.blue'))

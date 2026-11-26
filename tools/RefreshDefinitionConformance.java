@@ -12,8 +12,11 @@ public final class RefreshDefinitionConformance {
   public static void main(String[] args)throws Exception {
     var root=Path.of(args[0]);
     var bundle=PackageBundle.builder();
-    for(String[] mount:List.of(new String[]{"Contracts","blue-contracts"},new String[]{"Clauses","blue-clauses"},new String[]{"Connections","clause-connections"},new String[]{"Activation","clause-activation"},new String[]{"Parties","blue-parties"},new String[]{"Documents","clause-documents"},new String[]{"Orders","blue-orders"},new String[]{"Agreements","blue-agreements"},new String[]{"Reseller","clause-reseller"}))
+    for(String[] mount:List.of(new String[]{"Contracts","blue-contracts"},new String[]{"Clauses","blue-clauses"},new String[]{"Connections","clause-connections"},new String[]{"Activation","clause-activation"},new String[]{"Parties","blue-parties"},new String[]{"Documents","clause-documents"},new String[]{"Orders","blue-orders"},new String[]{"Agreements","blue-agreements"}))
       bundle.mount(mount[0],BluePackage.open(root.resolve(mount[1]+"/dist/package.bluepkg")));
+    bundle.mount("Reseller", BluePackage.open(
+        root.resolve("retained/reseller-preview.9/clause-reseller/package.bluepkg"),
+        "76JjNtwDhX6u49EFP6e6xeYv4mjGD4B5QptczuGSYKva"));
     var documents=BluePackage.open(root.resolve("clause-documents/dist/package.bluepkg"));
     for(String variant:List.of("canonical","custom-helper","custom-constants","reseller")) {
       try(var blue=Blue.builder().packages(bundle.build()).build();var runtime=new AuthoringRuntime(RuntimeBindings.accessEvents().withDefinitionReadV1())) {
@@ -49,7 +52,7 @@ public final class RefreshDefinitionConformance {
           check(o(v.bexData(v.select(document,step+"/functions"))).keySet().containsAll(Set.of("connectionConfiguration","connectionSnapshots")),"Step overrides lost");
         }
         if(variant.equals("reseller")) {
-          System.out.println("PASS actual Reseller bootstrap initialization with shared guarded refresh planner");
+          System.out.println("PASS retained Reseller preview.9 bootstrap with shared guarded refresh planner");
           continue;
         }
         var approved=BootstrapPreparationConformance.applied(processor.process(initialized.document(),BootstrapPreparationConformance.event(initialized.document(),"approve_merchant",m("revision",1)),1));

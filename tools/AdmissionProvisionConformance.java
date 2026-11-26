@@ -106,6 +106,10 @@ public final class AdmissionProvisionConformance {
 
       order=apply(p,order.document(),event(order.document(),channel,"guarantor",consent,m("admissionRef",staged.get("admissionRef"),"decision","approve")),++clock);
       check(o(p.read(order.document(),"/activation/parties")).containsKey("guarantor"),"Guarantor admitted");
+      check("guarantor".equals(p.read(order.document(),"/contracts/approve_guarantor/steps/0/constants/activationApprovalRole")),
+          "Admission installs an approval route marked with the new role");
+      check(p.read(order.document(),"/contracts/updateParty_guarantor/steps/0/constants/activationApprovalRole")==Values.UNDEFINED,
+          "Admission leaves access update outside the approval route marker");
       check(((Number)p.read(order.document(),"/activation/revision")).intValue()==2,"Admission advances activation revision");
       check(((Number)p.read(order.document(),"/clauseRuntime/revision")).intValue()==1,"Admission preserves clause revision");
       check(!Boolean.TRUE.equals(p.read(order.document(),"/activation/active")),"Admission must not commercially activate Order");

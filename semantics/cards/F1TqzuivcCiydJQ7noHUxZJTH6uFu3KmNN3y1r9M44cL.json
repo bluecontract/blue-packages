@@ -1,0 +1,91 @@
+{
+  "blueId": "F1TqzuivcCiydJQ7noHUxZJTH6uFu3KmNN3y1r9M44cL",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "5F8CAS5wXyETFCFowUdyfQachUiVSvzbPZcUSWBjCNk8",
+      "27WsCFhXj41q6qD1aFwcDj5879XnBYzGFpwKUiGEjXmr",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Remember First Timestamp",
+    "limitations": [
+      "The fallback source has no independent temporal-unit contract in the evidence. Supplied and fallback integers can populate result without verification that they match native Unix microseconds."
+    ],
+    "parameterRefs": [
+      "bindings.result",
+      "bindings.unavailable",
+      "bindings.fallback",
+      "bindings.ready",
+      "bindings.sourceReady"
+    ],
+    "stateFacts": [
+      {
+        "absent": "No retained timestamp is available; time is unknown.",
+        "aggregate": null,
+        "binding": "result",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp.actions.startAt/startFromEntry/startFromFallback; Time §2",
+        "id": "rememberedTimestamp",
+        "meaning": "First retained timestamp; native source uses Unix microseconds. Supplied and fallback values are copied unchanged.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown; absence does not mean false.",
+        "aggregate": null,
+        "binding": "unavailable",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp.actions.startAt/startFromEntry/startFromFallback",
+        "id": "primaryTimestampUnavailable",
+        "meaning": "True records a missing primary timestamp and permits gated fallback; it can remain true after result is recorded.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "No fallback candidate is available.",
+        "aggregate": null,
+        "binding": "fallback",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp.actions.startFromFallback: time read, integer guard, copy",
+        "id": "fallbackTimestampCandidate",
+        "meaning": "Positive-integer timestamp candidate copied into result; its source units are not independently specified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "number"
+      },
+      {
+        "absent": "Bound but absent blocks fallback; unbound adds no gate.",
+        "aggregate": null,
+        "binding": "ready",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp.actions.startFromFallback: ready guard",
+        "id": "fallbackReadiness",
+        "meaning": "When configured, must equal true before startFromFallback can record a candidate.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      },
+      {
+        "absent": "Bound but absent blocks fallback; unbound adds no gate.",
+        "aggregate": null,
+        "binding": "sourceReady",
+        "defaultPath": null,
+        "evidence": "Remember First Timestamp.actions.startFromFallback: sourceReady guard",
+        "id": "fallbackSourceReadiness",
+        "meaning": "Additional configured gate that must equal true before startFromFallback can record a candidate.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Remember First Timestamp\n\nRemembers one timestamp at `result`, using a supplied value, the native entry timestamp, or a gated fallback. “First” means the first value retained at that location, not the earliest timestamp chronologically. Every action leaves an existing `result` untouched, even if that value is invalid.\n\n### Bindings\n\n`result` is required. `unavailable`, `fallback`, `ready`, and `sourceReady` are optional. All are document pointers beginning with `/`, excluding the root pointer `/`; no default paths or initial values are defined.\n\n- `result`: destination for the remembered timestamp.\n- `unavailable`: records that an attempted primary source had no timestamp. It is not an invalid-timestamp flag.\n- `fallback`: location of a replacement timestamp candidate.\n- `ready` and `sourceReady`: independent fallback gates. Each configured gate must contain exactly `true`; an omitted binding imposes no gate, while a configured pointer with no value blocks fallback.\n\n### Actions\n\n- **`startAt`** reads `params.timestampMicros`. If it is a positive integer and `result` is absent, it records that value. If the parameter is absent, `params.recordUnavailable` is exactly `true`, and `unavailable` is configured but has no value, it records `true` there. A present but invalid timestamp causes no write and does not mark unavailability.\n- **`startFromEntry`** reads the native `timestamp` execution binding. It records a positive integer when `result` is absent. If the native timestamp is absent, it records `unavailable = true` only when that binding is configured and its destination is absent. A present but invalid native timestamp causes no write and does not mark unavailability.\n- **`startFromFallback`** requires an absent `result`, configured `fallback` and `unavailable` bindings, `unavailable` equal to `true`, and all configured readiness gates equal to `true`. It copies a positive integer from `fallback` into `result`; otherwise it makes no change.\n\nThese actions never clear `unavailable`, overwrite an existing unavailability value, or reset `result`. Consequently, `unavailable = true` can coexist with a recorded result. A later primary timestamp cannot replace a fallback already recorded. Primary preference depends on invocation order and the fallback gates, rather than a comparison between candidates.\n\nNative execution timestamps use Unix microseconds. The supplied and fallback values are copied without conversion; the actions check only that they are positive integers, not their provenance or unit correctness. They do not read a clock, and a retained timestamp is not necessarily the wall-clock time of recording.\n\nThe type declares no automatic connections. Configured named connections determine triggers and any workflow actor. Inherited connection guards and action conditions can prevent execution; `once`, when configured, applies per connection and defaults to `false`. Calling an action does not establish that a timestamp was recorded: its guards may leave state unchanged. The committed value at `result` establishes what was retained."
+}

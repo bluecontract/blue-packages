@@ -283,6 +283,15 @@ functions:
                 path: /termsRef
             - $document: /activation/terms/ref
         message: TERMS_CHANGED
+    - $return:
+        $call:
+          function: approveCurrentTerms
+          args: {s: {$var: s}, role: {$binding: call/channel}}
+  approveCurrentTerms:
+    args:
+      s: {}
+      role: {type: Text}
+    do:
     - $if:
         cond:
           $pointerGet:
@@ -291,7 +300,7 @@ functions:
             path:
               $concat:
               - /approved/
-              - $binding: call/channel
+              - $var: role
             default: false
         then:
         - $return: true
@@ -309,7 +318,7 @@ functions:
                     path: /approved
                     default: {}
                 key:
-                  $binding: call/channel
+                  $var: role
                 val: true
     - $let:
         name: activated
@@ -356,13 +365,106 @@ functions:
         $merge:
         - type: Activation/Terms Accepted
         - party:
-            $binding: call/channel
+            $var: role
           revision:
             $pointerGet:
               object:
                 $var: s
               path: /revision
     - $return: true
+  applyReviewedApproval:
+    args:
+      role: {type: Text}
+      review: {}
+    do:
+    - $let:
+        vars:
+          s: {$document: /activation}
+          fact: {$event: ''}
+          cause:
+            $choose:
+              cond: {$exists: {$binding: processingEvent/operation/operation}}
+              then: {$binding: processingEvent/operation}
+              else: {$binding: processingEvent}
+    - $let:
+        vars:
+          decision: {$var: {name: fact, path: /decision}}
+          actor: {$var: {name: cause, path: /channel}}
+          record: {$document: {$var: {name: review, path: /source}}}
+          basis: {$document: {$var: {name: review, path: /basis}}}
+          approver:
+            $get: {object: {$var: {name: s, path: /parties}}, key: {$var: role}}
+          acceptanceBy: {$var: {name: review, path: /acceptanceBy}}
+    - $failIf:
+        cond:
+          $not:
+            $and:
+            - {$eq: [{$var: {name: cause, path: /requireExactDocumentVersion}}, true]}
+            - {$exists: {$var: {name: cause, path: /document}}}
+            - {$exists: {$var: {name: cause, path: /request}}}
+            - {$exists: {$var: approver}}
+            - {$eq: [{$var: actor}, {$var: {name: fact, path: /actor}}]}
+            - {$eq: [{$nodeBlueId: {$var: {name: cause, path: /request}}}, {$var: {name: fact, path: /requestBlueId}}]}
+            - {$exists: {$var: record}}
+            - {$eq: [{$nodeBlueId: {$var: record}}, {$var: {name: fact, path: /recordBlueId}}]}
+            - {$exists: {$var: basis}}
+            - {$eq: [{$var: basis}, {$var: {name: fact, path: /basis}}]}
+            - {$isKind: {val: {$var: {name: fact, path: /proposal}}, kind: text}}
+            - {$includes: {list: [approve, offer, accept], val: {$var: decision}}}
+            - {$eq: [{$var: {name: s, path: /accessReady}}, true]}
+        message: REVIEWED_APPROVAL_SCOPE_CHANGED
+    - $if:
+        cond: {$ne: [{$var: decision}, approve]}
+        then:
+        - $failIf:
+            cond: {$not: {$exists: {$var: acceptanceBy}}}
+            message: REVIEWED_APPROVAL_DELEGATION_REQUIRED
+    - $let:
+        vars:
+          grants: {$pointerGet: {object: {$var: s}, path: /reviewedGrants, default: {}}}
+          scope:
+            approver: {$nodeBlueId: {$var: approver}}
+            document: {$nodeBlueId: {$document: /contracts/initialized/document}}
+            revision: {$var: {name: s, path: /revision}}
+            termsRef: {$var: {name: s, path: /terms/ref}}
+            source: {$var: {name: review, path: /source}}
+            subject: {$var: {name: fact, path: /subject}}
+            proposal: {$var: {name: fact, path: /proposal}}
+            basis: {$var: basis}
+            acceptanceBy: {$var: acceptanceBy}
+    - $if:
+        cond: {$eq: [{$var: decision}, accept]}
+        then:
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$eq: [{$var: actor}, {$var: acceptanceBy}]}
+                - {$eq: [{$get: {object: {$var: grants}, key: {$var: role}}}, {$var: scope}]}
+            message: REVIEWED_APPROVAL_GRANT_REQUIRED
+        else:
+        - $failIf:
+            cond: {$ne: [{$var: actor}, {$var: role}]}
+            message: REVIEWED_APPROVAL_PARTY_REQUIRED
+    - $if:
+        cond: {$eq: [{$var: decision}, offer]}
+        then:
+        - $appendChange:
+            op: add
+            path: /activation/reviewedGrants
+            val: {$objectSet: {object: {$var: grants}, key: {$var: role}, val: {$var: scope}}}
+        - $return: true
+    - $if:
+        cond: {$hasKey: {object: {$var: grants}, key: {$var: role}}}
+        then:
+        - $set:
+            name: s
+            expr:
+              $pointerSet:
+                object: {$var: s}
+                path: {$concat: [/reviewedGrants/, {$var: role}]}
+                op: remove
+    - $return: {$call: {function: approveCurrentTerms, args: {s: {$var: s}, role: {$var: role}}}}
   updateParty:
     args:
       input: {}
@@ -731,6 +833,10 @@ functions:
                               constants:
                                 party:
                                   $var: role
+                                activationApprovalRole:
+                                  $choose:
+                                    cond: {$eq: [{$var: operation}, approve]}
+                                    then: {$var: role}
                               do:
                               - $pointerSet:
                                   object:

@@ -1,0 +1,141 @@
+{
+  "blueId": "5XCHwDatHqXdZxS2UaFztfT2CB3ki3ReaNu3MFAMDFCJ",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "6858mvwf3mU1WH3C62hU8r4FZbE4tadErY19wp9QuyJY",
+      "9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "EBuskkMM84G1os5d9eEvLJesCVi6vt2TeQUAoa2Q44At",
+      "4t1qR43VeKt6zTyrsnUCivgSTfiEM6hgNiryiED43iz9"
+    ],
+    "displayLabel": "Customer receipts",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.orders",
+      "bindings.entries",
+      "bindings.instruction",
+      "bindings.state",
+      "bindings.currency"
+    ],
+    "stateFacts": [
+      {
+        "absent": "No configured expectation. The projected currency still applies.",
+        "aggregate": null,
+        "binding": "currency",
+        "defaultPath": "/terms/currency",
+        "evidence": "Receipts Clause.project reads bindings.currency",
+        "id": "expectedCurrency",
+        "meaning": "Expected currency of linked customer payment instructions.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "",
+        "type": "currency"
+      },
+      {
+        "absent": "A currency is first recorded on a successful projection.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Payment Setup.projectConfirmedAmounts",
+        "id": "currency",
+        "meaning": "Currency from payment terms of the first projected instruction, enforced for later projections.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Recorded per-order receipt targets",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Payment Setup.projectConfirmedAmounts",
+        "id": "grossConfirmed",
+        "meaning": "Confirmed customer captures before refunds, in the receipts currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/grossConfirmedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No receipt value recorded for this order.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Payment Setup.projectConfirmedAmounts",
+        "id": "grossConfirmedPerOrder",
+        "meaning": "Confirmed customer captures before refunds, in the receipts currency. For one order.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*/grossConfirmedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Recorded per-order receipt targets",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Payment Setup.projectConfirmedAmounts",
+        "id": "refunds",
+        "meaning": "Confirmed post-capture customer refunds, in the receipts currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/refundsMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No receipt value recorded for this order.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Payment Setup.projectConfirmedAmounts",
+        "id": "refundsPerOrder",
+        "meaning": "Confirmed post-capture customer refunds, in the receipts currency. For one order.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*/refundsMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown when absent. Initialized to zero.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "Recorded per-order receipt targets",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Payment Setup.projectConfirmedAmounts",
+        "id": "netReceived",
+        "meaning": "Confirmed customer captures less confirmed refunds, in the receipts currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/netReceivedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No receipt value recorded for this order.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/receipts",
+        "evidence": "Payment Setup.projectConfirmedAmounts",
+        "id": "netReceivedPerOrder",
+        "meaning": "Confirmed customer captures less confirmed refunds, in the receipts currency. For one order.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*/netReceivedMinor",
+        "type": "money-minor"
+      }
+    ]
+  },
+  "semanticText": "# Receipts Clause\n\nRecords confirmed customer receipts for a managed collection of orders. The `state` binding defaults to `/receipts`. It stores the confirmed capture total, confirmed refund total, net receipts and per-order targets, all in minor units of the recorded receipt currency. Initialization creates empty targets and zero totals. The currency is recorded on first projection from the instruction's `/paymentTerms/currency`.\n\n`orders` defaults to `/orders`, `entries` to `/process_orders/entries`, and `instruction` to `/payment` inside each order. The clause uses the preparation entry and the linked document identity to find a usable order. It projects a matching Payment Completed or Payment Reversed After Completion event from that order's bound instruction. It can catch up when an attached, usable order has ready named sources. Either path requires the order to be active.\n\nProjection reads the linked Payment Instruction's cumulative `/payment/completed` and `/payment/reversed` state. The first amount is gross captures, the second is refunds after completion, and net received is the difference. Both amounts must be integers with refunds between zero and gross inclusive. Currency must be nonempty and match the `currency` binding's value when present (default `/terms/currency`) and the previously recorded receipt currency when present. Invalid amounts or currency fail the projection.\n\nEach changed order target updates the totals by the change in that target and emits Confirmed Receipts Changed with the order key and bound receipt state path. An identical target adds nothing. Authorization, pending captures, pending refunds and voids contribute no amounts."
+}

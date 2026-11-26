@@ -1,0 +1,197 @@
+{
+  "blueId": "Dm7RSKsudNMdcVcopgKBkyQCjksLdK8ABEqJqL28irt4",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "8mJDopJRiLHTJpYicYeDxHyDRDPvaX5LuryoL4kVeTHT",
+      "HJNwWVfDZ6PhWofXE2PR3ESLujQRbMjXnZFWQRaEirZG",
+      "2mThjTWqQSghgtjdRjWhvy1i9EUySyi2V7dTzhsrf3ht",
+      "2bkq2H4WEzn28pyC7qHJxjP6s9v8cRfU8QiEWNMYqVYa",
+      "2rnBfQy4PP7eSTwZEAFwKb1LMRRvyYUJm5T7NysFqxtC",
+      "Dh9eXe2YnbELTr98BS2V3w9KzwP8aUPEdj2kywSPjBXB",
+      "GYpMyBxVWZA3bYPNGEqzfgxdjcYnQu6J5p3QDSLkRme4",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "5H9oJ9uVpWG1jDhzLzv66MMUCdGjUEBubUA5uig4Ng1",
+      "9Upnd7HJhtfxFUbXZAcXZJ5fRY9Gtgs5hYzSv1bs6UPc",
+      "DnxqasX4kahXxEFeX7snKKbkoQfHnotT2vgjED89ggTX",
+      "6sNxToKRLdPYZL7ipXsG1w81vGvJjHzWdSYswLdYHrDA",
+      "CEncw6WKZptEvCRX4NkPtKLwdYdAbTMvvUSL5JS4iXSx",
+      "5tqWeWrFPfa2QtdV3onkGPnjGxTe2Ca9Jfz74WKhsnd6",
+      "9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW",
+      "EGC2BUWSkPbTGuj2sLfmpUALQnRMtnHTvzJb2zVYr4Nk",
+      "9hpsLLvz2pt8nioeMPptomxZY49DW2n2V1q5BxURA86Y",
+      "3AK1a8v6w2mJUKVEHFQRMW63iUcMchbuqeqkmtpniotg"
+    ],
+    "displayLabel": "Payout Ledger",
+    "limitations": [
+      "The supplied definitions establish minor-unit amounts but no authoritative currency field, currency binding or currency-consistency check."
+    ],
+    "parameterRefs": [
+      "bindings.frozenRate",
+      "bindings.orderEntries",
+      "bindings.orders",
+      "bindings.payoutEntries",
+      "bindings.payouts",
+      "bindings.receipts",
+      "bindings.state"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; zero only after initialization.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "state/targets/*",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Ledger Clause.initialState; Balance Functions.setTarget",
+        "id": "accrued",
+        "meaning": "Maintained total of current obligation targets in minor units; currency source is not established.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/accrued",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; zero only after initialization.",
+        "aggregate": {
+          "operation": "balance",
+          "over": "state/settlements/* recognized paid amounts",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.settle; Balance Functions.closeReservation",
+        "id": "paid",
+        "meaning": "Current booked settlement total, adjustable by closure corrections; minor units with no established currency source.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/paid",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; zero only after initialization.",
+        "aggregate": {
+          "operation": "sum",
+          "over": "state/settlements/* with status reserved",
+          "unit": "minor currency units"
+        },
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve, settle, closeReservation",
+        "id": "reserved",
+        "meaning": "Outstanding obligation reservations, not secured money; minor units with no established currency source.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/reserved",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No stored target; setTarget uses zero as prior.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.setTarget; Balance Functions.accruePercent",
+        "id": "targetAmount",
+        "meaning": "Current nonnegative obligation target per ledger key, in minor units; currency source is not established.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no reservation amount established.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve; Payout Ledger Functions.settlementResult",
+        "id": "settlementAmount",
+        "meaning": "Original positive reserved amount; gross basis for account transfers. Minor units; currency source not established.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; no lifecycle state established.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.reserve, settle, closeReservation",
+        "id": "settlementStatus",
+        "meaning": "reserved awaits settlement; paid books the full reservation; closed records a zero, partial or full adjustable outcome.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "May be absent for reserved or paid status.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.closeReservation; Payout Ledger Functions.settlementResult",
+        "id": "settlementPaid",
+        "meaning": "Closed amount: gross for verified account transfers, net of reversals for recipient payments; currency unspecified.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/paidMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No account-transfer fee recorded; not zero.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.recordSettlement; accountTransferResult.feeMinor",
+        "id": "settlementFee",
+        "meaning": "Fee recognized with an accepted account-transfer settlement, in minor units; currency source not established.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/feeMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No account-transfer net amount recorded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/balance",
+        "evidence": "Balance Functions.recordSettlement; accountTransferResult.transferredMinor",
+        "id": "settlementTransferred",
+        "meaning": "Recognized account-transfer net amount excluding the fee, in minor units; currency source not established.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/settlements/*/transferredMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Percentage accrual skips this missing basis.",
+        "aggregate": null,
+        "binding": "receipts",
+        "defaultPath": null,
+        "evidence": "Balance Functions.accruePercent: net read from receipts/targets",
+        "id": "receiptNetBasis",
+        "meaning": "Receipt state's net received amount used as the order's percentage-accrual basis; currency source not established.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/targets/*/netReceivedMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "Unknown; reconciliation requires true.",
+        "aggregate": null,
+        "binding": null,
+        "defaultPath": null,
+        "evidence": "Payout Ledger Functions.reconcilePayouts: activation guard",
+        "id": "agreementActive",
+        "meaning": "Agreement activation gate checked before reconciliation can queue or record payout settlements.",
+        "path": "/activation/active",
+        "scope": "document",
+        "suffix": "",
+        "type": "boolean"
+      }
+    ]
+  },
+  "semanticText": "# Payout Ledger Clause\n\nMaintains obligation targets, payout reservations and recorded settlement amounts. It inherits ledger actions and adds recognition of terminal MyOS account transfers and recipient payment outcomes, including optional reconciliation after the agreement becomes active again. Reserving an obligation does not secure or transfer money.\n\n## Bindings and amounts\n\n`state` is a required pointer binding defaulting to `/balance`. Structural initialization establishes `accrued`, `paid` and `reserved` as zero, with empty `targets` and `settlements`. Missing state does not establish those initialized values.\n\nThe other pointer bindings are optional and have no defaults:\n\n- `receipts` identifies receipt state; `orders` and `orderEntries` identify order documents and their admission records. `accruePercent` reads a matching receipt target's `netReceivedMinor` and an admitted order entry's frozen rate. `frozenRate` is the pointer used **within that entry**, specifying basis points.\n- `payouts` identifies payout documents; `payoutEntries` identifies their admission records. Attachment catch-up and reconciliation require matching usable entries, collection paths and original document identities.\n\nAmounts are integer minor currency units. The supplied definitions do not establish a currency field or currency-consistency check.\n\n## Ledger actions\n\n`setTarget` accepts a nonempty `key` without `/` or `~` and a nonnegative integer `amountMinor`. It replaces that key's obligation target and adjusts `accrued` by the change. An absent previous target is treated as zero for this operation; an unchanged target is a duplicate. Decreases are permitted without checking whether existing paid or reserved amounts exceed the revised obligation.\n\n`accruePercent` requires a matching receipt-state event, a usable admitted order and both the receipt amount and frozen rate. Otherwise it skips. It rounds the percentage to the nearest minor unit, with halves rounded up; the receipt basis must be between 0 and 1,000,000,000,000 and the rate between 0 and 10,000 basis points, both integers. Order keys are escaped for ledger storage.\n\n`reserve` defaults `key` and `amountMinor` from the trigger. It requires a valid ledger key and a positive integer amount within the accrued obligation remaining after paid amounts and existing reservations. It creates a `reserved` settlement and increases `reserved`. Reusing a key with the same amount is a duplicate, including after settlement; a different amount is rejected.\n\n`settle` records the entire existing reservation as `paid`, releases its reservation and increases the ledger's `paid` total. An already `paid` settlement is a duplicate; unknown or `closed` settlements are rejected. This action itself does not verify an external transfer.\n\n`closeReservation` accepts `key` and `paidMinor` from its caller. The amount must be an integer from zero through the original reservation amount. It releases an outstanding reservation, adjusts the recorded paid total and sets status to `closed`. It can also revise a previously `paid` or `closed` settlement; an unchanged terminal amount is a duplicate. Thus `closed` can mean zero, partial or full payment and does not make the recorded amount immutable.\n\n## Recognizing payout outcomes\n\n`observePayout` reads a direct payout collection member identified by the source event. `catchUpPayout` requires a correlated `Document Attached` event and a usable admission record. Both skip when there is no matching ledger reservation.\n\nFor the exact MyOS Test and Stripe account-to-account instruction types, recognition checks the payout key, reserved gross amount and fee/net breakdown. Invalid payout terms are rejected. A successful result requires an initialized original document, no unresolved financial requests, and an `/accountSettlement` report matching the terms, transaction and instruction origin. Completed payment must equal the net transfer and reversals must be zero. The ledger then closes the reservation with the **gross** amount credited to `paidMinor`, recording `feeMinor` and the **net** `transferredMinor` separately.\n\nA terminal zero-payment result requires zero completed and secured amounts, an empty settlement report, no unresolved financial requests, and either rejection, a declined/failed `payout-secure` request, or a successful `payout-void` request. A void releases secured funds; it is not a refund. Account-transfer recognition applies only while the ledger settlement is `reserved`.\n\nFor other supported payment instructions, recipient-payment recognition requires a live `Payment Event Received` for `/payment`; attachment catch-up does not recognize this route. It requires a recorded completed amount, no unresolved financial requests, and retirement (`settlementOpen` is false), rejection, closure, or completion of the reserved amount. The recognized amount is completed payment net of reversals and must pass `closeReservation` validation. Here unresolved means a financial request is `pending` or `unknown`, or financial reservations remain outstanding.\n\n`reconcilePayouts` skips unless `/activation/active` is true, both payout bindings exist and `reserved` is not zero. A configured nonautomatic invocation scans reserved settlements and emits `MyOS Payout Settlement Ready` events for recognizable admitted account transfers. Emission queues reconciliation; it does not itself update the ledger or confirm a new external payment. The automatic handler rechecks the clause, key, instruction origin and candidate result, and requires a configured `reconcilePayouts` connection before recording settlement. Reactivation alone is not a declared trigger for that scan.\n\nAction connections determine triggers and workflow actors; no actor is fixed for the inherited ledger actions. Configured conditions can prevent execution. These actions use `outcome-v1`: only `acceptedNew` proceeds to connection `after` effects and consumes `once`; duplicate or skipped work does not. Callable actions do not establish a viewer's authority or personal obligation."
+}

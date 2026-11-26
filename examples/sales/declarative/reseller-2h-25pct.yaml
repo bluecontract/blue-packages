@@ -1,0 +1,812 @@
+# Reseller Partnership: Tide Lantern Lodge x Bay Signal Bikes
+# Comments show package aliases next to their exact BlueIds.
+# Source SHA-256: 4854b85ba6c4cd865b01570ffb2e165f7ae5da25cd553e567e59d381e8099003
+# Catalogue SHA-256: cbacbbfd235545505195d701c9ae8daee59e8220a490adeb5def4304d134f5b9
+# Document SHA-256 (canonical JSON): 2b496ed01a6ad8b3e487feca5d67155f626cb97f133d8e0b503e4e698d72eb5c
+
+name: 'Reseller Partnership: Tide Lantern Lodge x Bay Signal Bikes'
+type:
+  blueId: 7cgSSaD4o6TGN6DMvZdi6VHebEEHfzU6NDqFJyzDYA27  # Agreements/Agreement with Clauses
+template:
+  id: catalogue-agreement-authoring
+  version: '19'
+terms:
+  currency: USD
+  exclusive: false
+  payoutOperator: stripe
+  payoutFeePolicy: myos-commission-fee-v1
+  payoutFeeBps: 2000
+  payoutOperatorAccountId:
+    type: Text
+  initialCommissionBps: 1250
+  type:
+    initialCommissionBps:
+      type: Integer
+      schema:
+        minimum: 0
+        maximum: 10000
+    commissionBps:
+      type: Integer
+    currency:
+      type: Text
+      schema:
+        enum:
+        - PLN
+        - USD
+        - EUR
+    exclusive:
+      type: Boolean
+orders: {}
+payouts: {}
+description: Book a two-hour bicycle rental with a helmet for an outing along the harbor.
+products:
+  revision: 1
+  supplierId: seller
+  currency: USD
+  entries:
+    harbor-bike:
+      label: Harbor bicycle rental
+      description: Two-hour bicycle rental with helmet for a harbor outing.
+      pricingUnit: per_unit
+      dateRequired: false
+      unitAmountMinor: 8000
+      guestDiscountPercent: 10
+offer:
+  title: Harbor Pedal Outing
+  text: Book a two-hour bicycle rental with a helmet for an outing along the harbor.
+  sections: []
+clauses:
+  # Sets the roles and approvals required for the current agreement terms.
+  activation:
+    type:
+      blueId: 9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj  # Activation/Activation Clause
+    parameters:
+      parties:
+        seller:
+          type:
+            blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+          business:
+            type:
+              blueId: 6oNfLaBHNpwcqPF75kTQ22KSbqStGEiPxwj5bBavL4VV  # Parties/Business
+            displayName: Bay Signal Bikes
+        partner:
+          type:
+            blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+          business:
+            type:
+              blueId: 6oNfLaBHNpwcqPF75kTQ22KSbqStGEiPxwj5bBavL4VV  # Parties/Business
+            displayName: Tide Lantern Lodge
+      required:
+      - seller
+      - partner
+      preActivationConnections:
+      - clause: catalog
+        action: validate
+        automatic: true
+      negotiation:
+        allowedPaths:
+        - /terms/initialCommissionBps
+        - /terms/exclusive
+  # Prices the customer’s selection against the current catalog revision.
+  catalog:
+    type:
+      blueId: 9s5acB23ioD1ycnAVbpwfd5nmrKRTQuvo7cQJr2akW1R  # Commerce/Catalog Clause
+    bindings:
+      state: /products
+  # Sets the commission rate on first activation.
+  quoteCommission:
+    type:
+      blueId: 7KbJT4mN89aF6HAkuWSjw7sWmHn6PaKCJWWzSaAQEzo8  # Features/Feature Clause
+    parameters:
+      actions:
+        initializeRate:
+          do:
+          - $appendChange:
+              op: add
+              path: /terms/commissionBps
+              val:
+                $document: /terms/initialCommissionBps
+    bindings:
+      initializeRate:
+        firstActivation:
+          'on': activated
+          once: true
+  # Prepares a separate Order and assigns it the current commission rate.
+  orders:
+    type:
+      type:
+        blueId: 3ZugrpKGtj7sCSdEcnLfCokUadLffFmWfKrepuzpo2cJ  # Documents/Documents Clause
+      optionalBindings:
+      - template
+      - fulfilment
+      bindingTypes:
+        catalog: pointer
+        fulfilment: pointer
+    parameters:
+      suppliedBy: partner
+      suppliedParties:
+      - customer
+      customerRole: customer
+      prepareFor: bootstrap
+      obtain: provide
+      preparationDefinition:
+        type:
+          blueId: FVMLYWpPnXjmtEdBmPvoWy5NQGmpGsoVcKsZhPZrfCvS  # Schedule/Order Preparation Functions
+      selectBeforeActivation: true
+      allowedFields:
+      - orderDescription
+      - customerAccountId
+      - customerEmail
+      - amountMinor
+      - currency
+      - quote
+      - quoteBlueId
+      - orderSnapshot
+      privateTerms:
+        commissionTerms:
+          fields:
+            revision: /commissionAmendments/revision
+            commissionBps: /terms/commissionBps
+      wholeOrderGroup: booking-1
+    bindings:
+      template: /orderTemplate
+      collection: /orders
+      catalog: /products
+      parties:
+        seller: seller
+        partner: partner
+      prepare:
+        prepareOrder:
+          'on': workflow
+          party: partner
+          request:
+            type:
+              blueId: EDJssftiVyrgWmPBBtj7qU1W1Pov5mFL7YJdqTEJdNo1  # Documents/Preparation Input
+          inputParams:
+            /key: /key
+            /requestId: /requestId
+            /fields: /fields
+            /values: /values
+      provide:
+        provideOrder:
+          'on': workflow
+          party: partner
+      fulfilment: /orderTemplate/reservationPolicy
+  # Totals confirmed captures, refunds, and net receipts after refunds.
+  receipts:
+    type:
+      blueId: Eu7G85oiFYPFkzwYaZ8TBYvuZenBAw1EvhD4Y5rNdmXU  # Payment/Receipts Clause
+    bindings:
+      reconcile:
+        afterAccessRestored:
+          'on': event
+          event:
+            type:
+              blueId: EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs  # Parties/Document Access Restored
+        afterTermsAccepted:
+          'on': event
+          event:
+            type:
+              blueId: 7dL9TXBk1TmaAuzEeui7rGX2D9X2apTDMenQmFP1z5Xu  # Activation/Terms Accepted
+  # Updates the commission due using net receipts and the rate assigned to the Order.
+  commission:
+    type:
+      blueId: Dm7RSKsudNMdcVcopgKBkyQCjksLdK8ABEqJqL28irt4  # MyOS/Payout Ledger Clause
+    bindings:
+      state: /commission
+      receipts: /receipts
+      orders: /orders
+      orderEntries: /process_orders/entries
+      frozenRate: /domainTerms/commissionTerms/commissionBps
+      payouts: /payouts
+      payoutEntries: /process_payouts/entries
+      accruePercent:
+        accrue:
+          'on': event
+          event:
+            type:
+              blueId: HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq  # Events/Event
+            kind: Confirmed Receipts Changed
+      reserve:
+        reservePayout:
+          'on': event
+          event:
+            type:
+              blueId: HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq  # Events/Event
+            kind: Commission Payout Opened
+            collection: /payouts
+      observePayout:
+        paymentTerminal:
+          'on': collection
+          path: /payouts
+          event:
+            type:
+              blueId: HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq  # Events/Event
+      catchUpPayout:
+        payoutAdmitted:
+          'on': event
+          event:
+            type:
+              blueId: 9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx  # Documents/Document Attached
+      reconcilePayouts:
+        afterAccessRestored:
+          'on': event
+          event:
+            type:
+              blueId: EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs  # Parties/Document Access Restored
+        afterTermsAccepted:
+          'on': event
+          event:
+            type:
+              blueId: 7dL9TXBk1TmaAuzEeui7rGX2D9X2apTDMenQmFP1z5Xu  # Activation/Terms Accepted
+  # Prepares a separate Payment Instruction to pay the partner’s commission.
+  payouts:
+    type:
+      blueId: 3ZugrpKGtj7sCSdEcnLfCokUadLffFmWfKrepuzpo2cJ  # Documents/Documents Clause
+    parameters:
+      allowedFields: []
+      fieldPaths:
+        limitMinor: /paymentTerms/limitMinor
+        netMinor: /paymentTerms/amountMinor
+        payoutTerms: /paymentDetails/payoutTerms
+      method: myos-account-to-account
+      obtain: provide
+      prepareFor: bootstrap
+      suppliedBy: seller
+      suppliedParties:
+      - guarantor
+      preparationDefinition:
+        type:
+          blueId: Hi2UMpAbaZT6Axpkdx7AD3RJ4nHFc8p9dyxihrWgEN8M  # MyOS/Account Transfer Preparation Functions
+      ledger: /commission
+      transferTerms: /terms
+      payerChannel: seller
+      payeeChannel: partner
+      guarantorChannel: guarantor
+    bindings:
+      collection: /payouts
+      parties:
+        partner: partner
+        seller: seller
+      template: /payoutTemplate
+      prepare:
+        startPayout:
+          'on': workflow
+          party: seller
+      provide:
+        providePayout:
+          'on': workflow
+          party: seller
+      cancel:
+        cancelPayout:
+          'on': workflow
+          party: seller
+  # Collects approval from both parties for a new catalog revision. The referenced Commerce function compares the
+  # current and proposed catalogs.
+  catalogAmendments:
+    parameters:
+      paths:
+      - /products
+      approvers:
+      - seller
+      - partner
+      replacementValidator:
+        definition:
+          type:
+            blueId: DJxPnV9MewgrBZwi2XV4bhAspo3iWB3ocR4pQaroTMvX  # Commerce/Catalog Functions
+        function: validateCatalogReplacement
+    bindings:
+      state: /catalogAmendments
+      editable: /activation/everActivated
+      propose:
+        proposeCatalog:
+          'on': workflow
+          party: seller
+          input: true
+      approve:
+        approveCatalog_seller:
+          'on': workflow
+          party: seller
+          input: true
+          requireExactDocumentVersion: true
+        approveCatalog_partner:
+          'on': workflow
+          party: partner
+          input: true
+          requireExactDocumentVersion: true
+    type:
+      blueId: EQxSgdf6iWPuAUxi1sF85mxTL6HVYrony7C1Ef8PoPjB  # Amendments/Amendments Clause
+  # Collects approval from both parties for a commission rate change.
+  commissionAmendments:
+    parameters:
+      paths:
+      - /terms/commissionBps
+      approvers:
+      - seller
+      - partner
+      replacementSchema:
+        path: /terms/type/initialCommissionBps
+        kind: integer
+    bindings:
+      state: /commissionAmendments
+      editable: /activation/everActivated
+      propose:
+        proposeCommission_seller:
+          'on': workflow
+          party: seller
+          input: true
+        proposeCommission_partner:
+          'on': workflow
+          party: partner
+          input: true
+      approve:
+        approveCommission_seller:
+          'on': workflow
+          party: seller
+          input: true
+          requireExactDocumentVersion: true
+        approveCommission_partner:
+          'on': workflow
+          party: partner
+          input: true
+          requireExactDocumentVersion: true
+    type:
+      blueId: EQxSgdf6iWPuAUxi1sF85mxTL6HVYrony7C1Ef8PoPjB  # Amendments/Amendments Clause
+# Separate customer Order document.
+orderTemplate:
+  currency: USD
+  description: Book a two-hour bicycle rental with a helmet for an outing along the harbor.
+  name: Harbor Pedal Outing
+  type:
+    blueId: DXVyaZMh1ohnUF7oY9NgDrwD7VB71WhVu7668Xwam1XS  # Orders/Order with Clauses
+  clauses:
+    # Sets Order roles and access and requires seller confirmation when configured.
+    activation:
+      parameters:
+        parties:
+          customer:
+            type:
+              blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+          partner:
+            type:
+              blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+          seller:
+            type:
+              blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+        preActivationOperations:
+        - preparePayment
+        - providePayment
+        - cancelOrder
+        - cancelBySupplier
+        readers:
+          guarantor:
+            myosAccountId:
+              type: Text
+            readerKeys:
+            - type: Text
+        required: []
+        # A single entry lets the action refresh cancellation availability before activation. It covers automatic
+        # refresh and the observations declared by the action.
+        preActivationConnections:
+        - clause: cancellation
+          action: refreshAvailability
+          observations: true
+      type:
+        blueId: 9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj  # Activation/Activation Clause
+    # Records the first valid timestamp at the result path. If the value is absent, the window start is still unset.
+    # If the activation time is reported missing, the selected instruction can supply the time of full authorization.
+    windowStart:
+      type:
+        blueId: F1TqzuivcCiydJQ7noHUxZJTH6uFu3KmNN3y1r9M44cL  # Connections/Remember First Timestamp
+      bindings:
+        result: /clockStartMicros
+        startFromEntry:
+          activation:
+            'on': activated
+        unavailable: /clockStartUnavailable
+        fallback: /payment/securedTimestamp/timestampMicros
+        ready: /activation/active
+        sourceReady: /activation/accessReady
+        startFromFallback:
+          authorizationEvent:
+            'on': embedded
+            path: /payment
+            event:
+              type:
+                blueId: GWf7EXdEurjVckzu5E3tGNCQmWnWHv64M1qzL5HMijWD  # PaymentInstruction/Funds Secured
+            embed: false
+          authorizationAttachment:
+            'on': change
+            path: /payment
+          authorizationAfterAccessRestored:
+            'on': event
+            event:
+              type:
+                blueId: EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs  # Parties/Document Access Restored
+          authorizationClockUnavailable:
+            'on': change
+            path: /clockStartUnavailable
+    # Decides cancellation for the entire Order and emits Order Cancellation Accepted.
+    cancellation:
+      type:
+        blueId: FyMd6AMcd6ADtyyHkzTeCXhzaeeXiLWGQXGCymBzSvvH  # Commerce/Whole Order Cancellation Policy
+      parameters:
+        freeCancellationHoursAfterStart: 2
+        beforeWindowStarts: free
+        lateCancellationChargePercent: 25
+      bindings:
+        amount: /amountMinor
+        decision: /cancellationDecision
+        availability: /cancellationAvailability
+        retentionBasis: /payment/payment/completed
+        windowStart: /clockStartMicros
+        accept:
+          cancelOrder:
+            'on': workflow
+            party: customer
+            input: true
+            requireExactDocumentVersion: true
+        acceptWithoutCharge:
+          cancelBySupplier:
+            'on': workflow
+            party: seller
+            input: true
+            requireExactDocumentVersion: true
+        refreshAvailability:
+          afterCapture:
+            'on': event
+            event:
+              type:
+                blueId: 9ZswyMYzP7ASbrvpeb6dbbdtvVWq9nkf1bQeY46jnfPW  # Payment/Payment Event Received
+              clause: payment
+              instructionPath: /payment
+              event:
+                type:
+                  blueId: EBuskkMM84G1os5d9eEvLJesCVi6vt2TeQUAoa2Q44At  # PaymentInstruction/Payment Completed
+          afterPaymentSelected:
+            'on': event
+            event:
+              type:
+                blueId: 3apzpYPbFPod5ipDZwiQA2pok9SfsoV4K6DnCm6xu8go  # Documents/Document Selected
+              clauseId: payment
+              itemKey: single
+          afterPaymentAttached:
+            'on': event
+            event:
+              type:
+                blueId: 9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx  # Documents/Document Attached
+              clauseId: payment
+              itemKey: single
+          afterAccessRestored:
+            'on': event
+            event:
+              type:
+                blueId: EvZeFWSxQzi6TgQVJE8ub1CGi1fBgKYA9vME1kXAFgFs  # Parties/Document Access Restored
+          afterWindowStart:
+            'on': change
+            path: /clockStartMicros
+    # Prepares and attaches one Payment Instruction with the agreed amount, currency, and roles.
+    payment:
+      type:
+        blueId: FbCgWezGFphFCZzHrPNQ5iV8kmYTQxDvE9gsjqEjEFtm  # Payment/Payment Clause
+      bindings:
+        instruction: /payment
+        observe:
+          selectedInstruction:
+            'on': embedded
+            path: /payment
+            embed: false
+        parties:
+          observer: partner
+          payee: seller
+          payer: customer
+        prepare:
+          preparePayment:
+            'on': workflow
+            party: seller
+            documentParams:
+              /values/amountMinor: /amountMinor
+              /values/limitMinor: /amountMinor
+              /values/currency: /currency
+              /values/orderOrigin: /contracts/initialized/document
+              /values/orderRevision: /activation/revision
+              /values/orderTermsRef: /activation/terms/ref
+            inputParams:
+              /values/providerReference: /providerReference
+        provide:
+          providePayment:
+            'on': workflow
+            party: seller
+      parameters:
+        fieldPaths:
+          amountMinor: /paymentTerms/amountMinor
+          currency: /paymentTerms/currency
+          limitMinor: /paymentTerms/limitMinor
+          orderOrigin: /businessContext/orderOrigin
+          orderRevision: /businessContext/orderRevision
+          orderTermsRef: /businessContext/orderTermsRef
+          providerReference: /paymentDetails/providerReference
+        obtain: provide
+        prepareFor: bootstrap
+        sourcePaths:
+          order: ''
+        suppliedBy: seller
+        suppliedParties:
+        - guarantor
+        # Template for the separate customer Payment Instruction.
+        template:
+          businessContext:
+            orderOrigin:
+              schema:
+                required: true
+            orderRevision:
+              schema:
+                minimum: 1
+                required: true
+              type: Integer
+            orderTermsRef:
+              schema:
+                required: true
+          clauses:
+            # Sets separate roles and access for the buyer, seller, and guarantor.
+            activation:
+              parameters:
+                parties:
+                  guarantor:
+                    myosAccountId:
+                      type: Text
+                    readerKeys:
+                      itemType: Text
+                      items:
+                      - type: Text
+                      schema:
+                        maxItems: 1
+                        minItems: 1
+                        uniqueItems: true
+                      type: List
+                    type:
+                      blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+                  observer:
+                    type:
+                      blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+                  payee:
+                    type:
+                      blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+                  payer:
+                    type:
+                      blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+                required: []
+              type:
+                blueId: 9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj  # Activation/Activation Clause
+            # Relays payment session and action events to the operator.
+            method:
+              type:
+                blueId: E7LRiTh19QD6CpRT1auSpyCoc98xoqU9WLDP7hTHJdn  # MyOS/Payment Method Events
+            # Issues native payment requests. The guarantor confirms the outcomes. The linked decision sets the amount
+            # to retain. The instruction can request a refund or release the hold.
+            payment:
+              type:
+                blueId: 5rzupigxrqAKqdskbG12yJDW1v2mb4qBdDg7f8QgMaJ5  # Payment/Payment Process Clause
+              parameters:
+                capture:
+                  type:
+                    blueId: EQcAFTiBMhve8nPSEaJeUHjCaY11oMZw6BSCF1RfiA1R  # Payment/Selected Order Capture
+                  requestId: order-accepted-capture
+                  blockedBy: cancellation
+                sources:
+                  order: {}
+                # Links the Order and its selected instruction for the adjustment rules.
+                selectedPayment:
+                  source: /sources/order
+                  expectedSourceOrigin: /businessContext/orderOrigin
+                  entries: /sources/order/process_payment/entries
+                  path: /payment
+                  key: single
+                adjustments:
+                  cancellation:
+                    decision:
+                      path: /sources/order/cancellationDecision
+                      when:
+                        field: status
+                        equals: accepted
+                      retainMinorFrom: retainedMinor
+                    requestIds:
+                      refund: order-cancellation-refund
+                      void: order-cancellation-void
+              bindings:
+                requestAuthorize:
+                  authorize:
+                    'on': workflow
+                    party: guarantor
+                    input: true
+                requestRefund:
+                  refund:
+                    'on': workflow
+                    party: payee
+                    input: true
+                requestVoid:
+                  voidPayment:
+                    'on': workflow
+                    party: guarantor
+                    input: true
+                adjust:
+                  afterSelection:
+                    'on': change
+                    path: /sources/order/process_payment/entries
+                  afterPaymentAttached:
+                    'on': embedded
+                    path: /sources/order
+                    embed: false
+                    event:
+                      type:
+                        blueId: 9BuYfpVDFybFkggpnobd1Xdju3QmpDvE9nVCgSedMWzx  # Documents/Document Attached
+                      clauseId: payment
+                  afterLink:
+                    'on': change
+                    path: /sourceLinks
+                  afterPaymentOutcome:
+                    'on': event
+                    event:
+                      type:
+                        blueId: 81xyv2z2JxycpEAb9bzdTv3S7kkpny6fvDTvYsDcf3o4  # PaymentInstruction/Payment Response
+                  # After this instruction is selected, checks for an earlier decision, such as cancellation while
+                  # payment was pending, and can release an existing hold.
+                  afterPaymentSelected:
+                    'on': embedded
+                    path: /sources/order
+                    embed: false
+                    event:
+                      type:
+                        blueId: 3apzpYPbFPod5ipDZwiQA2pok9SfsoV4K6DnCm6xu8go  # Documents/Document Selected
+                      clauseId: payment
+                      itemKey: single
+                  afterCancellation:
+                    'on': embedded
+                    path: /sources/order
+                    embed: false
+                    event:
+                      type:
+                        blueId: HkDDRCYbdk6VTWN2FhnNG5EywKPbAR3G31LLVqJL5LH9  # Commerce/Domain Event
+                      kind: Order Cancellation Accepted
+                      clause: cancellation
+                    params:
+                      adjustment: cancellation
+                  afterDecisionAttached:
+                    'on': change
+                    path: /sources/order/cancellationDecision
+            # Records the time of the first full authorization and the secureFunds request ID.
+            securedTime:
+              type:
+                blueId: Bn8E8eawqZy6XgDADd9RQrMizhKXRAk3rF3LFD2CXGpN  # Payment/Secure Timestamp Projection
+              bindings:
+                fact: /securedTimestamp
+                record:
+                  onFundsSecured:
+                    'on': event
+                    event:
+                      type:
+                        blueId: GWf7EXdEurjVckzu5E3tGNCQmWnWHv64M1qzL5HMijWD  # PaymentInstruction/Funds Secured
+          name: Harbor Pedal Outing
+          paymentDetails:
+            customerPaymentTerms:
+              paymentWindowDays: 30
+              recipientPaymentAccountId:
+                type: Text
+            # The single setting for the customer’s payment method.
+            method: myos-customer
+            providerReference:
+              type: Text
+          paymentTerms:
+            allowedPayees:
+            - payee
+            amountMinor:
+              type: Integer
+            currency:
+              type: Text
+            guarantorChannel: guarantor
+            limitMinor:
+              type: Integer
+            payeeChannel: payee
+            payerChannel: payer
+            recipientApprovalRequired: false
+          type:
+            blueId: HELwiXNwpB136D2CikyAV3SZe1k8i937TFD67LhHzY1a  # MyOS/MyOS Stripe Customer Payment Instruction
+  reservationPolicy:
+    confirmationMode: automatic
+    dateRequired: false
+    fulfilmentText: Book a two-hour bicycle rental with a helmet for an outing along the harbor.
+# Template for the separate commission payout instruction.
+payoutTemplate:
+  name: Partner commission payout
+  type:
+    blueId: 9hpsLLvz2pt8nioeMPptomxZY49DW2n2V1q5BxURA86Y  # MyOS/MyOS Stripe Account to Account Payment Instruction
+  paymentTerms:
+    amountMinor:
+      type:
+        blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+    limitMinor:
+      type:
+        blueId: E2LM6qgzWG9ttagq2xTmiZkgYEAgkYedFCmU9v7NnVEq
+    currency: USD
+    payerChannel: seller
+    payeeChannel: partner
+    guarantorChannel: guarantor
+    allowedPayees:
+    - partner
+    captureGate: ''
+    recipientApprovalRequired: false
+  paymentDetails:
+    method: myos-account-to-account
+    payoutTerms: {}
+  clauses:
+    # Sets roles and access separately for the commission payout instruction.
+    activation:
+      type:
+        blueId: 9QGLBqYRo7jsyf2ke13vgzpss1V8t2QrAumMwX8aUpmj  # Activation/Activation Clause
+      parameters:
+        parties:
+          seller:
+            type:
+              blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+          partner:
+            type:
+              blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+          guarantor:
+            type:
+              blueId: BMz54jViTSnnyfhug3rnuD81or6AekswsVrwyV3ZXLid  # MyOS/MyOS Party
+        required:
+        - seller
+    # Requests the commission payout once the instruction’s conditions are met.
+    payment:
+      type:
+        blueId: DGGUGxRXhq2GoaMFPnu2p4iac7JaavxNJjyLqzabFzZp  # PaymentInstruction/Payment Request Actions
+      bindings:
+        requestAuthorize:
+          securePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-secure
+            documentParams:
+              /amountMinor: /paymentTerms/amountMinor
+            request:
+              description: Executes the complete frozen payout; no input fields.
+        requestCapture:
+          capturePayout:
+            'on': workflow
+            party: guarantor
+            params:
+              requestId: payout-capture
+            documentParams:
+              /amountMinor: /paymentTerms/amountMinor
+            request:
+              description: Executes the complete frozen payout; no input fields.
+        requestVoid:
+          voidPayout:
+            'on': workflow
+            party: seller
+            params:
+              requestId: payout-void
+            documentParams:
+              /amountMinor: /payment/secured
+            request:
+              description: Executes the complete frozen payout; no input fields.
+    # Checks the transfer and records the operator’s charge and transfer references.
+    method:
+      type:
+        blueId: E7LRiTh19QD6CpRT1auSpyCoc98xoqU9WLDP7hTHJdn  # MyOS/Payment Method Events
+      bindings:
+        validateAccountTransfer:
+          fixedTerms:
+            'on': event
+            event:
+              type:
+                blueId: HTAdHVkjPAbr15Mx8L6zcndb7hknyHrdtZoUVnpmAWbq  # Events/Event
+        confirmAccountSettlement:
+          confirmAccountSettlement:
+            'on': workflow
+            party: guarantor
+            input: true
+cataloguePresentation:
+  heading: Bicycle rentals
+  categories: []

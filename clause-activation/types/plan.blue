@@ -1,6 +1,204 @@
 name: Activation Plan Functions
 type: Activation/Activation Functions
+constants:
+  connectionPlannerDefinition:
+    type: Connections/Connection Planning Functions
 functions:
+  validConnectionName:
+    $blue:functionFrom: {definition: {type: Connections/Connection Planning Functions}, function: validName}
+  connectionConfiguration:
+    $blue:functionFrom: {definition: {type: Connections/Connection Planning Functions}, function: connectionConfiguration}
+  connectionId:
+    $blue:functionFrom: {definition: {type: Connections/Connection Planning Functions}, function: connectionId}
+  connectionSourceChannel:
+    $blue:functionFrom: {definition: {type: Connections/Connection Planning Functions}, function: connectionSourceChannel}
+  resolveConnectionChannels:
+    $blue:functionFrom: {definition: {type: Connections/Connection Planning Functions}, function: resolveConnectionChannels}
+  resolveObservationChannels:
+    args:
+      clauseKey: {type: Text}
+      actionName: {type: Text}
+    do:
+    - $let:
+        name: config
+        expr: {$call: {function: connectionConfiguration, args: {clauseKey: {$var: clauseKey}}}}
+    - $let:
+        name: action
+        expr: {$get: {object: {$var: {name: config, path: /actions}}, key: {$var: actionName}}}
+    - $if:
+        cond: {$not: {$isKind: {val: {$var: action}, kind: object}}}
+        then:
+        - $return: {allowed: false, code: PRE_ACTIVATION_CONNECTION_UNKNOWN_ACTION}
+    - $if:
+        cond: {$ne: [{$var: {name: action, path: /observation}}, true]}
+        then:
+        - $return: {allowed: false, code: PRE_ACTIVATION_CONNECTION_ACTION_NOT_OBSERVATIONAL}
+    - $let:
+        name: connections
+        expr: {$object: {$get: {object: {$var: {name: config, path: /bindings}}, key: {$var: actionName}}}}
+    - $if:
+        cond: {$exists: {$var: {name: action, path: /automatic}}}
+        then:
+        - $set:
+            name: connections
+            expr: {$objectSet: {object: {$var: connections}, key: _automatic, val: {$var: {name: action, path: /automatic}}}}
+    # Use the same names as the stock planner, only for dedicated internal sources.
+    - $return:
+        allowed: true
+        channels:
+          $map:
+            in:
+              $filter:
+                in: {$var: connections}
+                item: connection
+                where:
+                  $includes:
+                    list: [event, embedded, collection, change, initialized, activated]
+                    val: {$var: {name: connection, path: /on}}
+            key: connectionName
+            item: connection
+            expr:
+              $call:
+                function: connectionSourceChannel
+                args:
+                  id:
+                    $call:
+                      function: connectionId
+                      args:
+                        clauseKey: {$var: clauseKey}
+                        actionName: {$var: actionName}
+                        connectionName: {$var: connectionName}
+  preActivationConnectionPlan:
+    args:
+      p: {}
+    do:
+    - $let:
+        name: references
+        expr: {$pointerGet: {object: {$var: p}, path: /preActivationConnections, default: []}}
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: references}, kind: list}}}
+        message: INVALID_PRE_ACTIVATION_CONNECTION_REFERENCE
+    - $if:
+        cond: {$eq: [{$size: {$var: references}}, 0]}
+        then:
+        - $return: {references: {}, channels: []}
+    - $let:
+        name: canonicalPlanner
+        expr:
+          $nodeBlueId:
+            $document:
+              $concat:
+              - /clauseRuntime/work/candidate/
+              - {$const: clauseKey}
+              - /type/hookDefinition/type/constants/connectionPlannerDefinition/type/functions/planConnections
+    - $let:
+        vars:
+          installing:
+            $or:
+            - {$document: /clauseRuntime/work/initializing}
+            - {$not: {$exists: {$document: {$concat: [/clauses/, {$const: clauseKey}]}}}}
+          previous: {$object: {$document: /contracts/activationDispatch/constants/preConnectionRefs}}
+          retained: {}
+          channels: []
+    - $forEach:
+        index: referenceIndex
+        item: reference
+        in: {$var: references}
+        do:
+        - $let:
+            vars:
+              clauseKey: {$var: {name: reference, path: /clause}}
+              actionName: {$var: {name: reference, path: /action}}
+              connectionName: {$var: {name: reference, path: /connection}}
+              automatic: {$eq: [{$var: {name: reference, path: /automatic}}, true]}
+              observations: {$eq: [{$var: {name: reference, path: /observations}}, true]}
+        - $failIf:
+            cond:
+              $not:
+                $or:
+                - $and:
+                  - {$var: automatic}
+                  - {$eq: [{$keys: {$var: reference}}, [action, automatic, clause]]}
+                - $and:
+                  - {$var: observations}
+                  - {$eq: [{$keys: {$var: reference}}, [action, clause, observations]]}
+                - {$eq: [{$keys: {$var: reference}}, [action, clause, connection]]}
+            message: INVALID_PRE_ACTIVATION_CONNECTION_REFERENCE
+        - $forEach:
+            item: referenceName
+            in:
+              $listConcat:
+              - [{$var: clauseKey}, {$var: actionName}]
+              - {$choose: {cond: {$or: [{$var: automatic}, {$var: observations}]}, then: [], else: [{$var: connectionName}]}}
+            do:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - {$isKind: {val: {$var: referenceName}, kind: text}}
+                    - {$call: {function: validConnectionName, args: {candidate: {$var: referenceName}}}}
+                    - {$eq: [{$size: {$split: {text: {$var: referenceName}, separator: '*'}}}, 1]}
+                message: INVALID_PRE_ACTIVATION_CONNECTION_REFERENCE
+        - $let:
+            vars:
+              refKey: {$text: {$var: referenceIndex}}
+              target: {$document: {$concat: [/clauseRuntime/work/candidate/, {$var: clauseKey}]}}
+        - $let:
+            name: clauseId
+            expr:
+              $choose:
+                cond: {$exists: {$var: target}}
+                then: {$nodeBlueId: {$var: target}}
+                else: ''
+        - $if:
+            cond:
+              $or:
+              - {$var: installing}
+              - $and:
+                - {$ne: [{$var: clauseId}, '']}
+                - {$eq: [{$get: {object: {$var: previous}, key: {$var: refKey}}}, {$var: clauseId}]}
+            then:
+            - $failIf:
+                cond: {$not: {$exists: {$var: target}}}
+                message: PRE_ACTIVATION_CONNECTION_UNKNOWN_CLAUSE
+            - $let:
+                name: targetPlanner
+                expr:
+                  $document:
+                    $concat: [/clauseRuntime/work/candidate/, {$var: clauseKey}, /type/hookDefinition/functions/planConnections]
+            - $failIf:
+                cond:
+                  $or:
+                  - {$not: {$exists: {$var: targetPlanner}}}
+                  - {$ne: [{$nodeBlueId: {$var: targetPlanner}}, {$var: canonicalPlanner}]}
+                message: PRE_ACTIVATION_CONNECTION_CLAUSE_NOT_CONNECTED
+            - $let:
+                name: route
+                expr:
+                  $choose:
+                    cond: {$var: observations}
+                    then:
+                      $call:
+                        function: resolveObservationChannels
+                        args: {clauseKey: {$var: clauseKey}, actionName: {$var: actionName}}
+                    else:
+                      $call:
+                        function: resolveConnectionChannels
+                        args:
+                          clauseKey: {$var: clauseKey}
+                          actionName: {$var: actionName}
+                          connectionName: {$pointerGet: {object: {$var: reference}, path: /connection, default: ''}}
+                          automatic: {$var: automatic}
+            - $failIf:
+                cond: {$not: {$var: {name: route, path: /allowed}}}
+                message: {$var: {name: route, path: /code}}
+            - $set:
+                name: retained
+                expr: {$objectSet: {object: {$var: retained}, key: {$var: refKey}, val: {$var: clauseId}}}
+            - $set:
+                name: channels
+                expr: {$listConcat: [{$var: channels}, {$var: {name: route, path: /channels}}]}
+    - $return: {references: {$var: retained}, channels: {$var: channels}}
   configuration:
     args: {}
     do:
@@ -243,6 +441,113 @@ functions:
               - /clauseRuntime/work/candidate/
               - $const: clauseKey
         code: USE_ACTIVATION_PARTY_OPERATIONS
+  reviewedApprovalPlan:
+    args:
+      p: {}
+      roster: {}
+    do:
+    - $let:
+        vars:
+          configured: {$pointerGet: {object: {$var: p}, path: /reviewedApprovals, default: {}}}
+          reviewedContracts: {}
+          approvalRoles: {}
+          blocked: []
+          selectors: []
+    - $failIf:
+        cond: {$not: {$isKind: {val: {$var: configured}, kind: object}}}
+        message: INVALID_REVIEWED_APPROVALS
+    - $forEach:
+        key: role
+        item: review
+        in: {$var: configured}
+        do:
+        - $let:
+            vars:
+              event: {$var: {name: review, path: /event}}
+              basis: {$var: {name: review, path: /basis}}
+              source: {$var: {name: review, path: /source}}
+              acceptanceBy: {$var: {name: review, path: /acceptanceBy}}
+              channel: {$concat: [activation.reviewed.source., {$var: role}]}
+        - $failIf:
+            cond:
+              $not:
+                $and:
+                - {$hasKey: {object: {$var: roster}, key: {$var: role}}}
+                - {$includes: {list: {$pointerGet: {object: {$var: p}, path: /required, default: {$keys: {$var: roster}}}}, val: {$var: role}}}
+                - {$isKind: {val: {$var: event}, kind: object}}
+                - {$eq: [{$size: {$var: event}}, 3]}
+                - {$exists: {$var: {name: event, path: /type}}}
+                - {$is: {node: {$var: {name: event, path: /clause}}, pattern: {type: Text, schema: {minLength: 1}}}}
+                - {$is: {node: {$var: {name: event, path: /subject}}, pattern: {type: Text, schema: {minLength: 1}}}}
+                - {$isKind: {val: {$var: basis}, kind: text}}
+                - {$startsWith: [{$var: basis}, /]}
+                - {$ne: [{$var: basis}, /]}
+                - {$isKind: {val: {$var: source}, kind: text}}
+                - {$startsWith: [{$var: source}, /]}
+                - {$ne: [{$var: source}, /]}
+                - $or:
+                  - {$not: {$exists: {$var: acceptanceBy}}}
+                  - $and:
+                    - {$isKind: {val: {$var: acceptanceBy}, kind: text}}
+                    - {$ne: [{$var: acceptanceBy}, {$var: role}]}
+                    - {$hasKey: {object: {$var: roster}, key: {$var: acceptanceBy}}}
+            message: INVALID_REVIEWED_APPROVAL
+        - $failIf:
+            cond: {$includes: {list: {$var: selectors}, val: {$var: event}}}
+            message: DUPLICATE_REVIEWED_APPROVAL_SOURCE
+        - $set: {name: selectors, expr: {$listConcat: [{$var: selectors}, [{$var: event}]]}}
+        - $set:
+            name: approvalRoles
+            expr: {$objectSet: {object: {$var: approvalRoles}, key: {$var: channel}, val: {$var: role}}}
+        - $set:
+            name: blocked
+            expr:
+              $listConcat:
+              - {$var: blocked}
+              - - {$concat: [approve_, {$var: role}]}
+                - {$concat: [activate_, {$var: role}]}
+                - {$concat: [proposeAndActivate_, {$var: role}]}
+        - $set:
+            name: reviewedContracts
+            expr:
+              $objectSet:
+                object: {$var: reviewedContracts}
+                key: {$var: channel}
+                val:
+                  kind: channel
+                  contract:
+                    $merge:
+                    - {type: Contracts/Triggered Event Channel}
+                    - event: {$var: event}
+        - $set:
+            name: reviewedContracts
+            expr:
+              $objectSet:
+                object: {$var: reviewedContracts}
+                key: {$concat: [activation.reviewed.workflow., {$var: role}]}
+                val:
+                  kind: handler
+                  contract:
+                    $merge:
+                    - {type: Contracts/Sequential Workflow}
+                    - channel: {$var: channel}
+                      steps:
+                      - type: Contracts/Compute
+                        definition: {type: Activation/Activation Functions}
+                        constants: {role: {$var: role}, review: {$var: review}}
+                        do:
+                        - $literal:
+                            $call:
+                              function: applyReviewedApproval
+                              args: {role: {$const: role}, review: {$const: review}}
+    - $return:
+        contracts: {$var: reviewedContracts}
+        channels: {$keys: {$var: approvalRoles}}
+        blocked: {$var: blocked}
+        approvalRoles:
+          $choose:
+            cond: {$gt: [{$size: {$var: approvalRoles}}, 0]}
+            then: {$var: approvalRoles}
   plan:
     args: {}
     do:
@@ -314,6 +619,12 @@ functions:
                 channel: activationInitialized
                 steps:
                 - type: Activation/Refresh Activation
+    - $let:
+        name: reviewed
+        expr: {$call: {function: reviewedApprovalPlan, args: {p: {$var: p}, roster: {$var: roster}}}}
+    - $set:
+        name: contributions
+        expr: {$merge: [{$var: contributions}, {$var: {name: reviewed, path: /contracts}}]}
     - $forEach:
         item: contribution
         in:
@@ -616,6 +927,10 @@ functions:
                       - definition: /contracts/activationNegotiationDefinition
                         constants:
                           clauseKey: activationNegotiation
+                          activationApprovalRole:
+                            $choose:
+                              cond: {$includes: {list: [proposeAndActivate, activate], val: {$var: operation}}}
+                              then: {$var: role}
                           fieldPaths:
                             $pointerGet:
                               object:
@@ -712,6 +1027,13 @@ functions:
                           contract:
                             $var: operationContract
     - $let:
+        name: connections
+        expr:
+          $call:
+            function: preActivationConnectionPlan
+            args:
+              p: {$var: p}
+    - $let:
         name: policy
         expr:
           type: Dispatch/Document Dispatch Policy
@@ -727,12 +1049,14 @@ functions:
                 $var: controlChannels
               preOperations:
                 $var: preOperations
+              reviewedOperations: {$var: {name: reviewed, path: /blocked}}
+              reviewedApprovalRoles: {$var: {name: reviewed, path: /approvalRoles}}
+              preConnectionRefs: {$var: {name: connections, path: /references}}
               preChannels:
-                $pointerGet:
-                  object:
-                    $var: p
-                  path: /preActivationChannels
-                  default: []
+                $listConcat:
+                - {$pointerGet: {object: {$var: p}, path: /preActivationChannels, default: []}}
+                - {$var: {name: connections, path: /channels}}
+                - {$var: {name: reviewed, path: /channels}}
             do:
               $literal:
               - $if:
@@ -875,6 +1199,13 @@ functions:
                             - {$eq: [{$pointerGet: {object: {$var: consentRegistration}, path: /channelId}}, {$nodeBlueId: {$pointerGet: {object: {$var: consentParty}, path: /lead/channel}}}]}
                           then:
                           - $return: {allowed: true}
+              - $if:
+                  cond:
+                    $and:
+                    - {$eq: [{$binding: dispatch/kind}, EXTERNAL]}
+                    - {$includes: {list: {$const: reviewedOperations}, val: {$binding: dispatch/operation}}}
+                  then:
+                  - $return: {allowed: false, reason: REVIEWED_APPROVAL_REQUIRED}
               - $if:
                   cond:
                     $or:

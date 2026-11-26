@@ -283,7 +283,7 @@ public final class DocumentInputConformance {
         String preparedId=null;
         for(String mode:configuration.equals("task")?List.of("direct","inherited","reference","omitted"):List.of("direct")) {
           var request=m("type","Attachments/Attachment Preparation Input","authorityParty",processor.read(initial.document(),"/activation/parties/guarantor"));
-          if(!mode.equals("omitted"))request.put("values",m("task","Sprawdź przesyłkę"));
+          if(!mode.equals("omitted"))request.put("values",m("task","Inspect the café’s shipment"));
           if(configuration.startsWith("description"))((Map<String,Object>)request.get("values")).put("description","Customer description");
           Object input=request;
           if(mode.equals("inherited"))input=m("type",m("blueId",NativeRuntime.identity(values.source(request,"definition"))));
@@ -302,7 +302,7 @@ public final class DocumentInputConformance {
           } else {
             if(!result.status().equals("APPLIED"))ClauseGasProbe.diagnose(processor,initial.document(),event,100);
             require(result.status().equals("APPLIED"),"Attachment actual preparation effect: "+mode);
-            require((mode.equals("omitted")?"initial":"Sprawdź przesyłkę").equals(processor.read(result.document(),"/instructionRequest/document/terms/task")),"Exact prepared business value: "+mode);
+            require((mode.equals("omitted")?"initial":"Inspect the café’s shipment").equals(processor.read(result.document(),"/instructionRequest/document/terms/task")),"Exact prepared business value: "+mode);
             require("waiting".equals(processor.read(result.document(),"/attachmentState_instruction/status")),"Attachment waiting state");
             String id=processor.read(result.document(),"/instructionRequest/documentBlueId").toString();
             var prepared=values.select(new Exact.Ref(result.document().blueId()),"/instructionRequest/document");

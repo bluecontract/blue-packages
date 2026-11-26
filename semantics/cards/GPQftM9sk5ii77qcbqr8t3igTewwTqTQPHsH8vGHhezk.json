@@ -1,0 +1,40 @@
+{
+  "blueId": "GPQftM9sk5ii77qcbqr8t3igTewwTqTQPHsH8vGHhezk",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "9Qu5i1YyM9Jby5SL4vDmBXZynpaiGUZWSqStztaFyfJX",
+      "Hnw3FqVrPQPZZPavvnEAZUL8rWweJZTAVyKgThT26bPd",
+      "868Uc5RNCk85BMMQpwU6TRUEnt5TTcBQ1Ss8TiUdSU5q",
+      "HpkinYzoCDoLo8FppfNSPzqPzGXtkY7XKnowvVeio2ia",
+      "Dwk5GcV1WMDMxBKtcRazDPJdDRZaSx9GC9gBWrkmR7qk",
+      "6493wie6qLg12FyYzpHq2rXTq1SdbVjE5JTHU1MrrFSG"
+    ],
+    "displayLabel": "Fulfilment Terms",
+    "limitations": [
+      "Connection configuration determines which channel can approve availability.",
+      "Security deposits remain descriptive supplier terms."
+    ],
+    "parameterRefs": [
+      "bindings.availability",
+      "bindings.quotes",
+      "bindings.terms"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown; approval cannot be inferred.",
+        "aggregate": null,
+        "binding": "availability",
+        "defaultPath": "/supplierReadiness",
+        "evidence": "Order Functions.approveAvailability: timestampMicros; Time §2.",
+        "id": "readinessRecordedAt",
+        "meaning": "Invocation instant when readiness approval was recorded, in Unix microseconds.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/timestampMicros",
+        "type": "date-micros"
+      }
+    ]
+  },
+  "semanticText": "# Fulfilment Terms Clause\n\nProvides the configured fulfilment terms used when preparing a catalog-priced Order. It also exposes supplier availability approval for an explicit quote workflow.\n\nThe `terms` binding defaults to `/resellerTerms`. An Order preparation can read the fulfilment text, confirmation mode, optional date requirement and optional cancellation policy. The customer order clause freezes those terms alongside the price it computes from the selected catalog lines.\n\n`approveAvailability` requires `quoteKey`, `groups` and a nonempty `reference` of at most 256 characters. It reads the quote from `quotes`, which defaults to `/quotes`. Each group identifies its selected line indices and a proposed start strictly after the invocation time. The groups must cover every quote line exactly once and each group can include at most one distinct service date.\n\nA successful approval saves the exact quote BlueId, groups, reference, calling channel and Unix-microsecond timestamp under that quote key in `availability`, which defaults to `/supplierReadiness`. The configured connection determines who may invoke this action. The resulting proof records that caller’s approval.\n"
+}

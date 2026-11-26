@@ -1,0 +1,84 @@
+name: Order Preparation Functions
+description: Extend common Order preparation with an optional reviewed reservation snapshot.
+type: Contracts/Compute Definition
+functions:
+  $blue:membersFrom:
+    definition: {type: Orders/Order Preparation Functions}
+    field: functions
+  freezeReservation:
+    $blue:functionFrom:
+      definition: {type: Schedule/Reservation Functions}
+      function: freezeReservation
+  initialGroups:
+    $blue:functionFrom:
+      definition: {type: Schedule/Reservation Functions}
+      function: initialGroups
+  validateGroupSelections:
+    $blue:functionFrom:
+      definition: {type: Schedule/Reservation Functions}
+      function: validateGroupSelections
+  validateTerms:
+    $blue:functionFrom:
+      definition: {type: Schedule/Reservation Functions}
+      function: validateTerms
+  makeProposal:
+    $blue:functionFrom:
+      definition: {type: Schedule/Reservation Functions}
+      function: makeProposal
+  prepareDetails:
+    args:
+      input: {}
+    do:
+    - $let:
+        name: details
+        expr: {$call: {function: prepareCatalogDetails, args: {input: {$var: input}}}}
+    - $let:
+        vars:
+          fields: {$var: {name: details, path: /fields}}
+          quote: {$var: {name: details, path: /fields/quote}}
+    - $let:
+        name: policy
+        expr:
+          $choose:
+            cond: {$exists: {$pointerGet: {object: {$const: bindings}, path: /fulfilment}}}
+            then: {$document: {$const: {name: bindings, path: /fulfilment}}}
+            else: {$pointerGet: {object: {$call: {function: configuredTemplate, args: {}}}, path: /reservationPolicy}}
+    - $if:
+        cond: {$exists: {$var: policy}}
+        then:
+        - $let:
+            name: wholeOrderGroup
+            expr: {$pointerGet: {object: {$call: {function: configurationParameters, args: {}}}, path: /wholeOrderGroup}}
+        - $if:
+            cond: {$exists: {$var: wholeOrderGroup}}
+            then:
+            - $failIf:
+                cond:
+                  $not:
+                    $and:
+                    - {$eq: [{$size: {$var: {name: input, path: /groups}}}, 1]}
+                    - {$eq: [{$var: {name: input, path: /groups/0/id}}, {$var: wholeOrderGroup}]}
+                message: WHOLE_ORDER_GROUP_REQUIRED
+        - $let:
+            name: agreementDescription
+            expr:
+              $choose:
+                cond: {$exists: {$document: /description}}
+                then: {$document: /description}
+                else: ''
+        - $set:
+            name: fields
+            expr:
+              $pointerSet:
+                object: {$var: fields}
+                path: /orderSnapshot
+                val:
+                  $call:
+                    function: freezeReservation
+                    args:
+                      quote: {$var: quote}
+                      terms: {$merge: [{$var: policy}, {agreementDescription: {$var: agreementDescription}}]}
+                      groups: {$var: {name: input, path: /groups}}
+        else:
+        - $failIf: {cond: {$exists: {$var: {name: input, path: /groups}}}, message: BOOKING_CLAUSE_REQUIRED}
+    - $return: {fields: {$var: fields}}

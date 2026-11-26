@@ -1,0 +1,164 @@
+{
+  "blueId": "6F2x51zXuF1ofagtUtCJZJJ5yV4stXvrL4cJp9gVjrq8",
+  "metadata": {
+    "covers": [],
+    "dependencies": [
+      "BCZeuhHEcKfbEUVCBkaZ3oCcne3kQkYSAAhtNevaNDmH",
+      "8o9Lenpg83mV7C6Cw3QfzB9CPWb7KTcjKo4QqaE2UPb5"
+    ],
+    "displayLabel": "Reservation Clause",
+    "limitations": [],
+    "parameterRefs": [
+      "bindings.state",
+      "bindings.snapshot",
+      "bindings.requests",
+      "bindings.wholeReservation"
+    ],
+    "stateFacts": [
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.initialGroups, confirmProposal, fulfilGroup and endReservation",
+        "id": "groupStatus",
+        "meaning": "Group phase: pending supplier, pending customer, confirmed, fulfilled, cancelled, declined, expired or no show.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/status",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.reservationRequest and initialGroups",
+        "id": "proposalRef",
+        "meaning": "Exact group proposal identity required by review actions.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposalBlueId",
+        "type": "string"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.makeProposal",
+        "id": "proposalAmount",
+        "meaning": "Amount of this group proposal in its frozen quote currency.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/amountMinor",
+        "type": "money-minor"
+      },
+      {
+        "absent": "No exact start has been proposed.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.makeProposal",
+        "id": "proposedStart",
+        "meaning": "Proposed service start as a Unix-microsecond instant.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/proposal/proposedStartMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No exact start confirmed.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.confirmProposal, acceptProposal and initialGroups",
+        "id": "confirmedStart",
+        "meaning": "Confirmed service start as a Unix-microsecond instant.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/confirmedStartMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No confirmation time recorded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.confirmProposal, acceptProposal and initialGroups",
+        "id": "confirmedAt",
+        "meaning": "Timestamp when this group was confirmed.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/confirmedAtMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No response deadline recorded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.setResponseDeadline",
+        "id": "responseDeadline",
+        "meaning": "Last pending response boundary recorded for the group.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/responseDeadlineMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "No fulfilment time recorded.",
+        "aggregate": null,
+        "binding": "state",
+        "defaultPath": "/reservations",
+        "evidence": "Reservation Functions.fulfilGroup",
+        "id": "fulfilledAt",
+        "meaning": "Time when fulfilment was recorded.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/*/fulfilledAtMicros",
+        "type": "date-micros"
+      },
+      {
+        "absent": "Unknown when unavailable.",
+        "aggregate": null,
+        "binding": "snapshot",
+        "defaultPath": "/orderSnapshot",
+        "evidence": "Reservation Functions.initialGroups and endReservation",
+        "id": "quoteCurrency",
+        "meaning": "Frozen currency of the reservation quote.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/quote/currency",
+        "type": "currency"
+      },
+      {
+        "absent": "No whole-Order group status recorded.",
+        "aggregate": null,
+        "binding": "wholeReservation",
+        "defaultPath": null,
+        "evidence": "Reservation Functions.publishWholeOrderReservation",
+        "id": "wholeReservationStatus",
+        "meaning": "Most recent status of the whole-Order group, when a projection is configured.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/status",
+        "type": "string"
+      },
+      {
+        "absent": "No confirmed service start recorded.",
+        "aggregate": null,
+        "binding": "wholeReservation",
+        "defaultPath": null,
+        "evidence": "Reservation Functions.publishWholeOrderReservation",
+        "id": "wholeReservationStart",
+        "meaning": "Confirmed service start for the projected whole-Order group.",
+        "path": null,
+        "scope": "binding",
+        "suffix": "/confirmedStartMicros",
+        "type": "date-micros"
+      }
+    ]
+  },
+  "semanticText": "# Reservation Clause\n\nApplies reviewed booking proposals and operational decisions to the Order. `snapshot` points to the frozen Order snapshot and defaults to `/orderSnapshot`. `state` defaults to `/reservations`, and `requests` to `/reservationRequests`. Initialization derives groups if the snapshot is present and can check the configured customer role against the Order account.\n\nConfirmation, alternative proposal and acceptance use an exact proposal identity. Each request key records the action, input and actor. Reusing a key with different intent or supplying a stale proposal fails. A group can wait for the supplier or customer, be confirmed or fulfilled, or close through configured operational actions. No-show requires a confirmed start already reached. Expiry requires a reached response deadline.\n\nWhen reviewed seller activation is enabled, the workflow checks the exact document version, the expected role, a single reviewed group, current activation access and matching amount. The customer's acceptance must match the seller's stored proposal grant. A confirmed reviewed group can record the seller approval. Configuration controls which workflows are exposed.\n\nThe optional `wholeReservation` binding projects the single snapshot group's ID, status and confirmed start. It has no default. An absent start means the group has no confirmed service time to share. Operational cancellation changes the booking status. Any commercial charge and financial request are determined by the separately configured policy and payment connections.\n\nThe configured `parameters.conditionGroups` can give named booking actions a shared condition under the ordinary before-effects action guard.\n\nA typed condition group can share one condition with several Reservation actions. Its instance inputs select the sources to check on the current Order. An unsatisfied group rejects the guarded workflow before the booking changes."
+}
