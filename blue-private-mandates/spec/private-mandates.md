@@ -152,7 +152,7 @@ found out only by an inquiry that reads the mandate.
    evidence, that is a channel whose type is not, by ancestry, a
    `Timeline Channel with Evidence`, such as a plain `Timeline Channel`, an
    evidence channel whose fields are not well formed, or an evidence channel whose
-   profile is not, by ancestry, a `Signed Statement Profile` (§4), is rejected from
+   profile's exact type is not `Signed Statement Profile` (§4), is rejected from
    the document state, without reading any evidence timeline, and the document
    continues with the next input (Coordination Evidence section 6).
 6. *Cyclic sets.* A mandate, a mandate state, a target state and an operation
@@ -291,16 +291,23 @@ unchanged, and a failure has the same outcome as it has for `Mandate Authority`:
 4. the target document's actor policy admits E as a delegated action.
 
 The ordinary validation of the operation also remains with the processor and is
-decided from the document state as well: exact-version and request validation,
-protection against executing E twice, and every other check of the target
-document that is decidable from the document state. All of it runs before T is
-read, and an operation that fails it is rejected at once. T is read only for an
-operation that passed it. Everything that needs the mandate is the signer's (§7).
+decided from the document state as well. It is exactly the delivery validation of
+the Contracts specification on the target document (C08, C09): the target channel
+exists and accepts E, the named operation is declared on that channel, a required
+exact document version is the document's current state, and a declared request
+definition matches the request. It runs before T is read, and an operation that
+fails it is rejected at once. Before all of these checks the newness rule of the
+channel is applied, as Mandates section 6 step 1 does: an E that the channel's
+lifetime has already consumed is not processed again; it is skipped, not
+rejected, and T is not read for it (Coordination Evidence section 6). T is read
+only for an operation that passed all of them. The execution of the operation,
+its handlers and what they do, comes only after T has decided E. Everything that
+needs the mandate is the signer's (§7).
 
 An outcome under one of these four checks or under the ordinary validation, a
 rejection for a claim that is malformed or is not of the exact type, and a
 rejection for a channel that is not an evidence channel, whose fields are not well
-formed or whose profile is not, by ancestry, a `Signed Statement Profile` (§4) are
+formed or whose profile's exact type is not `Signed Statement Profile` (§4) are
 decided from the document state without consulting T. None of them carries `AUTHORITY_EVIDENCE_DENIED` or `AUTHORITY_EVIDENCE_REJECTED`;
 those two reasons belong to an operation that T decided (Coordination Evidence
 section 6).
@@ -385,9 +392,11 @@ Support depends on nothing but the exact type: no installed file, no
 configuration and no platform.
 
 **A claim and a profile of another type.** An operation with a
-`Mandate Commitment Authority` on an evidence channel whose profile type is not,
-by ancestry, `Signed Statement Profile` is rejected at once from the document
-state, without reading T, and the document continues. A host that does not
+`Mandate Commitment Authority` on an evidence channel whose profile's exact type is
+not `Signed Statement Profile` is rejected at once from the document state,
+without reading T, and the document continues. The type is compared exactly, not
+by ancestry: a type that extends `Signed Statement Profile` is another profile
+(item 1 above), and a commitment claim on its channel is rejected the same way. A host that does not
 implement that profile type refuses the document before (Coordination Evidence
 section 6), so this rejection applies on a host that implements it.
 
@@ -814,6 +823,13 @@ NOT A STATEMENT is final for that entry: the entry is skipped, is the same as no
 entry, and is never retried. FAULT is never a decision: the processor finalises
 nothing, retries, and does not pass over the entry to a later one.
 
+*Host note (not a rule of this text).* Verification needs an Ed25519 signature
+routine on the host. A deployment whose platform has none, for example a Java
+runtime without its elliptic-curve provider, gives FAULT for every entry, so every
+operation decided under this profile waits and never decides. Such a platform is a
+deployment fault of the host, not an outcome of these rules; a host that
+implements this protocol is deployed with a working Ed25519 routine.
+
 Every outcome that depends on the bytes of the entry or of the profile is
 STATEMENT or NOT A STATEMENT, and is the same on every host. An implementation
 MUST NOT let an error that a library raises on particular bytes become a FAULT:
@@ -857,8 +873,9 @@ reason `AUTHORITY_EVIDENCE_REJECTED`; with no considered entry the processor wai
 
 **Which outcome applies when several could** is stated in section 6 of the
 Coordination Evidence specification: a host that does not implement the profile
-refuses; then every outcome from the document state, the ordinary validation of
-the operation included (§3, §4 here); then T. For a Proof
+refuses; then an E that is not new is not processed again; then every outcome
+from the document state, the ordinary validation of the operation included (§3,
+§4 here); then T. For a Proof
 Entry under this profile the checks on T are, in this order and stopping at the
 first that fails: attribution to the channel's actor; the field set of the entry;
 the canonical base64 form of `receipt`; verification; the five comparisons.
@@ -947,7 +964,7 @@ publication is unchanged and remains selectable. This package and its protocol a
 unused unless a document declares a channel whose `evidenceProfile` has the exact
 type `Signed Statement Profile`, or an operation carries a
 `Mandate Commitment Authority`. On a channel that is not an evidence channel,
-whose fields are not well formed or whose profile is not, by ancestry, a
+whose fields are not well formed or whose profile's exact type is not
 `Signed Statement Profile`, an operation with this claim is rejected from the
 document state and the document continues (§1).
 

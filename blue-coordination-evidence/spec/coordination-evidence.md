@@ -232,7 +232,10 @@ final id of E. Ids are compared as texts. A reference and the same content writt
 in full are the same Blue content with the same final id, so an entry cannot be
 told apart by which of the two was written in `document` or `operationEntry`, and
 no naming rule depends on it. A field that holds anything else, a text for example,
-has another id and names neither.
+has another id and names neither. Naming decides only a Rejection Entry. The
+`document` and `operationEntry` of a Proof Entry are a hint that is never compared
+(below): it names nothing in this sense whatever it holds, and an id written there
+as a text is a lookup aid for a reader, not a naming node.
 
 **Open schemas.** The Blue definitions of `Proof Entry` and `Rejection Entry` name
 their fields and constrain nothing: no field is typed or required, and the field set
@@ -331,9 +334,18 @@ outside the open schemas: whether it is Blue content is decided by its own type.
 
 ## 6. Deciding an evidence-decided operation
 
-**Immediate rejection from the document state.** Everything that can be decided
-from the document state is decided first, and T is read only for an operation that
-passed it. E is rejected at once, without reading T, when at the position of E:
+**An operation that is not new.** The newness rule of the channel is applied
+first, as for every input: the checkpoint of the channel's lifetime (Contracts
+C12) and the rules of Coordination for an input that the lifetime has already
+passed, that belongs to another lifetime or whose decision there is terminal. An E
+that is not new is not processed again: it is skipped, not rejected, nothing below
+is checked for it and T is not read for it. This is the rule of Contracts that an
+already consumed call does not repeat the operation, its precondition or its
+request validation (C10).
+
+**Immediate rejection from the document state.** The checks listed here are made
+from the document state, and T is read only for an operation that passed all of
+them. E is rejected at once, without reading T, when at the position of E:
 
 - the channel E is performed on is not an evidence channel (section 3 rule 3), for
   example a plain `Timeline Channel`;
@@ -342,12 +354,16 @@ passed it. E is rejected at once, without reading T, when at the position of E:
 - the authority claim of E is malformed under the rules of its own protocol, or
   that protocol does not admit it with the channel's profile;
 - a check that the claim's own protocol makes from the document state fails;
-- the ordinary validation of the operation fails: exact-version and request
-  validation, protection against executing E twice, and every other check of the
-  target document that is decidable from the document state.
+- the ordinary validation of the operation fails. It is exactly the delivery
+  validation of the Contracts specification on the target document (C08, C09):
+  the target channel exists and accepts E, the named operation is declared on that
+  channel, a required exact document version is the document's current state, and
+  a declared request definition matches the request.
 
-Every processor reads the same document state at that position, so the rejection is
-deterministic.
+Nothing else is part of these checks. In particular the execution of E's operation,
+its handlers and what they do, is not: it comes only after T has decided E, and an
+outcome of that execution is never an immediate rejection. Every processor reads
+the same document state at that position, so the rejection is deterministic.
 
 **Considered entries.** Otherwise the processor considers an entry on T for E only
 if both hold:
@@ -417,12 +433,13 @@ document state. Neither can therefore change the BlueId of a state.
 1. A host that does not implement the declared profile refuses the document where
    the channel is declared or its profile is changed to such a type (section 1).
    Nothing below is reached.
-2. An outcome decided from the document state without reading T: an immediate
+2. An E that is not new in the channel's lifetime is not processed again (above).
+3. An outcome decided from the document state without reading T: an immediate
    rejection above, which includes the outcome of a check that the claim's own
    protocol makes before T is read and the ordinary validation of the operation.
    An evidence channel whose fields are not well formed is one of these immediate
    rejections.
-3. Otherwise T decides, by its first considered entry for E in chain order. For
+4. Otherwise T decides, by its first considered entry for E in chain order. For
    each entry on T the processor checks, in this order and stopping at the first
    that fails: attribution to the channel's actor; that the message carries one of
    the two types and is well formed; for a Rejection Entry, that it names this

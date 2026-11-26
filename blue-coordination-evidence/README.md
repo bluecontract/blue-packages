@@ -24,8 +24,11 @@ no support for this package.
 - A rejection decided from the evidence timeline has one of two durable reasons,
   the same on every processor: `AUTHORITY_EVIDENCE_DENIED` for verified evidence
   that denies and `AUTHORITY_EVIDENCE_REJECTED` for a Rejection Entry.
-- Everything decidable from the document state, the ordinary validation of the
-  operation included, is decided before the evidence timeline is read.
+- An operation the channel's lifetime has already consumed is not processed again
+  (skipped, not rejected). Then the checks from the document state, among them the
+  delivery validation of Contracts (target channel, declared operation, exact
+  version, request pattern), reject at once; only then is the evidence timeline
+  read. The operation's handlers run only after the evidence timeline decided it.
 
 The package's protocol identity is the capability a host must support for a
 document that declares the new channel. A host without it must refuse such a

@@ -42,19 +42,19 @@ comparisons of texts. A statement is a signed assertion and no more.
 
 | Item | Version | BlueId |
 | --- | --- | --- |
-| Coordination Evidence package | 0.1.0-preview.3 | `h3fEuEfhBYT7zos6S3vHcnCYw66dMCFU83DpoyuSkRT` |
-| Coordination Evidence protocol | | `329QqnEM7eHbGVZwYXEUxMyK8bYocQURE88iZxDMG7k7` |
-| Coordination Evidence rules | | `5qMz44n8Pw2FntXMb15oSSJBu6NUKeWFv6ha57Sn8Cxw` |
-| `Timeline Channel with Evidence` | | `44zSwFFsmhNqhVM983hPdcCj5kQyiSPKKb4Av9pqG5fR` |
-| `Evidence Profile` | | `AuL7uxDpMkJASfTVAYSyA2vnpds33AKGeXVJCbDd7Rfy` |
-| `Proof Entry` | | `DVJfLRb9RV5ngBmub2rZCs589u6zfighjhR2YALNtLMv` |
-| `Rejection Entry` | | `GyJE8zJqDVFXdXfCxeW9wY8U6bQKcdyVPM8FyT2tQcm8` |
-| Private Mandates package | 0.1.0-preview.3 | `8Cr8GxnDN2p2u7RaBgc1BrLMnYr8WxKBuLootzmB1Qrd` |
-| Private Mandates protocol | | `GWrcHmSaSdjPb6LJ9pkRoSBUY6xJRi3DN5dpwTUtGzrJ` |
-| Private Mandates rules | | `6ydZG9j6ENCw82coeu3UeWsJsirZULCbbeKjnT4RZRdF` |
-| `Mandate Commitment Authority` | | `2CHjYRUwXhbZZwsyoFMiSdiSS1CMCR7qHNAjBnMdmTcF` |
-| `Mandate State Attestation` | | `7Aza2MqkDzybxDiHV6yUfqMvkPN1zJrHETfYJXnbz97t` |
-| `Signed Statement Profile` | | `99iQxFhQUYYzop8H3WhjkUCwXvv5TEsoRUQvdoDffKwt` |
+| Coordination Evidence package | 0.1.0-preview.3 | `92jurrzKryQ3KkrCo5r5rzXLZxzgz1oKFCuz7u913T1X` |
+| Coordination Evidence protocol | | `H3puQP7A8zh9B6z7NXUTnpNu9hGPUfW8fxdCw8EqXtyk` |
+| Coordination Evidence rules | | `ErvK9PC58CpUcUzdJRfuTQhrYyQdvXFdBrrvzYh4T2Vn` |
+| `Timeline Channel with Evidence` | | `CboJK2cNdaboP5MW6xwM9sn6BuxBfbHDTLpMsprEhDqZ` |
+| `Evidence Profile` | | `GJ3VeCJXPSSz3biDudF3eCB76vxJJrNDNhwLbYenHqi9` |
+| `Proof Entry` | | `95KMR7eZ8Ma4tNeyBii6MHSWZYgRjZByUiTfWERBaDT6` |
+| `Rejection Entry` | | `Bcke6mnURaC9ghLj1azZrYxPWnCUTWuDkX5xAYwHdUTg` |
+| Private Mandates package | 0.1.0-preview.3 | `3d1PhdbiTvhse5NkyFBroM9AkwQrXdwtSNuev1aAZePW` |
+| Private Mandates protocol | | `3cKx66R6qTMQB9pwtBL3U3vdbebH7TYHt8TBpir7Ehj8` |
+| Private Mandates rules | | `FLaS74tzzjUgtoD7CunFM9d7mnx6u2VSiAje9VSL6Djq` |
+| `Mandate Commitment Authority` | | `8LKNmiL8fsNHrbo6kamG8vH2Bon2T1padWUCyXCU2Fdo` |
+| `Mandate State Attestation` | | `9aLeqrVyc51p9ipvNgQ8Vc1FWKXW6e2M9V2uU3iZh3Hh` |
+| `Signed Statement Profile` | | `An3eAvv3yW8Sthj4FpMkJMacoLR61wSJ2ZBcEE1gwicu` |
 | Coordination package (required, unchanged) | 0.2.0-access-events.1 | `4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA` |
 | Coordination protocol (unchanged) | | `4YRV74QByZidyvspvbhZvx9Mfod16dHNCqCVbkKditGc` |
 | Coordination rules (unchanged) | | `26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG` |
@@ -134,11 +134,15 @@ apply:
   (the content is checked). A document may hold a channel whose fields are not well
   formed; an operation on it with a commitment authority is rejected from the
   document state and the document continues. So is such an operation on a channel
-  whose profile is not, by ancestry, a `Signed Statement Profile`.
-- **The document state decides first.** The ordinary validation of an operation
-  (exact-version and request validation, protection against executing it twice,
-  every other check decidable from the document state) runs before the evidence
-  timeline is read; an operation that fails it is rejected at once.
+  whose profile's exact type is not `Signed Statement Profile` (compared exactly,
+  not by ancestry).
+- **The document state decides first.** An operation the channel's lifetime has
+  already consumed is not processed again: it is skipped, not rejected (Contracts
+  C10, C12). Then the ordinary validation of an operation, which is exactly the
+  delivery validation of Contracts (C08, C09: target channel, declared operation,
+  exact document version, request pattern), runs before the evidence timeline is
+  read; an operation that fails it is rejected at once. The operation's execution,
+  its handlers, comes only after the evidence timeline decided it.
 - **Changes of a channel are the document's own.** This package adds no rule about
   changing a channel's fields or type. A change happens only through the document's
   program, and Contracts decides whether the resulting document is valid and whether
@@ -167,7 +171,7 @@ records these outcomes with their exact failure kinds.
 | A profile with a further field | Same |
 | `evidenceProfile` with no profile type | Same |
 | `evidenceProfile` whose exact type is a profile the host does not implement | The host refuses the document where the channel is declared, or where its profile is changed to such a type, and finalises nothing |
-| A commitment authority on a channel whose profile the host implements but is not, by ancestry, a `Signed Statement Profile` | The operation is rejected from the document state, without reading the evidence timeline |
+| A commitment authority on a channel whose profile the host implements but whose exact type is not `Signed Statement Profile` (also a type that extends it) | The operation is rejected from the document state, without reading the evidence timeline |
 | A commitment authority whose fields are not exactly `actor` and `mandateCommitment`, or whose `mandateCommitment` is not 64 characters `0-9a-f`; a claim whose exact type is not `Mandate Commitment Authority` | The operation is rejected from the document state, without reading the evidence timeline |
 | An entry of one of the two types that is not well formed; a Rejection Entry that does not name this document and the operation | The entry is skipped |
 | A Proof Entry whose `document` or `operationEntry` names something else, or that has neither | Decided by its statement like every other; the hint changes no classification. Written as a reference, the hint is opened at admission, and one that cannot be resolved blocks the evidence timeline (known limit); written as id texts it needs no resolution |
