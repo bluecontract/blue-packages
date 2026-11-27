@@ -7,7 +7,7 @@ processor writes a signed statement on the party's evidence timeline. The rules 
 
 ## The package
 
-`blue-private-mandates` `0.1.0-preview.4` (namespace `PrivateMandates`) requires the
+`blue-private-mandates` `0.1.0-preview.5` (namespace `PrivateMandates`) requires the
 unchanged `blue-coordination` `0.2.0-access-events.1` and `blue-mandates`
 `0.3.0-preview.1`. No other source, archive, identity, lock or catalogue row
 changes. It exports five types:
@@ -23,14 +23,14 @@ changes. It exports five types:
 
 | Item | Version | BlueId |
 | --- | --- | --- |
-| Private Mandates package | 0.1.0-preview.4 | `2TLRthivPZWE73UzUA2m3rV7DSPjYw8881Hq8Sf2BRoK` |
-| Private Mandates protocol | | `AfopfSQVSyKqr4YFcGV5mECe3pKBM8rXvrcnkUVGYQ56` |
-| Private Mandates rules | | `GPnibLpDVQ42R8a5FiMVs4WsYuECxCpJn9keSiU5fyYb` |
-| `Timeline Channel with Evidence` | | `2urZYoLXq4P8bYPnfM8MY7XwrWzSU7ahd6qBZRmWGtM1` |
-| `Statement Entry` | | `6xyRxFNZ9MU4qogf8S8Wx1dMmcpEkXUkeXG8VFwwzJBB` |
-| `Rejection Entry` | | `2fuvLdJztY8i7LHrCY5Ey6nQrRhbQuv7RL3aAUSpyhTa` |
-| `Mandate Commitment Authority` | | `BhnqfiWUee9qDYj6usyrTNC6N2MXeERFLMtr2Jn7sMac` |
-| `Mandate State Attestation` | | `73wiyuc4Z7EVtRSXn9TTqDXEFgkVxxZgY1WYUCNssBVB` |
+| Private Mandates package | 0.1.0-preview.5 | `6bnwKNGL9JVHTxG6LWUe4PYJtrJ7tjxncAw8aVYYeVSz` |
+| Private Mandates protocol | | `5wZeeJhRxom33zJMaXWGDTTWSM9VBFWmPRa235xKHMXR` |
+| Private Mandates rules | | `KSLxgCzJ2qfw4JsUbSFuaJ1AzRe4bpCtKkkQREkk5Zf` |
+| `Timeline Channel with Evidence` | | `EKvy1PrQrctcrv1PXGidPEGkiUmQQVPfP9hn3TmuEgJ1` |
+| `Statement Entry` | | `6mCgeQcdwuLxA38NSvK8pT8C3LoYKtk2WFcFb1ahgcUo` |
+| `Rejection Entry` | | `CvF8DLysZeYudYV3wnoX3vxThEMRY9pg9gKF9DMornHN` |
+| `Mandate Commitment Authority` | | `6e5ZucrMLVfYtYGC1PSsfXXr56pPpQKJNP5tg4JPyTJC` |
+| `Mandate State Attestation` | | `EzEvuSnkfDEib8ETtpXoM2WojLv5SfjuyhwA6Mz1GgoL` |
 | Coordination package (required, unchanged) | 0.2.0-access-events.1 | `4gmSjwn3DCYBVeDieXxuXgsPvvz2dU6ovFXnnuyv2RjA` |
 | Coordination protocol (unchanged) | | `4YRV74QByZidyvspvbhZvx9Mfod16dHNCqCVbkKditGc` |
 | Coordination rules (unchanged) | | `26NVkgkaq67dYNCRvZASHJvKQUQe1JM1Q3WcLK1NT5dG` |

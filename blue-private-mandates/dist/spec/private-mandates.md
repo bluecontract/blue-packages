@@ -46,6 +46,10 @@ have the same final id (LANG-REFERENCE). Two final ids are equal only as texts, 
 `X#0` and `X` differ. Where a position allows only a plain id, this text says so,
 and a member id there is not well formed.
 
+**Fields.** The fields of a node are its fields in the Language sense. `name` and
+`description` are labels (LANG-LABELS), not fields: a rule that a node has exactly
+certain fields does not count them.
+
 **Order.** The *order key* of an input is the one Coordination and Time define
 (Coordination §2.4, Time §6): (timestamp, source id, entry id), compared by the
 timestamp as an integer, then by the source id and then by the entry id as ASCII
@@ -191,11 +195,11 @@ participation decides it under the rules of Coordination, its claim is not
 evaluated and T is not read for it. Any other operation is *commitment-decided*
 when the exact type of its authority claim is `Mandate Commitment Authority` of
 this package; ancestry does not count. Section 7 decides every
-commitment-decided operation. An operation that is not direct and whose claim's
-exact type extends `Mandate Commitment Authority` has an authority wrapper that
-no supported protocol decides and fails closed, as Mandates §1 requires: it is
-rejected from D with the reason `AUTHORITY_DENIED`, without reading any evidence
-timeline. A claim of `Mandates/Mandate Authority` keeps the rules of Mandates,
+commitment-decided operation of the document. An operation of the document (§7)
+that is not direct and whose claim's exact type extends `Mandate Commitment
+Authority` has an authority wrapper that no supported protocol decides and fails
+closed, as Mandates §1 requires: it is rejected from D with the reason
+`AUTHORITY_DENIED`, without reading any evidence timeline. A claim of `Mandates/Mandate Authority` keeps the rules of Mandates,
 also on an evidence channel.
 
 ## 5. Entries on the evidence timeline
@@ -295,8 +299,16 @@ attestations of one mandate into a hash chain.
 
 ## 7. How a processor decides a commitment-decided operation
 
-A processor decides every commitment-decided E by these steps, in this order. The
-first step that ends the procedure decides E.
+E is an *operation of the document* when its Operation Request is addressed to
+the document as Contracts C08 selects recipients: an explicitly addressed request
+names in `document` a state of this document, and a request without `document`
+names in `channel` a channel of D. Any other E is not an operation of the
+document; this text does not decide it, and Coordination and Contracts give its
+outcome.
+
+A processor decides every commitment-decided E that is an operation of the
+document by these steps, in this order. The first step that ends the procedure
+decides E.
 
 1. **Newness.** The newness rules of the channel lifetime through which E is
    delivered apply first (Mandates §6 step 1 names them): the lifetime's
@@ -316,8 +328,10 @@ first step that ends the procedure decides E.
      participant);
    - D's actor policy does not allow E as a delegated action.
 
-   Every rejection of this step has the reason `AUTHORITY_DENIED`, also where
-   Contracts would give the same input another reason. End.
+   Every rejection of this step, and the rejection of a claim whose exact type
+   extends `Mandate Commitment Authority` (§4), has the reason
+   `AUTHORITY_DENIED`, also where the target channel does not exist in D and
+   where Contracts would give the same input another reason. End.
 
 3. **Delivery validation.** E is rejected from D, without reading T, when the
    delivery validation of Contracts on the target document fails (C08, C09): the
@@ -357,7 +371,9 @@ first step that ends the procedure decides E.
    admitted (§5). Absence, a read failure or a missing entry is never a decision.
    When the processor holds two contradictory chains of T, that is an integrity
    failure of the source (Coordination §9, §12): the processor retains the
-   evidence and stops reading T, and decisions already recorded stand.
+   evidence and the document stops with Coordination's source integrity failure
+   for T. E is not decided, and decisions already recorded stand. This applies to
+   T only; every other source keeps the rules of Coordination.
 
 Later entries for an E that step 4 has decided do not change the decision,
 whatever they carry. Whether a processor records them is open (§11).
@@ -367,8 +383,9 @@ no input after K is processed, also not an input of another participant. No rule
 of this text ends the wait (§11).
 
 **What is recorded.** A processor records a rejection with its reason. With a
-decision of step 4 by a Statement Entry it also records that statement's
-`statementCommitment`. Every processor records the same reason for the same E,
+decision of step 4 by a Statement Entry it keeps that statement's
+`statementCommitment` with its assessment of E; this text requires no other
+record of the decision. Every processor records the same reason for the same E,
 because the steps decide from D and from T's authenticated chain only. A processor
 MUST NOT write a reason or a `statementCommitment` into the document state, so
 neither changes the BlueId of any state.
@@ -440,9 +457,14 @@ is a well-formed key (§7 step 2). The entry is *matching* only if all hold:
 | 4 | `targetState` | The final id of D, the processor's own state |
 | 5 | `mandateProcessorKey` | The `mandateProcessorKey` of the target channel in force before K |
 
-The values compared with MUST come from the processor's own D and from E as
-authenticated, never from the entry. `statementCommitment` and
-`verdict` are compared with nothing. A matching entry carries its `verdict`.
+The values that the statement's values are compared with MUST come from the
+processor's own D and from E as authenticated, never from the entry.
+`statementCommitment` and `verdict` are compared with nothing. A matching entry
+carries its `verdict`.
+
+The order of the checks is free; only the result is normative. An implementation
+that makes items 1 to 3 before item 4 never leaves unfinished an entry that one of
+them skips.
 
 An entry that is not matching is *skipped*: it is the same as no entry, is never a
 denial and is never classified again. The classification is a function of B, E,
@@ -551,11 +573,19 @@ order. No processor repeats them; a statement asserts them.
    authenticated itself and for which its own processing of the document has
    reached §7 step 4.
 
-**The verdict.** When the five hold, the signer evaluates S for E as follows. The
-*grants* are the entries of the scope of S. A grant *applies* to E when its target
-names the target channel and the operation of E and, if it pins an initial
-document, that document's final id is the final id of the target document's
-initial state. A grant has a document validation (`target.documentValidation`), a
+**The verdict.** When the five hold, the signer's verdict for E is the result
+Mandates §6 gives for S, D and E with the mandate named in clear: `true` where a
+processor of the mandate named in clear authorizes E, `false` where it denies E,
+and no verdict where it stops with an error or waits for content. Owner approval
+and unchanged program and participant bindings (Mandates §6 step 5) are
+properties of S that the mandate processor attests by attesting S as a state it
+processed under Mandates (§6); the signer does not check them again.
+
+*Note.* This note and its two lists restate that result for one S, D and E and
+are informative. The *grants* are the entries of the scope of S. A grant
+*applies* to E when its target names the target channel and the operation of E
+and, if it pins an initial document, that document's final id is the final id of
+the target document's initial state. A grant has a document validation (`target.documentValidation`), a
 request validation (`validation`), both or neither. Each validation is evaluated
 as Mandates §4 and §6 define, with S as `$document`, D as `targetDocument` and the
 request payload of E as `request`, and with its own fresh gas ledger of
@@ -597,15 +627,6 @@ The verdict is given by the first of these steps that applies, in this order:
 
    In each case that ends the step, later grants are not looked at.
 7. No grant passes: `false`.
-
-The steps restate, for one S, D and E, the result Mandates §6 gives for the
-mandate named in clear: `true` where a processor of the mandate named in clear
-authorizes E, `false` where it denies E, and no verdict where it stops with an
-error or waits for content. Where the steps and Mandates differ, Mandates
-decides. Owner approval and unchanged program and participant bindings
-(Mandates §6 step 5) are properties of S that the mandate processor attests by
-attesting S as a state it processed under Mandates (§6); the steps do not check
-them again.
 
 **No verdict, no statement.** When a condition fails or there is no verdict, the
 signer signs nothing for E. This includes an M that matches no mandate the signer

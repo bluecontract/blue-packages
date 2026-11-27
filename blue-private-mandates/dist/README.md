@@ -1,6 +1,6 @@
 # Blue Private Mandates
 
-`blue-private-mandates` **0.1.0-preview.4** lets the participants of a document
+`blue-private-mandates` **0.1.0-preview.5** lets the participants of a document
 decide an agent's operation without reading the mandate. The agent's operation
 carries a salted commitment to the mandate, and the document processor of the
 represented party writes a signed statement on the party's evidence timeline that
