@@ -64,14 +64,15 @@ capability declaration.
 A statement is a signed assertion and nothing more. No processor other than the
 signer checks the evaluation. The mandate processor answers for the attested state,
 the signer for the evaluation; the signatures let each be held to what it stated
-when the mandate is later disclosed in an inquiry, and `statementCommitment` ties a
+when the mandate is later disclosed for review, and `statementCommitment` ties a
 statement to the exact bytes the mandate processor signed, so that a wrong state can
 be told apart from a wrong evaluation of a rightly attested state. The other
 participants accept the two keys by accepting the document: the represented party's
 channel names them, and it changes only through the document's own program.
 
 What stays trusted to the mandate processor: that S results from exactly the
-entries of `position`, the completeness of `documents`, dependencies that are not a
+entries of `position`, owner approval and unchanged program and participant
+bindings of S, the completeness of `documents`, dependencies that are not a
 channel contract (documents referred to without embedding, evidence timelines,
 anything a contract reads when it runs), the two timer bounds and
 `authorityPackage`. The attestation chain shows equivocation (two attestations with
@@ -110,10 +111,12 @@ attestation was handed over.
 - **Ed25519 on the host.** A host that implements the protocol needs a working
   Ed25519 routine. A host without one does not start with the protocol; it does not
   run documents under it and leave their operations waiting. Core's Java host
-  checks for the JDK's Ed25519 (provider `SunEC`) when it starts. A routine that
-  fails at run time on bytes that passed every check of §10.2 is a failure of the
-  host, not of the bytes: the processor's step fails, decides nothing and is
-  repeated when the host works again (§8.4, *unfinished*).
+  checks for the JDK's Ed25519 (provider `SunEC`) when it starts. The processor
+  checks every property of the key and the signature that §10 names, other than
+  the equation itself, before it calls the routine. A routine that then fails to answer is a failure of the
+  host, not of the bytes: the classification is *unfinished* (§8.4), the step
+  decides nothing and is repeated when the host works again. A library's refusal
+  of particular bytes before that point means the condition does not hold.
 
 ## What the schemas enforce
 
