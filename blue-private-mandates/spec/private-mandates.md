@@ -2,7 +2,7 @@
 
 Protocol name: `Private Mandates / statement-decided operation authority/1`
 Package namespace: `PrivateMandates`
-Release status: Core Java integration preview, 26 November 2026
+Release status: Core Java integration preview, 27 November 2026
 
 This package lets the participants of a document decide an agent's operation
 without reading the mandate. The agent's operation carries a salted commitment to
@@ -35,7 +35,7 @@ compared byte for byte.
 decode canonically to exactly 32 bytes (LANG-ID-ENCODING, Language §4.4). A
 *member id* names a member of a finalized cyclic set (Language §12.3): a plain id,
 `#`, and the member's index in decimal with the digits `0-9`, either `0` or
-beginning with `1-9`. This text admits an index of at most 9 digits, so a member id
+beginning with `1-9`. This text allows an index of at most 9 digits, so a member id
 is 34 to 54 characters. A *final id* is a plain id or a member id.
 
 The final id of a node is the id under which the Language established it as final
@@ -43,7 +43,7 @@ content: its member id when it is a member of a finalized cyclic set, and its
 plain id otherwise. The BlueId of a member's detached body is never its final id
 (Language §12.4). A reference `{blueId: …}` and the same content written in full
 have the same final id (LANG-REFERENCE). Two final ids are equal only as texts, so
-`X#0` and `X` differ. Where a position admits only a plain id, this text says so,
+`X#0` and `X` differ. Where a position allows only a plain id, this text says so,
 and a member id there is not well formed.
 
 **Order.** The *order key* of an input is the one Coordination and Time define
@@ -180,20 +180,23 @@ The claim is *well formed* only if its fields, beside its type, are exactly
 written as its ASCII text. Nothing separates, prefixes or ends the two. A
 statement carries M as this same text.
 
-**The salt.** The salt is 32 bytes and is held by the signer; one salt per mandate
-is the baseline. No processor other than the signer sees a salt, so no processor
-checks it.
+**The salt.** The salt is 32 bytes, chosen and held by the signer. The signer
+SHOULD use one salt per mandate. No processor other than the signer sees a salt,
+so no processor checks it.
 
-**Which claims this text decides.** An operation is *commitment-decided* when the
-exact type of its authority claim is `Mandate Commitment Authority` of this
-package; ancestry does not count. Section 7 decides every commitment-decided
-operation. An operation whose claim's exact type extends
-`Mandate Commitment Authority` has an authority wrapper that no supported protocol
-decides and fails closed, as Mandates §1 requires: it is rejected from D with the
-reason `AUTHORITY_DENIED`, without reading any evidence timeline. A claim of
-`Mandates/Mandate Authority` keeps the rules of Mandates, also on an evidence
-channel. An operation of the represented party itself on its own channel is a
-direct operation and keeps the rules of Coordination; T is not read for it.
+**Which claims this text decides.** An operation whose entry has the actor and
+the timeline of the target channel is a *direct operation* of that channel's
+participant, whatever claim it carries: as Mandates §6 step 2, direct
+participation decides it under the rules of Coordination, its claim is not
+evaluated and T is not read for it. Any other operation is *commitment-decided*
+when the exact type of its authority claim is `Mandate Commitment Authority` of
+this package; ancestry does not count. Section 7 decides every
+commitment-decided operation. An operation that is not direct and whose claim's
+exact type extends `Mandate Commitment Authority` has an authority wrapper that
+no supported protocol decides and fails closed, as Mandates §1 requires: it is
+rejected from D with the reason `AUTHORITY_DENIED`, without reading any evidence
+timeline. A claim of `Mandates/Mandate Authority` keeps the rules of Mandates,
+also on an evidence channel.
 
 ## 5. Entries on the evidence timeline
 
@@ -241,7 +244,8 @@ any other type is admissible or not by its own type.
 
 The mandate processor states one thing per mandate state: a document of the exact
 type `Mandate State Attestation` of this package. No processor reads an
-attestation; the signer and an inquiry do.
+attestation. The signer reads it, and so does a later review of the mandate when
+the mandate is disclosed (§9, What the signer keeps).
 
 | Field | Content | Form |
 |---|---|---|
@@ -272,10 +276,10 @@ form the table gives; and `documents` and `position` are in the stated order.
 
 **Signature.** The mandate processor signs
 
-    attestation signing input = UTF8( "blue.private-mandates.mandate-state-attestation" ) || LF || UTF8( A )
+    attestation signing input = UTF8( "blue.private-mandates.mandate-state-attestation" ) || LF || UTF8( attestation id )
 
-where A is the plain id of the attestation as its ASCII text and no byte follows
-it. The signature is pure Ed25519 (RFC 8032), 64 bytes, accepted by the rule of
+where the attestation id is the plain id of the attestation as its ASCII text and
+no byte follows it. The signature is pure Ed25519 (RFC 8032), 64 bytes, accepted by the rule of
 §10.2. It is held outside the attestation, which has no signature field.
 
 **Position completeness.** `position` has a row for every timeline that S depends
@@ -294,13 +298,13 @@ attestations of one mandate into a hash chain.
 A processor decides every commitment-decided E by these steps, in this order. The
 first step that ends the procedure decides E.
 
-1. **Newness.** The newness rules of the channel through which E is delivered
-   apply first, as Mandates §6 step 1 states: the checkpoint of the channel's
-   lifetime (Contracts C12) and Coordination's rules for an input that the
-   lifetime has already passed, that belongs to another lifetime or whose
-   decision there is terminal. An E that is not new is skipped: it is not
-   processed again, nothing below is checked for it, it is not rejected and T is
-   not read for it. End.
+1. **Newness.** The newness rules of the channel lifetime through which E is
+   delivered apply first (Mandates §6 step 1 names them): the lifetime's
+   checkpoint (Contracts C12), no second invocation of an operation already
+   consumed through another channel (Contracts C10), and Coordination's
+   explicit dispositions of inputs already decided (Coordination §12). An E that
+   is not new is skipped: it is not processed again, nothing below is checked
+   for it, it is not rejected and T is not read for it. End.
 
 2. **Rejection from the claim and the channel.** E is rejected from D with the
    reason `AUTHORITY_DENIED`, without reading T, when any of these holds:
@@ -310,17 +314,19 @@ first step that ends the procedure decides E.
    - the claim's `actor` is not the `actor` of the target channel;
    - D holds no `Timeline Channel` with the actor and timeline of E (the delegate
      participant);
-   - D's actor policy does not admit E as a delegated action.
+   - D's actor policy does not allow E as a delegated action.
 
-   End.
+   Every rejection of this step has the reason `AUTHORITY_DENIED`, also where
+   Contracts would give the same input another reason. End.
 
 3. **Delivery validation.** E is rejected from D, without reading T, when the
    delivery validation of Contracts on the target document fails (C08, C09): the
-   target channel exists and is accepted, the named operation is declared on that
-   channel, a required exact document version is D, and a declared request
-   definition matches the request. The reason is the one Contracts gives that
-   failure: `INVALID_TARGET_CHANNEL`, `INVALID_TARGET_OPERATION`,
-   `STALE_DOCUMENT_PRECONDITION` or `INVALID_REQUEST`. End.
+   named operation is declared on the target channel, a required exact document
+   version is D, and a declared request definition matches the request. The
+   reason is the one Contracts gives that failure: `INVALID_TARGET_OPERATION`,
+   `STALE_DOCUMENT_PRECONDITION` or `INVALID_REQUEST`. That the target channel
+   exists and that a channel of D takes E as input is decided by step 2 and is
+   not checked again. End.
 
    Nothing else is checked before T is read. In particular the execution of E's
    operation and its handlers come only after T has decided E.
@@ -336,8 +342,8 @@ first step that ends the procedure decides E.
       - *Unfinished*: the processor finalises nothing, repeats the
         classification of X later, and does not take a later entry before it.
         End for now.
-      - *Matching* with `verdict` `true`: E is admitted and executed under the
-        target document's own rules. End.
+      - *Matching* with `verdict` `true`: E is authorized and executed under
+        the target document's own rules. End.
       - *Matching* with `verdict` `false`: E is rejected with the reason
         `AUTHORITY_EVIDENCE_DENIED`. End.
       - *Skipped*: take the next entry.
@@ -353,7 +359,8 @@ first step that ends the procedure decides E.
    failure of the source (Coordination §9, §12): the processor retains the
    evidence and stops reading T, and decisions already recorded stand.
 
-Later entries for an E that step 4 has decided are ignored, whatever they carry.
+Later entries for an E that step 4 has decided do not change the decision,
+whatever they carry. Whether a processor records them is open (§11).
 
 **Waiting.** The document processes its inputs in order-key order. While E waits,
 no input after K is processed, also not an input of another participant. No rule
@@ -378,7 +385,7 @@ neither changes the BlueId of any state.
 | `mandateCommitment` | M, the text of `mandateCommitment` in E's claim | 64 hex characters |
 | `mandateProcessorKey` | The `mandateProcessorKey` of the target channel in force before K, under which the signer verified the attestation | 64 hex characters |
 | `statementCommitment` | `hex( SHA-256( salt || attestation signing input ) )` (§9) | 64 hex characters |
-| `verdict` | Whether the mandate admits E (§9) | `true` or `false` |
+| `verdict` | Whether the mandate authorizes E (§9) | `true` or `false` |
 
 ### 8.2 Layout
 
@@ -404,7 +411,7 @@ so a statement is 422 to 479 bytes long.
 ### 8.3 Signature and entry bytes
 
     statement signing input = UTF8( "blue.private-mandates.statement" ) || LF || statement
-    signature               = Ed25519( statement signing input )      64 bytes, R followed by S
+    signature               = Ed25519( statement signing input )      64 bytes, R followed by s
     entry bytes             = statement || signature
 
 The signature is pure Ed25519 (RFC 8032) with the signer's key, accepted by the
@@ -444,12 +451,17 @@ and every processor reaches the same result.
 
 The classification is *unfinished* only when the processor cannot complete a
 check whose result it needs for a cause outside B and the key: it was stopped,
-ran out of memory or could not read its own data. An implementation MUST NOT
-turn an error that a library raises on particular bytes into an unfinished
-classification: an exception or refusal of a base58, hex or point decoder or of a
-signature routine on some input means that the condition it checks does not hold.
-An implementation MUST NOT take a library's notion of a valid key or a valid
-signature in place of §10 where the two differ. It MAY skip an entry whose
+ran out of memory, could not read its own data, or its signature routine failed
+after the checks below. An implementation MUST NOT turn an error that a library
+raises on particular bytes into an unfinished classification: an exception or
+refusal of a base58, hex or point decoder, or of any check made before the
+signature routine, means that the condition it checks does not hold. Before it
+calls a signature routine for item 4, the implementation checks every property
+of the key and the signature that §10 names, other than the equation of §10.2
+item 3. The routine's answer decides that equation; a failure of the routine to
+answer is then a cause outside B and the key, and the classification is
+unfinished. An implementation MUST NOT take a library's notion of a valid key or
+a valid signature in place of §10 where the two differ. It MAY skip an entry whose
 `statement` text is longer than 724 characters without decoding it.
 
 ### 8.5 Worked example
@@ -535,7 +547,9 @@ order. No processor repeats them; a statement asserts them.
    `nextTimerFiring` is present, K is below its order key. Both comparisons use
    the full order key (§1).
 5. *The target.* D is the signer's own state of the target document strictly
-   before K, and E is an entry the signer itself admitted.
+   before K, and E is an input of that document that the signer has
+   authenticated itself and for which its own processing of the document has
+   reached §7 step 4.
 
 **The verdict.** When the five hold, the signer evaluates S for E as follows. The
 *grants* are the entries of the scope of S. A grant *applies* to E when its target
@@ -584,10 +598,14 @@ The verdict is given by the first of these steps that applies, in this order:
    In each case that ends the step, later grants are not looked at.
 7. No grant passes: `false`.
 
-For one S, D and E these steps give exactly the result Mandates gives for the
+The steps restate, for one S, D and E, the result Mandates §6 gives for the
 mandate named in clear: `true` where a processor of the mandate named in clear
-admits E, `false` where it denies E, and no verdict where it stops with an error
-or waits for content.
+authorizes E, `false` where it denies E, and no verdict where it stops with an
+error or waits for content. Where the steps and Mandates differ, Mandates
+decides. Owner approval and unchanged program and participant bindings
+(Mandates §6 step 5) are properties of S that the mandate processor attests by
+attesting S as a state it processed under Mandates (§6); the steps do not check
+them again.
 
 **No verdict, no statement.** When a condition fails or there is no verdict, the
 signer signs nothing for E. This includes an M that matches no mandate the signer
@@ -643,13 +661,13 @@ stated because common libraries decode leniently.
 ### 10.2 Accepted signature
 
 This rule holds for the signature of an attestation and of a statement. A
-signature is 64 bytes, R followed by S, over a message under a well-formed key A.
+signature is 64 bytes, R followed by s, over a message under a well-formed key P.
 It is accepted only if all hold:
 
-1. S, read as a little-endian integer, is below the group order L;
+1. s, read as a little-endian integer, is below the group order L;
 2. R decodes to a point of edwards25519 and is not of small order;
-3. the encoding of [S]B − [k]A equals the 32 bytes of R, where B is the base point
-   and k = SHA-512(R || A || message) read as a little-endian integer and reduced
+3. the encoding of [s]G − [k]P equals the 32 bytes of R, where G is the base point
+   and k = SHA-512(R || P || message) read as a little-endian integer and reduced
    modulo L.
 
 This is the equation without the cofactor, compared on encodings. A signature made
@@ -662,7 +680,9 @@ when the two keys are equal.
 - A deadline, or another rule that ends the wait for an operation that the
   represented party does not decide (§7).
 - Whether the reason of a rejection is visible to the document's contracts.
-- Whether a processor records a second statement for the same E.
+- Whether a processor records an entry of T that comes after the entry that
+  decided E.
 - How a participant supplies T, and how a channel added later gets its T.
 - Skipping an entry of T that cannot be admitted (§5); today it blocks T.
-- The retention period of what the signer keeps and the procedure of an inquiry.
+- The retention period of what the signer keeps and the procedure of a review of
+  a disclosed mandate.
